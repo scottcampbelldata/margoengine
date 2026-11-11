@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15142164,
+  "total": 15149175,
   "history": [
     {
       "date": "2026-10-24",
@@ -8627,6 +8627,12 @@
       "commit": "df426c8e4b",
       "reason": "webgl2-compat zeroes every new texture at creation (Firefox lazy-init), polls fences with SYNC_FLUSH_COMMANDS_BIT, keeps a resolved MSAA stencil copy and a compressed sRGB twin: device 111850 to 111898 B, xr 111667 to 111798 B, tiers 111581 to 111582 B measured",
       "grew": 3
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "e2c426c6c1",
+      "reason": "KB0477: ImageBitmap copies on the WebGL2 layer run on the GPU (alpha-state detection, crop, flip, f32 alpha conversion); 112716 B from 111889 B full, 81105 B from 80737 B base; the path is the layer's only correct bitmap copy, and a separate lazy entry would add a dynamic import and a chunk for every textured scene",
+      "grew": 2
     }
   ],
   "items": {
@@ -9931,8 +9937,8 @@
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
-    "@margoengine/webgl2-compat": 111889,
-    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 80737,
+    "@margoengine/webgl2-compat": 116098,
+    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 83539,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,

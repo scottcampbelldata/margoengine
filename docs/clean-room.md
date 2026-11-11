@@ -8817,3 +8817,16 @@ standards were read; no companion code or other repository source was used.
 before, they ran with no owner and a leak there passed (`tests/owner-lifetime.test.js`, "async factory work after an
 await is owned", fails on the old harness). This is the confinement reading above applied to asynchronous construction:
 the owner domain is the whole factory, not its first synchronous slice. No new source was read.
+
+KB0477 (2026-11-11), ImageBitmap copies on the WebGL2 layer: compared W3C, WebGPU (2026 retrieval), sections on
+GPUCopyExternalImageSourceInfo (origin from the top-left of the unflipped source, flipY copies the region bottom row
+first) and GPUCopyExternalImageDestInfo (premultipliedAlpha; the copy converts from the source's alpha state),
+https://www.w3.org/TR/webgpu/ ; Khronos Group, WebGL 1.0 specification section 5.14.8 (2026 retrieval: an ImageBitmap
+is uploaded as held, the unpack flip and alpha flags are ignored, and canvas premultiplication loses precision),
+https://registry.khronos.org/webgl/specs/latest/1.0/ ; WHATWG HTML, ImageBitmap and createImageBitmap premultiplyAlpha
+'default' left to the user agent (2026), https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html ;
+Thomas Porter and Tom Duff, Compositing Digital Images (1984), https://doi.org/10.1145/964965.808606 , and Alvy Ray
+Smith, Image Compositing Fundamentals, Microsoft Technical Memo 4 (1995), http://alvyray.com/Memos/CG/Microsoft/4_comp.pdf ,
+for premultiplied colour and its inverse (divide by a non-zero alpha); IEC 61966-2-1:1999 for the sRGB decode. Design
+from these: upload the region as held and as a premultiplied canvas copy, decide the alpha state on the GPU from any
+texel where they differ, convert in f32 in a draw. No foreign source read.

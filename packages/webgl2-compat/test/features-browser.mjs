@@ -166,6 +166,14 @@ try {
       assert.deepEqual(red.slice(1), [red[1], red[1], red[1]], 'target 1 keeps green, blue and alpha');
       assert.ok(red[0] > red[1] + 32, 'target 1 replaced red');
     }
+    if (name === 'bitmapCopies') {
+      // KB0477: every transform of every bitmap kind is compared with native above; these show the matrix ran and
+      // kept straight RGB at alpha 0 (source texel 0, RGB 11, 200, 7, written at 1, 2 of an 8-wide texture).
+      assert.equal(Object.keys(r).length, 56, 'bitmapCopies: 48 bitmap cases, 6 format cases, 2 canvas cases');
+      const at = (key) => r[key].slice((2 * 8 + 1) * 4, (2 * 8 + 1) * 4 + 4);
+      assert.deepEqual(at('none/1/whole/up/straight'), [11, 200, 7, 0], 'straight RGB survives alpha 0');
+      assert.deepEqual(at('none/1/whole/up/premultiplied'), [0, 0, 0, 0], 'premultiplied alpha 0 is black');
+    }
     if (name === 'compressed' && !r.missing)
       assert.deepEqual(r.pixels.slice(0, 4), [1, 0, 0, 1], 'BC1 colour 0 is red');
     if (name === 'mipViews')

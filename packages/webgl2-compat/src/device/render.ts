@@ -1097,6 +1097,10 @@ export class Replayer {
   }
 
   /** Whether a colour format can be a framebuffer attachment on this context. */
+  attachable(info: FormatInfo): boolean {
+    return this.clearable(info);
+  }
+
   private clearable(info: FormatInfo): boolean {
     return info.renderable && (info.kind !== 'float' || !info.name.includes('float') || this.device.ext.colorBufferFloat);
   }
@@ -1324,6 +1328,104 @@ export class Replayer {
     }
     gl.uniform4i(h.offset, opaque ? 1 : 0, t.height, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  /**
+   * copyExternalImageToTexture from an ImageBitmap (KB0477). WebGL ignores the unpack flip and alpha flags for an
+   * ImageBitmap and uploads it as it is held (WebGL 1.0 section 5.14.8): straight or premultiplied colour, which the
+   * page cannot ask (a bitmap made with premultiplyAlpha 'default' is premultiplied in Chromium). WebGPU's copy reads
+   * the source in its own alpha state and converts it to the requested one (WebGPU section 3.11). So the source region
+   * is uploaded as held (`held`), and a copy drawn through a 2D canvas, which stores premultiplied colour, is uploaded
+   * as stored (`stored`): a premultiplied bitmap is copied unchanged, so the two are equal, and a straight one differs
+   * wherever premultiplying changes a byte. One point per texel marks a 1 x 1 texture where they differ (`straight`),
+   * on the GPU with no readback. A draw over the destination region then writes each texel, flipped and converted:
+   * multiplied by alpha when straight colour must become premultiplied, divided by a non-zero alpha when premultiplied
+   * colour must become straight (both in f32, as the WebGPU copy), and sRGB-decoded for an sRGB destination, whose
+   * attachment encodes it again. Drawing through a canvas alone (the old path) quantised straight RGB at low alpha.
+   */
+  copyBitmap(
+    bitmap: ImageBitmap,
+    [sx, sy, w, h]: readonly number[],
+    flipY: boolean,
+    t: CompatTexture,
+    level: number,
+    [x, y, z]: readonly number[],
+    premultiplied: boolean,
+  ): void {
+    const gl = this.gl,
+      state = this.device.state;
+    const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const context = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+    if (!context) throw this.device.unsupported('a 2D canvas for ImageBitmap copies');
+    context.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
+    const scratch = (internal: number, width: number, height: number, image?: TexImageSource) => {
+      const texture = gl.createTexture() as WebGLTexture;
+      state.scratch(gl.TEXTURE_2D, texture);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, internal, width, height);
+      if (image) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      return texture;
+    };
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, sx);
+    gl.pixelStorei(gl.UNPACK_SKIP_ROWS, sy);
+    const held = scratch(gl.RGBA8, w, h, bitmap);
+    gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+    gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    const stored = scratch(gl.RGBA8, w, h, canvas as TexImageSource);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    const straight = scratch(gl.R8, 1, 1);
+    const fbo = gl.createFramebuffer() as WebGLFramebuffer;
+    state.bindDrawFramebuffer(fbo);
+    gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, straight, 0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+    const mark = this.helper(
+      'bitmap-alpha',
+      'out vec4 c;\nvoid main() { c = vec4(1.0); }',
+      'precision highp float;\nprecision highp int;\nuniform highp sampler2D t;\nuniform highp sampler2D b;\nuniform ivec4 o;\n' +
+        'void main() {\n' +
+        '  ivec2 p = ivec2(gl_VertexID % o.x, gl_VertexID / o.x);\n' +
+        '  gl_PointSize = 1.0;\n' +
+        '  gl_Position = texelFetch(t, p, 0) != texelFetch(b, p, 0) ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(2.0, 2.0, 2.0, 1.0);\n' +
+        '}',
+    );
+    this.helperState(mark, 1, 1);
+    gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
+    state.unit(0, gl.TEXTURE_2D, held, this.device.loadSampler);
+    state.unit(1, gl.TEXTURE_2D, stored, this.device.loadSampler);
+    gl.uniform4i(mark.offset, w, 0, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, w * h);
+    const s = t.primary as TextureStorage,
+      srgb = s.info.internal.includes('SRGB');
+    state.bindDrawFramebuffer(this.single(this.sub(s, level, z)));
+    const draw = this.helper(
+      'bitmap-copy',
+      'uniform highp sampler2D t;\nuniform highp sampler2D b;\nuniform ivec4 o;\nout highp vec4 c;\n' +
+        'void main() {\n' +
+        '  ivec2 p = ivec2(gl_FragCoord.xy) - o.xy;\n' +
+        '  if (o.z > 0) p.y = o.z - 1 - p.y;\n' +
+        '  c = texelFetch(t, p, 0);\n' +
+        '  bool held = texelFetch(b, ivec2(0), 0).r > 0.5, want = (o.w & 1) != 0;\n' +
+        '  if (held && want) c.rgb *= c.a;\n' +
+        '  else if (!held && !want && c.a != 0.0) c.rgb /= c.a;\n' +
+        '  if ((o.w & 2) != 0) c.rgb = mix(c.rgb / 12.92, pow((c.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c.rgb));\n' +
+        '}',
+    );
+    this.helperState(draw, w, h);
+    state.set('viewport', `${x},${y},${w},${h}`, () => gl.viewport(x, y, w, h));
+    state.unit(0, gl.TEXTURE_2D, held, this.device.loadSampler);
+    state.unit(1, gl.TEXTURE_2D, straight, this.device.loadSampler);
+    gl.uniform4i(draw.offset, x, y, flipY ? h : 0, (premultiplied ? 1 : 0) | (srgb ? 2 : 0));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    state.bindDrawFramebuffer(null);
+    gl.deleteFramebuffer(fbo);
+    for (const texture of [held, stored, straight]) {
+      state.forgetTexture(texture);
+      gl.deleteTexture(texture);
+    }
   }
 
   /** Full colour and depth write masks and no scissor, for clears and blits. */
@@ -2168,15 +2270,17 @@ export class Replayer {
 
   /** A full-target triangle program with this fragment shader body (compiled once per device). */
   /** @internal */
-  helper(key: string, fragment: string): Helper {
+  helper(
+    key: string,
+    fragment: string,
+    vertex = 'void main() { gl_Position = vec4(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0, 0.0, 1.0); }',
+  ): Helper {
     let h = this.helpers.get(key);
     if (h) return h;
     const gl = this.gl,
       program = gl.createProgram() as WebGLProgram;
-    const vertex =
-      '#version 300 es\nvoid main() { gl_Position = vec4(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0, 0.0, 1.0); }';
     for (const [type, source] of [
-      [gl.VERTEX_SHADER, vertex],
+      [gl.VERTEX_SHADER, `#version 300 es\n${vertex}`],
       [gl.FRAGMENT_SHADER, `#version 300 es\nprecision highp float;\nprecision highp int;\n${fragment}`],
     ] as const) {
       const shader = gl.createShader(type) as WebGLShader;
@@ -2193,8 +2297,10 @@ export class Replayer {
         'compatibility-layer',
       );
     this.device.state.useProgram(program);
-    const texture = gl.getUniformLocation(program, 't');
+    const texture = gl.getUniformLocation(program, 't'),
+      second = gl.getUniformLocation(program, 'b');
     if (texture) gl.uniform1i(texture, 0);
+    if (second) gl.uniform1i(second, 1);
     h = { program, offset: gl.getUniformLocation(program, 'o'), value: gl.getUniformLocation(program, 'v') };
     this.helpers.set(key, h);
     return h;
@@ -2483,28 +2589,18 @@ export function copyExternalImage(
   const [w, h] = extent(size),
     [x, y, z] = origin(destination.origin),
     [sourceX, sourceY] = origin(source.origin as GPUOrigin3D | undefined);
-  let image = source.source,
+  const image = source.source,
     sx = sourceX,
     sy = sourceY;
-  // A whole, unchanged bitmap can be uploaded directly. Drawing it through a
-  // 2D canvas irreversibly quantizes straight RGB when alpha is small (and loses
-  // RGB entirely at alpha zero). Keep that path only when a transform is needed.
-  // WebGL ignores unpack flip and alpha flags for ImageBitmap, so transformed
-  // copies still need a drawable source before applying those unpack flags.
-  if (
-    typeof ImageBitmap !== 'undefined' &&
-    image instanceof ImageBitmap &&
-    (source.flipY || destination.premultipliedAlpha || sx || sy || w !== image.width || h !== image.height)
-  ) {
-    const canvas =
-      typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const context = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
-    if (!context) throw device.unsupported('a 2D canvas for external bitmap copies');
-    context.drawImage(image, sx, sy, w, h, 0, 0, w, h);
-    image = canvas;
-    sx = sy = 0;
+  if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) {
+    if (!w || !h) return;
+    if (!device.replayer.attachable(info))
+      throw device.unsupported(`copying an ImageBitmap into a ${info.name} texture (it cannot be drawn into here)`);
+    const level = destination.mipLevel ?? 0;
+    beforeUpload(device, t, level, z, 1);
+    device.replayer.copyBitmap(image, [sx, sy, w, h], !!source.flipY, t, level, [x, y, z], !!destination.premultipliedAlpha);
+    afterUpload(t, level, z, 1);
+    return;
   }
   const level = destination.mipLevel ?? 0;
   beforeUpload(device, t, level, z, 1);

@@ -859,7 +859,22 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   has one it measures as before (Chromium native and compat pass). Playwright WebKit on Windows has no WebGPU adapter,
   so the unsupported branch is unconfirmed until a Mac run.
 
-### Batch 238 follow-up: transformed bitmap alpha precision
+### Fixed 2026-11-11: KB0477, ImageBitmap copies on the WebGL2 layer (crop, flip, alpha)
+
+Every `copyExternalImageToTexture` from an ImageBitmap now runs on the GPU (`Replayer.copyBitmap` in
+packages/webgl2-compat/src/device/render.ts): the source region is uploaded as the bitmap holds it, a copy drawn through a
+2D canvas is uploaded as the canvas stores it, one point per texel marks a 1 x 1 texture where the two differ (they differ
+only for a straight-alpha bitmap), and a draw over the destination region flips and converts each texel in f32. Before,
+cropped, flipped and premultiplied copies went through a 2D canvas (straight RGB at low alpha lost, 9 of 24 'none'
+bitmap cases wrong), and a whole copy of a bitmap made with premultiplyAlpha 'default' (premultiplied in Chromium; WebGL
+uploads a bitmap as held) stayed premultiplied where WebGPU makes it straight (7 of 24 cases; ui, lines and environment
+images are made that way). rgba8unorm-srgb, bgra8unorm and rgba16float destinations were also off by one or more levels.
+Regression: the `bitmapCopies` case of packages/webgl2-compat/test/features.html (features-browser.mjs, `test:gpu`):
+56 cases equal native WebGPU byte for byte (20 differed before), and packages/webgl2-compat/test/external-image.test.js
+pins that every bitmap copy takes the GPU path. Cost per bitmap copy: one 2D canvas of the copied region, two uploads
+of it, a point draw and a region draw, no readback; nothing per frame.
+
+Earlier record (batch 238 follow-up):
 
 Whole untransformed straight-alpha bitmap uploads now preserve every channel. A cropped, flipped or explicitly premultiplied ImageBitmap still passes through Canvas2D in webgl2-compat/device/render.ts and can quantize low-alpha RGB. Repro: crop the 61x23 diagnostic WebP from splats/test/gpu/check.mjs before copying it and compare straight RGB at alpha 0 or 1. Cause: Canvas2D stores premultiplied colour; a GPU transform path is needed to retain straight RGB through these operations. This existing transformed-copy gap is outside the progressive-loading job; unchanged-bitmap regression and existing transform semantics both pass.
 

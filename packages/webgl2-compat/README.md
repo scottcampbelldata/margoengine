@@ -160,6 +160,8 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   Work that uses a destroyed buffer, texture or query set is a validation error and makes no GL call (a failed submit
   runs none of its command buffers); `uncapturederror` is a `GPUUncapturedErrorEvent` dispatched in a task of its own,
   and `install()` names the layer's `GPUError` and `GPUUncapturedErrorEvent` with the other interfaces.
+  `copyExternalImageToTexture` from an ImageBitmap crops, flips and converts alpha on the GPU as WebGPU does, whether
+  the bitmap holds straight or premultiplied colour (WebGL itself ignores the flip and alpha flags for a bitmap).
   `device.destroy()` frees the
   context and, as in WebGPU, leaves the last frame on the canvas (one copy into a 2D context of the page). Texture views GL has no view
   for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a

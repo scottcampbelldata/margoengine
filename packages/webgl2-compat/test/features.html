@@ -752,6 +752,56 @@ const D = array<vec3f, 8>(vec3f(1,0,0), vec3f(-1,0,0), vec3f(0,1,0), vec3f(0,-1,
   },
 
   /**
+   * KB0477: ImageBitmap copies under every transform WebGPU names (GPUCopyExternalImageSourceInfo origin and flipY,
+   * GPUCopyExternalImageDestInfo premultipliedAlpha): whole and cropped, flipped or not, straight or premultiplied,
+   * from bitmaps made with premultiplyAlpha 'none' and 'default', into a layer of 1-, 2- and 6-layer textures (the
+   * last a cube on the layer), at an offset. The 7 x 5 source holds alpha 0, 1, 128 and 255 under varied RGB, so a
+   * copy that passes straight colour through a premultiplied 2D canvas loses the low-alpha RGB. Then the same cropped,
+   * flipped and premultiplied copy into rgba8unorm-srgb, bgra8unorm and rgba16float textures. Bytes as read back.
+   */
+  async bitmapCopies(device) {
+    const W = 7,
+      H = 5,
+      data = new Uint8ClampedArray(W * H * 4),
+      alphas = [0, 1, 128, 255];
+    for (let i = 0; i < W * H; i++) data.set([(i * 37 + 11) % 256, (i * 91 + 200) % 256, (i * 53 + 7) % 256, alphas[i % 4]], i * 4);
+    const usage = U.TEXTURE_BINDING | U.COPY_DST | U.COPY_SRC | U.RENDER_ATTACHMENT;
+    const copy = async (bitmap, { format = 'rgba8unorm', bytes = 4, layers = 1, crop, flipY, premultipliedAlpha }) => {
+      const texture = device.createTexture({ size: [8, 8, layers], format, usage }),
+        layer = layers - 1;
+      device.queue.copyExternalImageToTexture(
+        { source: bitmap, origin: crop ? [2, 1] : [0, 0], flipY },
+        { texture, origin: crop ? [3, 4, layer] : [1, 2, layer], premultipliedAlpha },
+        crop ? [4, 3] : [W, H],
+      );
+      const out = [...(await read(device, texture, { bytes, layer }))];
+      texture.destroy();
+      return out;
+    };
+    const out = {};
+    for (const premultiplyAlpha of ['none', 'default']) {
+      const bitmap = await createImageBitmap(new ImageData(data, W, H), { premultiplyAlpha });
+      for (const layers of [1, 2, 6])
+        for (const crop of [false, true])
+          for (const flipY of [false, true])
+            for (const premultipliedAlpha of [false, true])
+              out[`${premultiplyAlpha}/${layers}/${crop ? 'crop' : 'whole'}/${flipY ? 'flip' : 'up'}/${premultipliedAlpha ? 'premultiplied' : 'straight'}`] =
+                await copy(bitmap, { layers, crop, flipY, premultipliedAlpha });
+      if (premultiplyAlpha === 'none')
+        for (const [format, bytes] of [['rgba8unorm-srgb', 4], ['bgra8unorm', 4], ['rgba16float', 8]])
+          for (const premultipliedAlpha of [false, true])
+            out[`${format}/${premultipliedAlpha ? 'premultiplied' : 'straight'}`] = await copy(bitmap, { format, bytes, crop: true, flipY: true, premultipliedAlpha });
+      bitmap.close();
+    }
+    // An opaque canvas source takes the layer's unpack-flag path: the same crop and flip (WebGPU's origin counts from
+    // the top-left of the unflipped source).
+    const canvas = new OffscreenCanvas(W, H);
+    canvas.getContext('2d').putImageData(new ImageData(data.map((v, i) => (i % 4 === 3 ? 255 : v)), W, H), 0, 0);
+    for (const crop of [false, true]) out[`canvas/${crop ? 'crop' : 'whole'}/flip`] = await copy(canvas, { crop, flipY: true });
+    return out;
+  },
+
+  /**
    * Storage buffers read in render shaders (milestone M4): the vertex stage reads positions from a runtime-sized array,
    * the fragment stage a struct with a runtime array of structs and its arrayLength, through a dynamic offset; then
    * writeBuffer changes a value between submits, and copyBufferToBuffer fills a storage buffer on the GPU.

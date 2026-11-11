@@ -1068,9 +1068,11 @@ class Replayer {
     run(ops: readonly Op[]): void;
     putBlocks(s: TextureStorage, write: BlockWrite): void;
     zero(texture: WebGLTexture, target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): void;
+    attachable(info: FormatInfo): boolean;
     sub(s: TextureStorage, level: number, layer: number): Sub;
     single(s: Sub): WebGLFramebuffer;
     presentTexture(t: CompatTexture, opaque: boolean): void;
+    copyBitmap(bitmap: ImageBitmap, [sx, sy, w, h]: readonly number[], flipY: boolean, t: CompatTexture, level: number, [x, y, z]: readonly number[], premultiplied: boolean): void;
     readonly sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void;
     rebind(): void;
     beginPass(desc: PassDescriptor): void;
@@ -1091,7 +1093,7 @@ class Replayer {
     indirect(buffer: CompatBuffer, offset: number, size: number): ArrayBuffer;
     draw(count: number, instances: number, first: number, firstInstance: number): void;
     drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number, firstInstance: number): void;
-    helper(key: string, fragment: string): Helper;
+    helper(key: string, fragment: string, vertex?: string): Helper;
     helperState(h: Helper, w: number, ht: number): void;
     copyBuffer(src: CompatBuffer, srcOffset: number, dst: CompatBuffer, dstOffset: number, size: number): void;
     copyBufferToTexture(source: GPUTexelCopyBufferInfo & {
