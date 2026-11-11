@@ -480,7 +480,9 @@ export class Terrain implements EnginePlugin {
         spacing = cell * 2 ** i,
         x = Math.floor(c.camera.position[0] / spacing) * spacing,
         z = Math.floor(c.camera.position[2] / spacing) * spacing;
-      if (values[28] !== x || values[29] !== z) changed = true;
+      // The uniform holds float32: compare the rounded lattice, or a spacing not exact in float32 (0.1) reads as a
+      // move every frame and redraws the shadow maps every frame.
+      if (values[28] !== Math.fround(x) || values[29] !== Math.fround(z)) changed = true;
       values.set(c.camera.matrix);
       values.set(c.camera.position, 16);
       unitLight(values, 20, this.engine!.lighting.direction);
