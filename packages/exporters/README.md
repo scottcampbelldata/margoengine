@@ -965,7 +965,7 @@ const usdz = exportUSDZ({
 });
 ```
 
-Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND and MASK materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Quick Look does not follow those readers and draws such a mesh grey ([known bug](../../docs/known-bugs.md#usdz-vertex-colours-draw-grey-in-quick-look)). Animation, skins and morphs are not exported.
+Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND and MASK materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Quick Look does not follow those readers, but it draws the `displayColor` of a mesh with no material, so a material that says nothing but the paint (no texture, metalness 0, roughness 1, no emission, opaque: the data-scene defaults) is left out and the mesh is written unbound. A material that says more keeps its binding and shows grey in Quick Look; bake the colors into a base color texture for Apple's renderer. `@margoengine/usdz` reads an unbound mesh's colours back, with USD's fallback surface (roughness 0.5). Animation, skins and morphs are not exported.
 
 Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glTF writers take, from a data scene or from `materialData` for engine meshes. Each becomes a `UsdUVTexture` reading the mesh's `primvars:st` (its `uvs`, V flipped to USD's bottom-left origin) or `primvars:st1` (`uvs1`, for `texCoord: 1`) through a `UsdPrimvarReader_float2`, with its `wrapS`/`wrapT`:
 

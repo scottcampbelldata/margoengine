@@ -409,10 +409,16 @@ const meshoptExtension = 'EXT_meshopt_compression',
   basisuExtension = 'KHR_texture_basisu';
 /** Basis Universal replaces the ordinary PNG/JPEG source, including optional fallbacks. */
 export function textureSource(def: GLTFTexture, dds = false): number {
-  const extension = def.extensions?.[basisuExtension] ?? (dds ? def.extensions?.MSFT_texture_dds : undefined);
+  // The diagnostic names the extension that is malformed: a texture may carry KHR_texture_basisu or MSFT_texture_dds.
+  const extensions = def.extensions,
+    name =
+      extensions?.[basisuExtension] !== undefined || !dds || extensions?.MSFT_texture_dds === undefined
+        ? basisuExtension
+        : 'MSFT_texture_dds',
+    extension = extensions?.[name];
   if (extension !== undefined && (!extension || typeof extension !== 'object' || Array.isArray(extension)))
     throw new TypeError(
-      'Invalid glTF KHR_texture_basisu; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+      `Invalid glTF ${name}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
     );
   return integer(extension === undefined ? def.source : extension.source, 'image source');
 }

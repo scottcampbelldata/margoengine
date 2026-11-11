@@ -147,6 +147,15 @@ globalThis.GPUTextureUsage ??= {
   STORAGE_BINDING: 8,
   RENDER_ATTACHMENT: 16,
 };
+/** Moves the camera back until the model's whole box is in view, as the draw loop culls primitives out of view. */
+function frameAll(engine, model) {
+  const b = model.bounds,
+    centre = [0, 1, 2].map((k) => (b[k] + b[k + 3]) / 2),
+    radius = Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]);
+  engine.camera.target = centre;
+  engine.camera.position = [centre[0], centre[1], centre[2] + 3 * radius];
+  engine.camera.update(128 / 96, true);
+}
 async function gpuEngine() {
   const h = optionalGPU(),
     device = h.engine.gpu,
@@ -277,6 +286,7 @@ test('progressive geometry replaces and releases wireframe edge buffers created 
       load = loadGLTFProgressive(engine, base + '/grids.glb', { frameBudget: 0 }),
       model = await load.ready;
     t.after(() => engine.dispose());
+    frameAll(engine, model);
     for (const primitive of model.primitives) primitive.material.wireframe = true;
     draw(model);
     const placeholders = model['resources'].map((resource) => resource.wireframe.index);
@@ -336,6 +346,7 @@ test('progressive wireframe replacement releases both edge and replacement resou
       load = loadGLTFProgressive(engine, base + '/grids.glb', { frameBudget: 0 }),
       model = await load.ready;
     t.after(() => engine.dispose());
+    frameAll(engine, model);
     for (const primitive of model.primitives) primitive.material.wireframe = true;
     draw(model);
     const placeholders = model['resources'].map((resource) => resource.wireframe.index),

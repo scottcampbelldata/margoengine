@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
+import { nameFilter, selectChecks } from './name-filter.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 import { cubeDocument } from '../tests/support/cube-png.js';
 import { externalAssetRoot, requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
@@ -1201,10 +1202,9 @@ const checks = {
 
 try {
   assert.equal(hardware.webgpu?.fallback, false, 'Physical WebGPU adapter required');
-  const only = process.argv[2];
-  for (const [name, check] of Object.entries(checks)) {
-    if (only && !name.includes(only)) continue;
-    await check();
+  // --compat (or MARGO_COMPAT=1) runs on the WebGL2 layer (openBrowser); the first other argument filters by name.
+  for (const name of selectChecks(checks, nameFilter())) {
+    await checks[name]();
     console.log('ok -', name);
   }
   assert.deepEqual(errors, []);

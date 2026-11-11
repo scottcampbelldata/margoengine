@@ -374,8 +374,7 @@ device's storage binding, the WebGL2 layer's included) loads as several parts of
 primitive. Triangles go in Morton order of their centres, so each part is a compact piece of the surface with tight
 bounds, and are cut greedily: shared vertices stay shared inside a part, and only those on a cut are copied (0.37% on
 a 1,001,000-vertex grid). Blended primitives keep the file's triangle order. Each part is an ordinary `PBRPrimitive`
-with the same node, material and `definition`, and `part` says which it is; drawing, culling with `CulledModels`
-(`@margoengine/culling/models`; the engine's own culling takes a node whole), picking,
+with the same node, material and `definition`, and `part` says which it is; drawing, frustum culling, picking,
 `@margoengine/exporters` (one primitive per part, same material) and `@margoengine/lod` levels (simplified as one
 surface, then split again) work part by part. Skinned and morphed primitives must fit one part.
 `loadGLTFProgressive` takes `maxPartVertices` too and streams a split primitive part by part: the worker packs one part
@@ -386,6 +385,12 @@ options as 20 parts and draws the same pixels as the same field pre-split into 2
 the WebGL2 layer; close up, `CulledModels` draws 9 parts and 4,683,190 triangles (`npm run test:gpu:parts`).
 `maxPartVertices` takes 1,024 to 1,048,576: 65,536 draws 12 parts and 1,550,309 triangles in that view, 1,048,576
 draws 4 parts and 8,363,067.
+
+Every frame each primitive drawn by the standard vertex stage is tested against the camera frustum on the CPU by its
+bounding sphere (one test per primitive, the sphere measured once per vertex array), so a part out of view costs no
+draw with no culling package attached. Instanced, skinned, morphed or deformed primitives, and materials with their own
+shader or a displacement map, are not tested, as their vertices may move past the stored ones; `CulledModels` culls
+those on the GPU, with its `padding` for displaced ones. Shadow casters, picking and export still see every part.
 
 ```ts
 import {parseGLTFAsync} from 'margoengine/gltf-pro';

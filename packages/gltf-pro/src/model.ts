@@ -2110,6 +2110,65 @@ function transform(node: Mesh, def: GLTFNode): void {
 function nodeVisible(engine: Engine, node: Mesh): boolean {
   return !hiddenInTree(engine.store, node.id);
 }
+/** Bounding spheres (centre, radius in mesh space) of primitives' bind-pose vertices, by vertex array. */
+const cullSpheres = new WeakMap<Float32Array, Float32Array>();
+/**
+ * Whether a primitive lies wholly outside the camera's frustum, by its bounding sphere: the centre of its vertices'
+ * box and the farthest vertex from there, moved by the node and grown by its largest axis scale. Only primitives the
+ * standard vertex stage draws as stored are tested: not instanced, deformed, skinned or morphed ones, nor materials
+ * with their own shader or a displacement map, whose vertices may move past the stored ones. This is what lets each
+ * part of a split primitive cull on its own, since all parts share one node (Assarsson and Moller 2000, "Optimized
+ * view frustum culling algorithms for bounding boxes", Journal of Graphics Tools 5(1)).
+ */
+function outsideView(planes: Float32Array | undefined, p: PBRPrimitive): boolean {
+  if (!planes || planes.length < 24 || p.instances || p.deformed || p.topology) return false;
+  const m = p.material;
+  if (m.shading || m.displacement || p.definition.targets?.length || p.definition.attributes?.JOINTS_0 !== undefined)
+    return false;
+  let sphere = cullSpheres.get(p.vertices);
+  if (!sphere) {
+    const v = p.vertices,
+      low = [Infinity, Infinity, Infinity],
+      high = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < v.length; i += 20)
+      for (let k = 0; k < 3; k++) {
+        if (v[i + k] < low[k]) low[k] = v[i + k];
+        if (v[i + k] > high[k]) high[k] = v[i + k];
+      }
+    sphere = new Float32Array(4);
+    if (!(low[0] <= high[0])) sphere[3] = -1;
+    else {
+      for (let k = 0; k < 3; k++) sphere[k] = (low[k] + high[k]) / 2;
+      let far = 0;
+      for (let i = 0; i < v.length; i += 20) {
+        const dx = v[i] - sphere[0],
+          dy = v[i + 1] - sphere[1],
+          dz = v[i + 2] - sphere[2];
+        far = Math.max(far, dx * dx + dy * dy + dz * dz);
+      }
+      // A float32 step of slack, so a vertex exactly on the sphere is never outside it.
+      sphere[3] = Math.sqrt(far) * (1 + 1e-6) + 1e-6;
+    }
+    cullSpheres.set(p.vertices, sphere);
+  }
+  if (sphere[3] < 0) return false;
+  const a = p.node.matrix,
+    x = a[0] * sphere[0] + a[4] * sphere[1] + a[8] * sphere[2] + a[12],
+    y = a[1] * sphere[0] + a[5] * sphere[1] + a[9] * sphere[2] + a[13],
+    z = a[2] * sphere[0] + a[6] * sphere[1] + a[10] * sphere[2] + a[14],
+    scale = Math.sqrt(
+      Math.max(
+        a[0] * a[0] + a[1] * a[1] + a[2] * a[2],
+        a[4] * a[4] + a[5] * a[5] + a[6] * a[6],
+        a[8] * a[8] + a[9] * a[9] + a[10] * a[10],
+      ),
+    ),
+    r = sphere[3] * scale;
+  if (!Number.isFinite(x + y + z + r)) return false;
+  for (let k = 0; k < 24; k += 4)
+    if (planes[k] * x + planes[k + 1] * y + planes[k + 2] * z + planes[k + 3] < -r) return true;
+  return false;
+}
 /**
  * A glTF model attached to an engine as a plugin: its nodes, materials, variants, animation targets and picking data. Dispose it to release the GPU resources.
  */
@@ -2798,7 +2857,9 @@ export class PBRModel implements EnginePlugin {
       const { uvs } = geometry[i];
       for (const data of [list[i].vertices, list[i].indices, ...(uvs ? [list[i].uvs!] : [])])
         if (!written.has(data)) this.gpuCache.delete(data);
+      cullSpheres.delete(list[i].vertices);
       list[i].vertices = geometry[i].vertices;
+      cullSpheres.delete(list[i].vertices);
       list[i].indices = geometry[i].indices;
       if (uvs) list[i].uvs = uvs;
     }
@@ -3845,6 +3906,7 @@ export class PBRModel implements EnginePlugin {
         if (phase !== 'all' && (blended(m) || deferred) !== (phase === 'blend')) continue;
         node.check();
         if (!nodeVisible(this.engine, node) || (inst && !inst.count)) continue;
+        if (!r.batch && !r.mergedInto && outsideView(camera.planes, p)) continue;
         const wireframe = wireframeIndices(r),
           topology = p.topology ?? (wireframe ? 'line-list' : undefined),
           index = wireframe?.index ?? r.index,

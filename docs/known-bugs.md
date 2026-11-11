@@ -42,13 +42,18 @@
   Firefox on a quiet machine, and see whether the case finishes given the time.
 
 
-### gltf-pro parts cull one by one only under CulledModels (found 2026-11-11, open)
+### Fixed 2026-11-11: gltf-pro parts culled one by one only under CulledModels (bug sweep L2, KB0027)
 
 - **Repro:** `npm run test:gpu:parts` in packages/gltf-pro: without `CulledModels`, a 20-part 10M-triangle field draws
   all 20 parts in a close view where 9 are in the frustum (`draws` in test-results/gltf-pro-parts.json).
 - **Cause:** the frame's own culling tests a gltf-pro node's bounds, not each primitive's; parts of one primitive share
   a node.
 - **Fix to build:** test each primitive's sphere on the CPU in the PBR draw loop (work count: spheres tested per frame).
+- **Fix:** the PBR draw loop tests each primitive's bounding sphere against the camera planes (`outsideView` in
+  packages/gltf-pro/src/model.ts): one sphere test per primitive per draw call, measured once per vertex array, and a
+  part out of view issues no draw. Primitives whose vertices may move (instanced, skinned, morphed, deformed, own
+  shader, displacement map) are not tested. Regression: packages/gltf-pro/tests/parts.test.js ("each part culls on its
+  own"): a strip in 3 parts with a frustum over the first draws 1, not 3.
 
 ### compressDraco cannot encode a 10M-triangle mesh with normals and UVs (found 2026-11-11, open)
 
@@ -2073,6 +2078,8 @@ does not own. Each entry says exactly what is needed to close it.
 
 ### USDZ vertex colours draw grey in Quick Look
 
+- **Status:** worked around 2026-11-11 for paint-only materials (bug sweep L2, KB2028); the Apple defect is open.
+
 - **What:** a painted mesh from `exportUSDZ` is flat grey in Quick Look (macOS 27.2 thumbnail, 2026-11-05). `usdchecker
   --arkit` passes, and `@margoengine/usdz`, `readUSDA` and any reader that follows `UsdPrimvarReader` get the colours.
 - **Repro:** `exportUSDZ({ nodes: [{ geometry: { positions, normals, indices, colors, colorSize: 3 }, material: { color:
@@ -2083,6 +2090,10 @@ does not own. Each entry says exactly what is needed to close it.
 - **Plan:** leave the material out when it says nothing but the paint (no textures, metalness 0, roughness 1, no
   emission, opaque), and teach `@margoengine/usdz` to read `displayColor` on an unbound mesh. A material that says more
   cannot show paint on Apple's renderer; it needs the colours baked into a texture.
+- **Workaround (landed):** `exportUSDZ` writes a paint-only mesh unbound (no Material, no `MaterialBindingAPI`), and
+  `@margoengine/usdz` already read an unbound mesh's `displayColor`. Regression: packages/exporters/tests/usdz.test.js
+  ("a paint-only material is left out"). Still open upstream: Quick Look ignores `UsdPrimvarReader_float3` on
+  `inputs:diffuseColor`; still owed: a Quick Look thumbnail of the unbound file on a Mac (none on this PC).
 
 ### WebXR AR hit testing: never run on an AR device
 
@@ -5380,7 +5391,7 @@ Fixed 2026-11-10: loaders/geo pre-abort precedence (batch 202). Shapefile and MV
 - Batch 213 MToon integration: two independently loaded blended models with crossing renderQueueOffsetNumber values retain scene model order; the material adapter orders primitives only inside one model. Global model queue scheduling is a fix-phase follow-up.
 - Batch 213 MToon integration: an alpha-cutout shadow caster with a spatially varying UV animation mask uses the static alpha UV while beauty moves; optional shadow sampling does not receive the material's mask/time bindings. Beauty, normals, emission and hull animation are built; shadow integration is a fix-phase follow-up.
 
-- Existing gltf-pro GPU driver: test-extensions-browser.js reads argv[2] as a name filter, so --compat selects zero checks. Use MARGO_COMPAT=1 with no filter for the full compatibility run; driver repair waits for the fix phase.
+- Fixed 2026-11-11 (bug sweep L2, KB5289c): test-extensions-browser.js read argv[2] as a name filter, so --compat selected zero checks and passed. It now takes the first argument that is not a flag as the filter and refuses a filter that matches no check (scripts/name-filter.mjs). Regression: packages/gltf-pro/tests/name-filter.test.js.
 Fixed 2026-11-10: Existing physical-material compatibility limit physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 Batch 246 job 3: no open plane-rendering defect found by the matrix, depth and real-GPU ray-plane checks. Existing cross-lane browser-inventory findings remain listed above.
@@ -5754,7 +5765,7 @@ Repro: `MARGO_COMPAT=1` then `node packages/quality/test/features-browser.mjs` u
 - Fixed, lane S prefiltered IBL metadata overflow (2026-11-10): encodePrefilteredIBL checks the complete KTX2 key/value byte count, including the length word, key and padding, before accessing source mips or allocating output. The validated full source chain is sized from its dimensions; edges 8192/16384 cannot fit the u32 field and throw RangeError. The dimension-only regression in packages/environment/tests/prefiltered.test.js fails on the parent without allocating large fixtures, also checking that a 4096-edge source reaches ordinary mip validation. Existing bit-exact round trips and malformed-file checks remain intact.
 
 Fixed 2026-11-10: batch 201 AudioListener direct disposal registration. A registered listener now delegates to its owning Scene.removePlugin, which releases its name and frame passes before calling the existing resource teardown. Same-name replacement works immediately, stale handles retain replacement ownership, and another scene's same-name listener remains attached. Regression: packages/audio/tests/audio.test.js has two cases that fail on the parent; listener-disposal-browser.mjs checks the real engine on native WebGPU and WebGL2. Engine-driven cleanup and lazy audio-context creation are preserved; core is unchanged.
-Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject correctly but textureSource's shared validation message names KHR_texture_basisu; reproduce with a non-object DDS extension value. Valid DDS loading is unaffected. Correct the diagnostic in the fix phase.
+Fixed 2026-11-11 (bug sweep L2, KB5663b; regression packages/gltf-pro/tests/dds.test.js): textureSource names the malformed extension. Original entry: Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject correctly but textureSource's shared validation message names KHR_texture_basisu; reproduce with a non-object DDS extension value. Valid DDS loading is unaffected. Correct the diagnostic in the fix phase.
 
 
 Batch 136 replacement proof: the geometric-normal unsigned-residue scoring defect is fixed with circular-distance and complete-payload selection; the sparse high-precision RAW cutoff is expanded within a fixed memory bound. Rust regressions and the 76-row two-decoder corpus pass with no open defect found in this scope.
@@ -6340,7 +6351,7 @@ Scott's coordinator ruling (2026-11-10) accepts the identical-stream and backend
 
 ### Batch 159 matrix preflight gaps (2026-11-10)
 
-Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md. MeshoptCubeTest fails because gltf-pro recognizes KHR meshopt views but only EXT fallback-buffer markers; the packer omits that KHR fallback payload. The compute and grading adapters reject APIs now available in shader; coefficient-supplied SH and point-position/configurable-element lens-flare inputs still need owning-package work. Black-box reference depth-material WebGPU, USDZ (both) and FourCC-zero DDS (both) fail their current adapter/fixture contracts. Exact errors and outputs: docs/whitepaper/results/bp-159-preflight.json. These remain open; no test assertion or workload was removed.
+Update 2026-11-11 (bug sweep L2, KB6250a): the MeshoptCubeTest row was fixed by 1d9d2297bb (gltf-pro honours KHR_meshopt_compression fallback buffers; regression packages/gltf-pro/tests/meshopt-fallback.test.js), and the packer in bench/scenes/parity/margo-loaders.js keeps KHR fallback buffers; the harness's pack of the sample parses with the meshopt decoder on current main. The three other black-box rows (depth-material, USDZ, FourCC-zero DDS) fail on the three.js side of the harness (bp-159-preflight.json: NodeBuilder refuses MeshDepthMaterial, the USDZ loader throws on isVector3, DDSLoader reports an unsupported FourCC 0), not in Margo. Original entry: Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md. MeshoptCubeTest fails because gltf-pro recognizes KHR meshopt views but only EXT fallback-buffer markers; the packer omits that KHR fallback payload. The compute and grading adapters reject APIs now available in shader; coefficient-supplied SH and point-position/configurable-element lens-flare inputs still need owning-package work. Black-box reference depth-material WebGPU, USDZ (both) and FourCC-zero DDS (both) fail their current adapter/fixture contracts. Exact errors and outputs: docs/whitepaper/results/bp-159-preflight.json. These remain open; no test assertion or workload was removed.
 
 ### hygiene gate 6: TypeScript async API threw "getNodeId requires a RemoteNode" once (2026-11-10)
 

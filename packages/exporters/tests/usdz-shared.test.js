@@ -203,7 +203,8 @@ test('vertex colors stay on each node of a shared geometry', async () => {
     }),
     text = await usda(archive);
   assert.equal(count(text, /primvars:displayColor = \[.*interpolation = "vertex"/g), 2);
-  assert.equal(count(text, /inputs:diffuseColor.connect/g), 2);
+  // Paint-only materials are left out (Quick Look draws an unbound mesh's displayColor, not a primvar reader's).
+  assert.equal(count(text, /material:binding/g), 0);
   assert.equal((await readUSD(archive)).meshes.length, 2);
 });
 

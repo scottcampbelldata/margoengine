@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15077526,
+  "total": 15086003,
   "history": [
     {
       "date": "2026-10-24",
@@ -8489,6 +8489,12 @@
       "commit": "51d4422c1d",
       "reason": "KB0106: SSR and SSGI release their partial-view clear colour buffers (MaterialClear.dispose and releaseClears); ssr 13,257 to 13,319 B, ssgi 13,052 to 13,090 B gzip",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "6bae2b47e5",
+      "reason": "gltf-pro: per-primitive CPU frustum test in the PBR draw loop (KB0027, parts cull without CulledModels) and the MSFT_texture_dds diagnostic (KB5663b): about 400 B min; a lazy split would cost a dynamic import on the draw path",
+      "grew": 3
     }
   ],
   "items": {
@@ -8883,7 +8889,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 7560,
-    "@margoengine/gltf-pro": 86524,
+    "@margoengine/gltf-pro": 89527,
     "@margoengine/gltf-pro dist/workers/gltf.js": 38562,
     "@margoengine/gltf-pro dist/workers/progressive.js": 18330,
     "@margoengine/gltf-pro/asset": 6017,
@@ -8899,11 +8905,11 @@
     "@margoengine/gltf-pro/model": 68727,
     "@margoengine/gltf-pro/physics": 10136,
     "@margoengine/gltf-pro/prepare": 34132,
-    "@margoengine/gltf-pro/progressive": 95582,
+    "@margoengine/gltf-pro/progressive": 98789,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/spec-gloss": 10477,
     "@margoengine/gltf-pro/splats": 2100,
-    "@margoengine/gltf-pro/worker": 87006,
+    "@margoengine/gltf-pro/worker": 90034,
     "@margoengine/gltf/auto": 17848,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
@@ -9215,8 +9221,8 @@
     "@margoengine/post/selective-bloom": 9706,
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10083,
-    "@margoengine/post/ssgi": 13483,
-    "@margoengine/post/ssr": 13719,
+    "@margoengine/post/ssgi": 13401,
+    "@margoengine/post/ssr": 13650,
     "@margoengine/post/sss": 7461,
     "@margoengine/post/stack": 4479,
     "@margoengine/post/stylize": 7202,
@@ -9402,7 +9408,7 @@
     "@margoengine/sciviz/molecule": 5419,
     "@margoengine/sciviz/monitor": 2714,
     "@margoengine/sciviz/mrc": 3427,
-    "@margoengine/sciviz/multivolume": 24912,
+    "@margoengine/sciviz/multivolume": 24838,
     "@margoengine/sciviz/netcdf": 3674,
     "@margoengine/sciviz/notebook": 2064,
     "@margoengine/sciviz/nrrd": 1216,
@@ -9689,7 +9695,7 @@
     "@margoengine/video/dome": 2026,
     "@margoengine/video/material": 1407,
     "@margoengine/video/playback": 1725,
-    "@margoengine/video/record": 1996,
+    "@margoengine/video/record": 1460,
     "@margoengine/viewcube": 5321,
     "@margoengine/viewcube/axes": 6029,
     "@margoengine/viewcube/compass": 7914,

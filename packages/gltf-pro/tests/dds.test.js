@@ -145,3 +145,24 @@ test('DDS rejects malformed bytes, cube material images and cancellation', () =>
   );
   assert.throws(() => decodeDDSImage(bytes(), { signal: AbortSignal.abort() }), { name: 'AbortError' });
 });
+
+test('a malformed MSFT_texture_dds names itself, not KHR_texture_basisu', () =>
+  headlessModels(async () => {
+    const engine = await headless();
+    try {
+      for (const value of [null, 3, 'image.dds', [0]]) {
+        const doc = document();
+        doc.textures[0].extensions.MSFT_texture_dds = value;
+        await assert.rejects(
+          parseGLTFAsync(engine, doc),
+          (error) => error instanceof TypeError && /Invalid glTF MSFT_texture_dds;/.test(error.message),
+          String(value),
+        );
+      }
+      const doc = document();
+      doc.textures[0].extensions.KHR_texture_basisu = 1;
+      await assert.rejects(parseGLTFAsync(engine, doc), /Invalid glTF KHR_texture_basisu;/);
+    } finally {
+      engine.dispose();
+    }
+  }));

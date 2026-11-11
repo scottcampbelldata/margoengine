@@ -224,6 +224,7 @@ export function reflected({ positions, normals, indices }: Geo): Shape {
 
 /** A material as a mesh uses it: its prim, written once, and the mesh's own colour lines. */
 export interface BoundMaterial {
+  /** The Material prim's path; empty for a mesh written unbound (paint only, see `bind`). */
   path: string;
   /** The Material prim, or nothing when another mesh brought it. */
   lines: string[];
@@ -277,6 +278,27 @@ export class USDMaterials {
         for (let c = 0; c < 3; c++) displayColor[v * 3 + c] = colors[v * geometry.colorSize + c] * material.color[c];
         if (displayOpacity) displayOpacity[v] = colors[v * 4 + 3] * opacity;
       }
+    const appearance = (): string[] => [
+      `    uniform bool doubleSided = ${material.doubleSided}`,
+      `    color3f[] primvars:displayColor = ${tuples(displayColor, 3)}${colors ? ' (interpolation = "vertex")' : ''}`,
+      ...(displayOpacity
+        ? [
+            `    float[] primvars:displayOpacity = [${Array.from(displayOpacity, num).join(', ')}] (interpolation = "vertex")`,
+          ]
+        : []),
+    ];
+    // Apple's renderer does not follow a UsdPrimvarReader into a surface input, so a painted mesh under a material draws
+    // grey in Quick Look, but an unbound mesh draws its displayColor. A material that says nothing but the paint (no
+    // texture, metalness 0, roughness 1, no emission, opaque) is left out, and the mesh is written unbound.
+    if (
+      colors &&
+      opaque &&
+      material.metalness === 0 &&
+      material.roughness === 1 &&
+      material.emissive.every((v) => v * material.emissiveStrength === 0) &&
+      TEXTURES.every((slot) => !material[slot])
+    )
+      return { path: '', lines: [], appearance: appearance() };
     // One material per object and colour stream; its prim takes the first user's number.
     if (!this.keys.has(material)) this.keys.set(material, this.keys.size);
     const key = `${this.keys.get(material)}:${colors ? 1 : 0}:${displayOpacity ? 1 : 0}`,
@@ -406,16 +428,7 @@ export class USDMaterials {
     // Built before the mesh, which writes the UV sets the material reads; written after it.
     const materialLines = known ? [] : surface();
     if (!known) this.written.set(key, { path, sets });
-    const appearance = [
-      `    uniform bool doubleSided = ${material.doubleSided}`,
-      `    color3f[] primvars:displayColor = ${tuples(displayColor, 3)}${colors ? ' (interpolation = "vertex")' : ''}`,
-      ...(displayOpacity
-        ? [
-            `    float[] primvars:displayOpacity = [${Array.from(displayOpacity, num).join(', ')}] (interpolation = "vertex")`,
-          ]
-        : []),
-    ];
-    return { path, lines: materialLines, appearance };
+    return { path, lines: materialLines, appearance: appearance() };
   }
 }
 
@@ -442,6 +455,9 @@ export function meshPrim(
   { path, lines: materialLines, appearance }: BoundMaterial,
   { transform, schemas = '"MaterialBindingAPI"', extra = [] }: MeshPlacement,
 ): void {
+  // An unbound mesh has no material binding and so no MaterialBindingAPI.
+  if (!path) schemas = schemas.replace(/"MaterialBindingAPI"(, )?/, '');
+  const binding = path ? [`    rel material:binding = <${path}>`] : [];
   const vertexST = (set: 0 | 1, wanted: boolean): string[] => {
     const uvs = set ? geometry.uvs1 : geometry.uvs;
     return wanted && uvs
@@ -458,7 +474,7 @@ export function meshPrim(
   ];
   if (shape.users === 1) {
     lines.push(
-      `def Mesh "Mesh_${i}" (apiSchemas = [${schemas}]) {`,
+      schemas ? `def Mesh "Mesh_${i}" (apiSchemas = [${schemas}]) {` : `def Mesh "Mesh_${i}" {`,
       `    string displayName = ${JSON.stringify(name ?? `Mesh ${i}`)}`,
       ...transform,
       ...topology,
@@ -466,7 +482,7 @@ export function meshPrim(
       ...vertexST(0, shape.sets[0]),
       ...vertexST(1, shape.sets[1]),
       ...extra,
-      `    rel material:binding = <${path}>`,
+      ...binding,
       '}',
     );
     shared.push(...materialLines);
@@ -485,14 +501,14 @@ export function meshPrim(
   }
   lines.push(
     `def Mesh "Mesh_${i}" (`,
-    `    apiSchemas = [${schemas}]`,
+    ...(schemas ? [`    apiSchemas = [${schemas}]`] : []),
     `    references = <${shape.path}>`,
     ') {',
     `    string displayName = ${JSON.stringify(name ?? `Mesh ${i}`)}`,
     ...transform,
     ...appearance,
     ...extra,
-    `    rel material:binding = <${path}>`,
+    ...binding,
     '}',
   );
   shared.push(...materialLines);

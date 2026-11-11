@@ -302,3 +302,41 @@ test('refusals: over 2^24 vertices, skinned over the part size, an invalid maxPa
     engine.dispose();
   }
 });
+
+test('each part culls on its own against the camera frustum, without CulledModels', async () => {
+  // A 1,000 x 3 strip along x in parts of at most 1,024 vertices; the frustum keeps x from 0 to 100 only. Before
+  // per-primitive culling every part drew, since the parts share one node and nothing tested them one by one.
+  const h = optionalGPU(),
+    engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(64), {
+      backend: 'webgpu',
+      gpu: h.engine.gpu,
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    });
+  const { doc, buffer } = grid(1000, 3),
+    model = await parseGLTFAsync(engine, doc, [buffer], [], { maxPartVertices: 1024 }),
+    camera = { ...engine.camera, planes: new Float32Array(24) };
+  engine.store.tick(false);
+  // Planes as core writes them (inside where n.p + d >= 0): x >= 0, x <= 100, and four that hold everything.
+  camera.planes.set([1, 0, 0, 0, -1, 0, 0, 100]);
+  for (let k = 8; k < 24; k += 4) camera.planes[k + 3] = 1;
+  const c = { ...h.context, camera },
+    inside = model.primitives.filter((p) => {
+      let low = Infinity;
+      for (let i = 0; i < p.vertices.length; i += 20) low = Math.min(low, p.vertices[i]);
+      return low <= 100;
+    }).length;
+  assert.ok(model.primitives.length >= 3 && inside < model.primitives.length, `${inside} of ${model.primitives.length}`);
+  h.counts.indexed = 0;
+  model.draw(c, 'beauty', c.color, c.depth);
+  assert.equal(h.counts.indexed, inside, 'a part wholly past x = 100 is not drawn');
+  // A frustum holding everything draws every part again.
+  camera.planes.set([0, 0, 0, 1, 0, 0, 0, 1]);
+  h.counts.indexed = 0;
+  model.draw(c, 'beauty', c.color, c.depth);
+  assert.equal(h.counts.indexed, model.primitives.length);
+  model.dispose();
+  engine.dispose();
+});
