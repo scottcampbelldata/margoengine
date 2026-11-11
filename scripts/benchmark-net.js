@@ -14,6 +14,7 @@ import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { SnapshotBuffer, createSnapshot } from '../packages/net/dist/index.js';
 import { median } from './lib/percentile.mjs';
+import { baselineSource as baselineModules } from './lib/baseline-source.mjs';
 
 const baselineRef = process.argv[2];
 assert.ok(baselineRef, 'Usage: node scripts/benchmark-net.js <baseline Git ref>');
@@ -38,27 +39,23 @@ async function compile(source) {
     logLevel: 'silent',
     ...(source
       ? {
-          plugins: [
-            {
-              name: 'net-baseline-source',
-              enforce: 'pre',
-              load(id) {
-                if (id === entry.replaceAll('\\', '/')) return source;
-              },
-            },
-          ],
+          // Every Net source module comes from the baseline commit, so its siblings are the baseline's too.
+          plugins: [baselineModules({ commit: baselineCommit, packageName: 'net', overrides: { 'index.ts': source } })],
         }
       : {}),
     build: {
       write: false,
       target: 'es2022',
       lib: { entry, formats: ['es'], fileName: 'index' },
-      rollupOptions: { external: ['@margoengine/core'] },
+      // The candidate keeps sibling modules (./timeline.js) external, as the package build does, to compare with dist;
+      // the baseline inlines its own siblings so it imports as one module.
+      rollupOptions: { external: (id) => id === '@margoengine/core' || (!source && /^\.\/[\w-]+\.js$/.test(id)) },
     },
   });
   const chunks = result[0].output.filter((item) => item.type === 'chunk');
-  assert.equal(chunks.length, 1, 'Net comparison must stay a single standalone module');
-  return chunks[0].code.replace(/^\/\/#region packages\/net\/src\/index\.ts\r?\n/, '//#region src/index.ts\n');
+  assert.equal(chunks.length, 1, 'Net comparison must compile to one module');
+  // The region comment follows the sibling-module imports, so it is not anchored to the start.
+  return chunks[0].code.replace(/^\/\/#region packages\/net\/src\/index\.ts\r?\n/m, '//#region src/index.ts\n');
 }
 const baselineCode = await compile(baselineSource),
   candidateCode = await compile();

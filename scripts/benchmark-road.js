@@ -7,7 +7,7 @@ if (
   process.exit(0);
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -15,6 +15,7 @@ import { cpus } from 'node:os';
 import { build } from 'vite';
 import { Spline } from '../packages/splines/dist/index.js';
 import { median } from './lib/percentile.mjs';
+import { baselineSource as baselineModules } from './lib/baseline-source.mjs';
 
 // Build Road first; --direct-writes recreates the rejected allocation experiment without mutating the package.
 const baselineRef = process.argv[2];
@@ -39,23 +40,19 @@ const experimentSource = temporaryDirectWrites ? baselineSource.replace(arrayWri
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')),
   peers = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies });
 async function bundle(baseline) {
-  const replacement = baseline ? baselineSource : experimentSource;
+  // The baseline and the direct-writes experiment read every Road module from the baseline commit, so sibling modules
+  // (frame.ts, errors.ts) changed since then do not mix into them.
+  const plugins = baseline
+    ? [baselineModules({ commit: baselineRef, packageName: 'road' })]
+    : experimentSource
+      ? [baselineModules({ commit: baselineRef, packageName: 'road', overrides: { 'index.ts': experimentSource } })]
+      : [];
   const result = await build({
     root,
     configFile: false,
     publicDir: false,
     logLevel: 'silent',
-    plugins: replacement
-      ? [
-          {
-            name: 'road-measurement-source',
-            enforce: 'pre',
-            transform(code, id) {
-              if (id.replaceAll('\\', '/').endsWith('/packages/road/src/index.ts')) return replacement;
-            },
-          },
-        ]
-      : [],
+    plugins,
     build: {
       write: false,
       target: 'es2022',
@@ -71,12 +68,17 @@ async function bundle(baseline) {
 }
 const baselineCode = await bundle(true),
   candidateCode = await bundle(false);
-if (!temporaryDirectWrites)
-  assert.equal(
-    candidateCode,
-    await readFile(resolve(root, 'dist/index.js'), 'utf8'),
-    'Rebuild Road before benchmarking',
-  );
+// The candidate is bundled from the current source. dist is a multi-entry build with shared chunks that this
+// single-entry bundle cannot reproduce byte for byte, so the check is that dist is not older than the source.
+if (!temporaryDirectWrites) {
+  const newest = async (directory) =>
+    Math.max(
+      ...(await Promise.all(
+        (await readdir(directory, { recursive: true })).map(async (name) => (await stat(resolve(directory, name))).mtimeMs),
+      )),
+    );
+  assert.ok((await newest(resolve(root, 'dist'))) >= (await newest(resolve(root, 'src'))), 'Rebuild Road before benchmarking');
+}
 const load = async (code) =>
   (
     await import(

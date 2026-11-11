@@ -7,13 +7,14 @@ if (
   process.exit(0);
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdir, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { MeshBVH as Candidate } from '../packages/bvh/dist/index.js';
 import { createWorkload } from '../examples/package-benchmarks/bvh.js';
 import { median } from './lib/percentile.mjs';
+import { sourceClosure } from './lib/baseline-source.mjs';
 
 // Build the package first. An explicit prior Git ref keeps this comparison repeatable after landing the change.
 const baselineRef = process.argv[2];
@@ -22,27 +23,20 @@ const sourcePath = 'packages/bvh/src/bvh.ts',
   baselineSource = execFileSync('git', ['show', `${baselineRef}:${sourcePath}`], { encoding: 'utf8' });
 const currentSource = await readFile(sourcePath, 'utf8');
 assert.notEqual(currentSource, baselineSource, 'Choose a Git ref before the shapecast change');
-for (const name of ['build.ts', 'math.ts'])
-  assert.equal(
-    (await readFile(`packages/bvh/src/${name}`, 'utf8')).replace(/\r\n/g, '\n'),
-    execFileSync('git', ['show', `${baselineRef}:packages/bvh/src/${name}`], { encoding: 'utf8' }).replace(
-      /\r\n/g,
-      '\n',
-    ),
-    `Benchmark expects unchanged ${name}`,
-  );
+// Every BVH module of the baseline comes from the baseline commit (emitted below), so later changes to build.ts or
+// math.ts no longer mix into the baseline.
 // Use the package's installed compiler CLI; TypeScript 7 no longer exposes its classic transpile API.
-const names = (await readdir('packages/bvh/src')).filter((name) => name.endsWith('.ts'));
+// Emit bvh.ts and the src modules it imports, read from one revision. Other src files (lines.ts, points.ts) import
+// packages/shared by relative path and are not part of MeshBVH.
 async function emit(mode) {
   const directory = resolve('test-results/bvh-benchmark-emit', mode);
+  await rm(directory, { recursive: true, force: true });
   await mkdir(`${directory}/src`, { recursive: true });
-  for (const name of names)
-    await writeFile(
-      `${directory}/src/${name}`,
-      mode === 'baseline'
-        ? execFileSync('git', ['show', `${baselineRef}:packages/bvh/src/${name}`], { encoding: 'utf8' })
-        : await readFile(`packages/bvh/src/${name}`, 'utf8'),
-    );
+  const read = async (name) =>
+    mode === 'baseline'
+      ? execFileSync('git', ['show', `${baselineRef}:packages/bvh/src/${name}`], { encoding: 'utf8' })
+      : await readFile(`packages/bvh/src/${name}`, 'utf8');
+  for (const [name, text] of await sourceClosure('bvh.ts', read)) await writeFile(`${directory}/src/${name}`, text);
   await writeFile(
     `${directory}/tsconfig.json`,
     JSON.stringify({
@@ -59,11 +53,10 @@ async function emit(mode) {
 const baselineCode = await emit('baseline'),
   currentCode = await readFile('packages/bvh/dist/bvh.js', 'utf8');
 assert.equal(await emit('candidate'), currentCode, 'Rebuild BVH before benchmarking');
-const loadable = baselineCode.replace(
-  /from\s+(['"])\.\/([^'"]+)\1/g,
-  (_, quote, name) => `from ${quote}${pathToFileURL(resolve('packages/bvh/dist', name)).href}${quote}`,
+assert.ok(baselineCode.length > 0);
+const { MeshBVH: Original } = await import(
+  pathToFileURL(resolve('test-results/bvh-benchmark-emit/baseline/dist/bvh.js')).href + `?ref=${encodeURIComponent(baselineRef)}`,
 );
-const { MeshBVH: Original } = await import(`data:text/javascript;base64,${Buffer.from(loadable).toString('base64')}`);
 const work = createWorkload(256),
   source = work.source,
   old = Original.build(source),
