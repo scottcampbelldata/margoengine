@@ -33,7 +33,7 @@
     "test:real-files:runtimes": "node scripts/fetch-real-files-runtimes.mjs",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build",
-    "test:split-scale": "npm run build && node tests/split-scale-check.mjs"
+    "test:gpu:split-scale": "npm run build && node tests/split-scale-check.mjs"
   },
   "sideEffects": false,
   "exports": {

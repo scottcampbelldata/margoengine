@@ -184,6 +184,8 @@ const TOOLS = {
     'prints the WebGL2 report of every installed browser and ANGLE back end (test:browser checks the default one)',
   'packages/webgl2-compat/test/perf-browser.mjs':
     'times the M7 performance matrix with the GPU held exclusively (test:gpu checks the same scenes for pixels)',
+  'packages/culling/test/gpu/compat-cost.mjs':
+    'prints draws, triangles, stalls and frame times per crowd size for docs/limits.md, asserts nothing (test:gpu checks the culled counts); run directly',
 };
 /** A file that drives a real browser (Playwright, or scripts/browser.js's openBrowser). */
 const DRIVES_BROWSER =

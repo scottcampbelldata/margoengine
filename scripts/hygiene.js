@@ -35,6 +35,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 import { entries as errorHelp } from './errors/entries.js';
+import { plan as gpuPlan } from './gpu-package-tests.mjs';
 import { assertCitedResultsTracked } from './support/cited-results.mjs';
 import { assertNoConflictMarkers } from './support/conflict-markers.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
@@ -49,6 +50,9 @@ assertValidTrackedManifests(root);
 assertCitedResultsTracked(root);
 // Every committed Wasm blueprint must match the crate sources it was built from (scripts/wasm-blueprints.mjs).
 assertWasmBlueprintsCurrent(root);
+// Every browser test file must have a script check:gpu-packages runs; its plan throws otherwise. Checked here because
+// the fast gate runs hygiene on every push and the plan would only fail later, in local CI's full check.
+gpuPlan();
 const quick = process.argv.includes('--verify');
 const strict = process.argv.includes('--strict');
 const slash = (p) => p.replaceAll('\\', '/');

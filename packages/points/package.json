@@ -29,7 +29,7 @@
     "test:gpu": "cd ../.. && node packages/points/tests/scale-check.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build",
-    "test:scale": "npm run build && cd ../.. && node packages/points/tests/scale-check.mjs"
+    "test:gpu:scale": "npm run build && cd ../.. && node packages/points/tests/scale-check.mjs"
   },
   "sideEffects": false,
   "exports": {
