@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15072480,
+  "total": 15074416,
   "history": [
     {
       "date": "2026-10-24",
@@ -8459,6 +8459,12 @@
       "commit": "c10abc270f",
       "reason": "EXR chromaticities in every reader (exr-tiled 8112 to 8799 B, exr-codecs worker 1835 to 2557 B: header scan plus the RP 177 and Bradford matrix; a lazy chunk would add a request to every EXR load); volumetric fog repeats the Shadows texel bias (9741 to 9799 B); VirtualShadows scale-free reach and bias (15956 to 16178 B)",
       "grew": 4
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "4b1d358dd0",
+      "reason": "labels/gpu 6034 to 6213 B gzip (+179): abortable font wait and content-box sizing; cache entries +145 to +165 B (cache 3842 to 4007, stream 4233 to 4394, decoded 5108 to 5253, ranges +6): bytes fallback for WebKit ephemeral sessions; a split would cost a second module and the same bytes",
+      "grew": 5
     }
   ],
   "items": {
@@ -8575,15 +8581,15 @@
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 11036,
-    "@margoengine/cache": 3842,
+    "@margoengine/cache": 4263,
     "@margoengine/cache/bundles": 1883,
-    "@margoengine/cache/decoded": 5108,
+    "@margoengine/cache/decoded": 5509,
     "@margoengine/cache/eviction": 793,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,
-    "@margoengine/cache/ranges": 4640,
-    "@margoengine/cache/stream": 4233,
+    "@margoengine/cache/ranges": 4902,
+    "@margoengine/cache/stream": 4650,
     "@margoengine/cache/vary": 821,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
@@ -8933,7 +8939,7 @@
     "@margoengine/labels/cluster": 1771,
     "@margoengine/labels/declutter": 1512,
     "@margoengine/labels/distance": 1260,
-    "@margoengine/labels/gpu": 6034,
+    "@margoengine/labels/gpu": 6469,
     "@margoengine/lighting2d": 5895,
     "@margoengine/lighting2d/cookie": 7875,
     "@margoengine/lighting2d/emissive": 4410,
