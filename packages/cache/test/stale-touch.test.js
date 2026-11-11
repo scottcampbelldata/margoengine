@@ -26,3 +26,17 @@ for (const indexed of [false, true]) {
     });
   });
 }
+
+// WebKit refuses Blobs in ephemeral sessions and stalls a transaction whose refused Blob put is not its first request.
+// The caches ask once at open (storesBlobs), so no real write meets the refusal: before that, recreating a with b's
+// eviction in front stalled every later transaction, and staleTouch never finished in Playwright WebKit.
+for (const indexed of [false, true])
+  for (const mode of ['evict', 'replace'])
+    test(`staleTouch ${mode} finishes when the database refuses Blobs as WebKit does (indexed=${indexed})`, { timeout: 30_000 }, async () => {
+      globalThis.indexedDB = fakeIndexedDB({ refuseBlobs: 'webkit' });
+      const result = await staleTouch(mode, indexed);
+      assert.deepEqual(result.after, result.before);
+      assert.deepEqual(result.old, [100, 1]);
+      if (mode === 'evict') assert.equal(result.b, 'TypeError');
+      else assert.deepEqual([result.current, result.etag], [[80, 9], '"new"']);
+    });

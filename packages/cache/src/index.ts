@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { asBlob, blobRefused } from './bytes.js';
+import { asBlob, blobRefused, storesBlobs } from './bytes.js';
 import { defaultFetch, failure, freshnessPolicy, ifRange } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
@@ -212,6 +212,8 @@ export class AssetCache {
       db.close();
       throw error;
     }
+    // Asked before any write, so no write meets WebKit's refusal mid-transaction (see storesBlobs).
+    this.bytes = !(await storesBlobs(db, D));
     return db;
   }
 

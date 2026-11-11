@@ -519,13 +519,29 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `packages/cache/test/blob-refused.test.js` (the fake IndexedDB gained `refuseBlobs`, WebKit's refusal); it fails on the parent.
   In Playwright WebKit the cold, decoded, streamRanges, rangeOf and eviction steps of `test:browser` now pass.
 
-### WebKit: cache `test:browser` staleTouch step does not finish (found 2026-11-11, open)
+### Fixed 2026-11-11: WebKit: cache `test:browser` staleTouch step did not finish
 
 - **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache`; every step before `staleTouch`
-  passes, then `staleTouch took over 180 s`. The warm copy is stored (`stats.stored` is 1), and the 20 s step limits
-  added to `packages/cache/test/stale-touch.js` do not fire, so the wait is in a call that has no step limit yet
-  (the warm fetch's body read, `flush` or `usage`). Chromium passes.
-- **Cause:** not found. Next: run `staleTouch` alone with a log line before every await to name the stuck call.
+  passed, then `staleTouch took over 180 s`. Chromium passed.
+- **Cause:** run alone with a log line per await and per transaction, the stuck call was the second cache's write of b,
+  whose transaction deletes the evicted a before it puts b's Blob. A probe in Playwright WebKit (Windows, 2026-11-11)
+  showed the rule: a refused Blob put that is the first request of its transaction aborts it with UnknownError, as the
+  cache expected; one that comes after any other request (a delete, a get, a put to the other store) leaves the
+  transaction for ever, with no complete, no abort, not even after `abort()`, and every later transaction on its stores
+  waits behind it. The warm cache had passed only because its first write put the Blob first.
+- **Fix:** AssetCache and RangeCache ask once at open with a transaction of their own that puts a 1-byte Blob first and
+  deletes it (`storesBlobs` in `packages/cache/src/bytes.ts`), and store bytes from the first write when it is refused.
+  The write's own fallback stays for any other refusal. In WebKit `staleTouch` now passes in 3.0 s.
+- **Regression:** `packages/cache/test/stale-touch.test.js` (four "refuses Blobs as WebKit does" cases); the fake
+  IndexedDB's `refuseBlobs: 'webkit'` models the stall. Three of the four time out on the parent.
+
+### WebKit: cache `test:browser` evictionReads step over its limit (found 2026-11-11, open)
+
+- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` (Windows, busy dev PC): plain
+  `evictionReads` (2,030 fetches and writes) took 158.9 s and the indexed run passed the 180 s call limit; Chromium took
+  17.7 s and 8.8 s in the same session. Every step before it passes.
+- **Cause:** not found. Each of its 2,030 requests goes through the check's `context.route`, which on Playwright WebKit
+  is a round trip to the test process; a measurement of the route's share against the cache's own IndexedDB time is next.
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
@@ -6021,7 +6037,7 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
 - Fixed, lane S (2026-11-10): AssetCache and RangeCache retain stored Cache-Control/Expires fields when omitted by a 304; provided fields replace them, and Date/Age are taken from the validating response. The common policy helper persists only the two lifetime fields, with matching-validator updates. Parent-failing regressions in packages/cache/test/freshness.test.js cover both caches; additional cases cover retained Expires, current Age and no-cache replacement/retention. Legacy metadata without saved policy remains conservatively revalidated until a response supplies that policy; offline bytes remain usable.
-- RangeCache response snapshot race (lane S, 2026-11-10, found during 304 policy retention): warm URL a with 100 bytes, ETag "a" and model/gltf-binary; hold a reader's conditional 304, then replace a from a second cache with 80 different bytes, ETag "new" and application/new before releasing the 304. The held response contains the new 80 bytes with the old ETag/type. Cause: answer holds old metadata across revalidation, but assemble reads blocks later by reused URL/block keys in another transaction. Metadata and the requested stored Blob handles need one consistent snapshot; validator-guarded freshness updates alone do not fix the response. The standalone delayed-response probe reproduces with fakeIndexedDB; no runtime change in the policy-retention job under lane rule 21.
+- Fixed 2026-11-11: RangeCache response snapshot race (lane S, 2026-11-10, found during 304 policy retention): warm URL a with 100 bytes, ETag "a" and model/gltf-binary; hold a reader's conditional 304, then replace a from a second cache with 80 different bytes, ETag "new" and application/new before releasing the 304. The held response contained the new 80 bytes with the old ETag/type, because assemble read the blocks in a transaction of their own, after the record. Assemble now reads the record and the blocks in one transaction; when the record no longer has the validators and size the answer was planned with, the request is answered again from the new record (RFC 9111 section 3.4), so the held response is the new 80 bytes with ETag "new" and application/new. Regression: packages/cache/test/ranges.test.js ("a file replaced while a revalidation is held"), failing on the parent.
 - Fixed 2026-11-11: RangeCache combines stored blocks only under one strong ETag (RFC 9111 section 3.4) and sends
   `If-Range` with it on block requests; under a weak ETag or none a miss fetches every block of the range again and the write
   replaces the old blocks. Regression: packages/cache/test/ranges.test.js (weak ETag and If-Range tests).

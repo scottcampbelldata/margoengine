@@ -8,6 +8,8 @@
  * runs onupgradeneeded with the old version; a lower version than stored fails with VersionError. Object stores support
  * createIndex(name, keyPath) and index(name).openCursor() in ascending key order, with cursor.continue() and delete().
  * `refuseBlobs` makes a readwrite transaction that puts a Blob fail with UnknownError, as WebKit's ephemeral sessions do.
+ * `refuseBlobs: 'webkit'` also models WebKit's stall (Playwright WebKit, 2026-11-11): when the refused Blob put is not
+ * the first request of its transaction, that transaction never completes or aborts, and neither does any later one.
  * `counts.reads` counts the records handed out by get, getAll and cursors.
  */
 export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = false } = {}) {
@@ -16,9 +18,10 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
     later = (fn) => setTimeout(fn, 0);
   const copy = (value) => (value instanceof Blob ? value : structuredClone(value));
   const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-  const store = (target, writable, log) => {
+  const store = (target, writable, log, tally = { requests: 0 }) => {
     const { map, indexes } = target;
     const request = (run) => {
+      tally.requests++;
       const r = {};
       queueMicrotask(() => {
         r.result = run();
@@ -44,11 +47,15 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
         }),
       getAllKeys: () => request(() => [...map.keys()]),
       count: () => request(() => map.size),
-      put: (value, key) =>
-        write(key, () => {
+      put: (value, key) => {
+        // The put itself is refused, even when a later delete leaves no Blob behind.
+        if (refuseBlobs && value instanceof Blob) tally.blob = true;
+        if (refuseBlobs === 'webkit' && value instanceof Blob && tally.requests > 0) tally.stalled = true;
+        return write(key, () => {
           map.set(key, copy(value));
           return key;
-        }),
+        });
+      },
       delete: (key) =>
         write(key, () => {
           map.delete(key);
@@ -140,11 +147,15 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
                   [names].flat().map((n) => [n, { map: new Map(stores.get(n).map), indexes: stores.get(n).indexes }]),
                 ),
                 logs = new Map([names].flat().map((n) => [n, new Set()])),
+                tally = { requests: 0 },
                 t = {
                   error: null,
-                  objectStore: (n) => store(staged.get(n), mode === 'readwrite', logs.get(n)),
+                  objectStore: (n) => store(staged.get(n), mode === 'readwrite', logs.get(n), tally),
                 };
               later(() => {
+                // WebKit's stall: this transaction and every later one never finish.
+                if (tally.stalled) db.stalled = true;
+                if (db.stalled) return;
                 const after = (n) => {
                   const live = new Map(stores.get(n).map);
                   if (logs.get(n).cleared) live.clear();
@@ -154,11 +165,7 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
                   return live;
                 };
                 const next = new Map([...staged.keys()].map((n) => [n, after(n)]));
-                if (
-                  refuseBlobs &&
-                  mode === 'readwrite' &&
-                  [...next.values()].some((map) => [...map.values()].some((v) => v instanceof Blob))
-                ) {
+                if (refuseBlobs && mode === 'readwrite' && tally.blob) {
                   t.error = new DOMException('Error preparing Blob/File data to be stored in object store', 'UnknownError');
                   t.onabort?.();
                   return;

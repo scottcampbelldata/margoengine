@@ -247,3 +247,46 @@ test('under a strong ETag block requests carry If-Range with it', async () => {
   await read(await get(cache, 'strong.glb', 'bytes=1100-1109'));
   assert.equal(network.log.at(-1).headers['if-range'], '"abc"');
 });
+
+test('a file replaced while a revalidation is held never answers new bytes with the old validators', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const files = { '/a': { body: bytes(100), etag: '"a"' } },
+    network = server(files),
+    entered = Promise.withResolvers(),
+    gate = Promise.withResolvers();
+  let hold = false;
+  const held = async (input, init) => {
+    const request = new Request(input, init),
+      response = await network(request);
+    if (hold && request.headers.has('if-none-match')) {
+      entered.resolve();
+      await gate.promise;
+    }
+    return response;
+  };
+  const warm = new RangeCache({ name: 'replaced', block: B, fetch: network });
+  assert.deepEqual(await read(await warm.fetch(base + 'a')), bytes(100));
+  await warm.flush();
+  // The reader's one-byte check is answered 304 for the old file, then held while a second cache replaces the file.
+  const reader = new RangeCache({ name: 'replaced', block: B, fetch: held });
+  hold = true;
+  const pending = reader.fetch(base + 'a');
+  await entered.promise;
+  files['/a'] = {
+    body: bytes(80, 9),
+    etag: '"new"',
+    headers: { 'content-type': 'application/new', 'cache-control': 'max-age=600' },
+  };
+  const writer = new RangeCache({ name: 'replaced', block: B, fetch: network });
+  assert.deepEqual(await read(await writer.fetch(base + 'a')), bytes(80, 9));
+  await writer.flush();
+  gate.resolve();
+  const response = await pending,
+    body = await read(response);
+  // Before the fix: the new 80 bytes with ETag "a" and model/gltf-binary.
+  assert.deepEqual(
+    [body.length, body[0], response.headers.get('etag'), response.headers.get('content-type')],
+    [80, bytes(80, 9)[0], '"new"', 'application/new'],
+  );
+  await reader.flush();
+});

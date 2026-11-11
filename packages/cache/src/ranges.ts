@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { asBlob, blobRefused } from './bytes.js';
+import { asBlob, blobRefused, storesBlobs } from './bytes.js';
 import { byteRange, contentRange, defaultFetch, freshnessPolicy, ifRange, transact } from './http.js';
 
 /** Options for `new RangeCache(...)`. A negative or NaN `maxBytes` or `timeout`, or a `block` under 1, throws a RangeError. */
@@ -147,6 +147,8 @@ export class RangeCache {
       db.close();
       throw error;
     }
+    // Asked before any write, so no write meets WebKit's refusal mid-transaction (see storesBlobs).
+    this.bytes = !(await storesBlobs(db, D));
     return db;
   }
 
@@ -397,7 +399,11 @@ export class RangeCache {
     return this.respond(file, blob.slice(range[0] - offset, range[1] - offset + 1), range[0], !!header);
   }
 
-  /** Answers from stored and just fetched blocks; reads stored blocks in one transaction. */
+  /**
+   * Answers from stored and just fetched blocks. The stored blocks and the file's record are read in one transaction,
+   * so the answer never pairs one version's bytes with another's validators: when another cache or tab replaced the
+   * file after the lookup, the record no longer matches and the request is answered again from the new record.
+   */
   private async assemble(
     request: Request,
     file: Stored,
@@ -410,19 +416,28 @@ export class RangeCache {
       last = Math.floor(end / this.block),
       reads = new Map<number, IDBRequest>(),
       db = await this.db;
+    let record: IDBRequest | undefined;
     if (db)
-      await transact(db, [D], 'readonly', (data) => {
+      await transact(db, [M, D], 'readonly', (meta, data) => {
+        record = meta.get(file.url);
         for (let i = first; i <= last; i++) if (!fetched.has(i)) reads.set(i, data.get(key(file.url, i)));
       }).catch(() => {
         this.stats.errors++;
       });
     const parts: Blob[] = [],
       gone: number[] = [];
+    let stored = false;
     for (let i = first; i <= last; i++) {
-      const blob = fetched.get(i) ?? asBlob(reads.get(i)?.result, file.type);
+      const read = fetched.has(i) ? undefined : asBlob(reads.get(i)?.result, file.type),
+        blob = fetched.get(i) ?? read;
+      if (read) stored = true;
       if (blob) parts.push(blob);
       else gone.push(i);
     }
+    const now = record?.result as Stored | undefined;
+    // RFC 9111 section 3.4: stored parts combine only under the validators they were stored with.
+    if (stored && !(isStored(now) && now.size === file.size && now.etag === file.etag && now.modified === file.modified))
+      throw CHANGED;
     // A block evicted between the lookup and this read (another tab's write): fetch it once more.
     if (gone.length) {
       const got = await this.download(request, file, gone);
