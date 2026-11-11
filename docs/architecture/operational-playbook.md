@@ -2472,7 +2472,12 @@ reports it once through `engine.onError` (coded `failed`, help `gpu-lost`) and d
 until the ordinary restore rebuilds every batch and plugin; later errors from the same device are not reported again. Other
 uncaptured errors (validation) still fail every frame with the coded fault. Optional packages scope their own allocations
 (`packages/shared/error-scope.js` `scoped`) and leave them unused until the device confirms them, so a failure there stays in
-the package: `CulledMeshes` draws the affected meshes unculled until the next restore. On a device without
+the package: `CulledMeshes` draws the affected meshes unculled until the next restore. `Shadows` and `VirtualShadows`
+make their maps outside error scopes on purpose (KB6434b, KB-C34g): receivers bind them in the first frame after an
+attach, a restore or a new map size, so that frame is shadowed, and an out-of-memory failure there goes to the device
+rebuild above. Containment in the package was tried and dropped: waiting for the scope cost one unshadowed frame after
+every attach, restore and resize, and the rebuild already covers the failure (evidence
+`packages/shadows/test/alloc-failure.test.js`, `packages/materials/test/browser-check.mjs` catcherSun). On a device without
 `core-features-and-limits` (the compatibility level, the WebGL2 layer) every shadow map receivers bind as a '2d-array'
 view, a one-cascade map included, is made with `textureBindingViewDimension: '2d-array'` (KB-C34f; evidence
 `packages/shadows/test/compat-view-dimension.test.js` and `packages/webgl2-compat/test/adapter-browser.mjs`). Evidence:
