@@ -149,15 +149,16 @@ await runSuite(
           [],
         );
         const removeCaster = shadows.add(model);
-        // Pipelines compile asynchronously: render until two frames agree.
-        let pixels = await render();
-        for (let t = 0; t < 20; t++) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          const next = await render(),
-            same = next.every((v, i) => v === pixels[i]);
+        // The model's pipelines compile first; then render until two frames agree (each waits for its readback).
+        await model.compile();
+        let pixels = await render(),
+          same = false;
+        for (let t = 0; t < 20 && !same; t++) {
+          const next = await render();
+          same = next.every((v, i) => v === pixels[i]);
           pixels = next;
-          if (same && t > 2) break;
         }
+        if (!same) throw new Error('frames did not settle in 20 renders');
         const shadow = await readShadow(),
           remove = picker.add(model);
         let picked = 0;
