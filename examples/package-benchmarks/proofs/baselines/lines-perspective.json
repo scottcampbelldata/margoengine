@@ -1,12 +1,12 @@
 {
  "proof": "lines-perspective",
- "ref": "f1854aa04",
- "revision": "f1854aa04f4418b4adc86bdc94c28ea159bac774",
- "capturedAt": "f1854aa04f4418b4adc86bdc94c28ea159bac774",
+ "ref": "9f9845a0f5",
+ "revision": "9f9845a0f5c726f3fa6a46a909abad0c2f532ea6",
+ "capturedAt": "9f9845a0f5c726f3fa6a46a909abad0c2f532ea6",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "1x": "2eb103845fcce9e9aaa8d66ae7d7feff870952b51a98417178ad731212400aac",
-  "4x": "71296070e4a85fda946d59d77e8092748561fa13634e6ce16c840dab82c6e208"
+  "1x": "420647d8ec8f6872a513297be9412cad4724b19b9b75b53dbdbe0efde2a75443",
+  "4x": "b09aa8863517090098a866a5a60911f15d91c8da15d5a1bc74c596ee07cdc80b"
  }
 }

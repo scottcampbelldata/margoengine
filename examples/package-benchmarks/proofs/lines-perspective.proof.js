@@ -2,12 +2,12 @@
 // write of a 30-frame story (pixel and world widths, dashes, vertex colors, on-top, resize, MSAA, depth format, add,
 // remove, device restore) matches the package at `ref`, byte for byte.
 // Run: node examples/package-benchmarks/proofs/lines-perspective.proof.js [ref] [pin] [--current]
-// Pinned: 96edc75 against 6da7f7e, the commit that made this claim. --current: f1854aa04 (the 96-byte Frame again, tile code in lines/tiles; after d38b95ea1's one frame upload for static frames and 6-vertex butt and square segments) against the working tree.
+// Pinned: 96edc75 against 6da7f7e, the commit that made this claim. --current: 9f9845a0f5 (KB5588c: every style layout binds the selection mask at 7, a zeroed stand-in without one; after f1854aa04's 96-byte Frame again, tile code in lines/tiles, and d38b95ea1's one frame upload for static frames and 6-vertex butt and square segments) against the working tree.
 import assert from 'node:assert/strict';
 import { refs, versions, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('96edc75', '6da7f7e', 'f1854aa04'),
+const { ref, pin } = refs('96edc75', '6da7f7e', '9f9845a0f5'),
   { baseline, candidate } = await versions('lines', ref, undefined, pin);
 
 function story(module, samples) {
