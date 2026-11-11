@@ -12,7 +12,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('b803d56', '0e02ead', '65098f33f');
+const { ref, pin } = refs('b803d56', '0e02ead', 'edcb6debb');
 const { baseline, candidate } = await versions('gltf-pro', ref, undefined, pin);
 const materials = [
   {},
