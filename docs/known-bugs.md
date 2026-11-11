@@ -4958,7 +4958,21 @@ Fixed 2026-11-10: Batch 245 GPU planner registrations. GPU planner registrations
 
 
 
-### Open: review 99 composed native validation exceeds its twelve-minute lease
+### Fixed: review 99 composed native validation exceeds its twelve-minute lease
+
+Fixed 2026-11-10. Cause: each of the 32 feature subsets (plus the reflected and update cases) builds its own trace
+program, and on native Dawn/D3D12 (RTX A6000, Edge 157) each trace pipeline takes about 17 s to compile (16.3 to
+18.6 s measured, other pipelines of a tracer under 3.2 s). `compose.html` made one tracer at a time, so 35 compiles
+ran end to end (about 600 s) before any rendering, past the twelve-minute lease. The page now makes `parallel`
+subsets at once (default 8 natively, 1 on the WebGL2 layer, where 8 measured 223 s against 43 s; `--parallel=<1..32>`), so their pipelines compile side by side on the browser's worker
+threads: 8 trace pipelines were ready in 34 s against 136 s one after another, and the whole native run passed in
+146 s with every subset oracle, the reflected RIS case and the atomic update unchanged. The check now fails if
+native trace compiles stop overlapping (`trace pipelines compile side by side`). The per-pipeline compile time
+itself is the parked bug 45 compiler-pressure work (native split), not changed here. The review 99 timeout
+supervisor (ee32e602f) was not landed: the page's `compose-progress` lines already name the phase and pipeline a
+stalled run waits on. Regression: packages/voxel-pathtracer/tests/compose-browser.mjs.
+
+History:
 
 Repro at mesh checkpoint 4a40f2e29, rebased as 3c9a4f8f8 onto main 0ba1d4f94:
 build packages, then run `node scripts/gpu-lock.mjs run --owner=review-99-mesh-compose-native

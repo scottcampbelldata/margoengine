@@ -5519,6 +5519,8 @@ replacement-device specialization. The registered test:gpu:compose-native and te
 analytic camera attenuation for all 32 subsets and interacting RGB RIS shadow
 sampling. The failed-only WebGL2/Vulkan continuation now passes all 32 subsets,
 IDs, RGB RIS shadows and atomic replacement within the unchanged 12-minute lease.
+Since 2026-11-10 the page builds 8 subsets at once so native trace pipelines (about 17 s each on Dawn/D3D12)
+compile side by side; the native suite passes in 146 s under the same lease (docs/known-bugs.md, review 99).
 Native transport/AOV proofs are retained without repetition. The old timeout has
 no phase record; it cannot be attributed to ANGLE D3D11. An isolated resampled
 README diagnostic runs on Dawn and passes its unchanged 20-second deadline;

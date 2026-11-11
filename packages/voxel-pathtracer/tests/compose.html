@@ -7,7 +7,7 @@ import {triangleMeshes} from '/packages/voxel-pathtracer/dist/mesh.js';
 import {coloredMedia} from '/packages/voxel-pathtracer/dist/media.js';
 import {causticGuiding} from '/packages/voxel-pathtracer/dist/guiding.js';
 import {spectralTransport} from '/packages/voxel-pathtracer/dist/spectral.js';
-window.run=async(compat=false,phase='all')=>{
+window.run=async(compat=false,phase='all',parallel=1)=>{
  const progress=(phase,extra={})=>{window.progress={phase,...extra,ms:performance.now()};console.info('compose-progress '+JSON.stringify(window.progress));};
  progress('backend-install',{compat});
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
@@ -47,14 +47,19 @@ window.run=async(compat=false,phase='all')=>{
  try{
   const subsets=[];
   // fixed-wait: enumerate all 32 subsets of five features; each has its own exact image oracle and awaits readiness.
-  for(let mask=0;mask<32;mask++){
+  // Each subset is its own trace program, and a native trace pipeline takes about 17 s to compile on Dawn/D3D12
+  // (docs/known-bugs.md), so `parallel` subsets are made at once: their pipelines compile side by side on the
+  // browser's worker threads, while every subset still renders, checks and disposes its own tracer.
+  const one=async mask=>{
    progress('subset',{mask});
    const selected=factories.filter((_,i)=>mask&(1<<i)).map(make=>make()).reverse();
    const im=await render(selected);
    const expected=mask&4?[0.5,1/3,0.25]:[1,1,1];
-   subsets.push({mask,actual:mean(im),expected,finite:im.color.every(Number.isFinite),
-    firstBoundary:im.instance.every(id=>id===1)});
-  }
+   subsets[mask]={mask,actual:mean(im),expected,finite:im.color.every(Number.isFinite),
+    firstBoundary:im.instance.every(id=>id===1)};
+  };
+  for(let mask=0;mask<32;mask+=parallel)
+   await Promise.all(Array.from({length:Math.min(parallel,32-mask)},(_,k)=>one(mask+k)));
   const noFog=structuredClone(scene);noFog.instances.pop();
   const triangleImage=await render(factories.map(make=>make()),noFog);
   const triangleMarker=triangleImage.instance.every(id=>id<=-4);
@@ -72,7 +77,8 @@ window.run=async(compat=false,phase='all')=>{
   s.meshes[0].positions=new Float32Array([20,-8,0,28,-8,0,24,8,0]);
   const other=[triangleMeshes(),coloredMedia(),causticGuiding(),spectralTransport()];
   progress('reflected');
-  const reference=await render(other,s,4096),actual=await render([resampledEmitters(),...other],s,2048);
+  const pair=[()=>render(other,s,4096),()=>render([resampledEmitters(),...other],s,2048)];
+  const [reference,actual]=parallel>1?await Promise.all(pair.map(f=>f())):[await pair[0](),await pair[1]()];
   const reflected={reference:mean(reference),actual:mean(actual),finite:actual.color.every(Number.isFinite)};
   // Scene replacement must change both palette conversion and geometry, then restoration
   // must use that same converted scene rather than the caller's mutated arrays.
