@@ -9,9 +9,26 @@ import {
   Animator,
   type AnimatorEvent,
   type AnimatorEventMap,
+  type AnimatorState,
   type AnimatorTransition,
   type BlendTree,
 } from './index.js';
+
+/**
+ * A detached {@link AnimatorGraph} snapshot: the Animator's playback plus the decisions the graph keeps itself (bools,
+ * set triggers, and which transition rules the current crossfade's interruptions and from where). JSON-safe.
+ */
+export interface AnimatorGraphState {
+  version: 1;
+  /** Playback, as {@link Animator.captureState} returns it. */
+  animator: AnimatorState;
+  bools: Record<string, boolean>;
+  triggers: string[];
+  /** Index in the document's `transitions` of the transition whose crossfade is playing; -1 for none. */
+  active: number;
+  /** The state and time the active crossfade left, which `current` interruptions read. */
+  source?: { state: string; time: number };
+}
 
 /** A parameter's type: a float or int read by blend trees and comparisons, a bool, or a trigger that a transition consumes. */
 export type GraphParameterType = 'float' | 'int' | 'bool' | 'trigger';
@@ -304,6 +321,55 @@ export class AnimatorGraph {
     const type = this.types.get(name);
     if (!type) throw new TypeError(`Animator graph has no parameter "${name}"; declare it under parameters.`);
     return type;
+  }
+
+  /** Detached snapshot of playback and of the graph's own decisions; restore it with {@link AnimatorGraph.restoreState}. */
+  captureState(): AnimatorGraphState {
+    if (this.disposed) throw new MargoError('disposed', 'Animator graph is disposed; create a new AnimatorGraph.');
+    return {
+      version: 1,
+      animator: this.animator.captureState(),
+      bools: Object.fromEntries(this.bools),
+      triggers: [...this.triggers],
+      active: this.active ? (this.document.transitions ?? []).indexOf(this.active) : -1,
+      ...(this.source ? { source: { ...this.source } } : {}),
+    };
+  }
+  /**
+   * Restores a {@link AnimatorGraph.captureState} snapshot of a graph built from the same document, without firing
+   * events. A snapshot that does not fit this graph throws a `state` MargoError and changes nothing.
+   */
+  restoreState(state: AnimatorGraphState): this {
+    if (this.disposed) throw new MargoError('disposed', 'Animator graph is disposed; create a new AnimatorGraph.');
+    const transitions = this.document.transitions ?? [],
+      bools = state?.bools,
+      source = state?.source;
+    const fits =
+      state?.version === 1 &&
+      bools !== null &&
+      typeof bools === 'object' &&
+      [...this.bools.keys()].every((name) => typeof bools[name] === 'boolean') &&
+      Object.keys(bools).every((name) => this.types.get(name) === 'bool') &&
+      Array.isArray(state.triggers) &&
+      state.triggers.every((name) => this.types.get(name) === 'trigger') &&
+      Number.isInteger(state.active) &&
+      state.active >= -1 &&
+      state.active < transitions.length &&
+      (source === undefined ||
+        (Object.hasOwn(this.document.states, source?.state) && Number.isFinite(source.time) && source.time >= 0));
+    if (!fits)
+      throw new MargoError(
+        'state',
+        'Invalid Animator graph state; restore a captureState snapshot of a graph built from the same document',
+      );
+    this.animator.restoreState(state.animator);
+    for (const name of this.bools.keys()) this.bools.set(name, bools[name]);
+    this.triggers.clear();
+    for (const name of state.triggers) this.triggers.add(name);
+    this.active = state.active < 0 ? undefined : transitions[state.active];
+    this.source = source && { state: source.state, time: source.time };
+    this.taking = this.takingSource = undefined;
+    return this;
   }
 
   /** The current state's name. */

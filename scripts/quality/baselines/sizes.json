@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15095518,
+  "total": 15096929,
   "history": [
     {
       "date": "2026-10-24",
@@ -8531,6 +8531,12 @@
       "commit": "8d63008b2a",
       "reason": "KB5974e: cache/eviction measured 772 to 927 B gzip (budget 793 to 1183): evictionIndex deletes a Vary names record with the last entry that lists it (release(): one getAll of the URL's keys per evicted entry with records); help links on cache throws add 38 to 203 B to the other cache entries, within their budgets",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "298c93e079",
+      "reason": "KB5322: AnimatorGraph captureState/restoreState (graph bools, triggers, active transition and source with playback): graph 10320 to 10596 B gzip measured, layers 10967 to 11252 and masks 11175 to 11462 (both bundle graph); the snapshot lives on the graph class it restores, a separate entry would need the graph's private state exposed",
+      "grew": 3
     }
   ],
   "items": {
@@ -8553,10 +8559,10 @@
     "@margoengine/animator": 20643,
     "@margoengine/animator/blend-trees": 1841,
     "@margoengine/animator/fbik": 5984,
-    "@margoengine/animator/graph": 10483,
+    "@margoengine/animator/graph": 10914,
     "@margoengine/animator/inertialize": 2150,
-    "@margoengine/animator/layers": 11052,
-    "@margoengine/animator/masks": 11364,
+    "@margoengine/animator/layers": 11590,
+    "@margoengine/animator/masks": 11806,
     "@margoengine/animator/mirror": 2030,
     "@margoengine/animator/motion-matching": 7250,
     "@margoengine/animator/spline-ik": 4094,

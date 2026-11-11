@@ -47,7 +47,7 @@ export interface SkyFeatures {
         create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
             texture: GPUTexture;
             run(c: SkyPassContext): void;
-            recode(code: string): void;
+            recode(code: string, entries: GPUBindGroupEntry[]): void;
         };
     };
     lighting?: {
@@ -58,7 +58,7 @@ export interface SkyFeatures {
                 readonly night: Vec3;
             } | undefined, night: number): void;
             pass(c: SkyPassContext): void;
-            recode(code: string): void;
+            recode(code: string, entries: GPUBindGroupEntry[]): void;
             pbr(group: number): {
                 readonly declarations: string;
                 readonly ambient: string;

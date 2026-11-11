@@ -113,6 +113,8 @@ class AnimatorGraph {
     readonly animator: Animator;
     constructor(animation: Animation, document: AnimatorGraphDocument);
     static attach(animation: Animation, document: AnimatorGraphDocument): AnimatorGraph;
+    captureState(): AnimatorGraphState;
+    restoreState(state: AnimatorGraphState): this;
     get state(): string;
     set(name: string, value: number | boolean): this;
     get(name: string): number | boolean;
@@ -129,6 +131,18 @@ interface AnimatorGraphDocument {
     initial: string;
     transitions?: readonly GraphTransition[];
     events?: readonly AnimatorEvent[];
+}
+
+interface AnimatorGraphState {
+    version: 1;
+    animator: AnimatorState;
+    bools: Record<string, boolean>;
+    triggers: string[];
+    active: number;
+    source?: {
+        state: string;
+        time: number;
+    };
 }
 
 type AnimatorLayer = AdditiveLayer;

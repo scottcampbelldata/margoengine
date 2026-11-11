@@ -246,6 +246,18 @@ lists it is taken (which clears it) or `resetTrigger(name)`. `graph.state` is th
 to `'event'` and `'statechange'`, and `graph.animator` is the underlying Animator, so layers, foot IK, CCD chains and
 root motion work on it. `dispose()` (or `using`) removes the Animator.
 
+`graph.captureState()` returns a JSON-safe snapshot of playback and of what the graph decides with: bool values, set
+triggers, and the transition whose crossfade is playing with the state and time it left, so a restored crossfade is
+interrupted by the same rule. `graph.restoreState(snapshot)` puts it back without firing events, on a graph built from
+the same document; any other snapshot throws a `state` MargoError and changes nothing. Restoring only
+`graph.animator` rewinds playback but keeps the graph's later decisions.
+
+```ts
+const saved = graph.captureState();
+graph.trigger('jump');
+graph.restoreState(saved); // the jump trigger is unset again
+```
+
 ## Override layers
 
 `addLayer({clip, weight, mask, blend: 'override'})` blends the masked bones toward the clip's pose by `weight` (an upper-body wave or aim over a walk), where the default `blend: 'additive'` adds the clip's difference from its reference pose. `time` (seconds, read every frame) plays a layer on its own clock; by default a layer follows the state's time. `weight` and `time` may change every frame, for example from `@margoengine/tween`.
