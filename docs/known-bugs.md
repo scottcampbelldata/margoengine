@@ -254,6 +254,33 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   for every `MARGO_BROWSER=webkit` or `firefox` run, since those engines launch through the default Chromium path; it now
   names the engine (`tests/browser-startup.test.js`, "a MARGO_BROWSER=webkit run names webkit").
 
+### WebKit canvas snapshot: drawImage keeps returning a frame's first read (WebKit sweep, 2026-11-11, WebKit's side)
+
+- **What:** in Playwright WebKit 2370 (Version/27.2) on the Apple M6, once `drawImage(canvas)` has read a WebGPU canvas,
+  later reads return that same image until a `getCurrentTexture()` made after a task boundary, even though more work was
+  submitted to the same current texture in between. `voxel` `models-browser-check` read 2116 red pixels after
+  `renderer.dispose()` and one more render; Playwright Chromium on the same Mac read 0.
+- **Repro:** configure a WebGPU canvas, clear it red and submit, `drawImage` it into an `OffscreenCanvas` and read a pixel,
+  then (same task) clear it green and submit, read again, `await device.queue.onSubmittedWorkDone()`, read again. WebKit:
+  red, red, red; a clear after that await reads as drawn. Chromium: red, green.
+- **Spec:** WebGPU (W3C CR), section 21.2 `GPUCanvasContext`, `[[drawingBuffer]]`: "Any time the drawing buffer is read,
+  implementations must ensure that all previously submitted work (e.g. queue submissions) have completed writing to it via
+  [[currentTexture]]." https://www.w3.org/TR/webgpu/
+- **Margo:** no library path reads a canvas twice in one frame (`exporters` `capture` resizes the canvas before each tile
+  read, which replaces the drawing buffer). The voxel check now draws its disposed frame after the queue drains, as its
+  other steps already did; the assertion (0 red pixels) is unchanged. To report upstream at bugs.webkit.org.
+
+### WebKit: a StreamingAssetCache hit right after a streamed miss never finishes (WebKit sweep, 2026-11-11, open)
+
+- **What:** `cache` `test:browser` in Playwright WebKit 2370 on the Apple M6: `beginMiss` gets its 256-byte first chunk,
+  the rest of the 4,125,392-byte body is read to the end and `cache.flush()` resolves, then
+  `(await cache.fetch('/cache-files/stream-chair.glb')).arrayBuffer()` (the stored copy) never settles. Chromium passes.
+- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` on a Mac; it now stops after 180 s
+  with `finishMiss took over 180 s` (before, the step had no limit and held its GPU slot until the runner's 10 minutes).
+- **Cause:** not found. Not yet split between the stored `Response(new Blob(parts))` written by `StreamingAssetCache.keep`
+  and the read of it in `AssetCache`'s hit path; the next step is a page that stores and reads back a Blob response with
+  the same headers in WebKit, outside Margo.
+
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
 - **What:** the `tools/real-proof/safari` page in Safari 27.2 at 07:52 recorded Fox for 3 s with `recordCanvas` MP4 and got 2

@@ -15,11 +15,13 @@ const renderer=await VoxelModelRenderer.create(engine,world);
 const image=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
 async function draw(){renderer.update();await waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});engine.render({delta:0});return image();}
 const red=a=>{let n=0;for(let i=0;i<a.length;i+=4)if(a[i]>50&&a[i]>a[i+1]*2&&a[i]>a[i+2]*2)n++;return n;};
+// The disposed frame is drawn after the queue drains, like every other step: WebKit keeps returning the last read of a
+// frame to drawImage until the next getCurrentTexture after a task boundary (docs/known-bugs.md, WebKit canvas snapshot).
 window.check={async run(){
  const before=red(await draw());world.setBlock(0,0,0,modelState(id,4));const rotated=red(await draw());
  world.removeChunk(0,0,0);const removed=red(await draw());
  world.setBlock(0,0,0,id);world.getChunk(0,0,0).fillLight(240);const reloaded=red(await draw());
- renderer.dispose();engine.render({delta:0});const disposed=red(image());
+ renderer.dispose();await engine.gpu.queue.onSubmittedWorkDone();engine.render({delta:0});const disposed=red(image());
  engine.dispose();return {before,rotated,removed,reloaded,disposed,errors};
 }};window.ready=true;
 </script>

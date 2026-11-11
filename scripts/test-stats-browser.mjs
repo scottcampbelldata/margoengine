@@ -17,6 +17,9 @@ try {
   assert.equal(hardware.webgpu?.fallback, false);
   page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
   const posted = page.waitForRequest((request) => request.url().endsWith('/stats-beacon-probe'), { timeout: 120000 });
+  // A failed check closes the browser, which rejects this wait; marked handled so the check's own error is the one
+  // reported (unhandled, the closed-page rejection ended the process first and hid it).
+  posted.catch(() => {});
   const proof = await page.evaluate(async () => {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
@@ -98,6 +101,14 @@ try {
       return GPUQueue.prototype.submit.call(this, commands);
     };
     device.queue.submit = slowSubmit;
+    // The tick of 5000 meshes is one Wasm call well under a millisecond on an Apple M6, and WebKit's clock steps by
+    // 1 ms, so it too is given a known length (FramePhases wraps whatever store.tick is when it attaches).
+    const { store } = engine,
+      fastTick = store.tick;
+    store.tick = function (culling) {
+      spin(1);
+      return fastTick.call(this, culling);
+    };
     const phases = FramePhases.attach(instance, { samples: 16 }),
       removeSpin = engine.onFrame(() => spin(3)),
       removePass = engine.frameGraph.add({ name: 'stats-spin', order: 1, execute: () => spin(4) });
@@ -108,7 +119,7 @@ try {
     ensure(phases.frames >= 16, 'Frames reach FramePhases');
     ensure(average.update >= 3, 'onFrame work reads as update: ' + average.update);
     ensure(average.encode >= 4, 'A pass reads as encode: ' + average.encode);
-    ensure(average.tick > 0, 'The kernel tick is timed: ' + average.tick);
+    ensure(average.tick >= 1, 'The kernel tick is timed: ' + average.tick);
     ensure(average.submit >= 2, 'The submit is timed: ' + average.submit);
     ensure(Math.abs(sum - total) < 0.01, 'Phases add up to the total');
     removeSpin();
@@ -116,6 +127,8 @@ try {
     phases.dispose();
     await frames(2);
     ensure(device.queue.submit === slowSubmit, 'Submit restored');
+    ensure(store.tick !== fastTick && store.tick.name === '', 'Tick restored');
+    store.tick = fastTick;
     delete device.queue.submit;
     result.phases = average;
 

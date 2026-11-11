@@ -114,12 +114,12 @@ try {
     await page.evaluate(() => window.cacheChecks.preload());
   };
   // Each call has a hard limit, so a stuck stream fails the run instead of holding it.
-  const call = async (name, ...args) => {
+  const limited = async (name, run) => {
     const started = Date.now();
     let timer;
     try {
       return await Promise.race([
-        page.evaluate(([n, a]) => window.cacheChecks[n](...a), [name, args]),
+        run(),
         new Promise(
           (_, reject) =>
             (timer = setTimeout(() => reject(new Error(`${name} took over ${CALL_LIMIT / 1000} s`)), CALL_LIMIT)),
@@ -130,6 +130,8 @@ try {
       console.error(`${name}: ${((Date.now() - started) / 1000).toFixed(1)} s`);
     }
   };
+  const call = (name, ...args) =>
+    limited(name, () => page.evaluate(([n, a]) => window.cacheChecks[n](...a), [name, args]));
   const report = { browser: `${browser.browserType().name()} ${browser.version()}`, sample, bytes: glb.length };
 
   // 1. Cold: the stream reads the chair in ranges, every one fetched once and stored.
@@ -138,7 +140,7 @@ try {
   assert.equal(firstMiss.bytes, 256, 'first chunk delivered while the server holds the remainder');
   assert.equal(firstMiss.files, 0, 'an incomplete response is never committed');
   releaseBody();
-  const streamedMiss = await page.evaluate(() => window.finishMiss());
+  const streamedMiss = await limited('finishMiss', () => page.evaluate(() => window.finishMiss()));
   assert.equal(streamedMiss.digest, sha(glb));
   assert.equal(streamedMiss.stored, sha(glb));
   assert.equal(streamedMiss.stats.stored, 1);
