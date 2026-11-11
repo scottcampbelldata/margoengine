@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15096929,
+  "total": 15100639,
   "history": [
     {
       "date": "2026-10-24",
@@ -8537,6 +8537,12 @@
       "commit": "298c93e079",
       "reason": "KB5322: AnimatorGraph captureState/restoreState (graph bools, triggers, active transition and source with playback): graph 10320 to 10596 B gzip measured, layers 10967 to 11252 and masks 11175 to 11462 (both bundle graph); the snapshot lives on the graph class it restores, a separate entry would need the graph's private state exposed",
       "grew": 3
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "8a8da3bf3d",
+      "reason": "bug sweep L3: linearHdr shared float-format check in grass, water and water/fft (the HDR output fix, +1 to +15 B); webgl2-compat WebGPU map-range validation (KB5128a) and the Firefox renderer query (+195 B); no split avoids them",
+      "grew": 4
     }
   ],
   "items": {
@@ -8739,7 +8745,7 @@
     "@margoengine/core": 22467,
     "@margoengine/core/extension": 22756,
     "@margoengine/creative": 19368,
-    "@margoengine/creative/grass": 6122,
+    "@margoengine/creative/grass": 6379,
     "@margoengine/creative/grass-terrain": 1907,
     "@margoengine/creative/paint": 3329,
     "@margoengine/creative/paint-aniso": 4002,
@@ -9264,7 +9270,7 @@
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10083,
     "@margoengine/post/ssgi": 13483,
-    "@margoengine/post/ssr": 13719,
+    "@margoengine/post/ssr": 13717,
     "@margoengine/post/sss": 7461,
     "@margoengine/post/stack": 4479,
     "@margoengine/post/stylize": 7202,
@@ -9817,10 +9823,10 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/voxel/wind": 3073,
-    "@margoengine/water": 20817,
+    "@margoengine/water": 21457,
     "@margoengine/water/bodies": 4419,
     "@margoengine/water/caustics": 9230,
-    "@margoengine/water/fft": 7590,
+    "@margoengine/water/fft": 7858,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/liquid": 18903,
     "@margoengine/water/query": 4719,
@@ -9843,7 +9849,7 @@
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
     "@margoengine/webgl2-compat": 111889,
-    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 78190,
+    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 80737,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
