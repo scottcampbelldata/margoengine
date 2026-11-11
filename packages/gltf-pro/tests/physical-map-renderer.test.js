@@ -242,8 +242,18 @@ test('mapped tint retains resource declarations with either WGSL attribute order
 @binding(7) @group(2) var<uniform> reversed:vec4f;
 @group( 3 )\n@binding( 1 ) var<storage, read> spaced:array<vec4f>;
 @fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(1);}`);
-  assert.match(code, /_=&reversed;/);
-  assert.match(code, /_=&spaced;/);
+  // Value uses, or the length of a runtime-sized array: WebKit drops a binding reached only through `_=&name`.
+  assert.match(code, /_=reversed;/);
+  assert.ok(code.includes('_=arrayLength(&spaced);'), code);
+  assert.doesNotMatch(code, /_=&/);
+  const tail = texturedTintPBR(`
+struct Rows {count:u32, rows:array<vec4f>}
+struct Fixed {a:vec4f, b:array<vec4f,4>}
+@group(2) @binding(3) var<storage, read> rows:Rows;
+@group(2) @binding(4) var<storage, read> fixed:Fixed;
+@fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(1);}`);
+  assert.ok(tail.includes('_=arrayLength(&rows.rows);'), tail);
+  assert.match(tail, /_=fixed;/);
 });
 
 test('absent normal maps decode to the exact geometric normal', async (t) => {

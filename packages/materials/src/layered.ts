@@ -210,7 +210,7 @@ export function layered(options: LayeredOptions = {}): LayeredFeature {
     // Vertex colours that weigh layers stop tinting the base; their alpha still counts as opacity.
     if (tinted) out = out.replace('*f.base*i.color;', '*f.base*vec4f(1,1,1,i.color.a);');
     const keep = slots.map((_, k) => `_=margoLayerMap${k};_=margoLayerSampler${k};`).join('');
-    out = out.replace('fn surface(i:Out,front:bool)->Surface {', (head) => `${head}\n  _=&margoLayerRows;${keep}`);
+    out = out.replace('fn surface(i:Out,front:bool)->Surface {', (head) => `${head}\n  _=margoLayerRows;${keep}`);
     out =
       `struct MargoLayerRows {rows:array<vec4f,${count}>}
 @group(${group}) @binding(150) var<uniform> margoLayerRows:MargoLayerRows;

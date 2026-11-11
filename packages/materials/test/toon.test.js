@@ -85,7 +85,7 @@ test('toon rewrites the direct and hemisphere terms through the ramp and keeps e
     assert.match(code, /fn hemisphere_ambient\(s:Surface\)->vec3f \{return s\.base\.rgb\*mix\(/, 'Lambert hemisphere');
     assert.ok(code.includes('fn margoFront(s:Surface)->Surface {var o=s; o.metal=0; o.roughness=1.0; return o;}'));
     assert.ok(
-      code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=&margoToon;_=margoToonMap;_=margoToonSampler;'),
+      code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=margoToon;_=margoToonMap;_=margoToonSampler;'),
     );
     assert.ok(code.includes('var color=direct+ambient(s)+s.emissive;'));
     assert.ok(!/fn direct_light[^}]*fresnel/.test(code), 'no GGX highlight');

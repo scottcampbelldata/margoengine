@@ -1717,7 +1717,7 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {var o=margoFront(s); let 
   // Auxiliary entries (G-buffer, ambient) keep the beauty bind group layout.
   ...(phong
     ? [
-        ['fn surface(i:Out,front:bool)->Surface {', 'fn surface(i:Out,front:bool)->Surface {\n  _=&mat_phong;'] as [
+        ['fn surface(i:Out,front:bool)->Surface {', 'fn surface(i:Out,front:bool)->Surface {\n  _=mat_phong;'] as [
           string,
           string,
         ],

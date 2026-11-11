@@ -45,7 +45,7 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {var o=margoFront(s); let 
   ],
   [
     'fn surface(i:Out,front:bool)->Surface {',
-    'fn surface(i:Out,front:bool)->Surface {\n  _=&margoToon;_=margoToonMap;_=margoToonSampler;',
+    'fn surface(i:Out,front:bool)->Surface {\n  _=margoToon;_=margoToonMap;_=margoToonSampler;',
   ],
 ];
 const surfaces = new Map<string, string>(),

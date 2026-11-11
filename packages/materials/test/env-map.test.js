@@ -127,7 +127,7 @@ test('standard envMap replaces the ambient light, also over a scene IBL, and bin
   assert.ok(code.includes('fn ambient(s:Surface)->vec3f {return margoEnvAmbient(s,margoEnvEye);}'));
   assert.ok(code.includes('@group(2) @binding(188) var margoEnvMap:texture_cube<f32>;'));
   assert.ok(
-    code.includes('margoEnvEye=normalize(margoView.eye.xyz-i.position);_=margoEnvMap;_=margoEnvSampler;_=&margoEnv;'),
+    code.includes('margoEnvEye=normalize(margoView.eye.xyz-i.position);_=margoEnvMap;_=margoEnvSampler;_=margoEnv;'),
   );
   assert.ok(
     all.some((c) => !c.includes('margoEnv')),

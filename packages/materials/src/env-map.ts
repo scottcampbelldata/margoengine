@@ -116,7 +116,7 @@ export function envMapShader(code: string, group: number, shading: 'standard' | 
   out = edit(
     code,
     'fn surface(i:Out,front:bool)->Surface {',
-    `fn surface(i:Out,front:bool)->Surface {\n  margoEnvEye=normalize(f.eye.xyz-i.position);_=margoEnvMap;_=margoEnvSampler;_=&margoEnv;${layers ? 'margoEnvIn=i;' : ''}`,
+    `fn surface(i:Out,front:bool)->Surface {\n  margoEnvEye=normalize(f.eye.xyz-i.position);_=margoEnvMap;_=margoEnvSampler;_=margoEnv;${layers ? 'margoEnvIn=i;' : ''}`,
   );
   if (shading === 'standard') {
     out = edit(

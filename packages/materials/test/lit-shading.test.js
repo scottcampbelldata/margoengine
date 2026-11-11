@@ -65,7 +65,7 @@ test('lambert and phong rewrite only the direct and hemisphere terms and keep ev
     assert.ok(!lambert.includes('mat_phong') && !/fn direct_light[^}]*pow\(/.test(lambert), 'Lambert has no highlight');
     assert.match(phong, /@group\(2\) @binding\(197\) var<uniform> mat_phong:vec4f;/);
     assert.ok(phong.includes('mat_phong.rgb*(mat_phong.w+2)/25.13274123*pow(max(dot(s.n,h),0.0001),mat_phong.w)'));
-    assert.ok(phong.includes('fn surface(i:Out,front:bool)->Surface {\n  _=&mat_phong;'), 'G-buffer keeps the layout');
+    assert.ok(phong.includes('fn surface(i:Out,front:bool)->Surface {\n  _=mat_phong;'), 'G-buffer keeps the layout');
     // Shadows, clustered lights, an IBL ambient and fog compose at gltf-pro's hook points.
     const ibl = { declarations: '// ibl\n', ambient: 'iblShade(s.n,v,s.base.rgb,s.metal,s.roughness)*s.occlusion' },
       fog = { declarations: '// fog\n', output: (c) => `fog(${c})` },

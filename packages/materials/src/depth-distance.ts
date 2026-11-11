@@ -37,7 +37,7 @@ fn margoPackDepth(value:f32)->vec4f {
     .replace('fn surface(i:Out,front:bool)->Surface {', (head) => {
       hooks++;
       // G-buffer and ambient entries retain the same local bind-group layout.
-      return head + '\n  _=&margoDepthDistance;';
+      return head + '\n  _=margoDepthDistance;';
     });
   if (hooks !== 2)
     throw new MargoError(

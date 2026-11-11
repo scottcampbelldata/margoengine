@@ -218,7 +218,7 @@ test('subsurface adds the wrap to the directional light and the translucency aft
   assert.ok(code.includes('var color=margoSubsurface(i,s,v,l)+'), 'the translucency is added unshadowed');
   assert.ok(code.includes('fn margoThickness(i:Out)->f32 {return 1.0;}'), 'no thickness map, no binding');
   assert.ok(
-    code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=&margoSurface;'),
+    code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=margoSurface;'),
     'auxiliary entries keep the layout',
   );
   assert.ok(bindings(log).some((list) => list.includes(170) && !list.includes(173)));

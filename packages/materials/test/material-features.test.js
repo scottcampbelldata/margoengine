@@ -686,7 +686,7 @@ test('WgslMaterial splices shade() and displace(), binds its uniforms and textur
     ),
   );
   assert.ok(
-    code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=&uniforms;_=noise;_=noiseSampler;'),
+    code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=uniforms;_=noise;_=noiseSampler;'),
     'every binding stays in the layout',
   );
   assert.ok(/s=shade\(i,s\);\n {2}if\(margoFaceTest&&!facing/.test(code), 'before the face and alpha tests');

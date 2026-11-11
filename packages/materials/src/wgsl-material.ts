@@ -156,7 +156,7 @@ export class WgslMaterial extends Material {
       .replace('fn surface(i:Out,front:bool)->Surface {', (head) => {
         count++;
         // Every binding stays in each entry point's layout, used by the WGSL or not.
-        return `${head}\n  ${Object.keys(this.sizes).length ? '_=&uniforms;' : ''}${names.map((n) => `_=${n};_=${n}Sampler;`).join('')}`;
+        return `${head}\n  ${Object.keys(this.sizes).length ? '_=uniforms;' : ''}${names.map((n) => `_=${n};_=${n}Sampler;`).join('')}`;
       });
     if (/\bfn\s+displace\b/.test(this.wgsl))
       code = code.replace(vertexSite, () => {

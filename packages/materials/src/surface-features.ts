@@ -168,7 +168,7 @@ export function subsurfaceShader(code: string, thicknessMap: boolean): string {
   return edit(
     out,
     head,
-    `${head}\n  _=&margoSurface;${thicknessMap ? '_=margoThicknessMap;_=margoThicknessSampler;' : ''}`,
+    `${head}\n  _=margoSurface;${thicknessMap ? '_=margoThicknessMap;_=margoThicknessSampler;' : ''}`,
   );
 }
 

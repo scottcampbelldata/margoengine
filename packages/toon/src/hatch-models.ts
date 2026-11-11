@@ -101,7 +101,7 @@ export class ModelHatching extends HatchStyle {
         const own = hooks ? lightPBR(code, hooks) : (source?.shader?.(code, group) ?? code);
         return (
           hatchWGSL(binding, group) +
-          own.replace('fn surface(i:Out,front:bool)->Surface {', 'fn surface(i:Out,front:bool)->Surface { _=&hatch;')
+          own.replace('fn surface(i:Out,front:bool)->Surface {', 'fn surface(i:Out,front:bool)->Surface { _=hatch;')
         );
       },
       lit: (code) => {

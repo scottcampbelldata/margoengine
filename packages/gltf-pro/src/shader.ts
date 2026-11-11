@@ -459,12 +459,30 @@ fn margoTintSurface(i:Out,s:Surface,tint:vec3f)->vec4f {
 }
 @fragment fn margoTint(i:Out)->@location(0) vec4f {return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));}
 `;
+/**
+ * What a phony assignment reads to keep resource `name` in an automatic layout. A runtime-sized storage array (or a
+ * storage struct ending in one) cannot be loaded as a value, so its length is read. Never a phony pointer: WebKit's
+ * WGSL compiler leaves a binding reached only through one out of the layout (WebKit sweep 2026-11-11), though WGSL
+ * counts it as a static use.
+ */
+function keptUse(code: string, space: string | undefined, name: string, type: string): string {
+  if (!space || !/^storage\b/.test(space)) return name;
+  if (/^array\s*<[^,<>]+(<[^<>]*>)?\s*>$/.test(type)) return `arrayLength(&${name})`;
+  const body = new RegExp(`struct\\s+${type}\\s*\\{([^}]*)\\}`).exec(code)?.[1],
+    last = body
+      ?.split(',')
+      .map((m) => m.trim())
+      .filter(Boolean)
+      .pop(),
+    tail = last && /^(?:@\w+\s*\([^)]*\)\s*)*(\w+)\s*:\s*array\s*<[^,<>]+(<[^<>]*>)?\s*>$/.exec(last);
+  return tail ? `arrayLength(&${name}.${tail[1]})` : name;
+}
+
 /** Retain the complete material/effect resource interface for a texture-dependent tint draw. */
 export function texturedTintPBR(code: string): string {
-  const resources = Array.from(code.matchAll(/((?:@\w+\s*\([^)]*\)\s*)+)var(?:\s*<([^>]+)>)?\s+(\w+)\s*:/g))
+  const resources = Array.from(code.matchAll(/((?:@\w+\s*\([^)]*\)\s*)+)var(?:\s*<([^>]+)>)?\s+(\w+)\s*:\s*([^;]+);/g))
     .filter(([, attributes]) => /@group\s*\(/.test(attributes) && /@binding\s*\(/.test(attributes))
-    // A runtime-sized storage array cannot be loaded as a value; retain its pointer instead.
-    .map(([, , space, name]) => `_=${space && /^(uniform|storage)\b/.test(space) ? '&' : ''}${name};`)
+    .map(([, , space, name, type]) => `_=${keptUse(code, space, name, type.trim())};`)
     .join('');
   return code.replace(
     /@fragment fn margoTint\(i:Out(?:,@builtin\(front_facing\) front:bool)?\)->@location\(0\) vec4f \{/,
