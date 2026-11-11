@@ -3,6 +3,7 @@ import { speedEnabled, deferSpeed } from './support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
+import { percentile } from './lib/percentile.mjs';
 import { build } from 'vite';
 
 await build({
@@ -331,14 +332,8 @@ try {
           await device.queue.onSubmittedWorkDone();
           durations.push(window.performance.now() - start);
         }
-        durations.sort((a, b) => a - b);
-        performance.push({
-          blades,
-          fullDetailVisible: visible[1],
-          resolution: [1280, 720],
-          medianFrameMs: durations[45],
-          p95FrameMs: durations[85],
-        });
+        // Median and p95 are taken in Node with the shared nearest-rank helper (after the evaluate).
+        performance.push({ blades, fullDetailVisible: visible[1], resolution: [1280, 720], durations });
       }
       meadow.dispose();
     }
@@ -435,6 +430,11 @@ try {
       ],
     };
   }, speedEnabled());
+  result.performance = result.performance.map(({ durations, ...row }) => ({
+    ...row,
+    medianFrameMs: percentile(durations, 50, { count: 90, label: `${row.blades} blades` }),
+    p95FrameMs: percentile(durations, 95, { count: 90, label: `${row.blades} blades` }),
+  }));
 
   const { page } = browser;
   await page.addInitScript(instrumentMeadow);

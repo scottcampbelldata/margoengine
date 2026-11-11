@@ -20,6 +20,7 @@ import { isAncestor, revision, show as showAt } from './history.js';
 import { begin, canonicalNaN, fact, golden as storedGolden, readOnly, reading, tape } from './golden.js';
 
 import { neutralNormalExpectations } from './normal-fallback.js';
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 export { canonicalNaN, fact, readOnly, tape };
 /** Historical exact expectations include the reviewed normal-fallback bug correction; candidate calls remain raw. */
 export async function golden(...args) {
@@ -216,7 +217,7 @@ export async function versions(name, ref, entry = 'src/index.ts', candidateRef) 
   };
 }
 
-const median = (values) => values.slice().sort((a, b) => a - b)[values.length >> 1];
+const median = (values) => nearestMedian(values);
 /** Interleave baseline (A) and candidate (B) runs A B B A so drift affects both alike. Each run returns nothing. */
 export function time(runBaseline, runCandidate, rounds = 12) {
   if (deferSpeed('proof paired wall-clock comparisons')) return { deferred: true };

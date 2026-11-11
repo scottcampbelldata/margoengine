@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { preview } from 'vite';
 import { launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { percentile } from './lib/percentile.mjs';
 
 const shots = process.argv.find((a) => a.startsWith('--shots='))?.slice(8),
   only = process.argv.find((a) => a.startsWith('--only='))?.slice(7),
@@ -185,18 +186,19 @@ try {
     result.hullLoadMs = await page.evaluate(() => globalThis.boulder.climber.hullLoadMs);
     // Timing, this PC only, and only meaningful when it is quiet.
     if (speedEnabled()) {
-      result.gpuSubmitMs = await page.evaluate(async () => {
+      const gpuMs = await page.evaluate(async () => {
         globalThis.__passes.timing = true;
         // fixed-wait: the length of the timing window
         await new Promise((r) => setTimeout(r, 2000));
         globalThis.__passes.timing = false;
-        const sorted = [...globalThis.__passes.gpuMs].sort((a, b) => a - b);
-        return {
-          samples: sorted.length,
-          median: sorted[sorted.length >> 1],
-          p95: sorted[Math.floor(sorted.length * 0.95)],
-        };
+        return [...globalThis.__passes.gpuMs];
       });
+      // Nearest rank (scripts/lib/percentile.mjs): an empty window or a non-finite sample throws.
+      result.gpuSubmitMs = {
+        samples: gpuMs.length,
+        median: percentile(gpuMs, 50, { label: `${name} GPU submit` }),
+        p95: percentile(gpuMs, 95, { label: `${name} GPU submit` }),
+      };
       result.solve = await page.evaluate(async () => {
         globalThis.boulder.climber.resetTimes();
         // fixed-wait: the length of the timing window

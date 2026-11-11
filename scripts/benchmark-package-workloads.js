@@ -12,6 +12,7 @@ import { gzipSync } from 'node:zlib';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { decodePNG } from '../tests/support/png.js';
+import { distribution as sampleDistribution } from './lib/percentile.mjs';
 
 const defaults = {
   ecs: 10000,
@@ -52,17 +53,11 @@ const flags = [
   '--disable-backgrounding-occluded-windows',
   '--disable-renderer-backgrounding',
 ];
+// An empty window reports null (no invented numbers); a non-finite sample throws in the shared helper.
 const distribution = (values) => {
   if (!values.length) return null;
-  const sorted = values.slice().sort((a, b) => a - b),
-    percentile = (fraction) => sorted[Math.ceil((sorted.length - 1) * fraction)];
-  return {
-    mean: values.reduce((a, b) => a + b, 0) / values.length,
-    median: percentile(0.5),
-    p95: percentile(0.95),
-    p99: percentile(0.99),
-    max: sorted.at(-1),
-  };
+  const { mean, median, p95, p99, max } = sampleDistribution(values);
+  return { mean, median, p95, p99, max };
 };
 
 /** Summarize actual render callbacks; gaps stay unclipped and pause intervals are excluded. */

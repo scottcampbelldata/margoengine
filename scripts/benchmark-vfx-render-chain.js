@@ -8,6 +8,7 @@ if (
 import assert from 'node:assert/strict';
 import { writeFile, appendFile, readFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
+import { median } from './lib/percentile.mjs';
 const previous = JSON.parse(await readFile('test-results/vfx-island-native-ab.json', 'utf8')),
   camera = previous.cadence[0].timing.camera;
 const browser = await openBrowser({
@@ -353,21 +354,6 @@ try {
         !validation && !info.length && !uncaptured.length,
         JSON.stringify({ validation: validation?.message, info, uncaptured }),
       );
-      const median = (values) => values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)],
-        fields = ['computeMsPerFrame', 'drawMsPerFrame', 'combinedPassMsPerFrame', 'chainSpanMsPerFrame'],
-        summary = Object.fromEntries(
-          fields.map((field) => [
-            field,
-            {
-              originalMedian: median(pairs.map((p) => p.original[field])),
-              fullMedian: median(pairs.map((p) => p.full[field])),
-              medianPairedSavingMs: median(pairs.map((p) => p.original[field] - p.full[field])),
-              wins: pairs.filter((p) => p.full[field] < p.original[field]).length,
-              ties: pairs.filter((p) => p.full[field] === p.original[field]).length,
-              losses: pairs.filter((p) => p.full[field] > p.original[field]).length,
-            },
-          ]),
-        );
       return {
         capacity,
         width,
@@ -396,7 +382,6 @@ try {
               m.code.includes('positionLife') && m.code.includes('f.right.xyz') && m.code.includes('let radius=dot'),
           ).length,
         },
-        summary,
         pairs,
         validationErrors: info,
         uncaptured,
@@ -409,6 +394,21 @@ try {
     }
   }, camera);
   assert.deepEqual(errors, []);
+  // Medians in Node with the shared nearest-rank helper; a missing or non-finite pair value throws.
+  const { pairs } = result;
+  result.summary = Object.fromEntries(
+    ['computeMsPerFrame', 'drawMsPerFrame', 'combinedPassMsPerFrame', 'chainSpanMsPerFrame'].map((field) => [
+      field,
+      {
+        originalMedian: median(pairs.map((p) => p.original[field])),
+        fullMedian: median(pairs.map((p) => p.full[field])),
+        medianPairedSavingMs: median(pairs.map((p) => p.original[field] - p.full[field])),
+        wins: pairs.filter((p) => p.full[field] < p.original[field]).length,
+        ties: pairs.filter((p) => p.full[field] === p.original[field]).length,
+        losses: pairs.filter((p) => p.full[field] > p.original[field]).length,
+      },
+    ]),
+  );
   const report = { recordedAt: new Date().toISOString(), hardware: browser.hardware, camera, ...result, errors };
   await writeFile('test-results/vfx-render-chain-native.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));

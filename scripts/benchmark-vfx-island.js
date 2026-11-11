@@ -13,6 +13,7 @@ import { gzipSync } from 'node:zlib';
 import { resolve } from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { distribution, median } from './lib/percentile.mjs';
 
 const baselineRef = process.argv[2];
 assert(baselineRef, 'Pass the explicit baseline Git ref used by scripts/measure-vfx-memory.js');
@@ -223,7 +224,7 @@ async function replaceEffect(name) {
   );
 }
 async function measure(seconds = 5) {
-  return page.evaluate(async (seconds) => {
+  const result = await page.evaluate(async (seconds) => {
     const a = vfxIslandAudit,
       app = sandbox,
       s = app.stats,
@@ -251,22 +252,15 @@ async function measure(seconds = 5) {
       index = end;
       foreground.push({ visibility: document.visibilityState, focus: document.hasFocus() });
     }
-    const elapsed = performance.now() - start,
-      sorted = intervals.slice().sort((a, b) => a - b),
-      q = (f) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * f))];
+    const elapsed = performance.now() - start;
     return {
       elapsedMs: elapsed,
       renderHz: ((app.timing[1] - frames) * 1000) / elapsed,
       oneSecondRates: rates,
       foreground,
       frameIntervalsMs: {
-        count: sorted.length,
-        median: q(0.5),
-        p95: q(0.95),
-        p99: q(0.99),
-        max: sorted.at(-1),
-        over16_667: sorted.filter((v) => v > 16.667).length,
-        over33_333: sorted.filter((v) => v > 33.333).length,
+        over16_667: intervals.filter((v) => v > 16.667).length,
+        over33_333: intervals.filter((v) => v > 33.333).length,
         raw: intervals,
       },
       allocationDelta: Object.fromEntries(Object.keys(before).map((key) => [key, a[key] - before[key]])),
@@ -275,8 +269,11 @@ async function measure(seconds = 5) {
       hours: app.sky.options.hours,
     };
   }, seconds);
+  // Statistics in Node with the shared nearest-rank helper; no intervals or a non-finite one throws.
+  const { count, median, p95, p99, max } = distribution(result.frameIntervalsMs.raw, { label: 'frame intervals' });
+  result.frameIntervalsMs = { count, median, p95, p99, max, ...result.frameIntervalsMs };
+  return result;
 }
-const median = (v) => v.slice().sort((a, b) => a - b)[Math.floor(v.length / 2)];
 async function run(name, profile) {
   const state = await replaceEffect(name);
   assert.equal(state.recordBytes, 64);

@@ -22,6 +22,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { acquire } from '../../scripts/gpu-lock.mjs';
 import { acPower } from './parts/power.mjs';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const arg = (name, fallback) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -444,11 +445,7 @@ async function timing(config) {
       return ms;
     });
   };
-  const median = (v) => {
-    const x = v.slice().sort((p, q) => p - q),
-      m = x.length >> 1;
-    return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2;
-  };
+  const median = (v) => nearestMedian(v);
   try {
     const blocks = [[], []],
       sessions = 4;

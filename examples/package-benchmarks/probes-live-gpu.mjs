@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { distribution } from '../../scripts/lib/percentile.mjs';
 
 const bench = process.argv.includes('--bench');
 const powerBefore = ac();
@@ -27,11 +28,11 @@ const failures = [],
       console.log('FAIL ' + message);
     }
   };
+// Nearest rank (scripts/lib/percentile.mjs); no samples give null, a non-finite sample throws.
 const stats = (values) => {
   if (!values.length) return null;
-  const s = [...values].sort((a, b) => a - b),
-    at = (q) => s[Math.min(s.length - 1, Math.floor(q * s.length))];
-  return { count: s.length, median: +at(0.5).toFixed(4), p95: +at(0.95).toFixed(4), max: +s.at(-1).toFixed(4) };
+  const d = distribution(values);
+  return { count: d.count, median: +d.median.toFixed(4), p95: +d.p95.toFixed(4), max: +d.max.toFixed(4) };
 };
 
 const context = await openBrowser({ startPath: '/LICENSE', port: 5274 }),

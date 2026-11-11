@@ -15,13 +15,14 @@ import { Engine, TransformStore } from '../../../packages/core/dist/extension.js
 import { buildAssembly, ENTITIES_PER_MODULE, partShapes } from './assembly.js';
 import { requireAC } from './power.mjs';
 import { waitForQuiet } from '../../../scripts/quiet-gate.mjs';
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
 const sizes = (arg('sizes') ?? '100000,500000,1000000').split(',').map(Number),
   diagnostic = process.argv.includes('--diagnostic');
 const fake = { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
   canvas = { width: 1432, height: 768, clientWidth: 1432, clientHeight: 768 };
-const median = (v) => +v.sort((a, b) => a - b)[v.length >> 1].toFixed(3),
+const median = (v) => +nearestMedian(v).toFixed(3),
   time = (fn) => {
     const s = performance.now();
     fn();

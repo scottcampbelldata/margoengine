@@ -1,12 +1,10 @@
 // Helpers for suites that run in Node (the same Wasm kernel and package code as the browser, no GPU).
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
+import { median } from '../../scripts/lib/percentile.mjs';
 
-/** Median of an array (sorted copy). */
-export const median = (values) => {
-  const v = [...values].sort((a, b) => a - b);
-  return v.length % 2 ? v[v.length >> 1] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
-};
+/** Nearest-rank median (scripts/lib/percentile.mjs): throws on an empty set or a non-finite sample. */
+export { median };
 
 /** Median ms of `fn()` over `reps` calls after `warm` untimed calls. One run's sample for a node case. */
 export function timed(fn, { reps = 30, warm = 3 } = {}) {

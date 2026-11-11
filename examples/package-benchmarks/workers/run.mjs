@@ -24,14 +24,11 @@ import { binary, grid } from '../../../packages/fbx/test/fixtures.js';
 import { exportUSDZ } from '../../../packages/exporters/dist/usdz.js';
 import { torusKnotGeometry, toGeometry } from '../../../packages/geometry/dist/index.js';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const rounds = +arg('rounds', 6),
-  median = (values) => {
-    const s = [...values].sort((a, b) => a - b),
-      m = s.length >> 1;
-    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-  };
+  median = (values) => nearestMedian(values);
 mkdirSync('test-results', { recursive: true });
 writeFileSync('test-results/workers-big.glb', bigGLB({ segments: 400, meshes: 4 })); // 4 x 160,801 vertices, 960,000 indices each (accessors are capped at 1M elements)
 writeFileSync('test-results/workers-grid.fbx', binary(grid(400), { compress: true }));

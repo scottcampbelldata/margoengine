@@ -13,6 +13,7 @@ import { build } from 'vite';
 import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { SnapshotBuffer, createSnapshot } from '../packages/net/dist/index.js';
+import { median } from './lib/percentile.mjs';
 
 const baselineRef = process.argv[2];
 assert.ok(baselineRef, 'Usage: node scripts/benchmark-net.js <baseline Git ref>');
@@ -67,7 +68,6 @@ assert.equal(
   'Rebuild Net before benchmarking',
 );
 const baseline = await import(`data:text/javascript;base64,${Buffer.from(baselineCode).toString('base64')}`);
-const median = (values) => values.slice().sort((a, b) => a - b)[Math.floor(values.length / 2)];
 function fixture(Type, count, capacity, angleStep) {
   const buffers = [],
     outputs = [];

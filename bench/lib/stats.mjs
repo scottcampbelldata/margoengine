@@ -2,22 +2,36 @@
 // spread is the relative range (max - min) / |median|: with the default 5 runs it is the plainest noise measure, and a
 // metric whose spread is over the noise threshold is noisy (a noisy primary metric makes the whole run invalid).
 
+import { distribution, percentile } from '../../scripts/lib/percentile.mjs';
+
 const round = (x, digits = 4) => (Number.isFinite(x) ? +x.toFixed(digits) : null);
 
-/** Median, p95 (nearest rank), min, max, mean and spread of `samples` (non-finite values are dropped). */
+/**
+ * Nearest-rank median and p95, min, max, mean and spread of `samples` (scripts/lib/percentile.mjs). An empty set gives
+ * the all-null summary; a NaN or other non-finite sample throws, so a failed run is never dropped from the summary.
+ */
 export function summarize(samples) {
-  const v = samples.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!v.length) return { n: 0, median: null, p95: null, min: null, max: null, mean: null, spread: null };
-  const median = v.length % 2 ? v[v.length >> 1] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+  if (!samples.length) return { n: 0, median: null, p95: null, min: null, max: null, mean: null, spread: null };
+  const { count, median, p95, min, max, mean } = distribution(samples);
   return {
-    n: v.length,
+    n: count,
     median: round(median),
-    p95: round(v[Math.min(v.length - 1, Math.ceil(v.length * 0.95) - 1)]),
-    min: round(v[0]),
-    max: round(v.at(-1)),
-    mean: round(v.reduce((a, b) => a + b, 0) / v.length),
-    spread: median ? round((v.at(-1) - v[0]) / Math.abs(median)) : 0,
+    p95: round(p95),
+    min: round(min),
+    max: round(max),
+    mean: round(mean),
+    spread: median ? round((max - min) / Math.abs(median)) : 0,
   };
+}
+
+/**
+ * The metrics some runs measured and others did not, or measured as NaN: each is an error, never a summary of the runs
+ * that happened to work. `runs` is the declared run count. A metric no run measured is absent, not partial.
+ */
+export function partialMetrics(names, samples, runs) {
+  return names.filter(
+    (m) => samples[m]?.some(Number.isFinite) && (samples[m].length !== runs || !samples[m].every(Number.isFinite)),
+  );
 }
 
 /**
@@ -58,11 +72,10 @@ export function frameIntervals(timestamps) {
     if (!Number.isFinite(value) || value < 0) throw new RangeError('Invalid frame timestamp: pass increasing times');
     intervals.push(value);
   }
-  intervals.sort((a, b) => a - b);
   return {
     mean: intervals.reduce((sum, value) => sum + value, 0) / intervals.length,
-    p95: intervals[Math.ceil(intervals.length * 0.95) - 1],
-    p99: intervals[Math.ceil(intervals.length * 0.99) - 1],
+    p95: percentile(intervals, 95),
+    p99: percentile(intervals, 99),
     duration: timestamps.at(-1) - timestamps[0],
   };
 }

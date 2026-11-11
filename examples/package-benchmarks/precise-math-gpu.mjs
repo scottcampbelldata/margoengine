@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { acPower } from './parts/power.mjs';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const ROUNDS = Number(process.env.PRECISE_ROUNDS ?? 5),
   COUNT = 1 << 24,
@@ -22,7 +23,7 @@ const ROUNDS = Number(process.env.PRECISE_ROUNDS ?? 5),
   BOUNCES = [1, 4];
 assert.notEqual(acPower(), false, 'run on AC power only');
 
-const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1],
+const median = (values) => nearestMedian(values),
   // The mean of the faster half: a pass the timer rounds to one 0.066 ms tick averages out, and a pass another job
   // on the machine slowed does not count.
   settled = (values) => {
@@ -76,7 +77,15 @@ try {
     Object.entries(compute).map(([name, c]) => {
       const precise = median(c.precise),
         fast = median(c.fast);
-      return [name, { preciseMs: round3(precise), fastMs: round3(fast), ratio: +(precise / fast).toFixed(2), differ: +c.differ.toFixed(4) }];
+      return [
+        name,
+        {
+          preciseMs: round3(precise),
+          fastMs: round3(fast),
+          ratio: +(precise / fast).toFixed(2),
+          differ: +c.differ.toFixed(4),
+        },
+      ];
     }),
   );
   console.table(report.compute);
@@ -88,7 +97,11 @@ try {
       for (let turn = 0; turn < 2; turn++) {
         const arm = (turn + round) % 2 ? 'builtin' : 'precise';
         await fresh();
-        const result = await page.evaluate((o) => window.tracerCost(o), { ...TRACE, builtin: arm === 'builtin', bounces });
+        const result = await page.evaluate((o) => window.tracerCost(o), {
+          ...TRACE,
+          builtin: arm === 'builtin',
+          bounces,
+        });
         if (arm === 'builtin') assert.ok(result.swapped > 0, 'the builtin arm swapped no call');
         for (const [lens, row] of Object.entries(result.rows)) {
           const a = (arms[arm][lens] ??= { ms: [], mean: row.mean });

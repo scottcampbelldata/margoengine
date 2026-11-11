@@ -8,6 +8,7 @@
 // device creation) and marks.buildMs (scene build or model load) are the engine's to fill.
 import { SCENES, sceneParams } from './catalog.js';
 import { workCounter } from '../lib/work-count.js';
+import { distribution } from '../../scripts/lib/percentile.mjs';
 
 const q = new URLSearchParams(location.search),
   numeric = (v) => (v !== '' && Number.isFinite(Number(v)) ? Number(v) : v);
@@ -37,19 +38,12 @@ export const params = sceneParams(
 );
 const scriptMs = performance.now();
 
+// Nearest rank (scripts/lib/percentile.mjs); no samples give null, a non-finite sample throws.
 const stat = (values) => {
   if (!values.length) return null;
-  const v = [...values].sort((a, b) => a - b),
-    at = (p) => v[Math.min(v.length - 1, Math.floor(v.length * p))],
+  const d = distribution(values),
     r = (x) => +x.toFixed(3);
-  return {
-    n: v.length,
-    median: r(at(0.5)),
-    p95: r(at(0.95)),
-    min: r(v[0]),
-    max: r(v.at(-1)),
-    mean: r(v.reduce((a, b) => a + b, 0) / v.length),
-  };
+  return { n: d.count, median: r(d.median), p95: r(d.p95), min: r(d.min), max: r(d.max), mean: r(d.mean) };
 };
 const raf = () => new Promise((r) => requestAnimationFrame(r));
 const resources = () =>

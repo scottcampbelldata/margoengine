@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { onAC, waitForQuiet } from '../../../scripts/quiet-gate.mjs';
 import { bigGLB } from '../../../tests/support/big-glb.js';
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 
 const option = (name, fallback) =>
   Number(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
@@ -33,7 +34,7 @@ const assets = [
 mkdirSync('test-results', { recursive: true });
 writeFileSync('test-results/cache-big.glb', bigGLB({ segments: 400, meshes: 6 }));
 const wifi = { offline: false, latency: 80, downloadThroughput: 20e6 / 8, uploadThroughput: 5e6 / 8 };
-const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1];
+const median = (values) => nearestMedian(values);
 const context = await openBrowser({ startPath: '/examples/package-benchmarks/cache/offline.html', port: 5231 }),
   { page, hardware } = context,
   pageErrors = [];

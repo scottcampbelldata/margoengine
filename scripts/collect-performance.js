@@ -57,14 +57,26 @@
   const add = (values, value) => {
     if (values.length < limit) values.push(value);
   };
+  // A copy of nearestRank in scripts/lib/percentile.mjs (a pasted script cannot import); tests/percentile.test.js keeps
+  // the two identical. Nearest rank, and a non-finite sample throws instead of becoming a number in the report.
+  function nearestRank(values, p) {
+    if (!(p > 0 && p <= 100)) throw new RangeError(`Percentile ${p} is outside (0, 100]`);
+    const n = values.length;
+    if (!n) throw new RangeError('No samples: a measurement that produced nothing has no percentile');
+    for (let i = 0; i < n; i++)
+      if (typeof values[i] !== 'number' || !Number.isFinite(values[i]))
+        throw new RangeError(`Sample ${i} is ${values[i]}, not a finite number`);
+    const sorted = Array.from(values).sort((a, b) => a - b);
+    // p * n / 100 is exact for whole p and n; the 1e-9 keeps a fractional p such as 99.9 from rounding up one rank.
+    return sorted[Math.max(1, Math.ceil((p * n) / 100 - 1e-9)) - 1];
+  }
   function summary(values) {
-    const sorted = values.slice().sort((a, b) => a - b),
-      n = sorted.length;
+    const n = values.length;
     return {
       samples: n,
-      medianMs: n ? sorted[Math.floor((n - 1) / 2)] : null,
-      p95Ms: n ? sorted[Math.floor((n - 1) * 0.95)] : null,
-      maxMs: n ? sorted[n - 1] : null,
+      medianMs: n ? nearestRank(values, 50) : null,
+      p95Ms: n ? nearestRank(values, 95) : null,
+      maxMs: n ? nearestRank(values, 100) : null,
     };
   }
   function hook(target, key, wrap) {

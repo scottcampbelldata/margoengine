@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { MeshBVH as Candidate } from '../packages/bvh/dist/index.js';
 import { createWorkload } from '../examples/package-benchmarks/bvh.js';
+import { median } from './lib/percentile.mjs';
 
 // Build the package first. An explicit prior Git ref keeps this comparison repeatable after landing the change.
 const baselineRef = process.argv[2];
@@ -177,10 +178,6 @@ for (const mode of ['contained all', 'region', 'ordered region', 'early exit']) 
       d = original.batch();
     pairs.push({ originalMs: (a + d) / 2, candidateMs: (b + c) / 2, ratio: (a + d) / (b + c) });
   }
-  const median = (values) => {
-    const sorted = values.slice().sort((a, b) => a - b);
-    return (sorted[5] + sorted[6]) / 2;
-  };
   reports.push({
     mode,
     queriesPerBatch: inputs.length,

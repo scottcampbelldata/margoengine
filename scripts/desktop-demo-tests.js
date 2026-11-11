@@ -10,6 +10,7 @@ import { preview } from 'vite';
 import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { closeAll } from './support/shutdown.mjs';
+import { percentile } from './lib/percentile.mjs';
 
 const demos = [
   { name: 'citadel', path: '/night-citadel/', range: ['azimuth', 'azimuth-value'] },
@@ -270,6 +271,15 @@ async function checkControls(page, demo) {
   return { control: 'animation pause', toggled: true, restored: true };
 }
 
+// Nearest-rank interval statistics (scripts/lib/percentile.mjs); no intervals give null, a non-finite one throws.
+function cadence({ intervals, ...rest }) {
+  return {
+    ...rest,
+    medianIntervalMs: intervals.length ? percentile(intervals, 50) : null,
+    p95IntervalMs: intervals.length ? percentile(intervals, 95) : null,
+  };
+}
+
 // Native browser callback pacing is evidence, not a hardware/display FPS promise.
 function nativeCadence(durationMs) {
   return new Promise((resolve) => {
@@ -287,17 +297,14 @@ function nativeCadence(durationMs) {
     setTimeout(() => {
       cancelAnimationFrame(frame);
       const elapsedMs = performance.now() - start;
-      const intervals = timestamps
-        .slice(1)
-        .map((time, index) => time - timestamps[index])
-        .sort((a, b) => a - b);
+      const intervals = timestamps.slice(1).map((time, index) => time - timestamps[index]);
       resolve({
         elapsedMs,
         callbacks: timestamps.length,
         callbackRateHz:
           timestamps.length > 1 ? ((timestamps.length - 1) * 1000) / (timestamps.at(-1) - timestamps[0]) : 0,
-        medianIntervalMs: intervals.length ? intervals[Math.floor(intervals.length / 2)] : null,
-        p95IntervalMs: intervals.length ? intervals[Math.floor((intervals.length - 1) * 0.95)] : null,
+        // Median and p95 are taken in Node with the shared nearest-rank helper (cadence below).
+        intervals,
         submissions: audit.submissions - submissions,
         canvasPasses: audit.canvasPasses - canvasPasses,
         note: 'Native callbacks and canvas passes; no FPS threshold or physical-display guarantee.',
@@ -385,7 +392,7 @@ try {
       const scenePath = resolve(output, prefix + '-' + demo.name + '-scene.png');
       result.scene = await canvasImage(page, scenePath);
       result.sceneScreenshot = scenePath;
-      if (speedEnabled()) result.cadence = await page.evaluate(nativeCadence, 3000);
+      if (speedEnabled()) result.cadence = cadence(await page.evaluate(nativeCadence, 3000));
       else deferSpeed('desktop callback cadence diagnostic');
       result.controls = await checkControls(page, demo);
       await page.setViewportSize(resizedViewport);

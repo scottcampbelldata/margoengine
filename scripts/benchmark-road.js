@@ -14,6 +14,7 @@ import { gzipSync } from 'node:zlib';
 import { cpus } from 'node:os';
 import { build } from 'vite';
 import { Spline } from '../packages/splines/dist/index.js';
+import { median } from './lib/percentile.mjs';
 
 // Build Road first; --direct-writes recreates the rejected allocation experiment without mutating the package.
 const baselineRef = process.argv[2];
@@ -158,11 +159,6 @@ function batch(fn, work) {
   }
   return performance.now() - start;
 }
-const median = (values) => {
-  const sorted = values.slice().sort((a, b) => a - b),
-    middle = sorted.length / 2;
-  return (sorted[middle - 1] + sorted[middle]) / 2;
-};
 const reports = [];
 for (const work of cases) {
   const before = original(work.curve, work.options),

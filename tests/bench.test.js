@@ -1,14 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { frameIntervals, metricRecord, summarize, worsening } from '../bench/lib/stats.mjs';
+import { frameIntervals, metricRecord, partialMetrics, summarize, worsening } from '../bench/lib/stats.mjs';
 import { compare, markdown, html } from '../bench/lib/results.mjs';
 import { SCENES, STANDARD, caseId, sceneParams } from '../bench/scenes/catalog.js';
 import { OPT_IN, SUITES, loadSuite } from '../bench/suites/index.mjs';
 
 test('bench statistics: median, nearest-rank p95, relative spread, noise', () => {
   assert.deepEqual(summarize([5, 1, 3, 2, 4]), { n: 5, median: 3, p95: 5, min: 1, max: 5, mean: 3, spread: 1.3333 });
-  assert.equal(summarize([2, 4]).median, 3);
+  // Nearest rank: the median of an even count is the lower middle sample, a measured value.
+  assert.equal(summarize([2, 4]).median, 2);
+  // A failed run (NaN or missing) throws instead of being dropped from the summary.
+  assert.throws(() => summarize([1, Number.NaN, 3]), RangeError);
+  assert.throws(() => summarize([1, undefined, 3]), RangeError);
   assert.equal(summarize([]).median, null);
   assert.equal(metricRecord({ unit: 'ms' }, [10, 10.5, 10.2], 0.1).noisy, false);
   assert.equal(metricRecord({ unit: 'ms' }, [10, 13, 10.2], 0.1).noisy, true);
@@ -18,6 +22,14 @@ test('bench statistics: median, nearest-rank p95, relative spread, noise', () =>
   assert.deepEqual(frameIntervals([0, 1, 3, 6, 10]), { mean: 2.5, p95: 4, p99: 4, duration: 10 });
   assert.throws(() => frameIntervals([2, 1]), RangeError);
   assert.throws(() => frameIntervals([Number.NaN, 2]), RangeError);
+  // A metric measured by some runs only, or as NaN in one, is an error; one no run measured is simply absent.
+  const samples = {
+    ms: [1, 2, 3],
+    gaps: [1, Number.NaN, 3],
+    short: [1, 2],
+    none: [Number.NaN, Number.NaN, Number.NaN],
+  };
+  assert.deepEqual(partialMetrics(['ms', 'gaps', 'short', 'none', 'unmeasured'], samples, 3), ['gaps', 'short']);
 });
 
 const run = (machine, metrics) => ({

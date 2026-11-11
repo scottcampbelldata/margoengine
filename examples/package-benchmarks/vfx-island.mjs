@@ -22,6 +22,7 @@ import { acquire } from '../../scripts/gpu-lock.mjs';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
 import { acPower } from './parts/power.mjs';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -42,11 +43,7 @@ const power = () => acPower() !== false;
 // Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
 const releaseGpu = await acquire({ owner: 'vfx-island', mode: 'exclusive' });
 let server, browser;
-const median = (v) => {
-  const x = v.slice().sort((p, q) => p - q),
-    m = x.length >> 1;
-  return x.length ? (x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2) : null;
-};
+const median = (v) => (v.length ? nearestMedian(v) : null);
 try {
   const report = {
     recordedAt: new Date().toISOString(),

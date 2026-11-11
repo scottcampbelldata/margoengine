@@ -15,6 +15,7 @@ import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { acPower } from './parts/power.mjs';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const ROUNDS = Number(process.env.TINT_ROUNDS ?? 5),
   FRAMES = 240,
@@ -32,7 +33,7 @@ const patches = {
 };
 assert.notEqual(acPower(), false, 'run on AC power only');
 
-const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1],
+const median = (values) => nearestMedian(values),
   round3 = (value) => +value.toFixed(3),
   meanLevel = (image) => {
     let sum = 0;
@@ -76,9 +77,12 @@ try {
       for (let turn = 0; turn < ARMS.length; turn++) {
         arm = ARMS[(turn + round) % ARMS.length];
         await page.setViewportSize({ width, height });
-        await page.goto(`http://127.0.0.1:5273/examples/package-benchmarks/tint-pass.html?width=${width}&height=${height}`, {
-          timeout: 120000,
-        });
+        await page.goto(
+          `http://127.0.0.1:5273/examples/package-benchmarks/tint-pass.html?width=${width}&height=${height}`,
+          {
+            timeout: 120000,
+          },
+        );
         await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
         for (const scene of SCENES) {
           assert.deepEqual(await page.evaluate((s) => window.check.show(s), scene), [], key(width, scene, arm));
@@ -87,7 +91,11 @@ try {
           assert.ok(result.gpuSamples >= 10, `${key(width, scene, arm)}: no GPU timestamps`);
           const k = key(width, scene, arm);
           samples.set(k, [...(samples.get(k) ?? []), result]);
-          if (round === 0) levels.set(k, meanLevel(await decodePNG(await page.getByRole('img', { name: 'Interactive 3D scene' }).screenshot())));
+          if (round === 0)
+            levels.set(
+              k,
+              meanLevel(await decodePNG(await page.getByRole('img', { name: 'Interactive 3D scene' }).screenshot())),
+            );
         }
       }
   assert.deepEqual(pageErrors, []);

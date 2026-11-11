@@ -36,3 +36,13 @@ test('missed-frame diagnostics retain the preceding CPU callback and merge overl
   assert.deepEqual(missedFrameRows([100, 80, 1, 2, 110, 10, 1, 2], 90, 120), []);
   assert.throws(() => missedFrameRows([100, 20, 1], 0, 200), /Incomplete/);
 });
+
+test('interval percentiles are nearest rank: p99 of intervals 1..100 ms is 99, not the maximum', () => {
+  const samples = [];
+  let at = 0;
+  for (let interval = 1; interval <= 100; interval++) samples.push((at += interval), interval, 1, 1);
+  const { intervalMilliseconds } = summarize(samples, 0, at);
+  assert.equal(intervalMilliseconds.p99, 99);
+  assert.equal(intervalMilliseconds.p95, 95);
+  assert.equal(intervalMilliseconds.median, 50);
+});

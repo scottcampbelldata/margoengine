@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
+import { percentile } from './lib/percentile.mjs';
 
 const vendor = process.env.GPU_VENDOR;
 const allocations = process.argv.includes('--allocations');
@@ -38,7 +39,6 @@ await page.addInitScript(() => {
     };
   }
 });
-const percentile = (values, p) => values.toSorted((a, b) => a - b)[Math.ceil(values.length * p) - 1];
 try {
   await page.reload();
   await page.waitForFunction(() => window.wrapper);
@@ -353,9 +353,9 @@ try {
       backend,
       durationMs: performance.now() - started,
       frames: times.length,
-      observedHz: 1000 / percentile(intervals, 0.5),
-      medianIntervalMs: percentile(intervals, 0.5),
-      p95IntervalMs: percentile(intervals, 0.95),
+      observedHz: 1000 / percentile(intervals, 50),
+      medianIntervalMs: percentile(intervals, 50),
+      p95IntervalMs: percentile(intervals, 95),
       maxIntervalMs: Math.max(...intervals),
       gapsOver25Ms: stalls.length,
       estimatedMissed60HzRefreshes: intervals.reduce(

@@ -6,6 +6,7 @@ import { build } from 'vite';
 import { openBrowser } from './browser.js';
 import { stressOptions, stressProfile, installStressGPU, scenarios } from '../tests/support/stress-profiles.js';
 import { decodePNG } from '../tests/support/png.js';
+import { nearestRank } from './lib/percentile.mjs';
 
 const options = stressOptions(process.argv.slice(2)),
   start = Date.now();
@@ -41,8 +42,8 @@ const report = {
 await browser.page.close();
 await writeFile(`${output}/sessions.jsonl`, '');
 await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
-const percentile = (values, p) =>
-  values.length ? values.toSorted((a, b) => a - b)[Math.ceil(values.length * p) - 1] : null;
+// No frames give null (the session reports frameCount 0); a non-finite frame time throws in the shared helper.
+const percentile = (values, p) => (values.length ? nearestRank(values, p) : null);
 let fatal;
 try {
   assert.ok(
@@ -146,8 +147,8 @@ try {
         resources: state,
         frameCount: frames.length,
         completedFrameMs: {
-          median: percentile(frames, 0.5),
-          p95: percentile(frames, 0.95),
+          median: percentile(frames, 50),
+          p95: percentile(frames, 95),
           max: frames.length ? frames.reduce((max, value) => Math.max(max, value), 0) : null,
         },
         status: 'passed',

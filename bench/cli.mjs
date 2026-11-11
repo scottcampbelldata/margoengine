@@ -26,7 +26,7 @@ import {
   saveReference,
   writeRun,
 } from './lib/results.mjs';
-import { metricRecord } from './lib/stats.mjs';
+import { metricRecord, partialMetrics } from './lib/stats.mjs';
 import { SUITES, loadSuite } from './suites/index.mjs';
 import { browserLabel } from '../scripts/lib/browser.mjs';
 
@@ -249,6 +249,12 @@ try {
             await c.teardown?.();
           } catch (error) {
             entry.error ??= `teardown: ${error?.message ?? error}`;
+          }
+          const partial = entry.unsupported ? [] : partialMetrics(Object.keys(c.metrics), samples, c.runs ?? runs);
+          if (partial.length) {
+            entry.error ??= `missing or non-finite samples in ${partial.join(', ')} (${c.runs ?? runs} runs declared)`;
+            record.status = 'error';
+            failed = true;
           }
           if (entry.error) {
             log(`  ${c.id.padEnd(34)} ERROR ${entry.error.split('\n')[0]}`);

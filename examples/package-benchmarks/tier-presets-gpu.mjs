@@ -21,6 +21,7 @@ import { createServer } from 'vite';
 import { cpuLoad, onAC, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
+import { nearestRank } from '../../scripts/lib/percentile.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -30,15 +31,9 @@ const config = {
   seconds: +arg('seconds', 6),
   label: arg('label', 'run'),
 };
-const median = (v) => {
-  const x = v.slice().sort((p, q) => p - q),
-    m = x.length >> 1;
-  return x.length ? (x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2) : null;
-};
-const pct = (v, f) => {
-  const x = v.slice().sort((p, q) => p - q);
-  return x.length ? x[Math.min(x.length - 1, Math.floor(x.length * f))] : null;
-};
+// Nearest rank (scripts/lib/percentile.mjs); no samples give null, a non-finite sample throws.
+const median = (v) => (v.length ? nearestRank(v, 50) : null);
+const pct = (v, p) => (v.length ? nearestRank(v, p) : null);
 const pages = {
   island: {
     root: 'examples/gameplay-sandbox',
@@ -191,9 +186,9 @@ try {
           fps: +row.fps.toFixed(1),
           submitsPerSecond: +row.submitsPerSecond.toFixed(1),
           gpuP50: median(row.gpu),
-          gpuP90: pct(row.gpu, 0.9),
+          gpuP90: pct(row.gpu, 90),
           spanP50: median(row.spans),
-          spanP90: pct(row.spans, 0.9),
+          spanP90: pct(row.spans, 90),
           spans: row.spans.length,
         };
         report.runs.push({ page: name, variant, round, ...row, gpu: undefined, spans: undefined, summary });

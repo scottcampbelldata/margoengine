@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { waitForQuiet, onAC } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -88,7 +89,7 @@ try {
 } finally {
   await closeAll({ servers: [server] });
 }
-const median = (values) => values.sort((a, b) => a - b)[values.length >> 1],
+const median = (values) => nearestMedian(values),
   pick = (feature, warm) => samples.filter((s) => s.feature === feature && s.warm === warm);
 const summary = Object.fromEntries(
   features.map((feature) => [

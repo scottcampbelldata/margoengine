@@ -10,7 +10,8 @@ if (
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
 import { requireAC } from './power.mjs';
-const median = (v) => +v.sort((a, b) => a - b)[v.length >> 1].toFixed(3),
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
+const median = (v) => +nearestMedian(v).toFixed(3),
   fake = { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} };
 const tick = (store, culling) => {
   for (let i = 0; i < 10; i++) store.tick(culling);

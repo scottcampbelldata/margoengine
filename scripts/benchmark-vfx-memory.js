@@ -8,6 +8,7 @@ if (
 import assert from 'node:assert/strict';
 import { writeFile, appendFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
+import { median } from './lib/percentile.mjs';
 import { prepareSources } from './support/vfx-memory-candidate.js';
 
 const baselineRef = process.argv[2],
@@ -593,16 +594,10 @@ try {
               savedMs: original - next,
             };
           });
-          const median = (values) => {
-            const sorted = values.slice().sort((a, b) => a - b);
-            return (sorted[4] + sorted[5]) / 2;
-          };
+          // Medians are taken in Node with the shared nearest-rank helper (below the evaluate).
           timedReports.push({
             candidate: names[candidate],
             pairs,
-            originalMedianMs: median(pairs.map((pair) => pair.originalMs)),
-            candidateMedianMs: median(pairs.map((pair) => pair.candidateMs)),
-            medianRatio: median(pairs.map((pair) => pair.ratio)),
             wins: pairs.filter((pair) => pair.savedMs > 0).length,
             ties: pairs.filter((pair) => pair.savedMs === 0).length,
           });
@@ -656,6 +651,18 @@ try {
     { shaders: source.shaders, billboardShader: source.billboardShader },
   );
   assert.deepEqual(errors, []);
+  for (const timed of result.timedReports) {
+    const of = (key) =>
+      median(
+        timed.pairs.map((pair) => pair[key]),
+        { count: 10, label: `${timed.candidate} ${key}` },
+      );
+    Object.assign(timed, {
+      originalMedianMs: of('originalMs'),
+      candidateMedianMs: of('candidateMs'),
+      medianRatio: of('ratio'),
+    });
+  }
   const report = { baselineRef, recordedAt: new Date().toISOString(), hardware: browser.hardware, ...result };
   await writeFile('test-results/vfx-inplace-gpu.json', JSON.stringify(report, null, 2));
   console.log(

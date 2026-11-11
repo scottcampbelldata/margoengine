@@ -12,13 +12,14 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { acPower } from './parts/power.mjs';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const ROUNDS = Number(process.env.SUBGROUP_ROUNDS ?? 5),
   COUNT = 1 << 24,
   TRIALS = 12;
 assert.notEqual(acPower(), false, 'run on AC power only');
 
-const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1],
+const median = (values) => nearestMedian(values),
   settled = (values) => {
     const fastest = [...values].sort((a, b) => a - b).slice(0, Math.ceil(values.length / 2));
     return fastest.reduce((sum, v) => sum + v, 0) / fastest.length;
@@ -64,8 +65,5 @@ try {
 } finally {
   await context.close();
 }
-await writeFile(
-  resolve(import.meta.dirname, 'results/compute-subgroups.json'),
-  `${JSON.stringify(report, null, 2)}\n`,
-);
+await writeFile(resolve(import.meta.dirname, 'results/compute-subgroups.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.table(report.rows);

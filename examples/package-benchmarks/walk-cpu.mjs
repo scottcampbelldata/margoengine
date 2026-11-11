@@ -16,6 +16,7 @@ import { Engine as Runtime, TransformStore } from '../../packages/core/dist/exte
 import { WalkControls } from '../../packages/controls/dist/walk.js';
 import { PATH, buildHouse } from '../../packages/controls/tests/house.js';
 import { waitForQuiet } from '../../scripts/quiet-gate.mjs';
+import { percentile } from '../../scripts/lib/percentile.mjs';
 
 const machine = process.argv.includes('--no-gate') ? { gate: 'skipped' } : await waitForQuiet();
 const canvas = () => ({
@@ -79,16 +80,15 @@ function measure(engine, walk, path, eye = 1.65) {
       for (const key in stats) stats[key] = Math.max(stats[key], walk.stats[key]);
       sum += walk.stats.triangles;
     }
-    const sorted = [...times].sort((a, b) => a - b),
-      pick = (q) => +sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))].toFixed(4);
+    const pick = (p) => +percentile(times, p).toFixed(4);
     passes.push({
       frames,
       waypoints: `${reached}/${path.length - 1}`,
       meanTrianglesTested: +(sum / frames).toFixed(1),
-      medianMs: pick(0.5),
-      p95Ms: pick(0.95),
-      p99Ms: pick(0.99),
-      maxMs: +sorted.at(-1).toFixed(3),
+      medianMs: pick(50),
+      p95Ms: pick(95),
+      p99Ms: pick(99),
+      maxMs: +percentile(times, 100).toFixed(3),
       meanMs: +(times.reduce((s, t) => s + t, 0) / times.length).toFixed(4),
       worstFrame: { ...stats },
     });

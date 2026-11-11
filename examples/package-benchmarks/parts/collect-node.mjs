@@ -9,6 +9,7 @@ if (
 // cull result changes every frame during an orbit. Run: node examples/package-benchmarks/parts/collect-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 const fake = { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
   modules = 3329;
 const e = new Engine(
@@ -20,7 +21,7 @@ const e = new Engine(
 );
 buildAssembly(e, modules);
 e.render();
-const median = (v) => +v.sort((a, b) => a - b)[v.length >> 1].toFixed(3);
+const median = (v) => +nearestMedian(v).toFixed(3);
 const run = (fn) => {
   for (let i = 0; i < 20; i++) fn();
   const t = [];

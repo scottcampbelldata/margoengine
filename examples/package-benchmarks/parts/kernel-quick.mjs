@@ -9,7 +9,8 @@ if (
 // Run: node examples/package-benchmarks/parts/kernel-quick.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { buildAssembly } from './assembly.js';
-const median = (v) => +v.sort((a, b) => a - b)[v.length >> 1].toFixed(3),
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
+const median = (v) => +nearestMedian(v).toFixed(3),
   fake = { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} };
 const modules = 3329,
   capacity = Math.min(100_000, modules * 30 + Math.ceil(modules / 32) + 1);

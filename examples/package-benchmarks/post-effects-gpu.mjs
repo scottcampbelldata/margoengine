@@ -33,6 +33,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const only = process.argv
   .find((a) => a.startsWith('--only='))
@@ -88,10 +89,7 @@ async function read() {
 }
 const grab = async (name) =>
   decodePNG(await page.locator('canvas').screenshot({ path: `test-results/post-${name}.png` }));
-const median = (values) => {
-  const s = [...values].sort((a, b) => a - b);
-  return s[s.length >> 1];
-};
+const median = (values) => nearestMedian(values);
 const round = (v, n = 3) => +v.toFixed(n);
 // Form factor from a floor point (normal +y) at distance d in front of a wall rectangle (normal +z) of the given width
 // (centred on x) and height: (1 / pi) * integral of cos * cos / r^2 over the rectangle, by the midpoint rule.

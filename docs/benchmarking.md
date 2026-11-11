@@ -130,6 +130,36 @@ For each case and metric the result keeps the raw samples (one per run) and thei
 Primary metrics are bold in the report. If any primary metric is noisy, the run is invalid. Byte and count metrics
 (`exact`) never are.
 
+### Statistics
+
+Every median and percentile in `bench/`, the benchmark and performance scripts in `scripts/` and
+`examples/package-benchmarks/` comes from one helper, `scripts/lib/percentile.mjs`:
+
+- **Nearest rank.** The p-th percentile of n samples is the sample at rank ceil(p / 100 x n) in ascending order, so it
+  is always a measured sample. The median is the 50th percentile: for an even count it is the lower middle sample, not
+  the average of the two. p99 of the samples 1 to 1000 is 990.
+- **Short sets.** With fewer than 100 samples, p99 is the largest sample; with fewer than 20, p95 is. Read a p99 from a
+  run of 5 or 30 as a maximum. The quiet speed phase takes 1000 samples for this reason.
+- **Broken sets fail.** An empty set, a NaN, an infinity or a missing value throws, and so does a set whose length
+  differs from the count the run declared. A bench case whose metric some runs measured and others did not (or
+  measured as NaN) is an error in the result, never a summary of the runs that worked; before 2026-11-10 such samples
+  were dropped silently.
+- **One rule.** Before 2026-11-10 the scripts used five rules: floor, ceil, ceil of (n - 1), the upper middle and the
+  averaged middle. Results recorded before then may differ from a rerun by one rank. `tests/percentile.test.js` fails
+  on a new hand-written percentile index. The files it leaves out are listed there with their reasons: pixel and value
+  error statistics of correctness checks, two fixed budget gates (`scripts/frame-alloc-browser.mjs`,
+  `scripts/support/visual-compat-pages.js`) whose current rule picks the same or a higher sample, so moving them would
+  loosen the budget by one rank, and medians still computed inside a browser page. The budget search in
+  `examples/package-benchmarks/transforms-budget.mjs` keeps its upper median and floor p90 for the same reason.
+  `scripts/collect-performance.js` is pasted into a console and cannot import, so it carries a copy of the helper's
+  `nearestRank` that the same test keeps identical.
+
+```js
+import { distribution, percentile } from './scripts/lib/percentile.mjs';
+percentile([12.1, 11.8, 12.4, 30.2], 50); // 12.1
+distribution(frameTimes, { count: 1000, label: 'frame times' }); // { count, mean, min, median, p95, p99, max }
+```
+
 Results recorded before October 24, 2026 (in `results/`, `benchmarks/records/` and some package READMEs) used the
 Khronos DamagedHelmet model. Its earlier version is CC BY-NC 4.0, so the repository now uses SciFiHelmet (CC0 1.0,
 `examples/assets/scifi-helmet.glb`) in the same places. Rerun a benchmark before comparing against those numbers.

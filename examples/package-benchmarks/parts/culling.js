@@ -7,20 +7,20 @@ import { CulledInstances } from '../../../packages/culling/dist/index.js';
 import { toGeometry } from '../../../packages/geometry/dist/index.js';
 import { withGPUTiming } from '../gpu-timing.js';
 import { buildAssembly, partShapes, ENTITIES_PER_MODULE } from './assembly.js';
+import { distribution } from '../../../scripts/lib/percentile.mjs';
 
 const now = () => performance.now();
+// Nearest rank (scripts/lib/percentile.mjs); no samples give null, a non-finite sample throws.
 const stat = (values) => {
-  const v = [...values].sort((a, b) => a - b),
-    at = (q) => v[Math.min(v.length - 1, Math.floor(v.length * q))];
-  return v.length
-    ? {
-        n: v.length,
-        median: +at(0.5).toFixed(4),
-        p95: +at(0.95).toFixed(4),
-        max: +v.at(-1).toFixed(4),
-        mean: +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(4),
-      }
-    : null;
+  if (!values.length) return null;
+  const d = distribution(values);
+  return {
+    n: d.count,
+    median: +d.median.toFixed(4),
+    p95: +d.p95.toFixed(4),
+    max: +d.max.toFixed(4),
+    mean: +d.mean.toFixed(4),
+  };
 };
 
 // World matrices for buildAssembly's layout (root and zones are identity), column-major.

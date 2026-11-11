@@ -10,6 +10,7 @@ if (
 // Same work on both sides, in alternating rounds. Published in docs/limits.md and docs/whitepaper/perf-history.md.
 import { World } from '../../packages/ecs/dist/index.js';
 import { GrowableWorld } from '../../packages/ecs/dist/growable.js';
+import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 
 const count = 100_000,
   rounds = 8,
@@ -35,7 +36,7 @@ const sides = { fixed: scene(new World(131072)), growable: scene(new GrowableWor
   times = { fixed: [], growable: [] };
 for (const side of Object.keys(sides)) run(sides[side]);
 for (let round = 0; round < rounds; round++) for (const side of Object.keys(sides)) times[side].push(run(sides[side]));
-const median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1];
+const median = (list) => nearestMedian(list);
 const fixed = median(times.fixed),
   growable = median(times.growable);
 console.log(`fixed ${fixed.toFixed(3)} ms, growable ${growable.toFixed(3)} ms, ratio ${(growable / fixed).toFixed(2)}`);

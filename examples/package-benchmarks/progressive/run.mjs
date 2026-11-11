@@ -28,15 +28,12 @@ import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
 import { acPower } from '../parts/power.mjs';
+import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const rounds = +arg('rounds', 4),
   diagnostic = process.argv.includes('--diagnostic');
-const median = (values) => {
-  const s = [...values].sort((a, b) => a - b),
-    m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
+const median = (values) => nearestMedian(values);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const files = {
   '/scifi-helmet.glb': readFileSync('examples/assets/scifi-helmet.glb'),

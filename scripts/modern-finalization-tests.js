@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
 import { closeAll } from './support/shutdown.mjs';
+import { percentile } from './lib/percentile.mjs';
 const browser = await openBrowser({ startPath: '/tests/modern.html' }),
   { page, hardware } = browser,
   errors = [],
@@ -113,18 +114,16 @@ try {
         if (timing) gpu.push(performance.now() - start);
       }
     }
-    const percentile = (values, p) => values.sort((a, b) => a - b)[Math.ceil(values.length * p) - 1],
-      report = {
-        entities: e.meshes.size,
-        visible: e.stats.visible,
-        batches: e.stats.drawCalls,
-        frames: sampledFrames,
-        cpuMedianMs: timing ? percentile(samples, 0.5) : undefined,
-        cpuP95Ms: timing ? percentile(samples, 0.95) : undefined,
-        completedGpuMedianMs: timing ? percentile(gpu, 0.5) : undefined,
-        completedGpuP95Ms: timing ? percentile(gpu, 0.95) : undefined,
-        memoryBytes: e.store.matrices.buffer.byteLength,
-      };
+    // Median and p95 are taken in Node with the shared nearest-rank helper (after the evaluate).
+    const report = {
+      entities: e.meshes.size,
+      visible: e.stats.visible,
+      batches: e.stats.drawCalls,
+      frames: sampledFrames,
+      cpuSamples: timing ? samples : undefined,
+      completedGpuSamples: timing ? gpu : undefined,
+      memoryBytes: e.store.matrices.buffer.byteLength,
+    };
     await e.rebootDevice();
     e.render();
     await e.gpu.queue.onSubmittedWorkDone();
@@ -133,9 +132,19 @@ try {
     return report;
   }, speedEnabled());
   assert.ok(stress.entities > 10000 && stress.frames === 60 && stress.batches < 10);
+  const { cpuSamples, completedGpuSamples, ...stressReport } = stress;
+  if (cpuSamples) {
+    const options = { count: 60 };
+    Object.assign(stressReport, {
+      cpuMedianMs: percentile(cpuSamples, 50, { ...options, label: 'CPU frame' }),
+      cpuP95Ms: percentile(cpuSamples, 95, { ...options, label: 'CPU frame' }),
+      completedGpuMedianMs: percentile(completedGpuSamples, 50, { ...options, label: 'completed GPU frame' }),
+      completedGpuP95Ms: percentile(completedGpuSamples, 95, { ...options, label: 'completed GPU frame' }),
+    });
+  }
   checks.push({
     name: 'Hierarchy stress: 10000 shared-geometry parts under a moving parent, batched draws and reboot',
-    ...stress,
+    ...stressReport,
   });
   assert.deepEqual(errors, []);
   await writeFile('test-results/modern-finalization.json', JSON.stringify({ hardware, checks }, null, 2));

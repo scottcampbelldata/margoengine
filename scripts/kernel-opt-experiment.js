@@ -10,6 +10,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { build } from 'vite';
 import { compactOutput, external } from './measure-size.js';
+import { median } from './lib/percentile.mjs';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argument = (name) => process.argv.find((value) => value.startsWith('--' + name + '='))?.slice(name.length + 3);
@@ -205,7 +206,6 @@ async function kernel(name, capacity, kind) {
     },
   };
 }
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 for (const capacity of [1000, 10000])
   for (const kind of ['flat', 'hierarchy', 'limits', 'culling']) {
     const reference = await kernel('speed', capacity, kind),
