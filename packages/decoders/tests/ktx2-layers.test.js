@@ -68,6 +68,18 @@ test('files that store a GPU format read without the transcoder, through zlib an
   }
 });
 
+test('a zlib level that declares more bytes than it inflates to fails as damaged, without allocating the claim', async () => {
+  const bytes = (await fixture('cube-native-zlib.ktx2')).slice(),
+    view = new DataView(bytes.buffer, bytes.byteOffset);
+  // Level 0's uncompressedByteLength (bytes 96 to 103) past 4 GiB: allocating it threw an uncoded RangeError.
+  view.setUint32(100, 1, true);
+  await assert.rejects(parseKTX2(bytes), (error) => error.code === 'failed' && /declares/.test(error.message));
+  // A few bytes over the real size: the same coded failure once the stream ends.
+  view.setUint32(100, 0, true);
+  view.setUint32(96, view.getUint32(96, true) + 4, true);
+  await assert.rejects(parseKTX2(bytes), (error) => error.code === 'failed' && /declares/.test(error.message));
+});
+
 test('uploadTexture writes every level and layer of a transcoded cube map', async () => {
   const file = transcodeKTX2Layers(await basis(), await fixture('cube-uastc-zstd.ktx2'), 'bc7'),
     writes = [];

@@ -80,6 +80,18 @@ test('decodeImage reads WebP and PNG', async () => {
   assert.deepEqual(webp.data, png.data);
 });
 
+test('decodeImage passes maxPixels to PNG and WebP, as it does to JPEG and AVIF', async () => {
+  const webp = fixture('webp/lossless.webp'),
+    png = fixture('webp/dwebp/lossless.png'),
+    { width, height } = await decodeImage(png),
+    pixels = width * height;
+  // One pixel short of the image refuses it before decoding; the exact count reads it.
+  for (const file of [webp, png]) {
+    await assert.rejects(decodeImage(file, { maxPixels: pixels - 1 }), RangeError);
+    assert.equal((await decodeImage(file, { maxPixels: pixels })).width, width);
+  }
+});
+
 test('decodeImage reads a DDS file through its blocks', async () => {
   const block = new Uint8Array([0xff, 0xff, 0, 0, 0, 0, 0, 0]),
     file = dds({ width: 4, height: 4, fourCC: 'DXT1', data: block }),

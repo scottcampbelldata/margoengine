@@ -311,15 +311,19 @@ impl Reader<'_> {
     }
 }
 
+/// Writes one index; false (the stream is damaged) when a 16-bit output would have to drop its high bits.
 #[inline(always)]
-unsafe fn put(out: *mut u8, wide: bool, at: usize, value: u32) {
+unsafe fn put(out: *mut u8, wide: bool, at: usize, value: u32) -> bool {
     unsafe {
         if wide {
             (out as *mut u32).add(at).write_unaligned(value);
+        } else if value > 0xffff {
+            return false;
         } else {
             (out as *mut u16).add(at).write_unaligned(value as u16);
         }
     }
+    true
 }
 
 /// Decodes a triangle list, codec version 0 or 1. `wide` is 1 for 32-bit output.
@@ -444,10 +448,8 @@ pub unsafe extern "C" fn decode_triangles(source: *const u8, length: usize, targ
                 push_vertex!(c);
             }
         }
-        unsafe {
-            put(target, wide, t * 3, a);
-            put(target, wide, t * 3 + 1, b);
-            put(target, wide, t * 3 + 2, c);
+        if unsafe { !(put(target, wide, t * 3, a) & put(target, wide, t * 3 + 1, b) & put(target, wide, t * 3 + 2, c)) } {
+            return 1;
         }
     }
     (data.pos != tail) as i32
@@ -471,7 +473,9 @@ pub unsafe extern "C" fn decode_sequence(source: *const u8, length: usize, targe
         let which = (v & 1) as usize;
         let delta = if v & 2 != 0 { !(v >> 2) } else { v >> 2 };
         baselines[which] = baselines[which].wrapping_add(delta);
-        unsafe { put(target, wide != 0, i, baselines[which]) };
+        if unsafe { !put(target, wide != 0, i, baselines[which]) } {
+            return 1;
+        }
     }
     (data.pos != tail) as i32
 }

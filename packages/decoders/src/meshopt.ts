@@ -208,9 +208,15 @@ function checkIndexOutput(out: Uint32Array | Uint16Array, count: number): void {
   if (!Number.isSafeInteger(count) || count < 0 || out.length < count) failRange('invalid count or output size');
 }
 
+/** A 16-bit output cannot hold an index past 65,535: such a stream is damaged, not wrapped. */
+function narrow(out: Uint32Array | Uint16Array, value: number): number {
+  if (value > 0xffff && out instanceof Uint16Array) fail(`index ${value} does not fit a 16-bit index buffer`);
+  return value;
+}
+
 /**
  * Decodes a triangle-list stream (index codec version 0 or 1) into `out`: `count` indices, a multiple of 3.
- * A 16-bit output keeps the low 16 bits of each index.
+ * An index past 65,535 for a 16-bit output fails as a damaged stream.
  */
 export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
   checkIndexOutput(out, count);
@@ -317,16 +323,16 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
       if (z === 0 || z === 15) pushVertex(b);
       if (w === 0 || w === 15) pushVertex(c);
     }
-    out[t * 3] = a;
-    out[t * 3 + 1] = b;
-    out[t * 3 + 2] = c;
+    out[t * 3] = narrow(out, a);
+    out[t * 3 + 1] = narrow(out, b);
+    out[t * 3 + 2] = narrow(out, c);
   }
   if (data.pos !== tail) fail('index stream has trailing or missing data');
 }
 
 /**
  * Decodes an index-sequence stream (mode INDICES, version 0 or 1) into `out`: `count` indices, each a zigzag delta
- * against one of two running baselines. A 16-bit output keeps the low 16 bits.
+ * against one of two running baselines. An index past 65,535 for a 16-bit output fails as a damaged stream.
  */
 export function meshoptDecodeIndexSequence(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
   checkIndexOutput(out, count);
@@ -345,7 +351,7 @@ export function meshoptDecodeIndexSequence(out: Uint32Array | Uint16Array, count
     const which = v & 1;
     const value = (baselines[which] + (v & 2 ? ~(v >>> 2) : v >>> 2)) >>> 0;
     baselines[which] = value;
-    out[i] = value;
+    out[i] = narrow(out, value);
   }
   if (data.pos !== tail) fail('index sequence has trailing or missing data');
 }

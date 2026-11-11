@@ -271,10 +271,14 @@ test('meshopt: self-encoded attribute, triangle and sequence streams round trip'
   const tris = Uint32Array.from({ length: 300 }, () => random() * 7919);
   const triStream = encodeTrianglesExplicit(tris);
   assert.deepEqual(new Uint32Array(decode(triStream, 300, 4, 'TRIANGLES').buffer), tris);
-  assert.deepEqual(
-    new Uint16Array(decode(triStream, 300, 2, 'TRIANGLES').buffer),
-    Uint16Array.from(tris, (v) => v & 0xffff),
-  );
+  // A 16-bit index buffer cannot hold these (up to 65,535 x 7,919): the stream is refused, never cut to its low 16 bits
+  // (which drew triangles between the wrong vertices). Indices that fit decode the same either way.
+  assert.throws(() => decode(triStream, 300, 2, 'TRIANGLES'), /does not fit a 16-bit index buffer/);
+  const small = Uint32Array.from(tris, (v) => v % 65536),
+    smallStream = encodeTrianglesExplicit(small);
+  assert.deepEqual(new Uint16Array(decode(smallStream, 300, 2, 'TRIANGLES').buffer), Uint16Array.from(small));
+  const wideSequence = encodeSequence(Uint32Array.of(1, 70000, 3));
+  assert.throws(() => meshoptDecodeIndexSequence(new Uint16Array(3), 3, wideSequence), /16-bit/);
   const seq = Uint32Array.from({ length: 257 }, (_, i) => (i & 1 ? 100000 - i * 3 : i * 2));
   const seqStream = encodeSequence(seq);
   const out = new Uint32Array(257);

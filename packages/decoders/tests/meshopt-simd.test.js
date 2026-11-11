@@ -69,7 +69,10 @@ test('a stream that fails gives the same error as the TypeScript decoder', () =>
     },
     [attributes, vertices, size] = vector('attributes'),
     [triangles, corners] = vector('triangles32'),
+    [sequence, sequenceCount] = vector('indices'),
     cases = [
+      // Index 100,000 cannot go into a 16-bit index buffer: refused, never cut to its low 16 bits.
+      [sequence, sequenceCount, 2, 'INDICES'],
       [Uint8Array.of(0xb0, ...attributes.subarray(1)), vertices, size, 'ATTRIBUTES'],
       [Uint8Array.of(0xa2, ...attributes.subarray(1)), vertices, size, 'ATTRIBUTES'],
       [attributes, vertices, 6, 'ATTRIBUTES'],

@@ -39,7 +39,7 @@ or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips
 
 ## Meshopt
 
-`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, written from the two extension specifications, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. Attribute streams of vertex codec version 0 (the only one `EXT_meshopt_compression` defines) and version 1 (added by `KHR_meshopt_compression`) are both decoded, whichever extension names the bufferView; any other version is rejected with a clear error. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged.
+`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, written from the two extension specifications, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit, with one deliberate difference: a TRIANGLES or INDICES stream decoded into a 16-bit index buffer (byteStride 2) that holds an index past 65,535 fails as damaged, where the reference keeps the low 16 bits and so joins the wrong vertices. Attribute streams of vertex codec version 0 (the only one `EXT_meshopt_compression` defines) and version 1 (added by `KHR_meshopt_compression`) are both decoded, whichever extension names the bufferView; any other version is rejected with a clear error. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged.
 
 ## Meshopt on Wasm SIMD (`@margoengine/decoders/meshopt-simd`)
 
@@ -140,7 +140,7 @@ Checked against dwebp 1.4.0, run as an outside tool, on 139 real files: the Y, U
 
 ## Any image to pixels (`@margoengine/decoders/image`, `/bc`)
 
-`decodeImage(bytes, {signal})` turns a PNG, WebP, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
+`decodeImage(bytes, {signal, maxPixels})` turns a PNG, WebP, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `maxPixels` (default 2^26, 8192 squared) bounds PNG, WebP, JPEG and AVIF before their pixels are allocated: a larger image throws `RangeError`. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
 
 ```ts
 import {decodeImage, imageFormat} from 'margoengine/decoders/image';

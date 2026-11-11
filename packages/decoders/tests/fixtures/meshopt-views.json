@@ -1108,9 +1108,9 @@
   {
    "name": "index sequence as 16-bit",
    "result": {
-    "ok": true,
-    "length": 20,
-    "sha256": "8393969e6561c4b7df0b55d394a29c86613141c94454ab9e802d1dac1c9304db"
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: index 100000 does not fit a 16-bit index buffer"
    }
   },
   {

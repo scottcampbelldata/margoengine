@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15013637,
+  "total": 15014173,
   "history": [
     {
       "date": "2026-10-24",
@@ -8399,6 +8399,12 @@
       "commit": "3432961089",
       "reason": "lague plan 1: new optional entry water/liquid (ParticleLiquid, 7965 B); water root, core and stage unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "d737a559a5",
+      "reason": "gltf-pro progressive worker +33 B (16,713 to 16,746 gzip): its bundled meshopt decoder now refuses an index past 65,535 in a 16-bit index buffer instead of wrapping it; a split would move the decoder out of the worker it decodes in",
+      "grew": 1
     }
   ],
   "items": {
@@ -8795,7 +8801,7 @@
     "@margoengine/gltf": 7560,
     "@margoengine/gltf-pro": 86524,
     "@margoengine/gltf-pro dist/workers/gltf.js": 36850,
-    "@margoengine/gltf-pro dist/workers/progressive.js": 16713,
+    "@margoengine/gltf-pro dist/workers/progressive.js": 17249,
     "@margoengine/gltf-pro/asset": 6017,
     "@margoengine/gltf-pro/audio": 4956,
     "@margoengine/gltf-pro/coordinates": 755,

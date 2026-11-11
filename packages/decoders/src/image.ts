@@ -18,7 +18,10 @@ export interface DecodedImage {
 export interface DecodeImageOptions {
   /** Aborts before decoding, or while a KTX2 decoder waits; rejects with the signal's reason. */
   signal?: AbortSignal;
-  /** Largest JPEG pixel count accepted, default 2^26. Checked before allocating decoded blocks. */
+  /**
+   * Largest pixel count accepted for PNG, WebP, JPEG and AVIF, default 2^26 (8192 squared). Checked from the header,
+   * before the pixels are allocated; a larger image throws RangeError.
+   */
   maxPixels?: number;
 }
 
@@ -114,18 +117,20 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
  * if (file.length) console.log((await decodeImage(file)).width);
  *
  * @throws TypeError when `bytes` is not a Uint8Array.
+ * @throws RangeError when a PNG, WebP, JPEG or AVIF image has more than `maxPixels` pixels.
  * @throws MargoError `unsupported` for unsupported coding tools or image item types.
  * @throws MargoError `failed` when the bytes are not a known image, or are damaged.
  */
 export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions = {}): Promise<DecodedImage> {
   if (!(bytes instanceof Uint8Array)) throw new TypeError("bytes must be a Uint8Array; pass the image file's bytes");
   options.signal?.throwIfAborted();
-  const format = imageFormat(bytes);
+  const format = imageFormat(bytes),
+    limits = options.maxPixels === undefined ? {} : { maxPixels: options.maxPixels };
   switch (format) {
     case 'png':
-      return decodePNG(bytes);
+      return decodePNG(bytes, limits);
     case 'webp':
-      return (await import('./webp.js')).parseWebP(bytes);
+      return (await import('./webp.js')).parseWebP(bytes, limits);
     case 'dds':
       return textureFileToRGBA((await import('./dds.js')).parseDDS(bytes));
     case 'ktx':
