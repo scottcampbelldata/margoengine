@@ -92,8 +92,21 @@ fn sample(p: vec3f, weight: f32) -> vec4f {
 }
 `;
 
-/** @internal Screen-width trail segments. A generation mismatch cuts the trail at respawn. */
-export const flowDraw = /* wgsl */ `${frameWGSL}
+
+// Data space to world: the identity, or (globe) geodetic longitude, latitude in degrees and height in metres to
+// Earth-centred coordinates in Earth radii on the WGS 84 ellipsoid (NIMA TR8350.2, 2000, section 4.1.1).
+const flatProject = 'fn flowProject(p:vec3f)->vec3f{return p;}';
+const globeProject =
+  'fn flowProject(p:vec3f)->vec3f {\n let phi=p.y*0.0174532925199433;let lon=p.x*0.0174532925199433;let s=sin(phi);let n=1.0/sqrt(1.0-0.0066943799901413165*s*s);let h=p.z/6378137.0;\n return vec3f((n+h)*cos(phi)*cos(lon),(n+h)*cos(phi)*sin(lon),(n*(1.0-0.0066943799901413165)+h)*s);\n}';
+
+/**
+ * @internal Screen-width trail segments. A generation mismatch cuts the trail at respawn. `globe` projects geodetic data
+ * onto the planet; `appearance` is a planet appearance's WGSL (it defines `planetAerial`), empty for plain colour. The
+ * template is complete WGSL only once its slots are filled, so it lives inside this builder, which check:wgsl compiles
+ * with both projections.
+ */
+export function flowDraw(globe: boolean, appearance = ''): string {
+  const template = /* wgsl */ `${frameWGSL}
 ${config.replace('@group(0)', '@group(1)')}
 @group(1) @binding(1) var<storage, read> history: array<vec4f>;
 FLOW_PROJECT
@@ -145,3 +158,8 @@ struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32, @location(
   return vec4f(toOutput(FLOW_COLOUR), in.alpha);
 }
 `;
+  return template
+    .replace('FLOW_PROJECT', globe ? globeProject : flatProject)
+    .replace('FLOW_APPEARANCE', appearance)
+    .replace('FLOW_COLOUR', appearance ? 'planetAerial(in.world, flow.colour.rgb)' : 'flow.colour.rgb');
+}

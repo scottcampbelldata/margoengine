@@ -360,7 +360,7 @@ export class FlowParticles implements Drawable {
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     const pipeline = renderer.pipeline(`flow-particles:${this.#globe}:${this.#appearance?.key ?? ''}`, context, (target) => {
-      const module = this.#device.createShaderModule({ code: flowDraw.replace('FLOW_PROJECT', this.#globe ? "fn flowProject(p:vec3f)->vec3f {\n let phi=p.y*0.0174532925199433;let lon=p.x*0.0174532925199433;let s=sin(phi);let n=1.0/sqrt(1.0-0.0066943799901413165*s*s);let h=p.z/6378137.0;\n return vec3f((n+h)*cos(phi)*cos(lon),(n+h)*cos(phi)*sin(lon),(n*(1.0-0.0066943799901413165)+h)*s);\n}" : 'fn flowProject(p:vec3f)->vec3f{return p;}').replace('FLOW_APPEARANCE', this.#appearance?.shader ?? '').replace('FLOW_COLOUR', this.#appearance ? 'planetAerial(in.world, flow.colour.rgb)' : 'flow.colour.rgb'), label: 'sciviz flow trails' });
+      const module = this.#device.createShaderModule({ code: flowDraw(this.#globe, this.#appearance?.shader ?? ''), label: 'sciviz flow trails' });
       return {
         layout: this.#device.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#drawLayout, ...(this.#appearance ? [this.#appearance.layout] : [])] }),
         vertex: { module, entryPoint: 'vertex' },
