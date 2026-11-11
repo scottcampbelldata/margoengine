@@ -31,6 +31,23 @@ function earlyPaper(code: string): string {
     cursor = call + 8 + painted.length + 1;
   }
 }
+// The hatchings with a uniform on each device, told once when it is lost. Made outside any hatching's scope, so the
+// reaction holds only the device and this set, which a hatching leaves on dispose: one reaction per hatching and device
+// kept every disposed hatching alive as long as the device (docs/known-bugs.md).
+const lostWatch = new WeakMap<GPUDevice, Set<ModelHatching>>();
+function watchLost(device: GPUDevice): Set<ModelHatching> {
+  let set = lostWatch.get(device);
+  if (!set) {
+    const watching = (set = new Set());
+    lostWatch.set(device, watching);
+    void device.lost?.then(() => {
+      for (const hatching of [...watching]) hatching['lostDevice'](device);
+      watching.clear();
+    });
+  }
+  return set;
+}
+
 /**
  * Live hatching/halftone on a glTF-pro model or materials mesh, retaining its textures, deformation and lighting.
  * Pattern units/defaults match core Hatching. Borrowed model/materials remain caller-owned.
@@ -136,13 +153,7 @@ export class ModelHatching extends HatchStyle {
             device,
             (buffer = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
           );
-          const owned = buffer;
-          void device.lost?.then(() => {
-            if (this.buffers.get(device) === owned) {
-              retire(device, owned);
-              this.buffers.delete(device);
-            }
-          });
+          watchLost(device).add(this);
         }
         const uniform = writeUniform(device, buffer, this.hatchValues() as Float32Array<ArrayBuffer>, c.view ?? c);
         return [...(source?.bindings() ?? []), { binding, resource: uniform ?? { buffer } }];
@@ -152,13 +163,20 @@ export class ModelHatching extends HatchStyle {
     this.copies.set(original, copy);
     return copy;
   }
+  /** The device was lost: its uniform goes with it (called by `watchLost`). */
+  private lostDevice(device: GPUDevice): void {
+    const buffer = this.buffers.get(device);
+    if (!buffer) return;
+    retire(device, buffer);
+    this.buffers.delete(device);
+  }
   /** Remove the adapter and release only its uniforms. Idempotent; original records are never modified. */
   dispose(): void {
     if (this.dead) return;
     this.dead = true;
     this.removeDraw?.();
     this.unsubscribe?.();
-    for (const [device, buffer] of this.buffers) retire(device, buffer);
+    for (const [device, buffer] of this.buffers) retire(device, buffer), lostWatch.get(device)?.delete(this);
     this.buffers.clear();
   }
   declare [Symbol.dispose]: () => void;

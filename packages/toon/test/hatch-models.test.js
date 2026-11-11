@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
+import { setImmediate } from 'node:timers/promises';
 import { ModelHatching } from '../dist/hatch-models.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { parseGLTF } from '../../gltf-pro/dist/index.js';
@@ -85,6 +88,40 @@ test('a failed model draw restores every borrowed record', async () => {
     assert.equal(f.model.primitives[0].material, original);
   } finally {
     effect.dispose();
+    f.engine.dispose();
+  }
+});
+
+// A reaction on device.lost cannot be removed: one made per hatching kept every disposed hatching alive as long as the
+// device (docs/known-bugs.md). The device now has one reaction over the hatchings with a uniform on it.
+test('a disposed hatching is collected while its device lives; a live one still drops its uniform when it is lost', async () => {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc');
+  const f = await fixture();
+  let lose;
+  f.gpu.engine.gpu.lost = new Promise((resolve) => (lose = resolve));
+  try {
+    const reference = (() => {
+      const effect = ModelHatching.attach(f.model);
+      f.frame();
+      effect.dispose();
+      return new WeakRef(effect);
+    })();
+    for (let i = 0; i < 5 && reference.deref(); i++) {
+      await setImmediate();
+      gc();
+    }
+    assert.ok(reference.deref() === undefined, 'the disposed hatching is still reachable from its live device');
+    const live = ModelHatching.attach(f.model);
+    f.frame();
+    const uniform = f.gpu.bufferWrites.findLast((w) => w.bytes === 48).buffer;
+    assert.equal(uniform.destroyed, false);
+    lose({ reason: 'unknown', message: 'test' });
+    await setImmediate();
+    assert.ok(uniform.destroyed, 'the lost device takes the live hatching uniform with it');
+    live.dispose();
+  } finally {
+    setFlagsFromString('--no-expose-gc');
     f.engine.dispose();
   }
 });
