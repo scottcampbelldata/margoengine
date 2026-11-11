@@ -93,11 +93,15 @@ export async function startDevServer({
       await rm(cacheDir, { recursive: true, force: true });
     }
   };
+  // A plugin whose configureServer throws makes createServer reject after Vite opened its file system watches, and
+  // the rejected call returns no server to close: the two watches kept the process alive after its last test. This
+  // first plugin is handed the server before any other hook runs, so a failed start can still close it.
+  const own = { name: 'margo-start-owner', enforce: 'pre', configureServer: (started) => void (server = started) };
   try {
     server = await createServer({
       root,
       resolve: { alias: aliases },
-      plugins,
+      plugins: [own, ...plugins],
       cacheDir,
       optimizeDeps: { entries: [startPath.replace(/^\//, '')] },
       // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for

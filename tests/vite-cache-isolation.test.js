@@ -114,6 +114,24 @@ test('a failed start removes its cache folder', async () => {
   );
 });
 
+// The failed start left Vite's two file system watches open (FSEventWrap): every test of this file passed and then
+// the process never exited, until the gate's 1500 s limit killed it. A process that only makes a failed start must
+// exit by itself.
+test('a failed start leaves nothing open, so its process exits', () => {
+  const browser = pathToFileURL(resolve('scripts/browser.js')).href,
+    script = `
+      const { startDevServer } = await import(${JSON.stringify(browser)});
+      const broken = { name: 'broken', configureServer() { throw new Error('broken plugin'); } };
+      await startDevServer({ startPath: '/LICENSE', port: 0, plugins: [broken] }).catch(() => {});
+      setTimeout(() => {
+        console.log('still open: ' + process.getActiveResourcesInfo().join(', '));
+        process.exit(3);
+      }, 20_000).unref();`;
+  // wall-clock: a bound on a hang, far from the about 1 s a clean exit takes.
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 60_000 });
+  assert.equal(run.status, 0, `the process did not exit by itself: ${run.stdout}${run.stderr}`);
+});
+
 // A checkout prepared by an obsolete shared-dependency setup can still link mutable caches. Refuse it so two Vite
 // servers never share cache output.
 test('this checkout’s tool caches are its own, not links to another checkout’s', () => {
