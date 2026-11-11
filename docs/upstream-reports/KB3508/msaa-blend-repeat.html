@@ -1,0 +1,182 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>4x MSAA blend repeat</title>
+<pre id="out">running</pre>
+<script type="module">
+// Draws the same frame again and again on one device and compares the results.
+// Frame: clear, a dense mesh of flat-coloured triangles (pixels on triangle edges hold samples of different colours),
+// then a coarse mesh blended over it with   color = dst * constant   (blendFunc ZERO, SRC_COLOR), then a resolve.
+// Per-sample blending makes every sample dst * constant, so every frame must give the same bytes.
+//
+// Query: ?api=webgpu|webgl2 (default webgpu)  ?frames=N (60)  ?mask=N (WebGPU: pipeline sample mask)  ?size=WxH (640x480)
+//        ?gpu=high-performance|low-power (WebGPU adapter preference)  ?grid=N (blended mesh cells per side, 6)
+// Result: window.result = { api, gpu, frames, changedFrames, distinctResults, example }.
+const q = new URLSearchParams(location.search);
+const api = q.get('api') ?? 'webgpu';
+const frames = Number(q.get('frames') ?? 60);
+const [W, H] = (q.get('size') ?? '640x480').split('x').map(Number);
+const grid = Number(q.get('grid') ?? 6);
+const mask = q.has('mask') ? Number(q.get('mask')) : undefined;
+
+// Counter-clockwise quads of a warped grid over [-span, span]; edges do not follow pixel rows.
+function mesh(cells, span, warp) {
+  const v = [];
+  const at = (i, j) => {
+    const x = -span + (2 * span * i) / cells, y = -span + (2 * span * j) / cells;
+    return [x + warp * Math.sin(y * 17), y + warp * Math.cos(x * 13)];
+  };
+  for (let i = 0; i < cells; i++)
+    for (let j = 0; j < cells; j++) {
+      const a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1);
+      v.push(...a, ...b, ...c, ...a, ...c, ...d);
+    }
+  return new Float32Array(v);
+}
+const opaqueVertices = mesh(150, 1, 0.004);
+const blendVertices = mesh(grid, 0.8, 0.013);
+const hash = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+
+async function runWebGPU() {
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: q.get('gpu') ?? 'high-performance' });
+  const device = await adapter.requestDevice();
+  const info = adapter.info ?? {};
+  const format = 'bgra8unorm';
+  const usage = GPUTextureUsage;
+  const color = device.createTexture({ size: [W, H], sampleCount: 4, format, usage: usage.RENDER_ATTACHMENT | usage.TEXTURE_BINDING });
+  const depth = device.createTexture({ size: [W, H], sampleCount: 4, format: 'depth32float', usage: usage.RENDER_ATTACHMENT });
+  const target = device.createTexture({ size: [W, H], format, usage: usage.RENDER_ATTACHMENT | usage.COPY_SRC });
+  const module = device.createShaderModule({ code: `
+struct O { @builtin(position) p: vec4f, @location(0) @interpolate(flat) h: f32 }
+@vertex fn opaqueVertex(@location(0) p: vec2f, @builtin(vertex_index) v: u32) -> O { return O(vec4f(p, 0.5 + 0.2 * cos(p.y * 8.0 - p.x * 3.0), 1), f32((v / 3u) % 7u) / 7.0); }
+@fragment fn opaqueFragment(o: O) -> @location(0) vec4f { return vec4f(0.1 + 0.6 * o.h, 0.5 - 0.4 * o.h, 0.2 + 0.3 * fract(o.h * 3.0), 1); }
+@vertex fn blendVertex(@location(0) p: vec2f) -> O { return O(vec4f(p, 0.5 + 0.2 * sin(p.x * 9.0 + p.y * 4.0), 1), 0.0); }
+@fragment fn tint(o: O) -> @location(0) vec4f { return vec4f(0.93, 0.91, 0.87, 1); }
+@group(0) @binding(0) var ms: texture_multisampled_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> out: array<u32>;
+@compute @workgroup_size(8, 8) fn copySamples(@builtin(global_invocation_id) g: vec3u) {
+  let d = textureDimensions(ms);
+  if (g.x >= d.x || g.y >= d.y) { return; }
+  for (var s = 0u; s < 4u; s++) { out[(g.y * d.x + g.x) * 4u + s] = pack4x8unorm(textureLoad(ms, vec2i(g.xy), i32(s))); }
+}` });
+  const buffers = [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }];
+  const opaque = device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'opaqueVertex', buffers },
+    fragment: { module, entryPoint: 'opaqueFragment', targets: [{ format }] },
+    depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' }, multisample: { count: 4 } });
+  const blended = device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'blendVertex', buffers },
+    fragment: { module, entryPoint: 'tint', targets: [{ format, blend: { color: { srcFactor: 'zero', dstFactor: 'src' }, alpha: { srcFactor: 'zero', dstFactor: 'one' } } }] },
+    primitive: { cullMode: 'back' }, depthStencil: { format: 'depth32float', depthWriteEnabled: false, depthCompare: 'greater-equal' }, multisample: { count: 4, ...(mask === undefined ? {} : { mask }) } });
+  const copy = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'copySamples' } });
+  const vertexBuffer = (data) => { const b = device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST }); device.queue.writeBuffer(b, 0, data); return b; };
+  const opaqueBuffer = vertexBuffer(opaqueVertices), blendBuffer = vertexBuffer(blendVertices);
+  const sampleBytes = W * H * 16;
+  const snapshots = [0, 1].map(() => device.createBuffer({ size: sampleBytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+  const groups = snapshots.map((buffer) => device.createBindGroup({ layout: copy.getBindGroupLayout(0), entries: [{ binding: 0, resource: color.createView() }, { binding: 1, resource: { buffer } }] }));
+  const pass = (e, loadOp, resolve) => e.beginRenderPass({ colorAttachments: [{ view: color.createView(), loadOp, storeOp: 'store', clearValue: [0.1, 0.12, 0.15, 1], ...(resolve ? { resolveTarget: target.createView() } : {}) }], depthStencilAttachment: { view: depth.createView(), depthLoadOp: loadOp, depthStoreOp: 'store', depthClearValue: 0 } });
+  const snapshot = (e, k) => { const p = e.beginComputePass(); p.setPipeline(copy); p.setBindGroup(0, groups[k]); p.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8)); p.end(); };
+  const bytesPerRow = Math.ceil((W * 4) / 256) * 256;
+  async function read(source, size) {
+    const staging = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const e = device.createCommandEncoder();
+    if (source) e.copyBufferToBuffer(source, 0, staging, 0, size);
+    else e.copyTextureToBuffer({ texture: target }, { buffer: staging, bytesPerRow }, [W, H]);
+    device.queue.submit([e.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const data = new Uint32Array(staging.getMappedRange().slice(0));
+    staging.destroy();
+    return data;
+  }
+  const frame = () => {
+    const e = device.createCommandEncoder();
+    pass(e, 'clear').end();
+    let p = pass(e, 'load'); p.setPipeline(opaque); p.setVertexBuffer(0, opaqueBuffer); p.draw(opaqueVertices.length / 2); p.end();
+    snapshot(e, 0);
+    p = pass(e, 'load'); p.setPipeline(blended); p.setVertexBuffer(0, blendBuffer); p.draw(blendVertices.length / 2); p.end();
+    snapshot(e, 1);
+    pass(e, 'load', true).end();
+    device.queue.submit([e.finish()]);
+  };
+  const differs = (a, b) => a.reduce((n, v, i) => n + (v !== b[i]), 0);
+  const hex = (a, i) => [0, 1, 2, 3].map((s) => a[i + s].toString(16).padStart(8, '0')).join(' ');
+  let first, changedFrames = 0, example;
+  const distinct = new Set();
+  for (let k = 0; k < frames; k++) {
+    frame();
+    const shot = [await read(snapshots[0], sampleBytes), await read(snapshots[1], sampleBytes), await read(null, bytesPerRow * H)];
+    distinct.add(await hash(shot[2]));
+    if (!first) { first = shot; continue; }
+    const row = { before: differs(first[0], shot[0]), after: differs(first[1], shot[1]) };
+    if (row.after || row.before) changedFrames++;
+    if (!example && row.after) {
+      for (let i = 0; i < shot[1].length; i += 4)
+        if ([0, 1, 2, 3].some((s) => first[1][i + s] !== shot[1][i + s])) {
+          example = { frame: k, samplesDifferingBeforeBlendPass: row.before, samplesDifferingAfterBlendPass: row.after,
+            pixel: [(i / 4) % W, Math.floor(i / 4 / W)], samplesAfterBlendPassFrame0: hex(first[1], i), samplesAfterBlendPassThisFrame: hex(shot[1], i) };
+          break;
+        }
+    }
+  }
+  return { gpu: [info.vendor, info.architecture, info.description].filter(Boolean).join(' '), changedFrames, distinctResults: distinct.size, example };
+}
+
+async function runWebGL2() {
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const gl = canvas.getContext('webgl2', { antialias: false });
+  const debug = gl.getExtension('WEBGL_debug_renderer_info');
+  const gpu = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  const program = (fragment, vertexBody) => {
+    const p = gl.createProgram();
+    for (const [type, src] of [[gl.VERTEX_SHADER, `#version 300 es
+layout(location=0) in vec2 p; flat out float h;
+void main() { gl_Position = vec4(p, 0.0, 1.0); h = ${vertexBody}; }`], [gl.FRAGMENT_SHADER, `#version 300 es
+precision highp float; flat in float h; out vec4 o;
+void main() { ${fragment} }`]]) {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(s));
+      gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(p));
+    return p;
+  };
+  const opaque = program('o = vec4(0.1 + 0.6 * h, 0.5 - 0.4 * h, 0.2 + 0.3 * fract(h * 3.0), 1.0);', 'float(uint(gl_VertexID / 3) % 7u) / 7.0');
+  const blended = program('o = vec4(0.93, 0.91, 0.87, 1.0);', '0.0');
+  const vao = (data) => { const v = gl.createVertexArray(); gl.bindVertexArray(v); const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); return v; };
+  const opaqueVao = vao(opaqueVertices), blendVao = vao(blendVertices);
+  const rb = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, rb); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, gl.RGBA8, W, H);
+  const from = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, from); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, rb);
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, W, H);
+  const to = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, to); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.viewport(0, 0, W, H); gl.disable(gl.DITHER); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  const pixels = new Uint8Array(W * H * 4);
+  const frame = () => {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, from);
+    gl.disable(gl.BLEND); gl.clearColor(0.1, 0.12, 0.15, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(opaque); gl.bindVertexArray(opaqueVao); gl.drawArrays(gl.TRIANGLES, 0, opaqueVertices.length / 2);
+    gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.ZERO, gl.SRC_COLOR, gl.ZERO, gl.ONE);
+    gl.useProgram(blended); gl.bindVertexArray(blendVao); gl.drawArrays(gl.TRIANGLES, 0, blendVertices.length / 2);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, from); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, to);
+    gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, to); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  };
+  let first, changedFrames = 0, example;
+  const distinct = new Set();
+  for (let k = 0; k < frames; k++) {
+    frame();
+    distinct.add(await hash(pixels));
+    if (!first) { first = pixels.slice(); continue; }
+    let n = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i] !== first[i] || pixels[i + 1] !== first[i + 1] || pixels[i + 2] !== first[i + 2]) {
+        if (!n++ && !example) example = { frame: k, pixel: [(i / 4) % W, H - 1 - Math.floor(i / 4 / W)], frame0: [...first.slice(i, i + 3)], thisFrame: [...pixels.slice(i, i + 3)] };
+      }
+    if (n) changedFrames++;
+  }
+  return { gpu, changedFrames, distinctResults: distinct.size, example, glError: gl.getError() };
+}
+
+const result = { api, frames, size: `${W}x${H}`, mask, userAgent: navigator.userAgent };
+try { Object.assign(result, await (api === 'webgl2' ? runWebGL2() : runWebGPU())); } catch (e) { result.error = String(e); }
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>

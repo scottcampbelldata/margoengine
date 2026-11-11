@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>GPU load</title>
+<script>
+// Keeps the GPU busy with back-to-back compute dispatches until the browser is ended from outside.
+(async () => {
+  const adapter = await navigator.gpu.requestAdapter();
+  const device = await adapter.requestDevice();
+  const n = 1 << 22;
+  const buffer = device.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE });
+  const module = device.createShaderModule({ code: `
+@group(0) @binding(0) var<storage, read_write> a: array<f32>;
+@compute @workgroup_size(256) fn main(@builtin(global_invocation_id) g: vec3u) {
+  var x = f32(g.x);
+  for (var i = 0; i < 4000; i++) { x = fract(sin(x) * 43758.5453) + x * 0.999; }
+  a[g.x] = x;
+}` });
+  const pipeline = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } });
+  const group = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer } }] });
+  document.title = 'working';
+  for (;;) {
+    const e = device.createCommandEncoder();
+    const p = e.beginComputePass(); p.setPipeline(pipeline); p.setBindGroup(0, group); p.dispatchWorkgroups(n / 256); p.end();
+    device.queue.submit([e.finish()]);
+    await device.queue.onSubmittedWorkDone();
+  }
+})();
+</script>

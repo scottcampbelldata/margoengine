@@ -1,0 +1,91 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>screen blend precision</title>
+<pre id="out">running</pre>
+<script type="module">
+// "Screen" blend in the fixed-function blend unit:  result = src + dst * (1 - src)   (srcFactor one, dstFactor one-minus-src),
+// on an rgba8unorm target. For source s and destination d (whole bytes), the exact result is s + d * (255 - s) / 255 bytes.
+// No whole-byte input pair has an exact result within 1/510 of a rounding tie, so any GPU that blends in float (or in a wider
+// format) and rounds to nearest gives the rounded exact value; one that rounds the intermediate dst * (1 - src) product to a byte
+// first can land one step low. The page draws all 256 source values on 4 destination values and counts the pixels that are
+// not the rounded exact value. Query: ?api=webgpu|webgl2  ?gpu=high-performance|low-power.
+const q = new URLSearchParams(location.search);
+const api = q.get('api') ?? 'webgpu';
+const dsts = [16, 100, 200, 250];
+const W = 256, H = dsts.length;
+const result = { api, userAgent: navigator.userAgent, size: `${W}x${H}` };
+
+function check(pixels, flip) {
+  let wrong = 0, low = 0, high = 0, first;
+  for (let r = 0; r < H; r++)
+    for (let s = 0; s < W; s++) {
+      const row = flip ? H - 1 - r : r;
+      const got = pixels[(row * W + s) * 4];
+      const d = dsts[r];
+      const want = Math.round((255 * s + d * (255 - s)) / 255);
+      if (got !== want) { wrong++; got < want ? low++ : high++; first ??= { src: s, dst: d, got, want, exactValue: (255 * s + d * (255 - s)) / 255 }; }
+    }
+  return { pixelsWrong: wrong, lower: low, higher: high, first };
+}
+
+async function webgpu() {
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: q.get('gpu') ?? 'high-performance' });
+  const device = await adapter.requestDevice();
+  const info = adapter.info ?? {};
+  const module = device.createShaderModule({ code: `
+struct O { @builtin(position) p: vec4f }
+@vertex fn v(@builtin(vertex_index) i: u32) -> O { var p = array(vec2f(-1,-1), vec2f(3,-1), vec2f(-1,3)); return O(vec4f(p[i], 0, 1)); }
+@group(0) @binding(0) var<uniform> dsts: array<vec4f, 1>;
+@fragment fn dstColor(o: O) -> @location(0) vec4f { return vec4f(dsts[0][u32(o.p.y)] / 255.0, 0, 0, 1); }
+@fragment fn srcColor(o: O) -> @location(0) vec4f { return vec4f(floor(o.p.x) / 255.0, 0, 0, 1); }` });
+  const target = device.createTexture({ size: [W, H], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+  const mk = (entryPoint, blend) => device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'v' }, fragment: { module, entryPoint, targets: [{ format: 'rgba8unorm', ...(blend ? { blend } : {}) }] } });
+  const one = { srcFactor: 'one', dstFactor: 'zero' };
+  const screen = { color: { srcFactor: 'one', dstFactor: 'one-minus-src', operation: 'add' }, alpha: { srcFactor: 'one', dstFactor: 'zero' } };
+  device.pushErrorScope('validation');
+  const first = mk('dstColor'), second = mk('srcColor', screen);
+  const ub = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(ub, 0, new Float32Array(dsts));
+  const bg = (p) => device.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ub } }] });
+  const e = device.createCommandEncoder();
+  const pass = e.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] });
+  pass.setPipeline(first); pass.setBindGroup(0, bg(first)); pass.draw(3);
+  pass.setPipeline(second); pass.draw(3);
+  pass.end();
+  const staging = device.createBuffer({ size: 1024 * H, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  e.copyTextureToBuffer({ texture: target }, { buffer: staging, bytesPerRow: 1024 }, [W, H]);
+  device.queue.submit([e.finish()]);
+  await staging.mapAsync(GPUMapMode.READ);
+  const raw = new Uint8Array(staging.getMappedRange().slice(0));
+  const err = await device.popErrorScope(); if (err) result.validation = err.message;
+  // bytesPerRow is 1024 for 256 pixels of 4 bytes, so rows are tight
+  result.gpu = [info.vendor, info.architecture, info.description].filter(Boolean).join(' ');
+  Object.assign(result, check(raw, false));
+}
+
+function webgl2() {
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  result.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  const prog = (body) => {
+    const p = gl.createProgram();
+    for (const [t, s] of [[gl.VERTEX_SHADER, `#version 300 es
+void main() { vec2 p[3] = vec2[3](vec2(-1,-1), vec2(3,-1), vec2(-1,3)); gl_Position = vec4(p[gl_VertexID], 0, 1); }`], [gl.FRAGMENT_SHADER, `#version 300 es
+precision highp float; uniform float d[4]; out vec4 o; void main() { ${body} }`]]) { const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh); gl.attachShader(p, sh); }
+    gl.linkProgram(p); return p;
+  };
+  const dstP = prog('o = vec4(d[int(gl_FragCoord.y)] / 255.0, 0, 0, 1);');
+  const srcP = prog('o = vec4(floor(gl_FragCoord.x) / 255.0, 0, 0, 1);');
+  gl.viewport(0, 0, W, H); gl.disable(gl.DITHER);
+  gl.useProgram(dstP); gl.uniform1fv(gl.getUniformLocation(dstP, 'd'), dsts); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_COLOR, gl.ONE, gl.ZERO);
+  gl.useProgram(srcP); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  const raw = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+  Object.assign(result, check(raw, false));
+}
+
+try { await (api === 'webgl2' ? webgl2() : webgpu()); } catch (e) { result.error = String(e); }
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>

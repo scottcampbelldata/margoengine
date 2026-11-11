@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>MediaRecorder VP8 WebM colour</title>
+<canvas id="c" width="64" height="64"></canvas>
+<pre id="out">running</pre>
+<script type="module">
+// Records a 2D canvas filled with #336699 (51, 102, 153) for 1.5 s with MediaRecorder as VP8 WebM (and as MP4 where supported),
+// plays each recording back in a <video> and reads the centre pixel through a 2D canvas.
+// Expected: the played-back colour is within 4 levels of (51, 102, 153).   Reported: WebKit 27.2 draws (61, 113, 164) for WebM, MP4 (50, 101, 151).
+const result = { userAgent: navigator.userAgent, recordings: {} };
+const canvas = document.getElementById('c');
+const g = canvas.getContext('2d');
+async function record(mimeType) {
+  g.fillStyle = '#336699'; g.fillRect(0, 0, 64, 64);
+  const stream = canvas.captureStream(30);
+  const chunks = [];
+  const recorder = new MediaRecorder(stream, { mimeType });
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  const stopped = new Promise((ok) => (recorder.onstop = ok));
+  recorder.start();
+  const t0 = performance.now();
+  while (performance.now() - t0 < 1500) { g.fillRect(0, 0, 64, 64); await new Promise((r) => setTimeout(r, 33)); }
+  recorder.stop(); await stopped; stream.getTracks().forEach((t) => t.stop());
+  return new Blob(chunks, { type: mimeType });
+}
+async function pixel(blob) {
+  const video = document.createElement('video');
+  video.muted = true; video.playsInline = true; video.src = URL.createObjectURL(blob);
+  await new Promise((ok, no) => { video.onloadeddata = ok; video.onerror = () => no(video.error); });
+  video.currentTime = 0.5;
+  await new Promise((ok) => (video.onseeked = ok));
+  const c = new OffscreenCanvas(64, 64).getContext('2d', { willReadFrequently: true });
+  c.drawImage(video, 0, 0, 64, 64);
+  return [...c.getImageData(32, 32, 1, 1).data].slice(0, 3);
+}
+if (typeof MediaRecorder === 'undefined') result.error = 'MediaRecorder is not available in this browser';
+for (const mimeType of typeof MediaRecorder === 'undefined' ? [] : ['video/webm;codecs=vp8', 'video/mp4']) {
+  if (!MediaRecorder.isTypeSupported(mimeType)) { result.recordings[mimeType] = 'unsupported'; continue; }
+  try {
+    const blob = await record(mimeType);
+    const rgb = await pixel(blob);
+    result.recordings[mimeType] = { bytes: blob.size, played: rgb, withinFourLevels: rgb.every((v, i) => Math.abs(v - [51, 102, 153][i]) <= 4) };
+    if (mimeType.includes('webm')) window.webm = blob;
+  } catch (e) { result.recordings[mimeType] = 'error: ' + e; }
+}
+result.reproduces = result.error ? 'not run' : result.recordings['video/webm;codecs=vp8']?.withinFourLevels === false;
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>

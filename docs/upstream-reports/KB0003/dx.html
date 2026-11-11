@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WGSL function named dx</title>
+<pre id="out">running</pre>
+<script type="module">
+// Compiles the same trivial fragment shader with a function called `dx`, `dy` and `ex`, and with a local `let dx`.
+// Valid WGSL in every case. Reports which render pipelines fail to build.
+const adapter = await navigator.gpu?.requestAdapter();
+const info = adapter?.info ?? {};
+const result = { userAgent: navigator.userAgent, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(' '), cases: {} };
+if (!adapter) result.error = 'no WebGPU adapter';
+else {
+  const device = await adapter.requestDevice();
+  const vertex = `@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { var p = array(vec2f(-1,-1), vec2f(3,-1), vec2f(-1,3)); return vec4f(p[i], 0, 1); }`;
+  const shaders = {
+    'fn dx': `fn dx() -> f32 { return 1.0; } @fragment fn f() -> @location(0) vec4f { return vec4f(dx()); }`,
+    'fn dy': `fn dy() -> f32 { return 1.0; } @fragment fn f() -> @location(0) vec4f { return vec4f(dy()); }`,
+    'fn ex': `fn ex() -> f32 { return 1.0; } @fragment fn f() -> @location(0) vec4f { return vec4f(ex()); }`,
+    'let dx': `@fragment fn f() -> @location(0) vec4f { let dx = 1.0; return vec4f(dx); }`,
+    'var dx': `@fragment fn f() -> @location(0) vec4f { var dx = 1.0; return vec4f(dx); }`,
+  };
+  for (const [name, fragment] of Object.entries(shaders)) {
+    device.pushErrorScope('validation');
+    const module = device.createShaderModule({ code: vertex + fragment });
+    let message = 'ok';
+    try {
+      await device.createRenderPipelineAsync({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'v' },
+        fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+      });
+    } catch (e) {
+      message = `${e.name}: ${e.message}`;
+    }
+    const scope = await device.popErrorScope();
+    result.cases[name] = scope ? `${message} / ${scope.message}` : message;
+  }
+}
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>

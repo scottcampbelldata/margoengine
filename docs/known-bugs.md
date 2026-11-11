@@ -11,6 +11,7 @@
   layer's features check named its gradient helpers `dx` and `dy` and now names them `gx` and `gy`, as what it tests is
   the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases).
 
 ### Firefox prints WebGL advisory warnings that the lod and materials browser checks count as errors (found 2026-11-11, open)
 
@@ -155,6 +156,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   core for rendering only, and multisampled when the engine is). Reading it would need, per `screen` layer, the pass
   ended, the covered region copied (or resolved) to a texture, and a new pass begun, or the whole composite moved to
   an extra target: a new copy and an extra render pass per frame, which Scott's ruling (2026-11-10) does not allow.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0171/report.md` with the raw WebGPU and WebGL2 page `screen-blend.html`. Reproduces on 2026-11-11 on this PC's AMD RDNA2 iGPU (19 of 1024 pixels off, including source 151 over destination 16: 157 instead of 158) and not on the RTX A6000.
 
 ### Fixed 2026-11-11: the transitions GLSL oracle and the WGSL port disagreed at a texel edge (list 5 R6 row 21)
 
@@ -492,6 +494,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   for it (limits.md, video/record). Found on the way: `scripts/browser.js` reported `hardware.browserName` as `chromium`
   for every `MARGO_BROWSER=webkit` or `firefox` run, since those engines launch through the default Chromium path; it now
   names the engine (`tests/browser-startup.test.js`, "a MARGO_BROWSER=webkit run names webkit").
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0401/report.md` with `webm-colour.html`. Not runnable on this PC (Playwright WebKit for Windows has no MediaRecorder); the page passes on Edge 157, the WebKit numbers are the Mac record above and need a Mac run before filing.
 
 ### WebKit canvas snapshot: drawImage keeps returning a frame's first read (WebKit sweep, 2026-11-11, WebKit's side)
 
@@ -508,6 +511,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 - **Margo:** no library path reads a canvas twice in one frame (`exporters` `capture` resizes the canvas before each tile
   read, which replaces the drawing buffer). The voxel check now draws its disposed frame after the queue drains, as its
   other steps already did; the assertion (0 red pixels) is unchanged. To report upstream at bugs.webkit.org.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0425/report.md` with `drawimage.html`. Not runnable on this PC (Playwright WebKit for Windows has no WebGPU); the page gives the expected red, green, blue on Edge 157. Needs a Mac run before filing.
 
 ### Fixed: WebKit ephemeral sessions: AssetCache and RangeCache stored nothing (WebKit sweep, 2026-11-11)
 
@@ -1748,6 +1752,7 @@ remaining unverified real-file variants. Their proof gaps are not claimed fixed 
 - **Evidence:** 40 cycles on the new path under the same load (2026-11-10 01:32 to 01:34): 0 timeouts, 0 leaks; close 347 ms median, 2,130 ms maximum; 5 cycles handed off at the grace, in which the kernel needed up to 9.3 s after the close to finish with the browser (cycles 33 to 35: 9,338, 4,950 and 5,230 ms), every browser, child and host process gone by then and no survivor file written; no Node process or pipe handle left in the suite. `tests/browser-host.test.js` (a real host process; a browser the kernel never finishes with is logged as a survivor at the bound, in the host) and `tests/browser-teardown.test.js` ("a browser process the kernel has not finished tearing down cannot hold the close past the grace"; the in-process design it replaces asserted `SHUTDOWN_TIMEOUT` for that case in its own test, and `tests/browser-host.test.js` runs it through `launchBrowser` against a real host whose browser never exits).
 - **False survivor, fixed 2026-11-10 (batch 217, lane P):** the host's waiter reported a listed child as a survivor 677 ms after the end, which failed the close with `SHUTDOWN_TIMEOUT` at `scripts/lib/browser.mjs:344`. The waiter read each pid's start time to tell ours from a newer process, and took a start time it could not read (PowerShell's getter gives `$null`) for a survivor. Measured as a black box: a process the waiter has found and the kernel then finishes with has no readable start time (its object already signalled: `WaitForExit(0)` true), while every process Chromium starts as this user stays readable through its teardown (9 of 9 listed; an 8 GB process killed mid-read stayed readable until it was gone); and 135 of 958 processes on the dev PC (services such as svchost, WmiPrvSE, SearchProtocolHost) are unreadable, so a pid such a service takes over was reported too. Both mean the pid names no process of ours, so the waiter now skips it. A survivor is still reported only after the waiter's bound. Regressions in `tests/browser-teardown.test.js`: "Windows waiter: an ended process gone before its start time was read is not a survivor" (the race widened by ending the process between lookup and read) and "a pid held by a process this user cannot query is not reported as ours" (pid 4); both fail on the parent with the pid reported.
 - **Still open:** why the kernel takes over 30 s in that machine state is not Margo's to find or fix. A line in `test-results/browser-host-survivors.log` is the signal to look at the Edge version or the driver; the GPU slot is released while the kernel may still be freeing the ended browser's allocations (docs/limits.md).
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB1703/report.md` with `teardown-latency.mjs` and `load.html`. On a quiet 2026-11-11 PC it does not give the multi-second case (median exit 104 ms with 4 busy browsers, 253 ms with 12, max 470 ms); the report says a Windows trace from a slow run is still needed.
 
 ### Open, outside Margo, worked around 2026-11-10: ANGLE Vulkan writes fragment output 7 wrong after dead programs are deleted
 
@@ -2304,6 +2309,7 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
+  Upstream report (draft, nothing filed): `docs/upstream-reports/KB2224c/report.md`; no standalone repro exists yet (a plain clear page holds 60).
 
 ### Fixed 2026-11-11: three routes broke WebGPU compatibility-level rules (KB2272); surfels at 4x still refuse
 
@@ -2529,6 +2535,7 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   GPU) for a day and count resets; if 153 still comes, a per-second recorder (GPU engine use and memory per process,
   Edge GPU processes, lock holders, running tests; kept with the private notes) saves the 150 s before it, and the
   NVIDIA driver is the next suspect (update it, or try with hardware-accelerated GPU scheduling off).
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB2426/report.md` with `collect-evidence.ps1`. There is no on-demand trigger; on 2026-11-11 the System log still holds ten event 153 entries (3 on 11-11 before 00:25, 7 on 11-09), none during the repro runs of that morning.
 
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
@@ -2775,6 +2782,7 @@ Measured but not fixed. Their history, sources and rerun commands are in
 The entries below were measured with `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu` (busy
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
+- **Upstream reports (drafts, nothing filed):** `docs/upstream-reports/KB2481/report.md` (this entry) and `docs/upstream-reports/KB3508/report.md` (the NVIDIA repro page `msaa-blend-repeat.html`, which has no Margo code). On 2026-11-11 the page still reproduces on the RTX A6000 (WebGPU: 299 of 299 frames differ, 36 distinct images; with `mask: 7` none). The Intel Arc half has no hand-written repro and could not be run here.
 
 ### createInstancedMesh draws 50,000 boxes slower than three.js
 
@@ -3579,6 +3587,7 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering --
 scripts/reference-rendering/run.mjs --case=<iridescence|anisotropy|clearcoat|transmission>` at the commit and its
 parent after `npm run build:packages`. Frozen budgets remain unchanged and these are not the sciviz/dispersion ANGLE
 exemption.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3497/report.md`; it points at the KB3508 NVIDIA page and says the link is consistent, not proven.
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 
@@ -3620,6 +3629,7 @@ Lane G current-main raw-API repro retains all 1280 triangles and captures
 eight raw-WebGL2 hashes, no validation errors. Both exact-repeat assertions
 fail. This is still an external multisample-blend problem with an unknown
 closed-driver mechanism, not an attributed Margo repair.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3508/report.md` with `msaa-blend-repeat.html` (WebGPU and WebGL2, no Margo code). On 2026-11-11, Edge 157, RTX A6000: WebGPU 299 of 299 frames differ (36 distinct), `mask: 7` none; WebGL2 on ANGLE D3D11 10 of 299 differ (9 distinct), on ANGLE Vulkan and D3D11on12 none; the AMD iGPU none.
 
 ### Fixed: medium boundary offsets shortened physical transport (Batch 99)
 
@@ -5938,6 +5948,7 @@ The sciviz GPU gate encountered the known ANGLE D3D11 MSAA resolve defect docume
 Batch 176 job 5: no open defect found in the declared tensor/OLS/Cartesian tracking contract. Device precision, degenerate-axis ambiguity, raw indefinite fits and analysis/preprocessing limits are recorded in limits.md.
 
 Batch 176 job 6: no open defect found in the declared first-model molecular sphere/stick contract. Unknown-element fallbacks, geometric bond inference and unsupported assembly/ribbon formats are explicit in limits.md.
+- **Upstream report drafts (nothing filed):** `docs/upstream-reports/KB5247d/report.md` (dispersion live reset) and `docs/upstream-reports/KB5185b/report.md` (atmosphere zero-cloud hash). Neither has a standalone repro; the nearest evidence is `docs/upstream-reports/KB3508/msaa-blend-repeat.html?api=webgl2` (ANGLE D3D11 + RTX A6000 returns different bytes for identical 4x frames, Vulkan does not). The report for this entry itself belongs to the webgl2-compat lane (KB5822a).
 
 ### Batch 137 quality gap closed
 
@@ -6308,6 +6319,7 @@ as unsupported by the light loader.
   the full `stylizedNight` body from a branch the frame never takes: ANGLE's or Apple's Metal compiler, not Margo's text.
   Left red: making two different programs round alike would mean steering that compiler with dead code. No tolerance
   changed.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB6171a/report.md`. No standalone repro: it needs a Mac and a hand-minimised page, which this PC cannot do.
 
 ## Batch 132 audit: viewcube (fixed)
 

@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>drawImage of a WebGPU canvas returns the first read</title>
+<canvas id="c" width="16" height="16"></canvas>
+<pre id="out">running</pre>
+<script type="module">
+// WebGPU spec, GPUCanvasContext [[drawingBuffer]]: "Any time the drawing buffer is read, implementations must ensure that all
+// previously submitted work ... have completed writing to it via [[currentTexture]]."
+// Steps, all in one task: clear the canvas red and submit; drawImage(canvas) into a 2D canvas and read a pixel; clear the SAME current texture
+// green and submit; read again; then await onSubmittedWorkDone(), clear it blue and read a third time.
+// Expected: red, green, blue.   Reported on WebKit 27.2 (Apple M6): red, red, then blue only after the await (see report.md).
+const result = { userAgent: navigator.userAgent };
+try {
+  const adapter = await navigator.gpu?.requestAdapter();
+  if (!adapter) throw Error('no WebGPU adapter');
+  const device = await adapter.requestDevice();
+  const canvas = document.getElementById('c');
+  const context = canvas.getContext('webgpu');
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({ device, format, alphaMode: 'opaque' });
+  const clear = (value) => {
+    const e = device.createCommandEncoder();
+    e.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: value }] }).end();
+    device.queue.submit([e.finish()]);
+  };
+  const scratch = new OffscreenCanvas(16, 16).getContext('2d', { willReadFrequently: true });
+  const read = () => { scratch.clearRect(0, 0, 16, 16); scratch.drawImage(canvas, 0, 0); return [...scratch.getImageData(8, 8, 1, 1).data].slice(0, 3); };
+  clear({ r: 1, g: 0, b: 0, a: 1 });
+  const first = read();
+  clear({ r: 0, g: 1, b: 0, a: 1 });
+  const second = read();
+  await device.queue.onSubmittedWorkDone();
+  clear({ r: 0, g: 0, b: 1, a: 1 });
+  const third = read();
+  Object.assign(result, { gpu: [adapter.info?.vendor, adapter.info?.architecture].filter(Boolean).join(' '), reads: { first, secondSameTask: second, afterWorkDoneAndANewClear: third }, expected: 'red, green, blue' });
+  result.reproduces = second[0] === 255 && second[1] === 0; // second read still red
+} catch (e) { result.error = String(e); }
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>
