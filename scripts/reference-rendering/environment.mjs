@@ -5,14 +5,24 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { referenceCase } from './cases.mjs';
-import { pictureError, assertBudget } from './compare.mjs';
+import { pictureError, assertBudget, edgeSplit } from './compare.mjs';
 import { environmentScene } from './environment-scene.mjs';
 import { benchRoot, sha256, capturePathReference, readPathReference } from './path-reference.mjs';
 
 const out = join(benchRoot, 'batch-160/environment'),
-  baselinePath = 'docs/whitepaper/results/batch-160-environment.json';
+  baselinePath = 'docs/whitepaper/results/batch-160-environment.json',
+  decompositionPath = 'docs/whitepaper/results/batch-160-environment-decomposition.json',
+  // KB3563: each reference removes one difference from the frozen direct comparison (mitsuba-environment-decompose.py).
+  decompositionNames = [
+    'principled-direct-1024',
+    'principled-unoccluded-1024',
+    'gltf-unoccluded-1024',
+    'split-model-unoccluded-1024',
+  ];
 const measure = process.argv.includes('--measure'),
-  compat = process.argv.includes('--compat');
+  compat = process.argv.includes('--compat'),
+  measureDecomposition = process.argv.includes('--measure-decomposition'),
+  decompose = measureDecomposition || process.argv.includes('--decompose');
 assert.ok(!measure || !existsSync(baselinePath), '--measure cannot replace an established budget');
 const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath)) : undefined;
 if (!measure) assert.ok(baseline, 'Freeze the first measurements before checking them');
@@ -36,6 +46,21 @@ if (process.argv.includes('--capture-reference')) {
   for (const mode of ['direct', 'full'])
     for (const suffix of ['-rgb.f32', '-meta.json', '.exr'])
       copyFileSync(join(candidate, 'mitsuba-' + mode + suffix), join(out, 'mitsuba-' + mode + suffix));
+}
+const decomposition = existsSync(decompositionPath) ? JSON.parse(readFileSync(decompositionPath)) : undefined;
+assert.ok(!measureDecomposition || !decomposition, '--measure-decomposition cannot replace an established decomposition');
+if (decompose && !measureDecomposition) assert.ok(decomposition, 'Record the decomposition with --measure-decomposition');
+if (process.argv.includes('--capture-decomposition')) {
+  // CUDA Mitsuba (the caller holds the GPU lock); validated against the frozen hashes before any file is replaced.
+  const candidate = join(out, `decomposition-${Date.now()}-${process.pid}`);
+  mkdirSync(candidate, { recursive: true });
+  for (const file of ['scene.glb', 'settings.json']) copyFileSync(join(out, file), join(candidate, file));
+  await capturePathReference(fileURLToPath(new URL('./mitsuba-environment-decompose.py', import.meta.url)), candidate);
+  for (const name of decompositionNames)
+    readPathReference(candidate, 'mitsuba-' + name, settings.width, settings.height, decomposition?.references[name]);
+  for (const name of decompositionNames)
+    for (const suffix of ['-rgb.f32', '-meta.json', '.exr'])
+      copyFileSync(join(candidate, 'mitsuba-' + name + suffix), join(out, 'mitsuba-' + name + suffix));
 }
 const context = await openBrowser({ startPath: '/scripts/reference-rendering/environment.html', port: 'free' });
 try {
@@ -68,6 +93,33 @@ try {
     if (baseline) assertBudget(metrics, compat ? baseline.compat.rows[mode].metrics : baseline.rows[mode].metrics);
     const { image, ...metadata } = reference;
     rows[mode] = { ...metadata, metrics };
+  }
+  let split;
+  if (decompose) {
+    const frozen = readPathReference(out, 'mitsuba-direct', settings.width, settings.height, baseline?.rows.direct).image;
+    split = { frozen: { ...rows.direct.metrics, ...edgeSplit(actual, frozen, frozen) } };
+    for (const name of decompositionNames) {
+      const reference = readPathReference(
+        out,
+        'mitsuba-' + name,
+        settings.width,
+        settings.height,
+        decomposition?.references[name],
+      );
+      const metrics = { ...pictureError(actual, reference.image), ...edgeSplit(actual, reference.image, frozen) };
+      if (decomposition) {
+        const budget = (compat ? decomposition.compat : decomposition.native)[name];
+        assertBudget(metrics, budget);
+        for (const key of ['edge', 'flat']) assert.ok(metrics[key] <= budget[key], `${name} ${key} over its budget`);
+      }
+      const { image, ...metadata } = reference;
+      split[name] = { reference: metadata, ...metrics };
+    }
+    writeFileSync(
+      join(out, compat ? 'decomposition-compat.json' : 'decomposition.json'),
+      JSON.stringify(split, null, 2) + '\n',
+    );
+    console.log('DECOMPOSITION', JSON.stringify(split));
   }
   const result = {
     family: 'environment',

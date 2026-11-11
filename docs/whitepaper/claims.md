@@ -2137,7 +2137,7 @@ IBL, cross-vendor byte-equality or speed claim.
 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
-| Direct-only RGB-byte MAE 2.9175338745117188 / 2.9175211588541665 (native re-recorded 2026-11-11, KB3574) | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. |
+| Direct-only RGB-byte MAE 2.9175338745117188 / 2.9175211588541665 (native re-recorded 2026-11-11, KB3574) | [Frozen result](results/batch-160-environment.json), tests/reference-environment.test.js | Complete 123-primitive sample; native WebGPU / real WebGL2 compatibility; Mitsuba max depth 2. Split by [decomposition](results/batch-160-environment-decomposition.json) (KB3563): visibility 42.9 %, multiple scattering 23.2 %, principled against glTF BSDF 11.0 %, noise 1.8 %, silhouettes 19.4 %, split-sum numerics 1.7 % with no bias. |
 | Full-transport MAE 1.8851051330566406 / 1.8851038614908855 | Same result and contracts; GPU-locked environment.mjs | Mitsuba max depth 8, constant radiance, no sun, shared display transform. Geometric IBL occlusion/reflections and BSDF mismatch remain open; no path-tracing equivalence or nonuniform-sky claim. |
 
 ### Batch 160 clustered and shadowed Cornell, job 8

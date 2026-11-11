@@ -73,3 +73,43 @@ test('IBL has exact first-measured direct/full budgets on each actual backend', 
   assert.equal(b.compat.hardware.webgpu.vendor, 'margo-webgl2');
   assert.equal(b.sceneSha256, b.compat.sceneSha256);
 });
+
+// KB3563 accepted difference: the frozen direct residual split by difference (docs/limits.md, batch 160 job 7).
+test('IBL furnace residual decomposes into noise, visibility, BSDF model, multiple scattering and edges (KB3563)', () => {
+  const b = JSON.parse(readFileSync(new URL('../docs/whitepaper/results/batch-160-environment.json', import.meta.url)));
+  const d = JSON.parse(
+    readFileSync(new URL('../docs/whitepaper/results/batch-160-environment-decomposition.json', import.meta.url)),
+  );
+  assert.equal(d.sceneSha256, b.sceneSha256);
+  assert.equal(d.frozenDirect.linearSha256, b.rows.direct.linearSha256);
+  assert.equal(d.frozenDirect.native.absolute, b.rows.direct.metrics.absolute);
+  assert.equal(d.compat.hardware.webgpu.vendor, 'margo-webgl2');
+  const names = ['principled-direct-1024', 'principled-unoccluded-1024', 'gltf-unoccluded-1024', 'split-model-unoccluded-1024'];
+  assert.deepEqual(Object.keys(d.references), names);
+  for (const [i, name] of names.entries()) {
+    const meta = d.references[name].meta;
+    assert.equal(meta.samples, 1024);
+    assert.equal(meta.triangles, 1040409);
+    assert.equal(meta.variant, 'cuda_ad_rgb');
+    assert.equal(meta.visibility, i === 0);
+  }
+  for (const [side, absolute] of [
+    ['native', [2253028, 1269809, 1017910, 484953]],
+    ['compat', [2252974, 1269851, 1017870, 484989]],
+  ])
+    names.forEach((name, i) => {
+      assert.equal(d[side][name].absolute, absolute[i]);
+      assert.equal(d[side][name].edge + d[side][name].flat, absolute[i]);
+    });
+  const base = d.frozenDirect.native.absolute,
+    rows = d.native,
+    share = (x) => Math.round((1000 * x) / base) / 10;
+  assert.equal(share(base - rows['principled-direct-1024'].absolute), 1.8); // 128-spp reference noise
+  assert.equal(share(rows['principled-direct-1024'].absolute - rows['principled-unoccluded-1024'].absolute), 42.9); // visibility
+  assert.equal(share(rows['principled-unoccluded-1024'].absolute - rows['gltf-unoccluded-1024'].absolute), 11); // BSDF model
+  assert.equal(share(rows['gltf-unoccluded-1024'].absolute - rows['split-model-unoccluded-1024'].absolute), 23.2); // multiple scattering
+  // What is left against the model's own exact integrals: silhouettes, and 1.7 % of numerics with no bias.
+  assert.equal(share(rows['split-model-unoccluded-1024'].edge), 19.4);
+  assert.equal(share(rows['split-model-unoccluded-1024'].flat), 1.7);
+  assert.ok(Math.abs(rows['split-model-unoccluded-1024'].flatSigned) < rows['split-model-unoccluded-1024'].flat / 5);
+});

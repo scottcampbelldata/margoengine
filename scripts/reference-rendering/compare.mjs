@@ -55,3 +55,45 @@ export function assertBudget(result, budget) {
     assert.ok(result[key] <= budget[key], `${key}: ${result[key]} > measured ${budget[key]}`);
   assert.ok(result.foreground >= budget.foreground, 'Lost foreground coverage');
 }
+
+/**
+ * Splits the absolute RGB error of `actual` against `reference` into edge and flat pixels. Edge pixels are those whose
+ * `edges` picture (the frozen reference) changes by more than 30 summed RGB levels to a 4-neighbour: silhouettes and
+ * contacts, where antialiasing and visibility differ most. `flatSigned` is the signed flat sum (positive: brighter).
+ */
+export function edgeSplit(actual, reference, edges) {
+  const { width, height } = edges,
+    level = (p) => edges.data[p * 4] + edges.data[p * 4 + 1] + edges.data[p * 4 + 2];
+  let edge = 0,
+    flat = 0,
+    flatSigned = 0,
+    edgePixels = 0;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      let error = 0,
+        signed = 0,
+        step = 0;
+      for (let c = 0; c < 3; c++) {
+        error += Math.abs(actual.data[p * 4 + c] - reference.data[p * 4 + c]);
+        signed += actual.data[p * 4 + c] - reference.data[p * 4 + c];
+      }
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const q = Math.min(height - 1, Math.max(0, y + dy)) * width + Math.min(width - 1, Math.max(0, x + dx));
+        step = Math.max(step, Math.abs(level(p) - level(q)));
+      }
+      if (step > 30) {
+        edge += error;
+        edgePixels++;
+      } else {
+        flat += error;
+        flatSigned += signed;
+      }
+    }
+  return { edgePixels, edge, flat, flatSigned };
+}
