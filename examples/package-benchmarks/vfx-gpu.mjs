@@ -22,7 +22,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { acquire } from '../../scripts/gpu-lock.mjs';
 import { acPower } from './parts/power.mjs';
-import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
+import { summarizeTiming } from './parts/vfx-timing.mjs';
 
 const arg = (name, fallback) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -68,13 +68,14 @@ try {
     report.timing = [];
     for (const capacity of config.capacities)
       for (const samples of config.samples) {
-        const row = await browser.page.evaluate(timing, {
+        const { frames: raw, ...page } = await browser.page.evaluate(timing, {
           ...config,
           a: '/' + config.a,
           b: '/' + config.b,
           capacity,
           samples,
         });
+        const row = { ...page, ...summarizeTiming(raw, config.rounds) };
         report.timing.push(row);
         console.log(JSON.stringify({ capacity, samples, summary: row.summary }));
       }
@@ -445,7 +446,6 @@ async function timing(config) {
       return ms;
     });
   };
-  const median = (v) => nearestMedian(v);
   try {
     const blocks = [[], []],
       sessions = 4;
@@ -455,12 +455,7 @@ async function timing(config) {
         for (let warm = 0; warm < 3; warm++) for (const e of effects) await block(e);
       }
       for (const v of r % 2 ? [1, 0] : [0, 1]) {
-        const list = await block(effects[v]);
-        blocks[v].push({
-          compute: median(list.map((m) => m.compute)),
-          draw: median(list.map((m) => m.draw)),
-          total: median(list.map((m) => m.compute + m.draw)),
-        });
+        blocks[v].push(await block(effects[v])); // raw frames; statistics run in Node (parts/vfx-timing.mjs)
       }
     }
     const live = await Promise.all(
@@ -470,22 +465,6 @@ async function timing(config) {
           .then((d) => new Uint32Array(d)[1]),
       ),
     );
-    const stat = (v, key) => {
-      const x = blocks[v].map((b) => b[key]).sort((p, q) => p - q);
-      return { median: median(x), min: x[0], max: x.at(-1) };
-    };
-    const summary = Object.fromEntries(
-      ['compute', 'draw', 'total'].map((key) => [
-        key,
-        {
-          A: stat(0, key),
-          B: stat(1, key),
-          pairedSavingMs: median(blocks[0].map((x, i) => x[key] - blocks[1][i][key])),
-          bFasterRounds: blocks[0].filter((x, i) => blocks[1][i][key] < x[key]).length,
-          rounds,
-        },
-      ]),
-    );
     return {
       capacity: config.capacity,
       samples: config.samples,
@@ -493,8 +472,7 @@ async function timing(config) {
       height: s.height,
       framesPerBlock: frames,
       live,
-      summary,
-      blocks,
+      frames: blocks,
       errors: s.errors,
     };
   } finally {
