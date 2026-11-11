@@ -1,5 +1,6 @@
 // Conservative block bounds and adaptive marching, derived from public papers;
 // clipping and refinement are written independently from the definitions.
+import { colorLookupWGSL } from './color-lookup.js';
 export const blockShader = /* wgsl */ `
 struct Blocks { dims:vec4u, grid:vec4u, size:vec4u }
 @group(0) @binding(0) var<uniform> u:Blocks;
@@ -58,8 +59,10 @@ fn gradient(p:vec3f)->vec3f {
 fn kept(p:vec3f)->bool {
  for(var k=0u;k<u32(u.dims.w);k++){if(dot(u.planes[k].xyz,p)+u.planes[k].w<0.0){return false;}}return true;
 }
+fn plainLookup(v:f32)->vec4f { return textureSampleLevel(transfer,linearSampler,vec2f(v,0.5),0.0); }
 fn classify(p:vec3f,next:vec3f)->vec4f {
  let v=scalar(p);var y=0.5;
+ if(u.classification.x<0.5){return plainLookup(v);}
  if(u.classification.x==1.0){y=length(gradient(p))*u.classification.y;}
  if(u.classification.x==2.0){y=scalar(next);}
  let n=vec2f(textureDimensions(transfer));
@@ -85,7 +88,9 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
  let opaque=opaquePoint(in.position.xy,in.ndc);
  if(opaque.w>0.0){exit=min(exit,dot(opaque.xyz-world,direction));}
  if(exit<=enter){discard;}
- let base=max(u.params.w/u.params.x,(exit-enter)/2048.0);
+ // Opacity is per finest data voxel along the ray, in data units (as figure.volume), whatever the figure's aspect.
+ let voxel=min(min(u.spacing.x,u.spacing.y),u.spacing.z)/max(length(d*u.spacing.xyz*(u.dims.xyz-1.0)),1e-30);
+ let base=max(voxel/u.params.x,(exit-enter)/2048.0);
  let grid=vec3i(ceil((u.dims.xyz-1.0)/u.adaptive.z));
  var t=enter;var total=vec4f(0.0);var previous=scalar(origin+d*t);var previousT=t;
  var depth=0.0;var peak=select(-1e30,1e30,u.blocks.y>1.5);var peakPoint=origin+d*enter;
@@ -118,8 +123,10 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
    previous=value;previousT=sampleT;
   }else if(kept(sampleP)){
    if(u.blocks.y>0.5){let v=scalar(sampleP);if(select((v>peak),(v<peak),(u.blocks.y>1.5))){peak=v;peakPoint=sampleP;}t+=ds;continue;}
-   let c=classify(sampleP,origin+d*min(t+ds,exit));
-   var sigma=-log(max(1.0-c.a,1e-6))*u.params.y/u.params.w;
+   // Preintegration spans [sampleT, sampleT + ds], the length its opacity is applied over (the far end may pass
+   // the exit face; scalar() clamps to the box).
+   let c=classify(sampleP,origin+d*(sampleT+ds));
+   var sigma=-log(max(1.0-c.a,1e-6))*u.params.y/voxel;
    if(u.classification.x==2.0){sigma/=u.classification.z*u.classification.w;}
    let alpha=1.0-exp(-sigma*ds);total+=vec4f(lit(c.rgb,sampleP,-direction)*alpha,alpha)*(1.0-total.a);
    if(total.a>0.9999){break;}
@@ -130,3 +137,22 @@ struct Result { @location(0) colour:vec4f,@builtin(frag_depth) depth:f32 }
  if(total.a<=0.0){discard;}
  var out:Result;out.colour=vec4f(toOutput(total.rgb/total.a),total.a);out.depth=depth;return out;
 }`;
+
+
+/**
+ * @internal The quality shader for a transfer table. A colour-scale map uploads an rgba32float table with its scale
+ * metadata in rows 1 to 3; it is bound unfilterable and read by the shared manual lookup, row 0 only.
+ */
+export function qualityCode(encoded: boolean): string {
+  if (!encoded) return qualityShader;
+  return (
+    colorLookupWGSL +
+    qualityShader
+      .replace(
+        'fn plainLookup(v:f32)->vec4f { return textureSampleLevel(transfer,linearSampler,vec2f(v,0.5),0.0); }',
+        'fn plainLookup(v:f32)->vec4f { return colourLookup(transfer,v); }',
+      )
+      // A colour scale never carries a 2D classification; no filtered read of the table may remain.
+      .replace('return textureSampleLevel(transfer,linearSampler,uv,0.0);', 'return colourLookup(transfer,uv.x);')
+  );
+}

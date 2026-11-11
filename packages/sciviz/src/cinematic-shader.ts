@@ -36,13 +36,14 @@ fn interval(p: vec3f, d: vec3f) -> vec2f {
   let lo = min(a,b); let hi = max(a,b);
   return vec2f(max(max(max(lo.x,lo.y),lo.z),0.0),min(min(hi.x,hi.y),hi.z));
 }
-fn scalar(p: vec3f) -> f32 { cost.x+=1u; return textureSampleLevel(data,linearSampler,p,0.0).r; }
+// Bounds are voxel centres: box coordinate p samples texel (p (n - 1) + 0.5) / n.
+fn scalar(p: vec3f) -> f32 { cost.x+=1u; return textureSampleLevel(data,linearSampler,(clamp(p,vec3f(0.0),vec3f(1.0))*(u.dims.xyz-1.0)+0.5)/u.dims.xyz,0.0).r; }
 fn gradient(p: vec3f) -> vec3f {
-  let h=1.0/u.dims.xyz;
-  let a=clamp(p-h,0.5*h,1.0-0.5*h); let b=clamp(p+h,0.5*h,1.0-0.5*h);
+  let h=1.0/(u.dims.xyz-1.0);
+  let a=clamp(p-h,vec3f(0.0),vec3f(1.0)); let b=clamp(p+h,vec3f(0.0),vec3f(1.0));
   return vec3f(scalar(vec3f(b.x,p.y,p.z))-scalar(vec3f(a.x,p.y,p.z)),
     scalar(vec3f(p.x,b.y,p.z))-scalar(vec3f(p.x,a.y,p.z)),
-    scalar(vec3f(p.x,p.y,b.z))-scalar(vec3f(p.x,p.y,a.z))) / max((b-a)*u.dims.xyz,vec3f(1.0)) / u.spacing.xyz;
+    scalar(vec3f(p.x,p.y,b.z))-scalar(vec3f(p.x,p.y,a.z))) / max((b-a)*(u.dims.xyz-1.0),vec3f(1.0)) / u.spacing.xyz;
 }
 fn classify(p: vec3f) -> vec4f {
   if (any(p < vec3f(0.0)) || any(p > vec3f(1.0))) { return vec4f(0.0); }

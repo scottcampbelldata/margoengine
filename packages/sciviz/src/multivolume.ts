@@ -10,6 +10,7 @@
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { resolveColormap, type ColormapSource } from './layer.js';
+import { volumeDepthWGSL } from './volume-depth.js';
 import type { Figure } from './figure.js';
 import type { Bounds } from './layer.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
@@ -44,8 +45,12 @@ export interface MultiVolumeOptions {
 }
 
 const MAX_CHANNELS = 4;
+// Bounds are voxel centres: channel coordinate q samples texel (q (n - 1) + 0.5) / n. Steps are measured in data units
+// along the ray against the finest channel voxel (extent is the union box in those voxels), and density scales
+// extinction, as in figure.volume. Rays stop at opaque scene depth; inside the box the back faces draw.
 const shader = /* wgsl */ `${frameWGSL}
-struct Params { model: mat4x4f, toBox: mat4x4f, lo: array<vec4f, 4>, size: array<vec4f, 4>, info: vec4f }
+${volumeDepthWGSL}
+struct Params { model: mat4x4f, toBox: mat4x4f, lo: array<vec4f, 4>, size: array<vec4f, 4>, info: vec4f, extent: vec4f }
 @group(1) @binding(0) var<uniform> u: Params;
 @group(1) @binding(1) var c0: texture_3d<f32>;
 @group(1) @binding(2) var c1: texture_3d<f32>;
@@ -73,10 +78,10 @@ fn channel(i: u32, p: vec3f) -> vec4f {
   if (any(q < vec3f(0.0)) || any(q > vec3f(1.0))) { return vec4f(0.0); }
   var v = 0.0;
   switch i {
-    case 0u: { v = textureSampleLevel(c0, linearSampler, q, 0.0).r; }
-    case 1u: { v = textureSampleLevel(c1, linearSampler, q, 0.0).r; }
-    case 2u: { v = textureSampleLevel(c2, linearSampler, q, 0.0).r; }
-    default: { v = textureSampleLevel(c3, linearSampler, q, 0.0).r; }
+    case 0u: { let n = vec3f(textureDimensions(c0)); v = textureSampleLevel(c0, linearSampler, (q * (n - 1.0) + 0.5) / n, 0.0).r; }
+    case 1u: { let n = vec3f(textureDimensions(c1)); v = textureSampleLevel(c1, linearSampler, (q * (n - 1.0) + 0.5) / n, 0.0).r; }
+    case 2u: { let n = vec3f(textureDimensions(c2)); v = textureSampleLevel(c2, linearSampler, (q * (n - 1.0) + 0.5) / n, 0.0).r; }
+    default: { let n = vec3f(textureDimensions(c3)); v = textureSampleLevel(c3, linearSampler, (q * (n - 1.0) + 0.5) / n, 0.0).r; }
   }
   if (!(v == v)) { return vec4f(0.0); }
   return textureSampleLevel(transfer, linearSampler, vec2f(clamp(v, 0.0, 1.0), (f32(i) + 0.5) / 4.0), 0.0);
@@ -89,9 +94,11 @@ fn channel(i: u32, p: vec3f) -> vec4f {
   let inv = 1.0 / dir;
   let t0 = (vec3f(0.0) - origin) * inv; let t1 = (vec3f(1.0) - origin) * inv;
   let enter = max(max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z)), 0.0);
-  let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
+  var exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
+  let opaque = opaquePoint(in.clip.xy, ndc);
+  if (opaque.w > 0.0) { let o = (u.toBox * opaque).xyz; exit = min(exit, dot(o - origin, dir)); }
   if (exit <= enter) { discard; }
-  let voxel = u.info.y;
+  let voxel = 1.0 / max(length(dir * u.extent.xyz), 1e-30);
   let stride = max(voxel / u.info.z, (exit - enter) / 2048.0);
   let count = min(u32((exit - enter) / stride) + 1u, 2048u);
   var t = enter + stride * hash(in.clip.xy);
@@ -103,7 +110,7 @@ fn channel(i: u32, p: vec3f) -> vec4f {
     var keep = 1.0; var weighted = vec3f(0.0); var total = 0.0;
     for (var i = 0u; i < channels; i++) {
       let tf = channel(i, p);
-      let a = 1.0 - pow(1.0 - clamp(tf.a * u.info.w, 0.0, 0.999), stride / voxel);
+      let a = 1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * u.info.w * stride / voxel);
       keep *= 1.0 - a; weighted += a * tf.rgb; total += a;
     }
     let a = 1.0 - keep;
@@ -173,7 +180,9 @@ export class MultiVolumeLayer implements Drawable {
   quality: number;
   readonly #renderer: SciRenderer;
   readonly #channels: Prepared[];
-  readonly #values = new Float32Array(16 + 16 + 16 + 16 + 4);
+  /** @internal Rays stop at opaque scene geometry. */
+  readonly needsSceneDepth = true;
+  readonly #values = new Float32Array(16 + 16 + 16 + 16 + 4 + 4);
   #model = new Float32Array(16);
   #textures: GPUTexture[] = [];
   #transfer?: GPUTexture;
@@ -261,26 +270,32 @@ export class MultiVolumeLayer implements Drawable {
       for (let a = 0; a < 3; a++) {
         const span = u[2 * a + 1] - u[2 * a];
         v[32 + 4 * i + a] = (c.bounds[2 * a] - u[2 * a]) / span;
-        const size = (c.bounds[2 * a + 1] - c.bounds[2 * a]) / span;
-        v[48 + 4 * i + a] = size;
-        voxel = Math.min(voxel, size / (c.dims[a] - 1));
+        v[48 + 4 * i + a] = (c.bounds[2 * a + 1] - c.bounds[2 * a]) / span;
+        voxel = Math.min(voxel, Math.abs(c.bounds[2 * a + 1] - c.bounds[2 * a]) / (c.dims[a] - 1));
       }
     });
     v.set([this.#channels.length, voxel, this.quality * (renderer.samplingScale ?? 1), this.density], 64);
+    for (let a = 0; a < 3; a++) v[68 + a] = Math.abs(u[2 * a + 1] - u[2 * a]) / voxel;
+    // Outside the box: front faces, tested against the scene's depth. Inside it: back faces, always.
+    const eye = context.camera.position,
+      toBox = v.subarray(16, 32),
+      p = [0, 1, 2].map((r) => toBox[r] * eye[0] + toBox[4 + r] * eye[1] + toBox[8 + r] * eye[2] + toBox[12 + r]),
+      inside = p.every((c) => c > 0 && c < 1);
     renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
-    const pipeline = renderer.pipeline('multi-volume', context, (target) => {
+    const pipeline = renderer.pipeline(`multi-volume|${inside}`, context, (target) => {
       const module = renderer.device!.createShaderModule({ code: shader, label: 'multi-volume' });
       return {
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!] }),
+        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout!, renderer.depthLayout!] }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: target.format, blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } } }] },
-        primitive: { topology: 'triangle-list', cullMode: 'back' },
+        primitive: { topology: 'triangle-list', cullMode: inside ? 'front' : 'back' },
         multisample: target.multisample,
-        depthStencil: { format: target.depth, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+        depthStencil: { format: target.depth, depthWriteEnabled: false, depthCompare: inside ? 'always' : 'greater-equal' },
       };
     });
     pass.setPipeline(pipeline);
     pass.setBindGroup(1, this.#group!);
+    pass.setBindGroup(2, renderer.depthGroup!);
     pass.draw(36);
   }
 

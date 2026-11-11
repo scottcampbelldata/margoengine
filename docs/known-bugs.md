@@ -558,29 +558,31 @@ WebCodecs section 9.4 (2026); sources in clean-room.md.
   they are now checked against the data left and maxBytes before any allocation.
 - Regression: packages/sciviz/tests/audit-132.test.js (every case fails on the old code).
 
-### Open from the batch 132 sciviz audit (2026-11-10): GPU volume defects
+### Fixed 2026-11-11: sciviz volume march physics (batch 132 audit, GPU volume defects)
 
-Found by reading the shaders against Max 1995 and the package's own docs; each needs a GPU check on both backends,
-so they wait for the fix phase. Line numbers are at the audit commit.
+Found by reading the shaders against Max 1995 and the package's own docs; fixed in `volume.ts`, `multivolume.ts`,
+`bricks.ts`, `cinematic-shader.ts`, `volume-quality.ts` and `volume-quality-shader.ts`.
 
-- **Absorption follows the box shape.** `src/volume.ts` (step setup and opacity correction) and `src/multivolume.ts`
-  measure the step in unit-box coordinates against 1 / max(dims), so a ray along a short axis absorbs as if it crossed
-  the longest one. Repro: dims [64, 64, 8], constant field, alpha 0.1: a ray along z gives about 1 - 0.9^64 instead of
-  1 - 0.9^7. `volume-quality-shader.ts` already uses physical length.
-- **Voxel centres are offset by half a voxel.** `volume.ts` and `multivolume.ts` sample at texture coordinate p while the
-  docs say bounds are voxel centres; the coordinate should be (p (n - 1) + 0.5) / n, as the quality shader does.
-  Multivolume channels of different resolutions are offset from each other. bricks.ts and cinematic-shader.ts share it.
-- **Lighting view direction uses the normal matrix.** `volume.ts` maps the box-space ray direction by the inverse
-  transpose instead of the model matrix; with non-cubic bounds the normal flip and specular are wrong.
-- **`density` means two things.** `volume.ts` and `multivolume.ts` scale opacity (min(alpha density, 0.999)) on one
-  path and extinction (1 - (1 - alpha)^density) on the other, so the quality wrapper changes the picture.
-- **The quality wrapper fails with a colorScale map.** `volume-quality.ts` binds the transfer texture as filterable
-  float but a colorScale map makes it rgba32float, so bind-group creation fails; the shader also reads row 0.5 of a
-  4-row table.
-- **Jittered preintegration spans the wrong length.** `volume-quality-shader.ts` takes front at t + ds jitter and back
-  at t + ds but applies opacity for the full ds; back should be front + ds.
-- **Multivolume culls back faces and ignores scene depth.** `multivolume.ts` always uses cullMode 'back' (nothing draws
-  with the camera inside the box) and never clips rays against opaque geometry, unlike `volume.ts`.
+- **Absorption followed the box shape.** Steps were measured in unit-box coordinates against 1 / max(dims), so a ray
+  along a short axis absorbed as if it crossed the longest one. Every march (the quality wrapper included, which used
+  scene units) now steps in data units along the ray against the finest data voxel spacing.
+- **Voxel centres were offset by half a voxel.** Box coordinate p now samples texel (p (n - 1) + 0.5) / n, so bounds
+  are voxel centres as documented, in every march and in multivolume channels of different resolutions.
+- **The lighting view direction used the normal matrix.** It now uses the model matrix; normals keep the inverse
+  transpose.
+- **`density` meant two things.** It now scales extinction everywhere: alpha = 1 - (1 - a)^(density step / voxel).
+- **The quality wrapper failed with a colorScale map.** The rgba32float table is bound unfilterable and read by the
+  shared manual lookup, row 0 only.
+- **Jittered preintegration spanned the wrong length.** A segment now spans [sample, sample + step], the length its
+  opacity is applied over, so segments tile the ray whatever the jitter.
+- **Multivolume culled back faces and ignored scene depth.** It now reads the scene depth and, with the eye inside
+  the box, culls front faces and draws always.
+- Regression: packages/sciviz/tests/volume-physics-browser.mjs (short-axis absorption 252 against 135 and oblique
+  shading 135 against 145 on the old code), the preintegrated spike case of
+  packages/sciviz/tests/volume-quality-browser.mjs (old code: a ray at 9 of an expected 28.6), and
+  packages/sciviz/tests/volume-depth-browser.mjs; all on both backends. The one-brick check of
+  packages/sciviz/tests/bricks-browser.js now compares under exact float filtering and bounds each hardware-filtered
+  march by the 8-bit weight model (docs/limits.md, "Sciviz volume filtering precision").
 
 ### Fixed 2026-11-11: sciviz preintegration range and cyclic table placement (batch 132 audit)
 
@@ -6281,8 +6283,9 @@ and a standalone pass over all 1,312 entry `.d.ts` files found every source file
   gltf-pro and materials files. Open, outside the lanes that may edit them: `packages/physics/src/physics.ts:1209`,
   `packages/physics/src/next/physics.ts:896` and `packages/physics2d/src/physics.ts:630` check `hasPlugin` and remove
   by name in the active scene (same bug); `packages/ragdoll/src/ragdoll.ts:1211` compares against the active scene, so
-  a ragdoll in another scene is never removed; sciviz (dev PC) `axes.ts:290`, `media-tiles.ts:282` and
-  `pointcloud.ts:374` have the same pattern. Also open: tiles' points plugin and usdz `curves()` attached after an
+  a ragdoll in another scene is never removed. Sciviz `axes.ts`, `media-tiles.ts` and `pointcloud.ts` had the same
+  pattern; fixed 2026-11-11 through `sceneOf` (regression: packages/sciviz/tests/scene-owner-browser.mjs for the axes,
+  both backends; the scene cases of packages/sciviz/tests/export-media.test.js and pointcloud.test.js). Also open: tiles' points plugin and usdz `curves()` attached after an
   import's await used to land in the default scene; tiles now attaches its points plugin to the renderer's scene,
   usdz is in finish-later.md.
 

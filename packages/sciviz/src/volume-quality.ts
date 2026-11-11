@@ -6,7 +6,7 @@ import type { Figure } from './figure.js';
 import type { VolumeLayer } from './volume.js';
 import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import { volumeDepthWGSL } from './volume-depth.js';
-import { qualityShader, blockShader } from './volume-quality-shader.js';
+import { blockShader, qualityCode } from './volume-quality-shader.js';
 import { blueNoiseRanks } from './volume-blue-noise.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -89,6 +89,9 @@ export class QualityVolume implements Drawable {
   #uniform!: GPUBuffer;
   #blockUniform!: GPUBuffer;
   #layout!: GPUBindGroupLayout;
+  /** The layout for a float colour-scale table (rgba32float), which is read with textureLoad, unfiltered. */
+  #encodedLayout!: GPUBindGroupLayout;
+  #encoded = false;
   #blockPipeline!: GPURenderPipeline;
   #blocks: GPUTexture | undefined;
   #opacity!: GPUTexture;
@@ -130,17 +133,20 @@ export class QualityVolume implements Drawable {
       usage = GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST;
     this.#uniform = d.createBuffer({ size: this.#values.byteLength, usage });
     this.#blockUniform = d.createBuffer({ size: 48, usage });
-    this.#layout = d.createBindGroupLayout({
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { viewDimension: '3d' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
-        { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
-        { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: {} },
-        { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: {} },
-      ],
-    });
+    const layout = (transfer: GPUTextureSampleType): GPUBindGroupLayout =>
+      d.createBindGroupLayout({
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+          { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { viewDimension: '3d' } },
+          { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: transfer } },
+          { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+          { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
+          { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+          { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        ],
+      });
+    this.#layout = layout('float');
+    this.#encodedLayout = layout('unfilterable-float');
     const module = d.createShaderModule({ code: blockShader, label: 'sciviz conservative block bounds' });
     this.#blockPipeline = d.createRenderPipeline({
       layout: 'auto',
@@ -240,11 +246,12 @@ export class QualityVolume implements Drawable {
     if (this.#transfer !== resources.transfer) {
       this.#opacityBounds();
       this.#transfer = resources.transfer;
+      this.#encoded = resources.transfer.format === 'rgba32float';
       this.#group = undefined;
     }
     if (!this.#group)
       this.#group = d.createBindGroup({
-        layout: this.#layout,
+        layout: this.#encoded ? this.#encodedLayout : this.#layout,
         entries: [
           { binding: 0, resource: { buffer: this.#uniform } },
           { binding: 1, resource: resources.data.createView() },
@@ -288,14 +295,15 @@ export class QualityVolume implements Drawable {
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (this.#disposed || !this.#volume.valid || !this.#group) return;
     const iso = this.#options.isovalue !== undefined;
-    const pipeline = renderer.pipeline('volume quality|' + iso, context, (target) => {
+    const encoded = this.#encoded;
+    const pipeline = renderer.pipeline(`volume quality|${iso}|${encoded}`, context, (target) => {
       const module = renderer.device!.createShaderModule({
-        code: frameWGSL + volumeDepthWGSL + qualityShader,
+        code: frameWGSL + volumeDepthWGSL + qualityCode(encoded),
         label: 'sciviz volume quality',
       });
       return {
         layout: renderer.device!.createPipelineLayout({
-          bindGroupLayouts: [renderer.frameLayout!, this.#layout, renderer.depthLayout!],
+          bindGroupLayouts: [renderer.frameLayout!, encoded ? this.#encodedLayout : this.#layout, renderer.depthLayout!],
         }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: {

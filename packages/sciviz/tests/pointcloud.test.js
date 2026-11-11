@@ -176,6 +176,46 @@ test('errors and cancellation propagate, malformed columns fail, and disposal re
   assert.equal(invalid.plugins.size, 0, 'invalid octree options allocate no engine plugins');
 });
 
+test("disposal while another scene is active removes the layer's own points plugin, not that scene's", async () => {
+  const f = figure(),
+    engine = f.engine,
+    scenes = [f.plugins, new Map()];
+  let active = scenes[0];
+  // As core: use and removePlugin(name) act on the active scene; sceneOf finds the scene a plugin joined.
+  const owner = (scene) => ({
+    removePlugin(name) {
+      const p = scene.get(name);
+      scene.delete(name);
+      p?.dispose?.();
+    },
+  });
+  Object.assign(engine, {
+    use(p) {
+      active.set(p.name, p);
+      p.setup?.(engine);
+    },
+    hasPlugin: (name) => active.has(name),
+    sceneOf: (p) => {
+      const scene = scenes.find((m) => m.get(p?.name) === p);
+      return scene && owner(scene);
+    },
+    removePlugin(name) {
+      owner(active).removePlugin(name);
+    },
+  });
+  const layer = await pointcloud(f, source()),
+    points = layer.points,
+    decoy = { name: points.name, disposed: 0, dispose() {
+      this.disposed++;
+    } };
+  scenes[1].set(decoy.name, decoy);
+  active = scenes[1];
+  layer.dispose();
+  assert.equal(scenes[1].get(decoy.name), decoy, 'the active scene keeps its same-named plugin');
+  assert.equal(decoy.disposed, 0);
+  assert.equal(scenes[0].has(points.name), false, 'the points plugin left the scene it joined');
+});
+
 test('an inactive empty:false shared predicate dims all points until a row is selected', async () => {
   const store = new SelectionStore([], { universe: 'open', empty: false });
   using layer = await pointcloud(figure(), source(), {

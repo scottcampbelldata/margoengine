@@ -25,7 +25,7 @@ import {
 } from './bricks-plan.js';
 import { rangeOption, resolveColormap, type Bounds } from './layer.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
-import { transferTable, type ClipPlane, type VolumeLayerOptions } from './volume.js';
+import { filterModeWGSL, transferTable, type ClipPlane, type VolumeLayerOptions } from './volume.js';
 import type { Colormap } from './colormaps.js';
 
 export {
@@ -89,25 +89,28 @@ export interface BrickStats {
 
 /** The page table and atlas lookup every bricked pipeline shares. */
 const bricksWGSL = /* wgsl */ `${frameWGSL}
-struct Volume { model: mat4x4f, toBox: mat4x4f, normalModel: mat4x4f, dims: vec4f, params: vec4f, planes: array<vec4f, 4>, atlas: vec4f, grid: vec4f }
+struct Volume { model: mat4x4f, toBox: mat4x4f, normalModel: mat4x4f, dims: vec4f, params: vec4f, planes: array<vec4f, 4>, atlas: vec4f, grid: vec4f, spacing: vec4f }
 @group(1) @binding(0) var<uniform> volume: Volume;
 @group(1) @binding(1) var atlas: texture_3d<f32>;
 @group(1) @binding(2) var transfer: texture_2d<f32>;
 @group(1) @binding(3) var linearSampler: sampler;
 @group(1) @binding(4) var pages: texture_3d<u32>;
+${filterModeWGSL('atlas')}
 // The finest loaded brick over a point: atlas slot in xyz, level + 1 in w, 0 when nothing covers it.
+// Bounds are voxel centres: box coordinate p is voxel position p (n - 1), whose voxel spans [i, i + 1) from i + 0.5.
 fn page(p: vec3f) -> vec4u {
-  let v = clamp(p, vec3f(0.0), vec3f(1.0)) * volume.dims.xyz;
+  let v = clamp(p, vec3f(0.0), vec3f(1.0)) * (volume.dims.xyz - 1.0) + 0.5;
   return textureLoad(pages, min(vec3u(v / volume.grid.x), textureDimensions(pages) - 1u), 0);
 }
 fn sample(p: vec3f) -> f32 {
-  let v = clamp(p, vec3f(0.0), vec3f(1.0)) * volume.dims.xyz;
+  let v = clamp(p, vec3f(0.0), vec3f(1.0)) * (volume.dims.xyz - 1.0) + 0.5;
   let cell = min(vec3u(v / volume.grid.x), textureDimensions(pages) - 1u);
   let entry = textureLoad(pages, cell, 0);
   if (entry.w == 0u) { return 0.0; }
   let level = entry.w - 1u;
   let local = v / f32(1u << level) - vec3f(cell >> vec3u(level)) * volume.grid.x;
   let at = vec3f(entry.xyz) * volume.grid.z + volume.grid.y + local;
+  if (filterMode > 0u) { return trilinear(at); }
   return textureSampleLevel(atlas, linearSampler, at / volume.atlas.xyz, 0.0).r;
 }`;
 
@@ -154,14 +157,16 @@ fn kept(p: vec3f) -> bool {
   let enter = max(max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z)), 0.0);
   let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
   if (exit <= enter) { discard; }
-  let voxel = 1.0 / max(max(volume.dims.x, volume.dims.y), volume.dims.z);
+  // Steps in data units along the ray against the finest voxel spacing (as figure.volume does).
+  let dataPerBox = max(length(dir * volume.spacing.xyz * (volume.dims.xyz - 1.0)), 1e-30);
+  let voxel = min(min(volume.spacing.x, volume.spacing.y), volume.spacing.z) / dataPerBox;
   let stride = max(voxel / volume.params.x, (exit - enter) / 2048.0);
   let count = min(u32((exit - enter) / stride) + 1u, 2048u);
   var t = enter + stride * hash(in.clip.xy);
   var colour = vec3f(0.0);
   var alpha = 0.0;
   var peak = select(0.0, 1.0, volume.params.y > 1.5);
-  let toEye = -normalize((volume.normalModel * vec4f(dir, 0.0)).xyz);
+  let toEye = -normalize((volume.model * vec4f(dir, 0.0)).xyz);
   var i = 0u;
   loop {
     if (i >= count) { break; }
@@ -176,11 +181,11 @@ fn kept(p: vec3f) -> bool {
     let v = sample(p);
     if (volume.params.y > 0.5) { peak = select(max(peak, v), min(peak, v), volume.params.y > 1.5); continue; }
     let tf = textureSampleLevel(transfer, linearSampler, vec2f(v, 0.5), 0.0);
-    let a = 1.0 - pow(1.0 - clamp(tf.a * volume.params.z, 0.0, 0.999), stride * span / voxel);
+    let a = 1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * volume.params.z * stride * span / voxel);
     if (a < 0.002) { continue; }
     var rgb = tf.rgb;
     if (volume.params.w > 0.5) {
-      let texel = span / volume.dims.xyz;
+      let texel = span / (volume.dims.xyz - 1.0);
       let g = vec3f(
         sample(p + vec3f(texel.x, 0.0, 0.0)) - sample(p - vec3f(texel.x, 0.0, 0.0)),
         sample(p + vec3f(0.0, texel.y, 0.0)) - sample(p - vec3f(0.0, texel.y, 0.0)),
@@ -812,6 +817,8 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
       [sx, sy, sz] = this.budget.slots;
     v.set([sx * side, sy * side, sz * side, 0], 72);
     v.set([brickSize, border, side, 0], 76);
+    const b = this.bounds;
+    v.set([0, 1, 2].map((a) => Math.abs(b[2 * a + 1] - b[2 * a]) / (this.dims[a] - 1)), 80);
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
   }
 

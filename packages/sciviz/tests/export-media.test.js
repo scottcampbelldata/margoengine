@@ -59,16 +59,35 @@ function captureFixture() {
     createCommandEncoder: () => ({ copyTextureToBuffer() {}, finish() {} }),
     queue: { submit() {} },
   };
+  // As core: plugins join the active scene, removePlugin(name) acts on the active scene, sceneOf finds the owner.
+  const scenes = [new Map(), new Map()];
+  let active = scenes[0];
+  const owner = (scene) => ({
+    plugins: scene,
+    removePlugin(name) {
+      removed.push(name);
+      scene.delete(name);
+    },
+  });
   const engine = {
     gpu,
     canvas,
     camera: new Camera(),
     disposed: false,
+    scenes,
+    activate(index) {
+      active = scenes[index];
+    },
     use(plugin) {
       this.plugin = plugin;
+      active.set(plugin.name, plugin);
+    },
+    sceneOf(plugin) {
+      const scene = scenes.find((s) => s.get(plugin.name) === plugin);
+      return scene && owner(scene);
     },
     removePlugin(name) {
-      removed.push(name);
+      owner(active).removePlugin(name);
     },
     render({ views }) {
       views[0].camera.update(1, true);
@@ -125,6 +144,23 @@ test('early iterator close, overlapping captures and readback errors release own
   await assert.rejects(renderMediaTiles(figure, { overlays: false }).next(), (e) => e === reason);
   assert.ok(created.every((c) => c.destroyed));
   assert.equal(removed.length, 2);
+});
+
+test("a capture that ends while another scene is active removes its own tile clear, not that scene's plugin", async () => {
+  const { figure, removed } = captureFixture(),
+    engine = figure.engine,
+    decoy = { name: 'sciviz:media-clear', setup() {} };
+  engine.scenes[1].set(decoy.name, decoy);
+  const iterator = renderMediaTiles(figure, { overlays: false, tileSize: 4 });
+  await iterator.next();
+  const clear = engine.plugin;
+  assert.equal(engine.scenes[0].get(clear.name), clear);
+  // A second view's scene is active when the last tile is taken and the capture finishes.
+  engine.activate(1);
+  while (!(await iterator.next()).done);
+  assert.equal(engine.scenes[1].get(decoy.name), decoy, 'the other scene keeps its plugin');
+  assert.equal(engine.scenes[0].has(clear.name), false, 'the tile clear left the scene it joined');
+  assert.deepEqual(removed, ['sciviz:media-clear']);
 });
 
 test('abort and invalid output requests reject before producing partial files', async () => {

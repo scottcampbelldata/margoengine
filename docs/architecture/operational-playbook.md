@@ -7666,3 +7666,15 @@ Optional water/liquid (ParticleLiquid) is an HDR PostStack stage of six render p
 Whitewater (2026-11-11): a lazy chunk of seven render-pass pipelines (bucket fill by depth-tested point draws into r32uint, normals and potentials into rgba32float and r32uint, a count pyramid in two r32uint atlases, the pool step as MRT into two rgba32float targets, a 1x1 ring head, sprites into an rgba16float layer the composite reads). No compute, atomics, workgroup memory or barriers, so the WebGL2 layer runs every pass as a draw; its fragment stages read storage buffers through the layer's data textures. Evidence: packages/water/test/liquid-whitewater.browser.mjs passes natively and with MARGO_COMPAT=1 with identical counts, equal to the float64 oracle on the first step; the CPU test checks and translates every shader with the layer's own WGSL front end. Missing: iGPU timing and the quiet rerun.
 
 Narrow band (2026-11-11, packages/water/src/liquid-band.ts, Oliveira and Paiva 2022): a lazy chunk of render passes only (bounds reduction, a 1x1 grid pass, additive voxel counts in rgba16float, two r32uint label passes, depth sprites culled in the vertex stage, one thickness ball per voxel), so the WebGL2 layer runs it as draws. Evidence: packages/water/test/liquid-band.browser.mjs, native and MARGO_COMPAT=1, labels equal the Algorithm 1 oracle, nearest depth identical with and without the band. Missing: quiet timing to set the default.
+
+## Sciviz volume march physics and filter precision (section 5 evidence, 2026-11-11)
+
+GPU maths change in `@margoengine/sciviz` volume marches (`volume.ts`, `multivolume.ts`, `bricks.ts`,
+`cinematic-shader.ts`, `volume-quality*.ts`): steps in data units against the finest voxel, voxel-centre texel
+addressing, model-matrix view direction, density as an extinction scale, full-length preintegration segments, and
+multivolume scene-depth clipping (docs/known-bugs.md, "Fixed 2026-11-11: sciviz volume march physics"). Evidence:
+`tests/volume-physics-browser.mjs`, the spike case of `tests/volume-quality-browser.mjs`, `tests/volume-depth-browser.mjs`,
+both backends. Quality gate change: the one-brick check of `tests/bricks-browser.js` compares whole and bricked under a
+test-only exact float trilinear filter (pipeline constant `filterMode`; the normal path builds the hardware branch
+only) at 1 of 255, and bounds each hardware march by an 8-bit filter-weight model (measured worst 6 within the model's
+8); docs/limits.md, "Sciviz volume filtering precision". Still missing: the same measurement on an AMD or Intel GPU.

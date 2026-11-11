@@ -371,7 +371,8 @@ export class PointCloudLayer extends EventTarget {
     this.#disposed = true;
     this.#events.abort();
     this.octree.dispose();
-    if (this.#figure.engine.hasPlugin(this.points.name)) this.#figure.engine.removePlugin(this.points.name);
+    // Leave the scene the points plugin joined, not whichever scene is active now.
+    this.#figure.engine.sceneOf(this.points)?.removePlugin(this.points.name);
     this.#resident.clear();
   }
   [Symbol.dispose](): void {

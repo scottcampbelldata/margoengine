@@ -49,7 +49,10 @@ export interface VolumeLayerOptions {
    * Default `t => t * t` (low values clear, high values solid).
    */
   readonly opacity?: readonly (readonly [number, number])[] | ((t: number) => number);
-  /** Overall opacity scale; above 1 makes the volume denser. Default 1. */
+  /**
+   * Extinction scale; above 1 makes the volume denser. Opacity is per finest data voxel along the ray, so a sample
+   * `step` voxels long takes alpha 1 - (1 - a)^(density step). Default 1.
+   */
   readonly density?: number;
   /**
    * `'composite'` (default) blends along the ray; `'mip'` shows the maximum value along it and `'minip'` the minimum,
@@ -126,6 +129,34 @@ fn colourLookup(table:texture_2d<f32>, value:f32)->vec4f {
   );
 }
 
+/**
+ * @internal Test-only filter modes of the volume marches, set through the pipeline constant `filterMode`, never by an
+ * option: 0 the hardware trilinear filter (the default; the branch folds away when the pipeline is built), 1 exact
+ * float trilinear from eight `textureLoad`s, 2 the same with every axis weight one full 8-bit step (1/256) off, its
+ * sign picked by a hash of the position: a model of hardware filter-weight precision (tests/bricks-browser.js).
+ * `x` is in texels of `texture`, voxel centres at i + 0.5.
+ */
+export const filterModeWGSL = (texture: string): string => /* wgsl */ `
+override filterMode: u32 = 0u;
+fn trilinear(x: vec3f) -> f32 {
+  let b = x - 0.5;
+  let base = floor(b);
+  var f = b - base;
+  if (filterMode == 2u) {
+    let h = fract(sin(vec3f(dot(x, vec3f(12.9898, 78.233, 37.719)), dot(x, vec3f(39.346, 11.135, 83.155)), dot(x, vec3f(73.156, 52.235, 9.151)))) * 43758.5453);
+    f = clamp(f + select(vec3f(-1.0), vec3f(1.0), h > vec3f(0.5)) / 256.0, vec3f(0.0), vec3f(1.0));
+  }
+  let i = vec3i(base);
+  let last = vec3i(textureDimensions(${texture})) - 1;
+  var s = 0.0;
+  for (var k = 0; k < 8; k++) {
+    let o = vec3i(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+    let w = select(1.0 - f, f, o == vec3i(1));
+    s += w.x * w.y * w.z * textureLoad(${texture}, clamp(i + o, vec3i(0), last), 0).r;
+  }
+  return s;
+}`;
+
 /** WGSL of the volume pipeline. */
 const volumeShader = /* Shader notes kept outside the uploaded source:
  * The 36 vertices of the unit box, counter-clockwise seen from outside.
@@ -133,7 +164,11 @@ const volumeShader = /* Shader notes kept outside the uploaded source:
  * counter-clockwise seen from outside.
  * The ray through this pixel, from the near plane, in box coordinates.
  * At most 2048 samples: a longer ray takes wider steps, so it still reaches the far side of the box.
- * Opacity was defined per voxel; correct it for the step length (1 - (1 - a)^(step / voxel)).
+ * Bounds are voxel centres: box coordinate p samples texel (p (n - 1) + 0.5) / n.
+ * Steps are measured in data units along the ray against the finest voxel spacing, so a ray along a short axis
+ * crosses only that axis's voxels. Opacity is defined per finest voxel and density scales extinction:
+ * alpha = 1 - (1 - a)^(density step / voxel), as in the quality wrapper (Max 1995).
+ * Normals use the inverse transpose; the view direction uses the model matrix itself.
  * The gradient points up the data; the surface faces the other way.
  */ /* wgsl */ `${frameWGSL}
 ${volumeDepthWGSL}
@@ -167,7 +202,12 @@ fn corner(index: u32) -> vec3f {
   return out;
 }
 fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 43758.5453); }
-fn sample(p: vec3f) -> f32 { return textureSampleLevel(data, linearSampler, p, 0.0).r; }
+fn texel(p: vec3f) -> vec3f { return (p * (volume.dims.xyz - 1.0) + 0.5) / volume.dims.xyz; }
+${filterModeWGSL('data')}
+fn sample(p: vec3f) -> f32 {
+  if (filterMode > 0u) { return trilinear(clamp(p, vec3f(0.0), vec3f(1.0)) * (volume.dims.xyz - 1.0) + 0.5); }
+  return textureSampleLevel(data, linearSampler, texel(p), 0.0).r;
+}
 fn kept(p: vec3f) -> bool {
   for (var k = 0u; k < u32(volume.dims.w); k++) {
     if (dot(volume.planes[k].xyz, p) + volume.planes[k].w < 0.0) { return false; }
@@ -190,7 +230,8 @@ fn kept(p: vec3f) -> bool {
     let p=(volume.toBox*opaque).xyz; exit=min(exit,dot(p-origin,dir));
   }
   if (exit <= enter) { discard; }
-  let voxel = 1.0 / max(max(volume.dims.x, volume.dims.y), volume.dims.z);
+  let dataPerBox = max(length(dir * volume.spacing.xyz * (volume.dims.xyz - 1.0)), 1e-30);
+  let voxel = min(min(volume.spacing.x, volume.spacing.y), volume.spacing.z) / dataPerBox;
   let stride = max(voxel / volume.params.x, (exit - enter) / 2048.0);
   let count = min(u32((exit - enter) / stride) + 1u, 2048u);
   var t = enter + stride * hash(in.clip.xy);
@@ -198,8 +239,8 @@ fn kept(p: vec3f) -> bool {
   var alpha = 0.0;
   var peak = 0.0;
   var hasPeak = false;
-  let texel = 1.0 / volume.dims.xyz;
-  let toEye = -normalize((volume.normalModel * vec4f(dir, 0.0)).xyz);
+  let h = 1.0 / (volume.dims.xyz - 1.0);
+  let toEye = -normalize((volume.model * vec4f(dir, 0.0)).xyz);
   for (var i = 0u; i < count; i++) {
     if(t>=exit) {break;}
     let p = origin + dir * t;
@@ -213,10 +254,10 @@ fn kept(p: vec3f) -> bool {
       continue;
     }
     var coordinate = 0.5;
-    if (volume.classification.x == 1.0) { coordinate = length(gradient(p, volume.dims.xyz, volume.spacing.xyz)) * volume.classification.y; }
+    if (volume.classification.x == 1.0) { coordinate = length(gradient(texel(p), volume.dims.xyz, volume.spacing.xyz)) * volume.classification.y; }
     if (volume.classification.x == 2.0) { coordinate = sample(origin + dir * min(t, exit)); }
     let tf = classify(v, coordinate, volume.classification.x);
-    var a = 1.0 - pow(1.0 - clamp(tf.a * volume.params.z, 0.0, 0.999), stride / voxel);
+    var a = 1.0 - exp(log(max(1.0 - tf.a, 1e-6)) * volume.params.z * stride / voxel);
     if (volume.classification.x == 2.0) {
       a = 1.0 - pow(max(1.0 - tf.a, 0.0), stride / voxel / volume.classification.z * volume.params.z / volume.classification.w);
     }
@@ -224,11 +265,11 @@ fn kept(p: vec3f) -> bool {
     var rgb = tf.rgb;
     if (volume.params.w > 0.5) {
       let g = vec3f(
-        sample(p + vec3f(texel.x, 0.0, 0.0)) - sample(p - vec3f(texel.x, 0.0, 0.0)),
-        sample(p + vec3f(0.0, texel.y, 0.0)) - sample(p - vec3f(0.0, texel.y, 0.0)),
-        sample(p + vec3f(0.0, 0.0, texel.z)) - sample(p - vec3f(0.0, 0.0, texel.z)));
+        sample(p + vec3f(h.x, 0.0, 0.0)) - sample(p - vec3f(h.x, 0.0, 0.0)),
+        sample(p + vec3f(0.0, h.y, 0.0)) - sample(p - vec3f(0.0, h.y, 0.0)),
+        sample(p + vec3f(0.0, 0.0, h.z)) - sample(p - vec3f(0.0, 0.0, h.z)));
       if (dot(g, g) > 1e-8) {
-        let n = normalize((volume.normalModel * vec4f(-g / texel, 0.0)).xyz);
+        let n = normalize((volume.normalModel * vec4f(-g / h, 0.0)).xyz);
         rgb = shade(rgb, n, toEye);
       }
     }
@@ -267,9 +308,10 @@ struct Out { @builtin(position) clip: vec4f, @location(0) box: vec3f }
   return out;
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  let v = textureSampleLevel(data, linearSampler, in.box, 0.0).r;
+  let q = (in.box * (slice.dims.xyz - 1.0) + 0.5) / slice.dims.xyz;
+  let v = textureSampleLevel(data, linearSampler, q, 0.0).r;
   var coordinate = 0.5;
-  if (slice.classification.x == 1.0) { coordinate = length(gradient(in.box, slice.dims.xyz, slice.spacing.xyz)) * slice.classification.y; }
+  if (slice.classification.x == 1.0) { coordinate = length(gradient(q, slice.dims.xyz, slice.spacing.xyz)) * slice.classification.y; }
   if (slice.classification.x == 2.0) { coordinate = v; }
   let rgb = classify(v, coordinate, slice.classification.x).rgb;
   return vec4f(toOutput(rgb), slice.plane.z);

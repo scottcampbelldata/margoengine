@@ -285,8 +285,8 @@ export class Axes {
     this.#offTicks = undefined;
     this.#updateTicks = undefined;
     for (const label of this.#texts.splice(0)) label.remove();
-    const engine = this.engine as unknown as { removePlugin(name: string): void };
     for (const line of this.#drawn.splice(0)) this.#lines?.remove(line);
-    if (this.#labels) engine.removePlugin(this.#labels.name);
+    // Leave the scene the label renderer joined, not whichever scene is active now.
+    if (this.#labels) this.engine.sceneOf(this.#labels)?.removePlugin(this.#labels.name);
   }
 }

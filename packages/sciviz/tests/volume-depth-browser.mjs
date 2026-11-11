@@ -65,8 +65,9 @@ for (const compat of [false, true]) {
           quality: 4,
         };
       let volume = f.volume(new Float32Array(8 ** 3).fill(0.5), options);
+      // Half the box is 3.5 voxel spacings of 8 samples (bounds are voxel centres), as the cinematic path counts.
       const ordinary = await pixel(),
-        a = 1 - (1 - 20 / 255) ** 4;
+        a = 1 - (1 - 20 / 255) ** 3.5;
       const expected = base.map((x, k) => Math.round((k === 0 ? 255 : 0) * a + x * (1 - a)));
       const cinematic = cinematicVolume(f, volume, { ambient: [1, 1, 1], light: [0, 0, 0] });
       const lit = await pixel(),

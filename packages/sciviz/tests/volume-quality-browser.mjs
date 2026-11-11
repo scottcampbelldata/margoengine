@@ -101,6 +101,46 @@ for (const compat of [false, true]) {
       const sourceVisible = base.visible;
       q.dispose();
       const restoredVisibility = base.visible;
+      f.remove(base);
+      f.remove(green);
+      // KB0507f: a preintegrated segment spans [sample, sample + step], the length its opacity is applied over, so
+      // the segments tile the ray whatever the jitter. A ramp along the view axis through an opacity spike narrower
+      // than one step: every ray crosses the spike once, in one segment or split across two, and draws it whole. With
+      // segments ending at t + step (the old code) the jittered start left gaps that missed the spike.
+      const { TransferFunction, preintegrateTransfer } = await import('/packages/sciviz/dist/transfer.js');
+      const spikeTf = new TransferFunction({
+        range: [0, 1],
+        gradientMax: 1,
+        points: [
+          { value: 0, rgba: [1, 0, 0, 0] },
+          { value: 0.4975, rgba: [1, 0, 0, 0] },
+          { value: 0.5, rgba: [1, 0, 0, 0.9] },
+          { value: 0.5025, rgba: [1, 0, 0, 0] },
+          { value: 1, rgba: [1, 0, 0, 0] },
+        ],
+      });
+      // Data y runs along this camera's view axis (as the isosurface check above).
+      const depthRamp = Float32Array.from({ length: 33 ** 3 }, (_, i) => (Math.floor(i / 33) % 33) / 32);
+      base = f.volume(depthRamp, { ...opts, quality: 1 });
+      base.setClassification(await preintegrateTransfer(spikeTf, { resolution: 256, samples: 256, range: base.range }));
+      const region = (p) => {
+        const reds = [];
+        for (let y = 40; y < 56; y++) for (let x = 40; x < 56; x++) reds.push(p[(y * 96 + x) * 4]);
+        return { min: Math.min(...reds), max: Math.max(...reds), mean: reds.reduce((a, b) => a + b, 0) / reds.length };
+      };
+      q = qualityVolume(f, base, { emptySpaceSkipping: false, adaptive: false, jitter: false });
+      const spikeFixed = region(await pixels());
+      q.configure({ emptySpaceSkipping: false, adaptive: false, jitter: true });
+      const spikeJittered = region(await pixels());
+      q.dispose();
+      // The spike's optical depth along the ramp (32 voxels per unit value, opacity per voxel): one crossing.
+      let depth = 0;
+      for (let k = 0; k < 10000; k++) {
+        const v = 0.4975 + ((k + 0.5) / 10000) * 0.005,
+          a = 0.9 * (1 - Math.abs(v - 0.5) / 0.0025);
+        depth += Math.log1p(-a) * (0.005 / 10000) * 32;
+      }
+      const spikeExpected = 255 * -Math.expm1(depth);
       f.dispose();
       return {
         constant,
@@ -114,6 +154,9 @@ for (const compat of [false, true]) {
         rebootError,
         sourceVisible,
         restoredVisibility,
+        spikeFixed,
+        spikeJittered,
+        spikeExpected,
         gpuErrors,
       };
     });
@@ -164,6 +207,12 @@ for (const compat of [false, true]) {
     assert.equal(report.rebootError, 0);
     assert.equal(report.sourceVisible, false);
     assert.equal(report.restoredVisibility, true);
+    // KB0507f: the spike draws whole on every ray, jittered or not: the mean within 4.5 of one crossing's opacity (the
+    // 256 x 256 table stores 8-bit opacity, which is 28 levels here, and is read bilinearly), and no ray below 60% of it.
+    for (const spike of [report.spikeFixed, report.spikeJittered]) {
+      assert.ok(Math.abs(spike.mean - report.spikeExpected) <= 4.5, JSON.stringify(report));
+      assert.ok(spike.min >= 0.6 * report.spikeExpected, JSON.stringify(report));
+    }
     reports.push({ compat, ...report });
   } finally {
     await browser.close();

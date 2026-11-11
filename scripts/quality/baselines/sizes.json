@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15074416,
+  "total": 15075283,
   "history": [
     {
       "date": "2026-10-24",
@@ -8465,6 +8465,12 @@
       "commit": "4b1d358dd0",
       "reason": "labels/gpu 6034 to 6213 B gzip (+179): abortable font wait and content-box sizing; cache entries +145 to +165 B (cache 3842 to 4007, stream 4233 to 4394, decoded 5108 to 5253, ranges +6): bytes fallback for WebKit ephemeral sessions; a split would cost a second module and the same bytes",
       "grew": 5
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "430f8ba969",
+      "reason": "Sweep L1 KB0507a-f: @margoengine/sciviz/volume-quality 8765 B ceiling (last measured 8509 B, batch 173) -> 9351 B gzip. The quality march now reads colour-scale tables through the shared colour-lookup chunk (the rgba32float table failed bind-group creation before) and steps in data units. A split would put the same lookup in a second entry and duplicate the quality pipeline state; only importers of volume-quality pay. Root sciviz, bricks and multivolume stay under their ceilings; core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9408,7 +9414,7 @@
     "@margoengine/sciviz/transfer": 6252,
     "@margoengine/sciviz/tubes": 2789,
     "@margoengine/sciviz/views": 5042,
-    "@margoengine/sciviz/volume-quality": 8765,
+    "@margoengine/sciviz/volume-quality": 9632,
     "@margoengine/sciviz/vtk": 6744,
     "@margoengine/sciviz/webgl2": 4667,
     "@margoengine/sciviz/workers": 1841,

@@ -125,7 +125,7 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
   signal?.throwIfAborted();
   if (active.has(figure.engine)) throw fault('state', 'A media capture is already active on this engine', 'sciviz');
   active.add(figure.engine);
-  let attached = false;
+  let attached: TileClear | undefined;
   try {
     await figure.ready();
     signal?.throwIfAborted();
@@ -172,7 +172,7 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
     const tint = options.transparent ? [0, 0, 0, 0] : [...clearColorValue(figure.theme.background)];
     const plugin = new TileClear(tint);
     engine.use(plugin);
-    attached = true;
+    attached = plugin;
     for (let y = 0; y < height; y += edge)
       for (let x = 0; x < width; x += edge) {
         signal?.throwIfAborted();
@@ -282,7 +282,8 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
         }
       }
   } finally {
-    if (attached && !figure.engine.disposed) figure.engine.removePlugin('sciviz:media-clear');
+    // Leave the scene the tile clear joined, not whichever scene is active when the capture ends.
+    if (attached && !figure.engine.disposed) figure.engine.sceneOf(attached)?.removePlugin(attached.name);
     active.delete(figure.engine);
   }
 }

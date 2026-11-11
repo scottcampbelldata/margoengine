@@ -16,6 +16,7 @@ export class MultiVolumeLayer implements Drawable {
     readonly bounds: Bounds;
     density: number;
     quality: number;
+    readonly needsSceneDepth = true;
     constructor(renderer: SciRenderer, channels: readonly VolumeChannel[], options?: MultiVolumeOptions);
     restore(): void;
     setModel(figure: Float32Array): void;

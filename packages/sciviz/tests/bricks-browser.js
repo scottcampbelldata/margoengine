@@ -6,7 +6,7 @@ import { arraySource, brickedVolume } from '@margoengine/sciviz/bricks';
 
 const errors = [];
 
-async function figureOn(width, height, camera) {
+async function figureOn(width, height, camera, filterMode = 0) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -15,8 +15,28 @@ async function figureOn(width, height, camera) {
   const figure = await Figure.create(canvas, { controls: false, axes: false });
   figure.engine.stop?.();
   figure.renderer.device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  if (filterMode) setFilterMode(figure.renderer.device, filterMode);
   place(figure, camera);
   return figure;
+}
+
+// The volume marches' test-only filter mode (filterModeWGSL in src/volume.ts): every pipeline this device builds from a
+// module that declares it takes `filterMode` as a pipeline constant. 1 exact float trilinear, 2 and 3 exact with the
+// weights rounded to nearest or down to an 8-bit grid. The figure's own renderer keeps these pipelines.
+function setFilterMode(device, filterMode) {
+  const codes = new WeakMap(),
+    module = device.createShaderModule.bind(device),
+    pipeline = device.createRenderPipeline.bind(device);
+  device.createShaderModule = (descriptor) => {
+    const made = module(descriptor);
+    codes.set(made, descriptor.code);
+    return made;
+  };
+  device.createRenderPipeline = (descriptor) => {
+    const fragment = descriptor.fragment;
+    if (!codes.get(fragment?.module)?.includes('override filterMode')) return pipeline(descriptor);
+    return pipeline({ ...descriptor, fragment: { ...fragment, constants: { ...fragment.constants, filterMode } } });
+  };
 }
 
 function place(figure, camera = [1.9, 1.3, 2.1]) {
@@ -65,14 +85,17 @@ async function capture(figure) {
 function compare(a, b) {
   let differing = 0,
     max = 0,
-    total = 0;
+    total = 0,
+    worst = 0;
   for (let i = 0; i < a.length; i += 4) {
     const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
     if (d) differing++;
-    if (d > max) max = d;
+    if (d > max) (max = d), (worst = i);
     total += d;
   }
-  return { pixels: a.length / 4, differing, max, mean: total / (a.length / 4) };
+  // Where the largest difference is, and both colours there, for a failure report.
+  const at = { x: (worst / 4) % WIDTH, y: Math.floor(worst / 4 / WIDTH), a: [...a.slice(worst, worst + 4)], b: [...b.slice(worst, worst + 4)] };
+  return { pixels: a.length / 4, differing, max, mean: total / (a.length / 4), at };
 }
 
 function lit(data) {
@@ -108,8 +131,8 @@ const WIDTH = 480;
 const HEIGHT = 360;
 
 // One whole and one bricked draw of the same data under `options`.
-async function whole(data, options = {}, dims = DIMS) {
-  const figure = await figureOn(WIDTH, HEIGHT);
+async function whole(data, options = {}, dims = DIMS, filterMode = 0) {
+  const figure = await figureOn(WIDTH, HEIGHT, undefined, filterMode);
   const layer = figure.volume(data, { dims, ...LOOK, ...options });
   const image = await capture(figure);
   layer.dispose();
@@ -117,8 +140,8 @@ async function whole(data, options = {}, dims = DIMS) {
   return image;
 }
 
-async function bricked(data, options = {}, dims = DIMS) {
-  const figure = await figureOn(WIDTH, HEIGHT);
+async function bricked(data, options = {}, dims = DIMS, filterMode = 0) {
+  const figure = await figureOn(WIDTH, HEIGHT, undefined, filterMode);
   const layer = brickedVolume(figure, arraySource(data, dims), { brickSize: 16, detail: 0, ...LOOK, ...options });
   await pump(figure, layer.ready());
   const image = await capture(figure),
@@ -191,15 +214,43 @@ window.runBrickTests = async () => {
     }
   });
 
-  await check('a small volume that fits one brick draws as whole', async () => {
-    const dims = [40, 40, 40],
-      small = field(...dims),
-      result = compare(
-        await whole(small, { shading: true }, dims),
-        (await bricked(small, { shading: true, brickSize: 64 }, dims)).image,
-      );
+  // One brick: the atlas holds the same voxels at other texel positions, so the two marches compute the same maths.
+  // With exact float filtering they agree to the last output step (the atlas offset rounds border + v in float).
+  const dims = [40, 40, 40],
+    small = field(...dims),
+    look = { shading: true },
+    shot = async (filterMode) => ({
+      whole: await whole(small, look, dims, filterMode),
+      bricked: (await bricked(small, { ...look, brickSize: 64 }, dims, filterMode)).image,
+    }),
+    hardware = await shot(0),
+    exact = await shot(1);
+  await check('a small volume that fits one brick draws as whole under exact filtering', async () => {
+    const result = compare(exact.whole, exact.bricked);
     numbers.oneBrick = result;
-    assert(result.max <= 2, JSON.stringify(result));
+    numbers.oneBrickHardware = compare(hardware.whole, hardware.bricked);
+    assert(lit(exact.whole) > 5000, `whole drew ${lit(exact.whole)} pixels`);
+    assert(result.max <= 1, JSON.stringify(result));
+  });
+
+  // Hardware filters with fixed-point weights: WebGPU leaves their precision to the implementation, and desktop GPUs
+  // keep 8 fractional bits (the D3D11 and Vulkan subTexelPrecisionBits figure), so every axis weight of every fetch can
+  // be off by up to one step, 1/256, and a fetch by up to 3/256 of its largest neighbour difference. The lit march
+  // turns those value errors into normal errors through a normalised central difference, which has no finite closed
+  // form bound where the gradient is small, so the bound is measured on the same picture from that error model:
+  // filter mode 2 puts every axis weight of every fetch one full step off, sign from a hash. Each hardware march must
+  // stay within the model's worst difference from exact filtering. Measured (A6000, native and the WebGL2 layer): the
+  // model 8 on the whole march and 3 on the bricked one, hardware 6 on both (docs/limits.md, volume filtering).
+  await check('each hardware-filtered march stays within the 8-bit weight model of exact filtering', async () => {
+    const model = await shot(2),
+      bound = Math.max(compare(model.whole, exact.whole).max, compare(model.bricked, exact.bricked).max),
+      whole = compare(hardware.whole, exact.whole),
+      brickedResult = compare(hardware.bricked, exact.bricked);
+    numbers.weightModel = { bound, whole, bricked: brickedResult };
+    // The model must move the picture at all, or the bound proves nothing.
+    assert(bound >= 1, JSON.stringify(numbers.weightModel));
+    assert(whole.max <= bound, `whole: ${JSON.stringify(numbers.weightModel)}`);
+    assert(brickedResult.max <= bound, `bricked: ${JSON.stringify(numbers.weightModel)}`);
   });
 
   await check('slices from bricks match slices of a whole volume', async () => {
