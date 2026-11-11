@@ -1,5 +1,43 @@
 # Known bugs and unverified features
 
+### Firefox on Windows rejects a WGSL function named `dx` (browser defect, found 2026-11-11, open upstream)
+
+- **Repro:** in Playwright Firefox 157 on Windows (RTX A6000, headed, `dom.webgpu.enabled`), a render pipeline whose
+  fragment module is `fn dx()->f32 {return 1.0;} @fragment fn f()->@location(0) vec4f {return vec4f(dx());}` fails
+  with "DXC compile error: redefinition of 'dx' as different kind of symbol". `fn dy`, and a local `let dx` or
+  `var dx`, compile. Chromium compiles all of them.
+- **Cause:** Firefox's WGSL to HLSL step keeps the name `dx`, which DXC reserves as a namespace. Valid WGSL, so the
+  defect is the browser's. No Margo package declares a WGSL function `dx` (checked over `packages/*/src`); the WebGL2
+  layer's features check named its gradient helpers `dx` and `dy` and now names them `gx` and `gy`, as what it tests is
+  the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
+- **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
+
+### Playwright's Chromium and Firefox will not start from a packaged app's redirected %LOCALAPPDATA% (found 2026-11-11, Firefox fixed, Chromium open)
+
+- **Repro:** from a process of an MSIX-packaged app on Windows (the Claude desktop app), start
+  `%LOCALAPPDATA%\ms-playwright\chromium-1248\chrome-win64\chrome.exe --headless --dump-dom about:blank` with Node's
+  `spawnSync`: `spawn UNKNOWN`, and the Application event log reports a side-by-side error. The same file by its
+  real path (`fs.realpathSync.native`, inside the package's `LocalCache` folder) starts.
+- **Cause:** the package redirects `%LOCALAPPDATA%` for its own processes, but Windows builds the new process's
+  side-by-side activation context from the path it was given, outside the redirection, and finds no private assembly
+  beside it. Firefox (`mozglue`) and full Chromium hit it; Chromium's headless shell, Edge and Chrome do not.
+- **Fixed for Firefox:** `scripts/lib/browser.mjs` starts Playwright's Firefox by its real path
+  (`firefoxExecutable`, tests/browser-selection.test.js). **Open for Chromium:** a headed Playwright Chromium run
+  (`MARGO_BROWSER=chromium` with `headless: false`) from such an app still fails; the same real-path start fixes it,
+  and needs a go to change the Chromium launch in browser.mjs. Workaround: `BROWSER_EXECUTABLE=<real path>` or
+  `PLAYWRIGHT_BROWSERS_PATH` outside `%LOCALAPPDATA%` (docs/benchmarking.md).
+
+### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
+
+- **Repro:** `MARGO_BROWSER=firefox node packages/voxel-pathtracer/tests/browser-check.mjs --compat --report=compat
+  traversal analytic textures shapes transparent determinism capture viewport materialtables` on the RTX A6000 PC
+  while other GPU suites ran: `traversal` to `shapes` pass, `transparent` was still running at 783 s, and closing
+  Firefox then took over the 30 s shutdown budget (SHUTDOWN_TIMEOUT, "still open: browser").
+- **Cause:** not found. Firefox's WebGL2 runs on ANGLE Direct3D 11, where Edge takes 90 to 125 s to compile the staged
+  tracer's programs (docs/limits.md), and Firefox has no `KHR_parallel_shader_compile`, so each link blocks; the close
+  likely waits on a compile in flight, as the 25 to 29 s dispose wait on Edge does. Next: time each program's link in
+  Firefox on a quiet machine, and see whether the case finishes given the time.
+
 
 ### gltf-pro parts cull one by one only under CulledModels (found 2026-11-11, open)
 

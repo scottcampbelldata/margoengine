@@ -1,6 +1,7 @@
 import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
 import { spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { closeAll, endTree, traceShutdown, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
 import { HOST_LOG, HOST_PATH, REAP_MS } from '../support/browser-host.mjs';
@@ -15,14 +16,17 @@ const ownedHosts = new WeakMap();
  *                                                elsewhere (Playwright's own build, so a Linux server needs no Edge)
  *   --browser=<name> on a suite's command line   same values; the legacy names msedge and bundled still work
  *   BROWSER_CHANNEL=msedge|chrome|bundled        older spelling, used when MARGO_BROWSER is not set
- *   BROWSER_EXECUTABLE=<path>                    launch this binary instead of the named browser's install
+ *   BROWSER_EXECUTABLE=<path>                    launch this binary instead of the named browser's install (Chromium
+ *                                                family and Firefox)
  *   MARGO_GPU=default|nvidia|amd|intel           which GPU on a Windows PC with two (see gpu-adapter.mjs); unset picks the
  *                                                hardware adapter with the most video memory, default adds no flag
  *   MARGO_GPU_LUID=high,low                      use exactly this adapter (decimal)
  *   MARGO_SOFTWARE_GPU=1                         use SwiftShader (a software WebGPU adapter) on a machine without a
  *                                                real GPU; slow, and its pixels differ from a real GPU's
  *
- * Firefox has no WebGPU in Playwright's builds, so a step that needs it is reported as skipped (never passed).
+ * Firefox is Playwright's own Firefox build. Its WebGPU is off by default and blocklisted on many GPUs, so it is launched
+ * with FIREFOX_WEBGPU_PREFS, and headed for a step that needs WebGPU: headless, it answers requestAdapter() with null
+ * ("WebGPU is disabled by blocklist") whatever the prefs say. A forced-compatibility run (MARGO_COMPAT=1) runs too.
  * webkit is Playwright's own WebKit build, which has WebGPU on macOS. It is not Safari: Safari needs safaridriver.
  */
 
@@ -76,7 +80,7 @@ export function resolveBrowser({ name, env = process.env, platform = process.pla
     engine,
     channel: picked === 'edge' ? 'msedge' : picked === 'chrome' ? 'chrome' : undefined,
     executablePath: env.BROWSER_EXECUTABLE || undefined,
-    webgpu: engine !== 'firefox',
+    webgpu: true,
     chooseGpu: engine === 'chromium' && platform === 'win32',
     env,
     software: env.MARGO_SOFTWARE_GPU === '1' || env.MARGO_SOFTWARE_GPU === 'true',
@@ -364,6 +368,49 @@ export function withBoundedClose(
   return browser;
 }
 
+/** The prefs that turn Firefox's WebGPU on and past its GPU blocklist (Playwright's Firefox has it off by default). */
+export const FIREFOX_WEBGPU_PREFS = Object.freeze({ 'dom.webgpu.enabled': true, 'gfx.webgpu.ignore-blocklist': true });
+
+/**
+ * The real path of Playwright's Firefox, or undefined. A process of an MSIX-packaged app on Windows (the Claude
+ * desktop app, for one) sees %LOCALAPPDATA% through the package's file-system redirection: Playwright installed the
+ * browser into the package's private LocalCache folder, and every path under %LOCALAPPDATA%\ms-playwright opens there.
+ * Windows builds Firefox's side-by-side activation context (firefox.exe names mozglue as a private assembly) from the
+ * path it was started with, outside that redirection, finds no mozglue.dll beside it and refuses to start it:
+ * `spawn UNKNOWN`, event log "Dependent Assembly mozglue ... could not be found". Started by its real path it runs.
+ * Elsewhere the real path is the same path.
+ */
+export function firefoxExecutable(launcher, { realpath = realpathSync.native } = {}) {
+  let path;
+  try {
+    path = launcher?.executablePath?.();
+  } catch {
+    return undefined;
+  }
+  if (!path) return undefined;
+  try {
+    return realpath(path);
+  } catch {
+    // Not installed: Playwright's own launch reports the missing executable and launchFailureMessage names the install.
+    return path;
+  }
+}
+
+/**
+ * Launch options for Playwright's Firefox: the caller's options with FIREFOX_WEBGPU_PREFS under the caller's own
+ * `firefoxUserPrefs`, headed when the step needs WebGPU (headless Firefox has none), and the executable: the caller's
+ * `executablePath`, else BROWSER_EXECUTABLE, else Playwright's install by its real path (see firefoxExecutable).
+ */
+export function firefoxLaunchOptions(browser, options = {}, { needs = 'webgpu', launcher, realpath } = {}) {
+  const executablePath = options.executablePath ?? browser.executablePath ?? firefoxExecutable(launcher, { realpath });
+  return {
+    ...options,
+    ...(needs === 'webgpu' ? { headless: false } : {}),
+    firefoxUserPrefs: { ...FIREFOX_WEBGPU_PREFS, ...options.firefoxUserPrefs },
+    ...(executablePath ? { executablePath } : {}),
+  };
+}
+
 /** Exit code when the requested browser cannot be started (not a test failure, not a skip). */
 export const LAUNCH_FAILED = 3;
 
@@ -414,6 +461,10 @@ export async function launchBrowser({
     reason = unsupportedReason(browser, needs);
   if (reason) return skipSuite(reason);
   try {
+    if (browser.engine === 'firefox')
+      return withBoundedClose(
+        await launchers.firefox.launch(firefoxLaunchOptions(browser, options, { needs, launcher: launchers.firefox })),
+      );
     if (browser.engine !== 'chromium') return withBoundedClose(await launchers[browser.engine].launch({ ...options }));
     const launch = async (channel) => {
       const settings = {

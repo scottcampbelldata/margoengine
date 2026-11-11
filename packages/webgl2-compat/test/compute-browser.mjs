@@ -139,8 +139,14 @@ async function suite() {
   assert.equal(budget[2].error, null, 'a raised budget runs the dispatch');
   assert.equal(budget[2].after[0], 64000, 'every invocation ran');
   lines.push('work budget: an endless loop and 64,000 invocations stop at 20,000, coded, nothing stored');
-  assert.equal(await page.evaluate(() => window.check.asyncLink()), true, 'an async pipeline polls for the link');
-  lines.push('an async compute pipeline leaves the link to the driver');
+  const link = await page.evaluate(() => window.check.asyncLink());
+  if (link.parallel) {
+    assert.equal(link.first, true, 'an async pipeline polls for the link');
+    lines.push('an async compute pipeline leaves the link to the driver');
+  } else {
+    assert.equal(link.first, true, 'without KHR_parallel_shader_compile an async pipeline reads the link status at once');
+    lines.push('no KHR_parallel_shader_compile here: an async compute pipeline reads the link status at once');
+  }
   assert.deepEqual(await page.evaluate(() => window.check.readbackOrder()), { lazy: true, value: 1 });
   lines.push('the first read-back loads its chunk and keeps the queue in order');
   const refusal = await page.evaluate(() => window.check.refusal());

@@ -18,8 +18,9 @@ try {
   await writeFile('test-results/compat-adapter.json', JSON.stringify({ hardware, result }, null, 1));
   console.log(JSON.stringify(result, null, 1));
   assert.equal(result.fullLimits.core, true, 'the plain device has the full level');
-  // WebKit has no compatibility level: a request for one gets a full device, which WebGPU allows.
-  const level = process.env.MARGO_BROWSER === 'webkit';
+  // WebKit and Firefox (157) have no compatibility level: a request for one gets a full device, which WebGPU allows.
+  // Chromium (Edge, Chrome) must give the level. hardware.browserName is the engine the run really launched.
+  const level = hardware.browserName === 'webkit' || hardware.browserName === 'firefox';
   assert.equal(result.limits.core, level, 'this device really is at compatibility level');
   assert.equal(result.different, 0, 'the frame is the same at both levels');
   assert.equal(result.pick, true, 'pick finds the mesh');

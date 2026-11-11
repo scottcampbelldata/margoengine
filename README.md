@@ -70,6 +70,12 @@ On the machine used to write this page, `npm ci` took 15 seconds, packing 35 and
 to a rendered, verified page took 76 seconds (`npm run check:quickstart` repeats the whole run and fails above 300).
 Then follow the Quickstart steps 2 to 4 below in `my-scene`.
 
+**For a class or a tester with no clone:** `node scripts/pack-student-kit.mjs` writes `test-results/margo-student-kit.zip`:
+one folder, `margo-student-kit`, holding every package packed (`margo-packages/*.tgz`), the two models the beginner and
+game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this README and those guides. Unzipped next to
+`my-scene`, it replaces `../margoengine/test-results/` in the install lines above with
+`../margo-student-kit/margo-packages/`.
+
 **After 1.0.0 is published,** `npm install margoengine vite` in a new folder replaces Route 2 and nothing else changes.
 
 ## Quickstart

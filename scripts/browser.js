@@ -1,4 +1,4 @@
-import { firefox, webkit } from '@playwright/test';
+import { webkit } from '@playwright/test';
 import { launchBrowser, resolveBrowser, softwareAdapterReason } from './lib/browser.mjs';
 import { createServer } from 'vite';
 import { realpathSync } from 'node:fs';
@@ -498,11 +498,11 @@ export async function openBrowser({
     if (browserName === 'chromium') {
       // MARGO_BROWSER / --browser / BROWSER_CHANNEL pick the browser (scripts/lib/browser.mjs); `channel` overrides them.
       browser = await launchBrowser({ name: channel, args, headless });
-    } else
-      browser = await { firefox, webkit }[browserName].launch({
-        headless,
-        ...(browserName === 'firefox' ? { firefoxUserPrefs } : {}),
-      });
+    } else if (browserName === 'firefox')
+      // Through launchBrowser for the real executable path and the WebGPU prefs (scripts/lib/browser.mjs); the caller's
+      // headless choice and prefs are kept.
+      browser = await launchBrowser({ name: 'firefox', needs: 'none', headless, firefoxUserPrefs });
+    else browser = await webkit.launch({ headless });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     page.setDefaultTimeout(30000);
     // Every shader module the page creates is compiled for diagnostics; close() fails on a WGSL error.
@@ -591,7 +591,8 @@ export async function openBrowser({
     hardware.launchArgs = browserName === 'chromium' ? args : [];
     hardware.powerPreference = powerPreference;
     hardware.hostPlatform = process.platform;
-    hardware.headless = headless;
+    // launchBrowser opens Firefox headed for a WebGPU step: headless Firefox has no WebGPU adapter.
+    hardware.headless = browserName === 'chromium' && hardware.browserName === 'firefox' ? false : headless;
     if (compat) hardware.compat = true;
     if (pipelineDelayMs > 0) hardware.pipelineDelayMs = pipelineDelayMs;
     if (mathErrorScale > 0) hardware.mathErrorScale = mathErrorScale;

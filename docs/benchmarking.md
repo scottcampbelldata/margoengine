@@ -276,18 +276,30 @@ works for all of them, on Windows, macOS and Linux:
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `MARGO_BROWSER=edge\|chrome\|chromium\|firefox\|webkit` | `edge` on Windows, `chromium` elsewhere | The browser to drive. `chromium` is Playwright's own build (`npx playwright install chromium`); `edge` and `chrome` need that browser installed. `webkit` is Playwright's own WebKit build (`npx playwright install webkit`), which has WebGPU on macOS; it is not Safari. `--browser=<name>` on a suite's command line does the same. |
+| `MARGO_BROWSER=edge\|chrome\|chromium\|firefox\|webkit` | `edge` on Windows, `chromium` elsewhere | The browser to drive. `chromium` is Playwright's own build (`npx playwright install chromium`); `edge` and `chrome` need that browser installed. `webkit` is Playwright's own WebKit build (`npx playwright install webkit`), which has WebGPU on macOS; it is not Safari. `firefox` is Playwright's own Firefox build (`npx playwright install firefox`). `--browser=<name>` on a suite's command line does the same. |
 | `BROWSER_CHANNEL=msedge\|chrome\|bundled` | unset | Older spelling of the same choice; `MARGO_BROWSER` wins when both are set. |
-| `BROWSER_EXECUTABLE=<path>` | unset | Launch this binary instead of the browser's normal install. |
+| `BROWSER_EXECUTABLE=<path>` | unset | Launch this binary instead of the browser's normal install (Chromium-family browsers and Firefox). |
 | `MARGO_GPU=default\|nvidia\|amd\|intel` | unset (the hardware GPU with the most video memory) | Windows PC with two GPUs only. Headless Chromium uses the first DXGI adapter, and Windows lists first the one that carries the session's display output, so the adapter changes with whether a Remote Desktop session is connected (nvidia while connected, amd after disconnecting on the Scott PC). The shared launcher (`scripts/lib/gpu-adapter.mjs`) looks the adapters up through PowerShell (about 2 s, cached per process and in a temp file for 30 minutes per boot), skips software adapters, and passes `--use-adapter-luid=<high>,<low>` (decimal; LUIDs change every boot, so never write one down) for the largest hardware GPU. `nvidia`, `amd` or `intel` prefers that vendor; `default` adds no flag, so the browser takes whatever Windows lists first. One hardware GPU: no flag. If the lookup fails, one warning line is printed and no flag is added. |
 | `MARGO_GPU_LUID=high,low` | unset | Use exactly this adapter (decimal, as Chromium reads it); wins over `MARGO_GPU`. |
 | `MARGO_SOFTWARE_GPU=1` | off | Use SwiftShader as the WebGPU adapter on a machine without a real GPU (a server, a CI runner). Slow, and its pixels differ from a real GPU's, so it proves "runs", never a timing or a pixel baseline. |
 
 Chromium-family browsers get `--enable-unsafe-webgpu` (and `--enable-features=Vulkan --use-angle=vulkan` on Linux, for a real Intel or AMD GPU; `BROWSER_ARGS` adds more) where WebGPU is not
-already on. Chromium-family browsers on a Windows PC with two GPUs also get `--use-adapter-luid` (see `MARGO_GPU`). Firefox has no WebGPU in Playwright's builds: a suite that
-needs WebGPU prints `<suite>: skipped: no WebGPU in firefox` and exits 0 without running, and a Chromium-only step
-(`page.pdf`) prints `skipped: needs a Chromium browser, not firefox`. A skip line is never a pass; read the log. Suites
-that do not need WebGPU (`check:no-webgpu`) run in Firefox.
+already on. Chromium-family browsers on a Windows PC with two GPUs also get `--use-adapter-luid` (see `MARGO_GPU`). Firefox runs every suite, on WebGPU and with `MARGO_COMPAT=1` on the WebGL2 layer. Playwright's Firefox has WebGPU off
+and blocklisted on many GPUs, so it is launched with the prefs `dom.webgpu.enabled` and `gfx.webgpu.ignore-blocklist`,
+and headed (a window opens) for any step that needs WebGPU: headless Firefox answers `requestAdapter()` with null
+("WebGPU is disabled by blocklist") whatever the prefs say. A step that needs no WebGPU keeps its headless setting. A
+Chromium-only step (`page.pdf`) prints `skipped: needs a Chromium browser, not firefox` and exits 0; a skip line is never
+a pass, so read the log. WebKit on Windows has no WebGPU, so a WebGPU suite there fails with "WebGPU unavailable".
+
+**Firefox will not start from a packaged app on Windows (`spawn UNKNOWN`).** A process of an MSIX-packaged app (the
+Claude desktop app, for one) sees `%LOCALAPPDATA%` through the package's file-system redirection: Playwright's browsers
+land in the package's private `LocalCache` folder, and `%LOCALAPPDATA%\ms-playwright` opens there for that process only.
+`firefox.exe` names `mozglue` as a private side-by-side assembly, and Windows looks for it beside the path the process
+was started with, outside the redirection, so the start fails with `spawn UNKNOWN` and the Application event log
+says "Dependent Assembly mozglue ... could not be found". `scripts/lib/browser.mjs` starts Playwright's Firefox by its
+real path, which works everywhere. Your own Playwright script needs the same: pass
+`executablePath: realpathSync.native(firefox.executablePath())`, or set `PLAYWRIGHT_BROWSERS_PATH` to a folder outside
+`%LOCALAPPDATA%` and install the browsers there. Playwright's full Chromium (`chrome.exe`, used headed) fails the same way there; its headless shell, Edge and Chrome start (docs/known-bugs.md).
 
 ## The browser runner
 

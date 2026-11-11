@@ -555,7 +555,7 @@ window.check = {
     }
     return out;
   },
-  /** Compat only: createComputePipelineAsync asks whether the link is done before anything that waits for it. */
+  /** Compat only: createComputePipelineAsync asks whether the link is done before anything that waits for it (with KHR_parallel_shader_compile). */
   async asyncLink() {
     const device = await (await createCompatGPU().requestAdapter()).requestDevice();
     const gl = device.gl,
@@ -572,9 +572,11 @@ window.check = {
         entryPoint: 'main',
       },
     });
-    const first = asked[0] === device.ext.parallel?.COMPLETION_STATUS_KHR;
+    // Without KHR_parallel_shader_compile (Firefox 157 has none) there is nothing to poll: the link is read at once.
+    const parallel = device.ext.parallel !== null,
+      first = asked[0] === (parallel ? device.ext.parallel.COMPLETION_STATUS_KHR : gl.LINK_STATUS);
     device.destroy();
-    return first;
+    return { parallel, first };
   },
   /** Compat only: the first read-back loads a chunk, and what the queue gets meanwhile stays behind it. */
   async readbackOrder() {

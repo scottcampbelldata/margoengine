@@ -142,7 +142,7 @@ const cases = {
       for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazyAnd', 'lazyOr', 'discard']) {
         const call = mode === 'implicit' ? 'textureSample(t,s,coords())' :
           mode === 'bias' ? 'textureSampleBias(t,s,coords(),level())' :
-          mode === 'grad' ? 'textureSampleGrad(t,s,coords(),dx(),dy())' : 'textureSampleLevel(t,s,coords(),level())';
+          mode === 'grad' ? 'textureSampleGrad(t,s,coords(),gx(),gy())' : 'textureSampleLevel(t,s,coords(),level())';
         const body = mode === 'lazyAnd' || mode === 'lazyOr' ?
           `let sampled=${mode === 'lazyAnd' ? 'false &&' : 'true ||'} ${call}.r>0;return vec4f(1,f32(count),0,1);` :
           `let color=${call};return vec4f(color.r,f32(count),0,1);`;
@@ -151,8 +151,8 @@ const cases = {
             var<private> count:u32;
             fn coords()->vec2f {${mode === 'discard' ? 'if(count==10000u){discard;}' : ''}count+=1u;return vec2f(0.5);}
             fn level()->f32 {count+=10u;return 2.125;}
-            fn dx()->vec2f {count+=100u;return vec2f(0.25,0);}
-            fn dy()->vec2f {count+=1000u;return vec2f(0,0.25);}
+            fn gx()->vec2f {count+=100u;return vec2f(0.25,0);}
+            fn gy()->vec2f {count+=1000u;return vec2f(0,0.25);}
             @fragment fn f()->@location(0) vec4f {${body}}`,
           entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }],
         });

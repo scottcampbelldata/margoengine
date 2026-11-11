@@ -4,6 +4,9 @@ import { spawnSync } from 'node:child_process';
 import {
   browserLabel,
   chromiumLaunchOptions,
+  FIREFOX_WEBGPU_PREFS,
+  firefoxExecutable,
+  firefoxLaunchOptions,
   LAUNCH_FAILED,
   launchBrowser,
   launchArgs,
@@ -130,14 +133,80 @@ test('a caller that needs no GPU gets none of the WebGPU switches', () => {
   assert.deepEqual(launchArgs(pick({}, 'linux'), ['--disable-gpu'], { webgpu: false }), ['--disable-gpu']);
 });
 
-test('Firefox has no WebGPU: WebGPU steps and Chromium-only steps are reported unsupported, the rest run', () => {
-  const firefox = pick({ MARGO_BROWSER: 'firefox' });
-  assert.equal(unsupportedReason(firefox), 'no WebGPU in firefox');
-  assert.match(unsupportedReason(firefox, 'chromium'), /needs a Chromium browser, not firefox/);
-  assert.equal(unsupportedReason(firefox, 'none'), null);
-  assert.deepEqual(launchArgs(firefox, ['--x']), []);
+test('Firefox runs WebGPU steps, forced-compatibility runs included; only Chromium-only steps are refused', () => {
+  for (const env of [{ MARGO_BROWSER: 'firefox' }, { MARGO_BROWSER: 'firefox', MARGO_COMPAT: '1' }]) {
+    const firefox = pick(env);
+    assert.equal(firefox.engine, 'firefox');
+    assert.equal(unsupportedReason(firefox), null, JSON.stringify(env));
+    assert.equal(unsupportedReason(firefox, 'none'), null);
+    assert.match(unsupportedReason(firefox, 'chromium'), /needs a Chromium browser, not firefox/);
+    assert.deepEqual(launchArgs(firefox, ['--x']), [], 'no Chromium switches');
+  }
+  assert.equal(pick({ MARGO_BROWSER: 'firefox' }, 'win32', ['--compat']).webgpu, true);
   for (const name of ['edge', 'chrome', 'chromium'])
     assert.equal(unsupportedReason(pick({ MARGO_BROWSER: name })), null);
+});
+
+const fakeFirefox = (path = 'C:/redirected/ms-playwright/firefox-1/firefox/firefox.exe') => {
+  const launched = [];
+  return {
+    launched,
+    launcher: {
+      executablePath: () => path,
+      launch: async (options) => (launched.push(options), { close: async () => {} }),
+    },
+  };
+};
+
+test('a WebGPU step in Firefox launches headed with the WebGPU prefs, by the real path of the install', async () => {
+  const { launched, launcher } = fakeFirefox();
+  const real = (path) => path.replace('C:/redirected/', 'C:/real/');
+  const options = firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }), { headless: true, timeout: 5 }, { launcher, realpath: real });
+  assert.deepEqual(options, {
+    headless: false,
+    timeout: 5,
+    firefoxUserPrefs: { 'dom.webgpu.enabled': true, 'gfx.webgpu.ignore-blocklist': true },
+    executablePath: 'C:/real/ms-playwright/firefox-1/firefox/firefox.exe',
+  });
+  assert.deepEqual({ ...FIREFOX_WEBGPU_PREFS }, options.firefoxUserPrefs);
+  // Through launchBrowser, as every suite calls it: needs defaults to 'webgpu'.
+  const opened = await launchBrowser({
+    env: { MARGO_BROWSER: 'firefox' },
+    platform: 'win32',
+    argv: [],
+    headless: true,
+    launchers: { chromium: missing('chromium'), firefox: launcher },
+    report: (text) => assert.fail(text),
+    exit: (code) => assert.fail(`exit ${code}`),
+  });
+  assert.equal(typeof opened.close, 'function');
+  assert.equal(launched.length, 1);
+  assert.equal(launched[0].headless, false);
+  assert.equal(launched[0].firefoxUserPrefs['dom.webgpu.enabled'], true);
+  assert.ok(launched[0].executablePath.endsWith('firefox.exe'));
+});
+
+test('Firefox: a step that needs no WebGPU keeps its headless choice; caller prefs win; the executable order is option, BROWSER_EXECUTABLE, install', () => {
+  const { launcher } = fakeFirefox('/pw/firefox');
+  const same = (path) => path;
+  const firefox = pick({ MARGO_BROWSER: 'firefox' });
+  const none = firefoxLaunchOptions(firefox, { headless: true, firefoxUserPrefs: { 'dom.webgpu.enabled': false, 'x.y': 1 } }, { needs: 'none', launcher, realpath: same });
+  assert.equal(none.headless, true);
+  assert.deepEqual(none.firefoxUserPrefs, { 'dom.webgpu.enabled': false, 'gfx.webgpu.ignore-blocklist': true, 'x.y': 1 });
+  assert.equal(none.executablePath, '/pw/firefox');
+  const fromEnv = pick({ MARGO_BROWSER: 'firefox', BROWSER_EXECUTABLE: '/own/firefox' });
+  assert.equal(firefoxLaunchOptions(fromEnv, {}, { launcher, realpath: same }).executablePath, '/own/firefox');
+  assert.equal(firefoxLaunchOptions(fromEnv, { executablePath: '/replay/firefox' }, { launcher, realpath: same }).executablePath, '/replay/firefox');
+});
+
+test('firefoxExecutable resolves the real path, keeps a path it cannot resolve, and gives up only without a launcher path', () => {
+  assert.equal(firefoxExecutable({ executablePath: () => '/a' }, { realpath: () => '/b' }), '/b');
+  const missingFile = () => {
+    throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+  };
+  assert.equal(firefoxExecutable({ executablePath: () => '/a' }, { realpath: missingFile }), '/a');
+  assert.equal(firefoxExecutable({ executablePath: missingFile }), undefined);
+  assert.equal(firefoxExecutable(undefined), undefined);
 });
 
 test('skipSuite says "skipped" with the reason and exits 0, never printing a pass', () => {
@@ -165,15 +234,15 @@ test('chromiumLaunchOptions carries channel, executable and args for a caller wi
   });
 });
 
-test('a suite that needs WebGPU run with MARGO_BROWSER=firefox prints the skip and exits 0 without launching', () => {
+test('a Chromium-only suite run with MARGO_BROWSER=firefox prints the skip and exits 0 without launching', () => {
   const script = `import { launchBrowser } from ${JSON.stringify(new URL('../scripts/lib/browser.mjs', import.meta.url).href)};
-    await launchBrowser({ headless: true }); console.log('LAUNCHED');`;
+    await launchBrowser({ headless: true, needs: 'chromium' }); console.log('LAUNCHED');`;
   const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
     env: { ...process.env, MARGO_BROWSER: 'firefox' },
     encoding: 'utf8',
   });
   assert.equal(run.status, 0, run.stderr);
-  assert.match(run.stdout, /skipped: no WebGPU in firefox/);
+  assert.match(run.stdout, /skipped: needs a Chromium browser, not firefox/);
   assert.doesNotMatch(run.stdout, /LAUNCHED/);
 });
 
