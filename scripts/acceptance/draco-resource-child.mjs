@@ -1,9 +1,17 @@
 // Owned harness: no clocks, timing assertions, implementation inspection or GPU.
+//
+// Outputs (argument 5): `api` (default) asks each side for what Margo's public API returns. A mesh gets every
+// attribute in its stored type and as float32 (DracoDecoder hands glTF float accessors; the prebuilt converts inside
+// its Wasm, the native side in JavaScript, as draco-native-codec.ts does). A point cloud gets its stored type only:
+// DracoPointsDecoder on either decoder never converts point attributes (codec.ts decodeDracoPoints,
+// draco-native-codec.ts decodeNativePoints). `float` also converts point-cloud attributes to float32 on both sides,
+// the prebuilt in its Wasm and the native side in JavaScript: a like-for-like row that carries both conversion costs,
+// which no Margo call pays (KB4824a residue, bug sweep L5b 2026-11-11).
 import assert from 'node:assert/strict';
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-const [variant, path] = process.argv.slice(2),
+const [variant, path, , outputs = 'api'] = process.argv.slice(2),
   counts = {
     compileCalls: 0,
     instantiateCalls: 0,
@@ -14,6 +22,7 @@ const [variant, path] = process.argv.slice(2),
     publicAllocationCalls: 0,
   };
 const rss = () => ({ rssBytes: process.memoryUsage.rss(), peakRSSBytes: process.resourceUsage().maxRSS * 1024 });
+assert.ok(['api', 'float'].includes(outputs), 'outputs must be api or float');
 const baseline = rss(),
   sha = (b) => createHash('sha256').update(b).digest('hex'),
   widths = { 1: 1, 2: 1, 3: 2, 4: 2, 5: 4, 6: 4, 9: 4, 10: 8, 11: 1 };
@@ -81,8 +90,8 @@ if (variant === 'native-full' || variant === 'native-gltf') {
         at += 12;
         const native = b.subarray(at, at + len);
         at += len;
-        const float = floats(native, type, normalized);
-        counts.resultCopyBytes += float.length;
+        const float = outputs === 'float' || b.readUInt32LE(12) ? floats(native, type, normalized) : null;
+        counts.resultCopyBytes += float?.length ?? 0;
         attributes.push({ semantic, type, width, normalized: !!normalized, id, native, float });
       }
       return { ok: true, points, indices, attributes };
@@ -168,7 +177,8 @@ if (variant === 'native-full' || variant === 'native-gltf') {
         try {
           const nativeOK = d.GetAttributeDataArrayForAllPoints(g, a, type, len, p),
             native = nativeOK ? Buffer.from(m.HEAPU8.subarray(p, p + len)) : undefined,
-            floatOK = d.GetAttributeDataArrayForAllPoints(g, a, m.DT_FLOAT32, count * 4, p),
+            floatOK =
+              (outputs === 'float' || mesh) && d.GetAttributeDataArrayForAllPoints(g, a, m.DT_FLOAT32, count * 4, p),
             float = floatOK ? Buffer.from(m.HEAPU8.subarray(p, p + count * 4)) : undefined;
           counts.resultCopyBytes += (native?.length ?? 0) + (float?.length ?? 0);
           attributes.push({
@@ -214,6 +224,6 @@ if (path) {
 const final = { ...rss(), linearBytes: memory() };
 assert.equal(counts.compileCalls, 1);
 assert.equal(counts.instantiateCalls, 1);
-console.log(JSON.stringify({ variant, wasmHash, counts, baseline, initialized, final, ...result }));
+console.log(JSON.stringify({ variant, outputs, wasmHash, counts, baseline, initialized, final, ...result }));
 // Keep the decoded buffers strongly reachable until after high-water capture.
 assert.ok(!path || retained);

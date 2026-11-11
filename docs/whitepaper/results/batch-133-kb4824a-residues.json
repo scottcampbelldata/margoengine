@@ -1,0 +1,270 @@
+{
+  "about": "KB4824a residues (bug sweep L5b, 2026-11-11). Frozen clean-room Wasm sha256 9384f0512fa8fdb5ccf17173fe926e9d83f485e3557b0af2e6accba5bdd5d5e4 (packages/decoders/src/draco-native.wasm at the KB4824a commit). Node v26.12.0, win32, dev PC under build-phase load. Driver scripts/acceptance/draco-resources.mjs; inputs from the pinned original corpus (results/batch-133-corpus-manifest.json identities).",
+  "pointCloudsApiOutputs": {
+    "method": "one-shot, --outputs=api: each side returns what DracoPointsDecoder returns (stored type only, no float conversion on either decoder)",
+    "summary": {
+      "rssLosses": 0,
+      "linearLosses": 0,
+      "exact": 4,
+      "startupOldPeakRSS": 81219584,
+      "startupNativePeakRSS": 79691776
+    },
+    "rows": [
+      {
+        "input": "google/draco/testdata/cube_pc.drc",
+        "sha256": "9c9f4810bf12d3bbc35f72d8d351b2d2b1393bcc5bf102423fe85cb14d1c95cb",
+        "oldPeakRSS": 81846272,
+        "nativePeakRSS": 80011264,
+        "nativeMinusOld": -1835008,
+        "oldLinear": 16777216,
+        "nativeLinear": 1179648,
+        "oldResultCopyBytes": 768,
+        "nativeResultCopyBytes": 828
+      },
+      {
+        "input": "google/draco/testdata/pc_color.drc",
+        "sha256": "69154c00d5c81796cf919fe89bd7427bf9467d088f21c09bb3b78c7f7593a65a",
+        "oldPeakRSS": 85458944,
+        "nativePeakRSS": 80855040,
+        "nativeMinusOld": -4603904,
+        "oldLinear": 16777216,
+        "nativeLinear": 1572864,
+        "oldResultCopyBytes": 115995,
+        "nativeResultCopyBytes": 116043
+      },
+      {
+        "input": "google/draco/testdata/pc_kd_color.drc",
+        "sha256": "4510aea1076b43498907cb11210938dc984238adced93c6e91ca406081202bad",
+        "oldPeakRSS": 83222528,
+        "nativePeakRSS": 81539072,
+        "nativeMinusOld": -1683456,
+        "oldLinear": 16777216,
+        "nativeLinear": 1507328,
+        "oldResultCopyBytes": 115995,
+        "nativeResultCopyBytes": 116043
+      },
+      {
+        "input": "google/draco/testdata/point_cloud_no_qp.drc",
+        "sha256": "047d271ed8f3f6f02723e9bd8d4901e021519564ef0d52fb9ecf491723aacc5d",
+        "oldPeakRSS": 81772544,
+        "nativePeakRSS": 80101376,
+        "nativeMinusOld": -1671168,
+        "oldLinear": 16777216,
+        "nativeLinear": 1179648,
+        "oldResultCopyBytes": 315,
+        "nativeResultCopyBytes": 363
+      }
+    ]
+  },
+  "pointCloudsFloatOutputs": {
+    "method": "one-shot, --outputs=float: like-for-like row, both sides also convert point attributes to float32 (prebuilt inside its Wasm, native in JavaScript); no Margo call pays this cost",
+    "summary": {
+      "rssLosses": 1,
+      "linearLosses": 0,
+      "exact": 4,
+      "startupOldPeakRSS": 81408000,
+      "startupNativePeakRSS": 79679488
+    },
+    "rows": [
+      {
+        "input": "google/draco/testdata/cube_pc.drc",
+        "sha256": "9c9f4810bf12d3bbc35f72d8d351b2d2b1393bcc5bf102423fe85cb14d1c95cb",
+        "oldPeakRSS": 82014208,
+        "nativePeakRSS": 79970304,
+        "nativeMinusOld": -2043904,
+        "oldLinear": 16777216,
+        "nativeLinear": 1179648,
+        "oldResultCopyBytes": 1536,
+        "nativeResultCopyBytes": 1596
+      },
+      {
+        "input": "google/draco/testdata/pc_color.drc",
+        "sha256": "69154c00d5c81796cf919fe89bd7427bf9467d088f21c09bb3b78c7f7593a65a",
+        "oldPeakRSS": 86274048,
+        "nativePeakRSS": 83279872,
+        "nativeMinusOld": -2994176,
+        "oldLinear": 16777216,
+        "nativeLinear": 1572864,
+        "oldResultCopyBytes": 301587,
+        "nativeResultCopyBytes": 301635
+      },
+      {
+        "input": "google/draco/testdata/pc_kd_color.drc",
+        "sha256": "4510aea1076b43498907cb11210938dc984238adced93c6e91ca406081202bad",
+        "oldPeakRSS": 83095552,
+        "nativePeakRSS": 83423232,
+        "nativeMinusOld": 327680,
+        "oldLinear": 16777216,
+        "nativeLinear": 1507328,
+        "oldResultCopyBytes": 301587,
+        "nativeResultCopyBytes": 301635
+      },
+      {
+        "input": "google/draco/testdata/point_cloud_no_qp.drc",
+        "sha256": "047d271ed8f3f6f02723e9bd8d4901e021519564ef0d52fb9ecf491723aacc5d",
+        "oldPeakRSS": 81952768,
+        "nativePeakRSS": 79978496,
+        "nativeMinusOld": -1974272,
+        "oldLinear": 16777216,
+        "nativeLinear": 1179648,
+        "oldResultCopyBytes": 819,
+        "nativeResultCopyBytes": 867
+      }
+    ]
+  },
+  "gltfPaired": {
+    "method": "allowed paired check, --paired=9, flavor draco (glTF): rounds take turns (even prebuilt first, odd native first), per-side minimum peak RSS decides; the two inputs whose one-shot losses (+90,112 and +81,920 B) sat below the 434,176 to 667,648 B native startup spread of the same run",
+    "rssLosses": 0,
+    "linearLosses": 0,
+    "results": [
+      {
+        "sha256": "f242e633abb3dc7f15c4fd478addfb233913a1cde8e22ad5ba2f25873d2ccef3",
+        "names": [
+          "KhronosGroup/glTF-Sample-Assets/Models/BrainStem/glTF-Draco/BrainStem.gltf:0/54"
+        ],
+        "oldPeakRSSMin": 82935808,
+        "nativePeakRSSMin": 82485248,
+        "oldLinearMin": 16777216,
+        "nativeLinearMin": 1507328
+      },
+      {
+        "sha256": "2c7c62e151e51000a922490472aee458fe100167e8a4af559c619a89c361ecea",
+        "names": [
+          "KhronosGroup/glTF-Sample-Assets/Models/CarConcept/glTF-KTX-BasisU-Draco/CarConcept.gltf:20/0"
+        ],
+        "oldPeakRSSMin": 82944000,
+        "nativePeakRSSMin": 82145280,
+        "oldLinearMin": 16777216,
+        "nativeLinearMin": 1376256
+      }
+    ],
+    "rounds": [
+      {
+        "sha256": "f242e633abb3",
+        "round": 0,
+        "first": "old",
+        "oldPeakRSS": 83083264,
+        "nativePeakRSS": 82571264
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 1,
+        "first": "native",
+        "oldPeakRSS": 82935808,
+        "nativePeakRSS": 82771968
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 2,
+        "first": "old",
+        "oldPeakRSS": 83300352,
+        "nativePeakRSS": 82669568
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 3,
+        "first": "native",
+        "oldPeakRSS": 83386368,
+        "nativePeakRSS": 82485248
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 4,
+        "first": "old",
+        "oldPeakRSS": 83030016,
+        "nativePeakRSS": 82968576
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 5,
+        "first": "native",
+        "oldPeakRSS": 83365888,
+        "nativePeakRSS": 82812928
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 6,
+        "first": "old",
+        "oldPeakRSS": 83574784,
+        "nativePeakRSS": 82558976
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 7,
+        "first": "native",
+        "oldPeakRSS": 83251200,
+        "nativePeakRSS": 82649088
+      },
+      {
+        "sha256": "f242e633abb3",
+        "round": 8,
+        "first": "old",
+        "oldPeakRSS": 83099648,
+        "nativePeakRSS": 82702336
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 0,
+        "first": "old",
+        "oldPeakRSS": 83255296,
+        "nativePeakRSS": 83091456
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 1,
+        "first": "native",
+        "oldPeakRSS": 83451904,
+        "nativePeakRSS": 83075072
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 2,
+        "first": "old",
+        "oldPeakRSS": 83365888,
+        "nativePeakRSS": 83046400
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 3,
+        "first": "native",
+        "oldPeakRSS": 83099648,
+        "nativePeakRSS": 82780160
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 4,
+        "first": "old",
+        "oldPeakRSS": 83341312,
+        "nativePeakRSS": 82989056
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 5,
+        "first": "native",
+        "oldPeakRSS": 82944000,
+        "nativePeakRSS": 82145280
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 6,
+        "first": "old",
+        "oldPeakRSS": 83021824,
+        "nativePeakRSS": 82481152
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 7,
+        "first": "native",
+        "oldPeakRSS": 83042304,
+        "nativePeakRSS": 83054592
+      },
+      {
+        "sha256": "2c7c62e151e5",
+        "round": 8,
+        "first": "old",
+        "oldPeakRSS": 83034112,
+        "nativePeakRSS": 82518016
+      }
+    ]
+  }
+}

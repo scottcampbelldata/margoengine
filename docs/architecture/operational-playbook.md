@@ -6150,9 +6150,16 @@ removal and speed-phase timing debt remain open.
 Batch133 resource evidence separates lifetime process peak RSS, linear-memory
 capacity and public work counts. The child harness uses an explicit frozen
 Wasm so builds cannot remove its input; draco-resource-harness.test.js proves
-working-directory/dist isolation in verify. RSS116/113 losses and historical
-width/predictor gaps remain open in the resource inventory; this gate work
-adds no core/stage or default decoder change.
+working-directory/dist isolation in verify. The RSS 116/113 losses were
+closed on 2026-11-11 (KB4824a): V8 optimizing-compiler memory on large hot Wasm
+functions, fixed by moving hot loops into small functions (output unchanged).
+The harness now measures what Margo's API returns (--outputs=api), keeps the
+both-sides float conversion as a like-for-like row (--outputs=float), and
+allows one paired check (--paired=<rounds>, sides taking turns, per-side
+minima) for inputs whose one-shot loss is below the same run's startup spread;
+draco-resource-harness.test.js pins all three. Evidence:
+whitepaper/results/batch-133-kb4824a-residues.json. Still missing: the warm
+speed proof (deferred speed phase), which keeps both prebuilts default.
 
 Resource acceptance also rejects a changed opaque variant on resume and
 returns a failing status for every retained RSS loss without taking another

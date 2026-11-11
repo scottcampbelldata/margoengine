@@ -3088,8 +3088,11 @@ removal and speed-phase timing debt remain open.
 | `@margoengine/lightmap/apply` draws a bake on materials, glTF-pro and core meshes, and a live GPU bake as it improves | `packages/lightmap/tests/gpu.browser.mjs` (WebGPU, M6 Mac mini, Metal): with live lights off, the lit half of the lightmap shows and the dark half adds nothing on all three; glTF-pro and core pixels within one 8-bit step of the materials mesh; the core stand-in follows the core mesh; `dispose()` restores each; `packages/lightmap/tests/apply.test.js` for the settings and refusals | no speed claim; Metal only measured |
 
 Batch133 resource/inventory observations: full 3,881 and glTF 1,003 accepted
-geometry fingerprints remain exact. Strict per-file RSS fails116/113; no
-memory-parity or replacement claim follows. Generic scalar inventory8,580
+geometry fingerprints remain exact. Strict per-file RSS failed 116/113 then;
+after the KB4824a fix (2026-11-11) no input of the 323-input pinned original
+corpus peaks higher natively on what Margo's API returns
+([residues](results/batch-133-kb4824a-residues.json)); no speed or
+replacement claim follows. Generic scalar inventory8,580
 is exact;440 usable wide cases and12 historical predictor3 cases expose
 native gaps. [Complete per-file evidence](results/batch-133-resources-inventory.json).
 

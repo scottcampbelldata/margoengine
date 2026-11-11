@@ -4978,12 +4978,13 @@ localizes remaining cost to mapping, reconstruction and traversal; the proven
 mapping work reduction did not establish overall speed parity. Reproduce with
 the pinned paired manifest and private batch 133 driver. Speed work is deferred
 by scripts/speed-phase.json; the item is listed in docs/work-lists/speed-phase.md.
-Cold/RSS/startup coverage is partial (fresh-process RSS losses below).
+Fresh-process RSS losses are closed (KB4824a, below); the native process
+starts below the prebuilt in every campaign.
 Historical predictor 3 and invalid UTF8 metadata conversion were closed on
 2026-11-11 (bug sweep L5b, see the two entries below and above). Full
 historical KD/type/transform coverage beyond the crafted one-triangle layouts
-is not established. Both prebuilts stay default while the RSS and speed gaps
-remain; no replacement pass is claimed.
+is not established. Both prebuilts stay default while the warm speed losses
+remain (deferred speed proof, KB1492 held); no replacement pass is claimed.
 
 ### Historical: batch 133 optional landing GPU acquisition (resume 9)
 
@@ -5021,7 +5022,7 @@ existing shared unitLight writer repairs the owning package. The real draw
 writer regression fails before and passes after; GPU comparison assertions
 and tolerances remain unchanged.
 
-### Open: batch 133 resource and historical target failures
+### Fixed 2026-11-11: batch 133 fresh-process RSS losses (bug sweep L5b, KB4824a)
 
 Fresh-process strict RSS losses: 116/3,881 full and 113/1,003 accepted glTF
 inputs. Largest observed excesses: full input83a312e3fe... +5,017,600 B; glTF
@@ -5067,8 +5068,27 @@ prebuilt's (107,794,432 against 108,666,880 B). The full loss is pc_kd_color
 in JavaScript, which Margo's point API never does; without that conversion the
 native process grows 2.1 MB against the prebuilt's 3.9 MB. Regression:
 packages/decoders/tests/draco-native-tierup.test.js (fails at 7,683,216 B
-before, passes at 3,241,160 B). Open: the two glTF observations and the harness
-conversion asymmetry, for a quiet-machine campaign before release.
+before, passes at 3,241,160 B).
+
+Residues closed the same day (records in
+[whitepaper/results/batch-133-kb4824a-residues.json](whitepaper/results/batch-133-kb4824a-residues.json)).
+pc_kd_color: the measurement child now asks each side for what Margo's API
+returns (`--outputs=api`, the default): DracoPointsDecoder hands point
+attributes in their stored type on both decoders, so neither side converts.
+On the four point clouds of the pinned corpus the native process peaks lower
+on every input (pc_kd_color 81,539,072 against 83,222,528 B). The old
+conversion stays as a like-for-like row (`--outputs=float`, both sides convert:
+the prebuilt in its Wasm, the native side in JavaScript): pc_kd_color is
++327,680 B there, a cost no Margo call pays, recorded in limits.md. The two
+glTF samples: re-measured with the allowed paired check (`--paired=9`, sides
+taking turns in fresh processes, per-side minimum), the native minimum is
+lower on both (BrainStem 0/54: 82,485,248 against 82,935,808 B; CarConcept
+20/0: 82,145,280 against 82,944,000 B), and lower in 17 of 18 rounds. No RSS
+loss remains on what Margo's API does. Regression:
+tests/draco-resource-harness.test.js (api outputs leave point-cloud floats out
+on both sides, float outputs convert on both; paired turns and minima; a
+float-output checkpoint cannot resume as an api campaign), failing on the old
+harness.
 
 Fixed in the lane G sweep: the native descriptor rejected widths above 16,
 and quantization, KD minima and prediction scratch also assumed 16 components.

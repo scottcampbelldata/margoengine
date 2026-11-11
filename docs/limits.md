@@ -3691,6 +3691,15 @@ plus 3 percent, scripts/quality/baselines/sizes.json). A split into separate
 Wasm files would add a fetch and a compile per stream kind. Output bytes are
 unchanged.
 
+Accepted difference (KB4824a, like-for-like row): when a caller converts point
+cloud attributes to float32 itself, the clean-room decoder does it in
+JavaScript and the prebuilt inside its Wasm. On pc_kd_color that conversion
+costs the native process 327,680 B more peak RSS than the prebuilt
+(83,423,232 against 83,095,552 B). Neither DracoPointsDecoder converts point
+attributes, so no Margo call pays it; on what the API returns the native
+process peaks 1,683,456 B lower (81,539,072 against 83,222,528 B). Records:
+whitepaper/results/batch-133-kb4824a-residues.json.
+
 Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
 for a destructured direction alias, matching core's unit-direction contract.
 No core/stage changes or pixel tolerances are involved.

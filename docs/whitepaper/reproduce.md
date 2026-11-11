@@ -2516,6 +2516,20 @@ has a30-second hard deadline; wrap the whole command in a40-minute process-tree
 deadline. --resume validates manifest/artifact identity and retained rows.
 No timing metric, GC, minima or repeat-to-pass is performed. The final record
 retains every RSS row and hashes the original raw campaign/harness.
+--outputs=api (the default since 2026-11-11, KB4824a) asks each side for what
+Margo's API returns: point clouds in their stored type on both sides, meshes
+also as float32. --outputs=float adds the float conversion of point clouds on
+both sides, the like-for-like row. The allowed paired check, --paired=<rounds>
+(odd, 5 to 15, fixed before the run), re-measures only inputs that a recorded
+one-shot run lost by less than its own startup spread: both sides start fresh
+each round, taking turns, output is checked every round, and per-side minimum
+peak RSS decides. It cannot resume and refuses an existing record. KB4824a
+residues: node scripts/acceptance/draco-resources.mjs draco-full
+<point-cloud-inputs.json> <prefix> <frozen.wasm> (and again with
+--outputs=float and another prefix), then node
+scripts/acceptance/draco-resources.mjs draco <two-gltf-inputs.json> <prefix>
+<frozen.wasm> --paired=9; results in
+results/batch-133-kb4824a-residues.json.
 Generate the historical generic inputs with node
 scripts/acceptance/draco-generic-inputs.mjs <own-output.json>; --wide generates
 the550 wide controls. Complete predictor3 repro streams are embedded in
