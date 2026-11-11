@@ -234,6 +234,18 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
+### Fixed 2026-11-11: README examples stalled behind the previous example's shader compiles in a shared browser
+
+- **Repro:** `npm run check:readme-run -- --packages=voxel-pathtracer` on main c37980e173: the resampled emissive
+  lighting example missed its 20 s deadline while waiting for module completion, and the runner then failed closing the
+  browser (`browser host ... did not acknowledge the end`). Run alone (`--only=resampled-emissive`) it passed.
+- **Cause:** every page example shared one browser; closing a page does not end its GPU process, so shader-compile
+  teardown left by the example before held the GPU process the next example's `requestAdapter` waited on.
+- **Fix:** `scripts/run-readme-examples.mjs` gives each page example its own browser and closes it, within the same
+  20 s deadline; a browser that arrives after the deadline is closed without a page. 27 of 27 examples of the path
+  tracer and the WebGL2 layer pass. Regression: `tests/run-readme-examples.test.js` (two tests that fail on the old
+  runner).
+
 ### Fixed 2026-11-11: the path tracer's transparent render never compiled on Direct3D 11 (WebGL2 layer)
 
 - **Repro:** `transparent` of `packages/voxel-pathtracer/tests/browser-check.mjs` with `MARGO_COMPAT=1` on ANGLE

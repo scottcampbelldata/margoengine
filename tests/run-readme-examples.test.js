@@ -65,6 +65,66 @@ test('one GPU slot runs every complete page lifecycle in order without overlappi
   assert.deepEqual(later, ['first'], 'a terminated browser schedules no later page');
 });
 
+test('each page example owns and closes a browser before the next example starts', async () => {
+  const calls = [];
+  const pages = { origin: 'http://example.test' };
+  let serial = 0,
+    release,
+    enteredClose;
+  const atClose = new Promise((resolve) => { enteredClose = resolve; });
+  const launch = async (options) => {
+    const id = ++serial;
+    assert.ok(options.args.includes('--enable-unsafe-webgpu'));
+    calls.push(`launch ${id}`);
+    return {
+      newPage: async () => ({
+        goto: async () => {},
+        waitForFunction: async () => {},
+        waitForTimeout: async () => {},
+        evaluate: async () => [],
+        close: async () => calls.push(`page ${id}`),
+      }),
+      close: async () => {
+        if (id === 1) await new Promise((resolve) => {
+          release = resolve;
+          enteredClose();
+        });
+        calls.push(`browser ${id}`);
+      },
+    };
+  };
+  const running = eachPage(['first', 'second'], async (id) => {
+    const result = await runInPage({ id: `runner-test/${id}`, code: 'export {}' }, pages, { launch });
+    assert.equal(result.result, 'pass', result.reason);
+  });
+  await Promise.race([atClose, running]);
+  assert.ok(release, 'the first example owns its browser close');
+  assert.deepEqual(calls, ['launch 1', 'page 1']);
+  release();
+  await running;
+  assert.deepEqual(calls, ['launch 1', 'page 1', 'browser 1', 'launch 2', 'page 2', 'browser 2']);
+});
+
+test('a browser that arrives after its page deadline is closed without creating a page', async () => {
+  let release,
+    closed = false,
+    created = false;
+  const result = await runInPage(
+    { id: 'runner-test/late-browser', code: 'export {}' },
+    { origin: 'http://example.test' },
+    { timeout: 50, launch: () => new Promise((resolve) => { release = resolve; }) },
+  );
+  assert.equal(result.result, 'fail');
+  assert.match(result.reason, /while creating browser/);
+  release({
+    newPage: async () => { created = true; },
+    close: async () => { closed = true; },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(created, false);
+  assert.equal(closed, true);
+});
+
 test('loader rendering and resolver examples choose one host, and OBJ examples fetch mesh bytes', () => {
   const examples = readmeEntries(readFileSync('packages/loaders/README.md', 'utf8')),
     render = examples.find(({ heading }) => heading === 'Optional vertex color and opacity rendering');

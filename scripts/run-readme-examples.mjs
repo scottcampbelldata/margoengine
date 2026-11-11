@@ -479,22 +479,37 @@ async function startPages(samples, examples) {
     ],
   });
   await server.listen();
-  const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
-  return { server, browser, origin: `http://127.0.0.1:${server.httpServer.address().port}` };
+  return { server, origin: `http://127.0.0.1:${server.httpServer.address().port}` };
 }
 
-export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
+export async function runInPage(example, pages, { timeout = PAGE_LIMIT, launch = launchBrowser } = {}) {
   const file = await writePageExample(example);
   const live = usesLiveLink(example.code);
   const url = `${pages.origin}/run.html?example=${encodeURIComponent(file)}&elements=${encodeURIComponent(JSON.stringify(askedElements(example.code)))}${live ? '&live' : ''}`;
-  let phase = 'creating page',
+  let phase = 'creating browser',
+    browser = pages.browser,
     page,
     result,
-    timer;
+    timer,
+    expiredDeadline = false,
+    closing;
+  const closeBrowser = async () => {
+    if (!browser) return;
+    // Normal teardown and the deadline handler share one bounded close.
+    closing ??= (async () => {
+      await closeAll({ browser });
+    })();
+    await closing;
+  };
   const fail = (reason) => ({ result: 'fail', place: 'page', reason });
   const work = (async () => {
     try {
-      page = await pages.browser.newPage();
+      // Closing a page does not close its GPU process: pending compiler teardown there can stall the next page's
+      // requestAdapter, even with sequential pages. Each example owns a browser, including its GPU process.
+      browser ??= await launch({ headless: true, args: ['--enable-unsafe-webgpu'] });
+      if (expiredDeadline) return fail('Browser creation exceeded the example deadline');
+      phase = 'creating page';
+      page = await browser.newPage();
       if (live) {
         // Redirect the documented add-on address to this run's own service. No shared port or fake browser API.
         await page.route('http://127.0.0.1:8765/**', (route) => {
@@ -525,7 +540,14 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
       result = fail(String(error.message).split('\n')[0].slice(0, 300));
     } finally {
       phase = 'closing page';
-      await traceShutdown(`README page close (${example.id})`, () => page?.close());
+      try {
+        await traceShutdown(`README page close (${example.id})`, () => page?.close());
+      } finally {
+        if (!pages.browser) {
+          phase = 'closing browser';
+          await closeBrowser();
+        }
+      }
     }
     return result;
   })();
@@ -538,10 +560,11 @@ export async function runInPage(example, pages, { timeout = PAGE_LIMIT } = {}) {
       }),
     ]);
     if (outcome !== expired) return outcome;
+    expiredDeadline = true;
     const reason = `Example did not finish within ${timeout / 1000} s while ${phase}${result?.reason ? '; ' + result.reason : ''}`;
     pages.failed = `${example.id}: ${reason}`;
     // The owned browser's bounded close kills its whole process tree, including unresponsive renderers/workers.
-    await closeAll({ browser: pages.browser });
+    await closeBrowser();
     return fail(reason);
   } catch (error) {
     return fail(String(error.message).split('\n')[0].slice(0, 300));
@@ -639,7 +662,7 @@ async function run() {
         if (pages.failed) throw new Error(pages.failed);
       });
     } finally {
-      await closeAll({ browser: pages.browser, servers: [pages.server] });
+      await closeAll({ servers: [pages.server] });
     }
   }
   const report = examples.map(({ id }) => ({ id, ...results.get(id) }));
