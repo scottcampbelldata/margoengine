@@ -215,15 +215,16 @@ exported for checks and custom tracers.
 import { bakeRefractedLightmap } from '@margoengine/lightmap/refracted';
 
 const floor = { positions: Float32Array.from([-5, 0, -5, -5, 0, 5, 5, 0, 5, 5, 0, -5]) };
-const slab = {
-  positions: Float32Array.from([-2, 1, -2, 2, 1, -2, 2, 1, 2, -2, 1, 2, -2, 2, -2, -2, 2, 2, 2, 2, 2, 2, 2, -2]),
-  indices: Uint32Array.from([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 3, 5, 0, 5, 4, 1, 7, 6, 1, 6, 2, 0, 4, 7, 0, 7, 1, 3, 2, 6, 3, 6, 5]),
-  ior: 1.5,
-  roughness: [0.7, 0.1], // brushed glass: rough along X, nearly smooth along Z
-  roughnessDirection: [1, 0, 0],
-};
 const result = await bakeRefractedLightmap(floor, {
-  glassVolumes: [slab],
+  glassVolumes: [
+    {
+      positions: Float32Array.from([-2, 1, -2, 2, 1, -2, 2, 1, 2, -2, 1, 2, -2, 2, -2, -2, 2, 2, 2, 2, 2, 2, 2, -2]),
+      indices: Uint32Array.from([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 3, 5, 0, 5, 4, 1, 7, 6, 1, 6, 2, 0, 4, 7, 0, 7, 1, 3, 2, 6, 3, 6, 5]),
+      ior: 1.5,
+      roughness: [0.7, 0.1], // brushed glass: rough along X, nearly smooth along Z
+      roughnessDirection: [1, 0, 0],
+    },
+  ],
   emitters: [{ type: 'directional', direction: [0, 1, 0], aperture: { corner: [-0.5, 3, -0.5], edgeU: [1, 0, 0], edgeV: [0, 0, 1] } }],
   photons: 4096,
 });

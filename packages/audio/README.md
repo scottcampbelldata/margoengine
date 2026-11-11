@@ -547,5 +547,5 @@ const { samples: estimate, convergence } = resynthesize(
   { magnitude, frames: spec.frames, size: 2048, hop: spec.hop, length: samples.length },
   { iterations: 16 },
 );
-console.log(image.width, image.height, same.length, estimate.length, convergence.at(-1) < convergence[0]);
+console.log(image.width, image.height, same.length, estimate.length, convergence[convergence.length - 1] < convergence[0]);
 ```
