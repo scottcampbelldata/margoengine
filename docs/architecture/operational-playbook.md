@@ -7436,3 +7436,9 @@ The optional WebGL2 backend detaches a VAO element buffer before binding a diffe
 ### Section 5 evidence: batch 163 line work
 
 Lines omits identical frame uploads using exact Uint32 word comparison and invalidates on GPU buffer recreation. Independent butt/square segments omit only endpoint-degenerate fan triangles. CPU tests assert work counts and exact uniform bytes; package GPU tests compare every pixel against forced original work at 1x/4x MSAA. No core, stage or shared implementation change. [Method](../whitepaper/bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).
+Batch 159 round 2 corrects EXT/KHR meshopt fallback handling in gltf-pro, including
+the async resolver's download decision. Synthetic compressed triangle accessors
+match byte for byte under both names; hostile fallback references and dual names
+reject. The previous snapshot inventory remains historical, with current readiness
+checked separately. No backend, decoder arithmetic, core, stage or API changed.
+[Regression and standards](../whitepaper/parity-diagnoses.md#round-2-meshopt-fallback-parsing).

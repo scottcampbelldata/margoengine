@@ -11,7 +11,6 @@ import type { Splats } from '@margoengine/splats';
 import type { ExtendedPlan } from './shader.js';
 import type {
   GLTFDocument,
-  GLTFBufferView,
   GLTFTexture,
   GLTFInstancing,
   GLTFExtensions,
@@ -262,8 +261,13 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_gaussian_splatting: 'splats',
   KHR_gaussian_splatting_compression_spz_2: 'splats',
 };
-const meshopt = (def: GLTFBufferView) =>
-  def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;
+const meshoptNames = ['EXT_meshopt_compression', 'KHR_meshopt_compression'];
+const meshopt = <T>(def: { extensions?: { EXT_meshopt_compression?: T; KHR_meshopt_compression?: T } }): T | undefined => {
+  const extensions = def?.extensions;
+  if (extensions?.EXT_meshopt_compression !== undefined && extensions?.KHR_meshopt_compression !== undefined)
+    throw new TypeError('Invalid glTF meshopt extensions; use only EXT or KHR on each buffer or bufferView');
+  return extensions?.EXT_meshopt_compression ?? extensions?.KHR_meshopt_compression;
+};
 export function integer(value: unknown, label: string, min = 0): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
     throw new TypeError('Invalid glTF ' + label + '; re-export the file and check it with the glTF Validator');
@@ -483,19 +487,20 @@ export class GLTFAsset {
           'Invalid glTF buffer; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
         );
       const length = integer(def.byteLength, 'buffer length', 1);
-      const fallback = def.extensions?.[meshoptExtension]?.fallback;
+      const fallback = meshopt(def)?.fallback;
       if (fallback !== undefined && typeof fallback !== 'boolean')
         throw new TypeError(
           'Invalid glTF meshopt fallback; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
         );
       const input = buffers[i],
         placeholder = (!input || input.byteLength === 0) && !def.uri && (i !== 0 || !binary);
-      if (fallback === true || (placeholder && doc.extensionsRequired?.includes(meshoptExtension))) {
+      if (fallback === true || (placeholder && meshoptNames.some((name) => doc.extensionsRequired?.includes(name)))) {
+        const name = meshoptNames.find((name) => def.extensions?.[name] !== undefined);
         const views = (doc.bufferViews ?? []).filter((view) => view?.buffer === i);
         if (
           !views.length ||
-          views.some((view) => !view.extensions?.[meshoptExtension]) ||
-          doc.bufferViews?.some((view) => view?.extensions?.[meshoptExtension]?.buffer === i)
+          views.some((view) => !meshopt(view) || (name !== undefined && !view.extensions?.[name])) ||
+          doc.bufferViews?.some((view) => meshopt(view)?.buffer === i)
         )
           throw new TypeError(
             'Invalid glTF meshopt fallback references; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
@@ -1055,7 +1060,7 @@ export async function loadAsset(
           : new Uint8Array(given.buffer, given.byteOffset, given.byteLength);
       continue;
     }
-    if (def.extensions?.[meshoptExtension]?.fallback === true) continue;
+    if (meshopt(def)?.fallback === true) continue;
     if (!def.uri) {
       if (i === 0 && binary) buffers[i] = binary;
     } else if (typeof def.uri !== 'string')

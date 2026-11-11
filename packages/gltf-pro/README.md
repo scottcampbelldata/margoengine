@@ -150,11 +150,28 @@ picking and shadows retain their existing behavior. See the [material controls](
 for constructor options, target boundaries and transmission behavior. glTF export omits these render controls.
 
 `loadGLTF` automatically decodes `KHR_draco_mesh_compression` primitives and
-`EXT_meshopt_compression` buffer views and `KHR_texture_basisu` textures using `@margoengine/decoders`, installed as
+`EXT_meshopt_compression` and `KHR_meshopt_compression` buffer views and `KHR_texture_basisu` textures using `@margoengine/decoders`, installed as
 a dependency. Draco workers and Wasm start only when compressed primitives are
 encountered and are released after decoding, including on failure or cancellation.
 Meshopt decoding is synchronous and cached per buffer view, including views used
 by skin, morph and animation accessors. Unknown required extensions still fail.
+Both meshopt names support marked fallback buffers and URI-less placeholders.
+Marked fallback files are not fetched; compressed views supply their bytes instead.
+An unmarked, absent fallback requires the matching compression extension to be
+required. A buffer or view cannot declare both names. Normal loads need no decoder
+configuration:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
+console.log(model.primitives.length);
+engine.render();
+model.dispose();
+engine.dispose();
+```
 
 For in-memory JSON or GLB bytes, use `await parseGLTFAsync(engine, input)` or pass an options object as the third
 argument, for example `{buffers, signal, draco, ktx2}`. Both forms decode embedded PNG/JPEG and KTX2 images;

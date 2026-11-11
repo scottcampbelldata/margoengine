@@ -47,7 +47,7 @@ The following failures remain for the next complete jobs:
 | Margo light probe | The scene supplies nine SH coefficients; the current adapter only knows baked LightProbes. Add the missing coefficient-source API in environment if no supported input fits. |
 | Margo grading | The adapter rejects hue rotation although shader utilities and tonemap/hue now supply hue operations. Wire the matching grading arithmetic and verify output. |
 | Margo lens flare | The adapter needs a point position and four configurable screen-size elements; the existing sun-direction/fixed-ghost API does not satisfy that job. Build in post, never core. |
-| Margo meshopt | `gltf-pro/src/asset.ts` recognizes KHR meshopt views but checks fallback buffers only for EXT. The packer strips the KHR fallback URI, then Asset rejects that absent buffer as truncated. Fix the owning parser with EXT/KHR hostile-input regressions. |
+| Margo meshopt | Fixed in round 2: the owning gltf-pro parser and async resolver now apply the fallback contract to EXT and KHR. See the regression and reproduction below. |
 | Reference depth material, WebGPU | The black-box adapter reports MeshDepthMaterial incompatible. Repair its supported material mapping without reading engine source. |
 | Reference USDZ, both | Both black-box calls fail reading `isVector3`. Establish the adapter's loader input/scene contract before measuring. |
 | Reference texture formats, both | The DDS parser rejects FourCC zero. Match the fixture contract while retaining coverage of the current uncompressed DDS case; do not remove work to get a ratio. |
@@ -70,3 +70,33 @@ Node.js contributors, *Inspector*, CPU profiler API (living documentation, acces
 separate native queue work from CPU parsing; the inspector supplies CPU call-path
 evidence without a benchmark campaign. No external implementation or companion
 code was read or copied.
+
+## Round 2: meshopt fallback parsing
+
+The parser used the EXT name for fallback-buffer validation and download decisions,
+although view decoding already accepted both extension names. A valid KHR placeholder
+was therefore treated as a truncated buffer, or its optional fallback file was fetched.
+The shared extension lookup now serves both buffers and views, rejects dual declarations,
+and checks that marked fallback references use that marker's extension. Core, stage,
+the packer and decoder output are unchanged. There is no speed claim or new API.
+
+`packages/gltf-pro/tests/meshopt-fallback.test.js` fails on the parent build and tests
+explicit and implicit placeholders, byte-identical EXT/KHR accessors, cached views,
+the external fallback download contract, invalid marker types, mixed/dual declarations,
+references to fallback storage and source/decoded bounds. Reproduce after building:
+
+```sh
+node --test --test-timeout=120000 packages/gltf-pro/tests/meshopt-fallback.test.js
+node scripts/gpu-lock.mjs run --owner=meshopt-smoke --max=15 --wait-max=15 -- node scripts/parity-smoke-browser.mjs --runs=1 --cases=p-meshopt --engines=margo
+```
+
+Research compared: Arseny Kapoulkine, Jasper St. Pierre, Alexey Knyazev and Don McCurdy,
+*KHR_meshopt_compression* (2026 release candidate),
+https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_meshopt_compression/README.md;
+Arseny Kapoulkine and Khronos contributors, *EXT_meshopt_compression* (2021),
+https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_meshopt_compression/README.md;
+Khronos 3D Formats Working Group, *glTF 2.0.1 Specification* (2021),
+https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html.
+Both extension specifications permit the same fallback layout, while KHR prohibits
+declaring both names on one object. The base specification still governs buffer-view
+bounds. These specifications, not companion code, informed the fix.
