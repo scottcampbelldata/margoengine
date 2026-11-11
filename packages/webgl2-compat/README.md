@@ -104,8 +104,8 @@ when it collects the object's JS wrapper (a collection lands at a moment of its 
 replay). An object goes when its resource is destroyed (`destroy()` of a buffer, texture or query set), at the end of
 the first submission after its resource was collected (WebGPU bind groups, samplers and pipelines have no `destroy()`,
 and buffers and textures may be dropped without one), or with `device.destroy()`. A delete asked for while a
-submission replays waits for the end of the replay. Render pipelines with the same translated GLSL and vertex
-attributes share one GL program and vertex array, so a pipeline made again (a renderer rebuilt, a scene reloaded)
+submission replays waits for the end of the replay. Render pipelines with the same translated GLSL, the same
+`@group` and `@binding` numbers and the same vertex attributes share one GL program and vertex array, so a pipeline made again (a renderer rebuilt, a scene reloaded)
 compiles and links nothing; the device keeps up to 64 programs no live pipeline uses, the least recently used going
 first. `device.glObjects` counts the objects made and deleted per kind; after `device.destroy()` the two match:
 

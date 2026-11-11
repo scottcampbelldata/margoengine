@@ -1806,8 +1806,11 @@ Mapping details:
 - The device owns every GL object its context makes (`GLObjects`, `device/gl.ts`) and deletes each one itself: on its
   resource's `destroy()`, at the end of the first submission after the resource was collected (bind groups, samplers
   and pipelines have no `destroy()`), or with `device.destroy()`; a delete asked for during a replay waits for its end.
-  Pipelines with the same GLSL and vertex attributes share one program and VAO (`LinkedProgram`, `device/render.ts`; up
-  to 64 idle ones kept, least recently used first out). Cause (2026-11-10): the layer had left programs, VAOs and some
+  Pipelines with the same GLSL, binding table and vertex attributes share one program and VAO (`LinkedProgram`,
+  `device/render.ts`; up to 64 idle ones kept, least recently used first out). The binding table is in the key since
+  2026-11-11: GLSL names uniforms and samplers by order, so WGSL differing only in `@binding` numbers (terrain with its
+  holes texture at 6 or at 8) gave one key, and the later pipeline drew with the earlier one's bindings, in Chromium
+  and WebKit alike, whenever the earlier pipeline was still alive (`test/device.test.js`, binding-numbers test). Cause (2026-11-10): the layer had left programs, VAOs and some
   textures and framebuffers for the browser to delete at wrapper collection, possibly mid-replay, and on ANGLE Vulkan
   (NVIDIA 617.42) the voxel tracer's loop programs then wrote fragment output 7 wrong in 13 of 78 renders. Evidence:
   `test/gl-objects.test.js` (created equals deleted after `destroy()`, program reuse, deletes only at a submission);

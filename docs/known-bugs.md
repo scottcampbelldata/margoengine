@@ -299,16 +299,27 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   read, which replaces the drawing buffer). The voxel check now draws its disposed frame after the queue drains, as its
   other steps already did; the assertion (0 red pixels) is unchanged. To report upstream at bugs.webkit.org.
 
-### WebKit: a StreamingAssetCache hit right after a streamed miss never finishes (WebKit sweep, 2026-11-11, open)
+### WebKit ephemeral sessions: AssetCache stores nothing, and the cache browser check hangs (WebKit sweep, 2026-11-11, open)
 
 - **What:** `cache` `test:browser` in Playwright WebKit 2370 on the Apple M6: `beginMiss` gets its 256-byte first chunk,
   the rest of the 4,125,392-byte body is read to the end and `cache.flush()` resolves, then
   `(await cache.fetch('/cache-files/stream-chair.glb')).arrayBuffer()` (the stored copy) never settles. Chromium passes.
 - **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` on a Mac; it now stops after 180 s
   with `finishMiss took over 180 s` (before, the step had no limit and held its GPU slot until the runner's 10 minutes).
-- **Cause:** not found. Not yet split between the stored `Response(new Blob(parts))` written by `StreamingAssetCache.keep`
-  and the read of it in `AssetCache`'s hit path; the next step is a page that stores and reads back a Blob response with
-  the same headers in WebKit, outside Margo.
+- **Cause (found 2026-11-11):** WebKit refuses every Blob put into IndexedDB in an ephemeral session (Playwright's
+  contexts, and Safari Private Browsing): the request fails with `UnknownError: Error preparing Blob/File data to be
+  stored in object store`, at 1,000 bytes as at 4 MB, whole or in 64 KB parts. Minimal repro, outside Margo: in Playwright
+  WebKit, `indexedDB.open(name, 1)`, create a store, `put({ blob: new Blob([new Uint8Array(1000)]) }, 'k')` in a
+  readwrite transaction; the request's error event fires with that message. Chromium stores it. So `AssetCache.put`
+  fails (counted in `stats.errors`, by design the load still succeeds) and the second fetch is a network miss; the
+  check's server holds every `stream-chair.glb` body until `releaseBody()`, which it calls only for the first request,
+  so the step waits instead of failing on `stats.stored`.
+- **Margo's side:** `AssetCache` (and `RangeCache`, which also stores Blobs) caches nothing in Safari Private Browsing.
+  The fix to build: detect the refusal once per database and store the bytes (`ArrayBuffer`, which WebKit accepts)
+  there, reading either kind back as a Blob; and the check's server answers every request for the held file, so a
+  failure shows as a failed assertion. Spec: IndexedDB 3.0 says values are stored with StructuredSerializeForStorage,
+  which covers Blob (https://www.w3.org/TR/IndexedDB/); WebKit's refusal is its own
+  limit in ephemeral sessions.
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
