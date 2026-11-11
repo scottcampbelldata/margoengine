@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14767693,
+  "total": 14768498,
   "history": [
     {
       "date": "2026-10-24",
@@ -8273,6 +8273,12 @@
       "commit": "24645f602",
       "reason": "save/node +149 B: exclusive temporary files and size-bounded reads (rust port R9)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "b7ce9f41a",
+      "reason": "core bug fixes Scott approved 2026-11-10: camera validate-before-publish, outward-rounded bounds with the rebuilt kernel Wasm, restore budget; core/extension 21951 -> 22093 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8471,7 +8477,7 @@
     "@margoengine/controls/transitions": 14087,
     "@margoengine/controls/walk": 14348,
     "@margoengine/core": 22467,
-    "@margoengine/core/extension": 21951,
+    "@margoengine/core/extension": 22756,
     "@margoengine/creative": 19368,
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/grass-terrain": 1907,

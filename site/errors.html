@@ -97,9 +97,9 @@
     </section>
     <section id="gpu-lost">
       <h2><a href="#gpu-lost">GPU lost or a GPU validation error</a></h2>
-      <p class="messages"><code>GPU lost: &lt;reason&gt;</code> <code>&lt;WebGPU validation message&gt;</code></p>
+      <p class="messages"><code>GPU lost: &lt;reason&gt;</code> <code>GPU lost 4 times; reload the page</code> <code>&lt;WebGPU validation message&gt;</code></p>
       <p><strong>Cause.</strong> The browser lost the GPU device (driver reset, tab in the background too long, GPU process crash), or WebGPU reported an uncaptured validation error.</p>
-      <p><strong>Fix.</strong> Core recreates the device itself; recreate textures your code owns (view <code>target</code>s) in <code>onDeviceRestored</code>. A validation error names the GPU object at fault: fix the call that created it.</p>
+      <p><strong>Fix.</strong> Core recreates the device itself; recreate textures your code owns (view <code>target</code>s) in <code>onDeviceRestored</code>. Core restores at most 3 times in a row: a fourth loss before 120 frames have drawn since the last one reports <code>failed</code> once and asks for no new device, so reload the page. A validation error names the GPU object at fault: fix the call that created it.</p>
     </section>
     <section id="reentrancy">
       <h2><a href="#reentrancy">Render or frame graph re-entered</a></h2>

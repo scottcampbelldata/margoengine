@@ -88,6 +88,11 @@ old one. WebGPU reports a real out-of-memory later, as a device error on the nex
 A `rebootDevice()` that fails leaves the engine and the canvas on the device they had, so on a healthy device the page
 keeps drawing and you can try again. The canvas moves to the new device only once every geometry is rebuilt on it.
 
+Core restores a lost device by itself at most 3 times in a row. A fourth loss before 120 frames have drawn since the
+last one reports `MargoError` code `failed` (`GPU lost 4 times; reload the page`) through `engine.onError` once, and
+core asks for no new device after that, so a driver that keeps resetting cannot hold the page in a restore loop. 120
+drawn frames after a restore give the 3 restores back.
+
 A camera update that throws (a field of view or clip planes that give no finite float32 frustum) keeps the matrix
 and planes of the last good update, so the next frame still culls and draws with a valid camera.
 

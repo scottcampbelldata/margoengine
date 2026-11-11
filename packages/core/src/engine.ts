@@ -450,6 +450,9 @@ export class Engine {
   private readonly frameOptions: { culling?: boolean; delta: number; views?: readonly RenderView[] } = { delta: 0 };
   private disposing = false;
   private recovery?: Promise<void>;
+  // Automatic restores since the last run of 120 drawn frames: a device lost again and again stops after 3.
+  private reboots = 0;
+  private good = 0;
   /** The scene being drawn or set up; the default scene otherwise. */
   private active: Scene;
   /** Layer mask of the current draw; -1 draws every layer. */
@@ -536,7 +539,10 @@ export class Engine {
   }
   private watchDevice(): void {
     this.renderer.onLost = () => {
-      if (!this.disposed && !this.disposing) void this.rebootDevice().catch((error) => this.onError(error));
+      if (this.disposed || this.disposing) return;
+      this.good = 0;
+      if (++this.reboots < 4) void this.rebootDevice().catch((error) => this.onError(error));
+      else if (this.reboots === 4) this.onError(fault('failed', 'GPU lost 4 times; reload the page', 'gpu-lost'));
     };
   }
   rebootDevice(): Promise<void> {
@@ -573,6 +579,11 @@ export class Engine {
       this.recovery = undefined;
     });
     return this.recovery;
+  }
+  /** Counts a drawn frame towards resetting the restore budget; always true. */
+  private drew(): boolean {
+    if (this.reboots && ++this.good >= 120) this.reboots = this.good = 0;
+    return true;
   }
   get backend(): 'webgpu' | 'webgl2' {
     return this.renderer.backend;
@@ -851,7 +862,7 @@ export class Engine {
       this.update(culling, delta, camera);
       const background = this.active.background,
         { width, height } = this.canvas;
-      if (!this.recovery)
+      if (!this.recovery && this.drew())
         this.renderer.render(
           camera,
           this.lighting,
@@ -927,7 +938,7 @@ export class Engine {
         this.update(culling, cameras.has(view.camera) ? 0 : delta, view.camera, rect, prepare, delta, view.layers);
         cameras.add(view.camera);
         scenes.add(scene);
-        if (!this.recovery)
+        if (!this.recovery && (index || this.drew()))
           this.renderer.render(view.camera, this.lighting, this.batchList, this.frameGraph, prepare ? delta : 0, {
             rect,
             scissor: view.scissor && this.viewPixels(view.scissor, view.pixels, size),
