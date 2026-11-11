@@ -54,7 +54,9 @@ window.check=async()=>{
         await new Promise((resolve,reject)=>{
           const timeout=setTimeout(()=>reject(new Error('Video frame delivery timed out')),5000);
           video.requestVideoFrameCallback(()=>{clearTimeout(timeout);resolve();});
-          context.fillStyle='rgb(20,200,50)';context.fillRect(0,0,8,8);track.requestFrame();
+          context.fillStyle='rgb(20,200,50)';context.fillRect(0,0,8,8);
+          // Firefox puts requestFrame on the capture stream (CanvasCaptureMediaStream), Chromium on its track.
+          (track.requestFrame?track:stream).requestFrame();
         });
         await draw();engine.render({delta:0});htmlNext=read(c);
       }finally{video.pause();video.srcObject=null;track.stop();}
