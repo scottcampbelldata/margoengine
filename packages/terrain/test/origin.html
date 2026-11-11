@@ -13,7 +13,7 @@
 // the same pose and rebases on the way; glide: the same flight with no rebase. ?start=x,y,z sets the origin the exact,
 // flight and glide modes start on (the controls of the flight start on the origin it ends on). The scene: rules with bump and macro over mipmapped layers, a hole, and a
 // runtime virtual texture with a decal and a road.
-import { Engine } from '/packages/core/dist/index.js';
+import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
 import { FloatingOrigin } from '/packages/cameras/dist/origin.js';
 import { Terrain } from '/packages/terrain/dist/index.js';
 import { TerrainVirtualTexture } from '/packages/terrain/dist/rvt.js';
@@ -23,7 +23,9 @@ const q = new URLSearchParams(location.search);
 const offset = Number(q.get('offset') ?? 0),
   mode = q.get('mode') ?? 'exact',
   // rvt: the cache with a decal and a road; overlays: the cache with cached imagery and an overlay polygon; pbr: layer
-  // materials with displacement; deform: footprints; imagery: imagery on the lit path.
+  // materials with displacement; deform: footprints; imagery: imagery on the lit path; mesh: the cache and a box sunk
+  // into the ground (placed in world coordinates); blend: the same with the box blended into the terrain; stream: the
+  // same ground streamed in 64 m tiles.
   stack = q.get('stack') ?? 'rvt';
 const errors = [];
 addEventListener('error', (e) => errors.push(String(e.message)));
@@ -31,11 +33,10 @@ addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.messa
 
 // Rolling hills and a ridge, 129 x 129 heights over 256 m (steep enough on the ridge for the cache's steep fallback).
 const n = 129,
-  heights = new Float32Array(n * n);
-for (let z = 0; z < n; z++)
-  for (let x = 0; x < n; x++)
-    heights[z * n + x] =
-      0.12 * Math.sin(x * 0.11) * Math.cos(z * 0.09) + 0.08 * Math.sin((x + z) * 0.05) + 0.25 * Math.exp(-(((x - 80) / 9) ** 2));
+  heights = new Float32Array(n * n),
+  ground = (x, z) =>
+    0.12 * Math.sin(x * 0.11) * Math.cos(z * 0.09) + 0.08 * Math.sin((x + z) * 0.05) + 0.25 * Math.exp(-(((x - 80) / 9) ** 2));
+for (let z = 0; z < n; z++) for (let x = 0; x < n; x++) heights[z * n + x] = ground(x, z);
 // Four 32 x 32 layers with a full mip chain (the macro tone reads the top mip): two-tone checks with a diagonal stripe.
 function layerTexture(gpu) {
   const tones = [
@@ -107,9 +108,7 @@ async function main() {
     start = q.get('start')?.split(',').map(Number);
   if (mode === 'exact') origin.rebase(start ?? [d, 0, d]);
   if (mode === 'flight' || mode === 'glide') origin.rebase(start ?? [d - 400, 0, d]);
-  const terrain = Terrain.attach(engine, {
-    origin: [-128 + d, -128 + d],
-    size: [256, 256],
+  const common = {
     heightScale: 100,
     cellSize: 1,
     resolution: 64,
@@ -121,12 +120,38 @@ async function main() {
       { height: [-1e5, 1e5], slope: [0.35, 1], scale: 0.3, bump: 0.6 },
       { height: [22, 1e5], slope: [0, 0.4], scale: 0.25 },
     ],
-    textures: (gpu) => {
-      const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
-      gpu.queue.writeTexture({ texture: heightmap }, heights, { bytesPerRow: n * 4 }, [n, n]);
-      return { heightmap, layers: layerTexture(gpu), holes: holeTexture(gpu) };
-    },
-  });
+  };
+  let stream, terrain;
+  if (stack === 'stream') {
+    // The same ground in 64 m tiles of 32 x 32 samples (2 m apart, the heightmap's spacing), a 4 x 4 tile window. The
+    // camera takes its pose first: the window and the terrain's anchor start around it, so they move with the scene.
+    const { TerrainStream } = await import('/packages/terrain/dist/stream.js');
+    origin.lookAt(pose.position, pose.target);
+    stream = TerrainStream.attach(engine, {
+      ...common,
+      origin: [-128 + d, -128 + d],
+      tileSize: 64,
+      tileTexels: 32,
+      window: 4,
+      colors: layerTexture,
+      load: async (x, z) => {
+        const tile = new Float32Array(32 * 32);
+        for (let v = 0; v < 32; v++) for (let u = 0; u < 32; u++) tile[v * 32 + u] = ground(x * 32 + u, z * 32 + v);
+        return { heights: tile };
+      },
+    });
+    terrain = stream.terrain;
+  } else
+    terrain = Terrain.attach(engine, {
+      ...common,
+      origin: [-128 + d, -128 + d],
+      size: [256, 256],
+      textures: (gpu) => {
+        const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
+        gpu.queue.writeTexture({ texture: heightmap }, heights, { bytesPerRow: n * 4 }, [n, n]);
+        return { heightmap, layers: layerTexture(gpu), holes: holeTexture(gpu) };
+      },
+    });
   const solid = (gpu, side, layers, texel) => {
     const texture = gpu.createTexture({ size: [side, side, layers], format: 'rgba8unorm', usage: 6 }),
       data = new Uint8Array(side * side * layers * 4);
@@ -135,10 +160,22 @@ async function main() {
     return texture;
   };
   let rvt;
-  if (stack === 'rvt' || stack === 'overlays') {
+  if (stack === 'rvt' || stack === 'overlays' || stack === 'mesh' || stack === 'blend') {
     rvt = TerrainVirtualTexture.attach(engine, terrain, { texel: 0.0625, size: 512, levels: 5, decals: decalTexture });
     rvt.addDecal({ center: [10 + d, 20 + d], size: [24, 12], angle: 0.4 });
     rvt.road([[-40 + d, -10 + d], [0 + d, 5 + d], [40 + d, 30 + d]], 6);
+  }
+  if (stack === 'mesh' || stack === 'blend') {
+    // A 16 m box 4 m into the ground near the view's centre, kept at its float64 world point across rebases.
+    const rock = engine
+      .createMesh()
+      .setGeometry(box(16, 16, 16))
+      .setMaterial(new PbrMaterial({ color: '#4f6f9f', roughness: 0.5 }));
+    origin.place(rock, world(0, 100 * ground(64, 69) + 4, 10));
+    if (stack === 'blend') {
+      const { TerrainBlend } = await import('/packages/terrain/dist/blend.js');
+      TerrainBlend.attach(engine, terrain, rvt, { height: 4, noise: 0.5 }).add(rock);
+    }
   }
   if (stack === 'overlays' || stack === 'imagery') {
     const { TerrainImagery } = await import('/packages/terrain/dist/imagery.js');
@@ -192,7 +229,18 @@ async function main() {
     }
   else origin.lookAt(pose.position, pose.target);
   const settle = async () => {
-    await waitForPipelines(frame, { ready: () => !rvt || (baked > 0 && last === 0) });
+    // A streamed window is whole once `ready` resolves after the last move (asked again each frame until it holds).
+    let streamed = !stream,
+      asked = false;
+    await waitForPipelines(frame, {
+      ready: () => {
+        if (!streamed && !asked) {
+          asked = true;
+          stream.ready().then(() => (streamed = true));
+        }
+        return streamed && (!rvt || (baked > 0 && last === 0));
+      },
+    });
     return { baked, draws, rebases: origin.rebases, shift: origin.origin, flight };
   };
   window.check = {

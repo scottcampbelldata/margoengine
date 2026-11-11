@@ -145,7 +145,8 @@ export class TerrainBlend implements EnginePlugin {
    */
   private code(binding: number): string {
     // With a floating origin the mesh positions are local: the heightmap's corner and offset come from the virtual
-    // texture's frame (`map`, the terrain's origin and height offset less the shift) instead of constants.
+    // texture's frame (`map`, the terrain's origin and height offset less the shift) instead of constants, and the
+    // noise reads world XZ less the terrain's anchor (local plus the frame's `anchor`), so a rebase leaves it in place.
     const o = this.terrain.options,
       floating = !!o.floatingOrigin,
       x = floating ? 'terrainVirtual.map.x' : num(o.origin?.[0] ?? 0),
@@ -171,7 +172,7 @@ fn terrainBlendGround(p:vec3f,s:vec4f,footprint:f32)->TerrainBlendGround {
  var g:TerrainBlendGround;g.weight=0.0;
  if(any(p.xz<vec2f(${x},${z}))||any(p.xz>vec2f(${x},${z})+vec2f(${w},${d}))){return g;}
  let h=terrainBlendHeight(p.xz);
- let jitter=(terrainNoise(p.xz*(2.0/s.x)).x-0.5)*s.y*s.x;
+ let jitter=(terrainNoise(${floating ? '(p.xz+terrainVirtual.anchor.xy)' : 'p.xz'}*(2.0/s.x)).x-0.5)*s.y*s.x;
  let fade=1.0-smoothstep(0.0,s.x,p.y-h+jitter);
  if(fade<=0.0){return g;}
  let ground=terrainVirtualColor(vec3f(p.x,h,p.z),footprint);

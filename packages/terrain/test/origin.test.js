@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Terrain, planRings } from '../dist/index.js';
-import { planWindows, splitTerrainColor } from '../dist/rvt.js';
+import { planWindows, splitTerrainColor, TerrainVirtualTexture } from '../dist/rvt.js';
+import { TerrainBlend } from '../dist/blend.js';
 import { TerrainQuery } from '../dist/query.js';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
@@ -242,6 +243,41 @@ test('a rebase rewrites the rules once and redraws the shadow maps once, a still
   assert.deepEqual([...r.terrain.shift], next);
   r.terrain.dispose();
   assert.equal(r.at.listeners.size, 0, 'dispose unsubscribes from the origin');
+});
+
+test('blend noise stays on the ground across a rebase: it reads world less the anchor from the cache frame', () => {
+  const d = 4883 * 2048,
+    r = originRig(d),
+    rvt = new TerrainVirtualTexture(r.terrain, { size: 256, levels: 2 });
+  r.gpu.record(() => rvt.setup(r.engine));
+  const passes = [];
+  rvt.registerPasses({ add: (p) => passes.push(p) });
+  const frame = () =>
+      r.gpu.record(() => {
+        r.view.begin(3);
+        r.prepare.execute(r.view.c);
+        for (const p of passes) p.execute(r.view.c);
+      }),
+    // The cache frame upload: 16 floats with the option (eye, params, map, anchor).
+    anchorOf = (log) => {
+      const write = log.filter((e) => e[0] === 'writeBuffer' && e[3].length === 128).at(-1);
+      return [...new Float32Array(new Uint8Array(Buffer.from(write[3], 'hex')).buffer).slice(12, 14)];
+    },
+    f = Math.fround,
+    world = [d + 3.3, d - 7.9],
+    noiseAt = (shift, anchor) => world.map((x, a) => f(f(x - shift[a * 2]) + anchor[a]));
+  const before = anchorOf(frame()),
+    first = [...r.terrain.shift];
+  r.at.rebase([d + 40.5, 12.25, d - 3.75]);
+  const after = anchorOf(frame()),
+    second = [...r.terrain.shift];
+  assert.deepEqual(before, [f(16), f(16)], 'the shift less the anchor (the terrain origin at construction)');
+  assert.deepEqual(after, [f(56.5), f(12.25)]);
+  // A fragment's noise coordinate, local XZ plus the anchor term, is world less the anchor at both origins.
+  assert.deepEqual(noiseAt(first, before), noiseAt(second, after));
+  const blend = new TerrainBlend(r.terrain, rvt);
+  assert.match(blend.code(40), /terrainNoise\(\(p\.xz\+terrainVirtual\.anchor\.xy\)\*/);
+  assert.match(blend.code(40), /params:vec4f,map:vec4f,anchor:vec4f\}/);
 });
 
 test('the origin shader edits every layer sample and keeps the anchors other entries patch', () => {

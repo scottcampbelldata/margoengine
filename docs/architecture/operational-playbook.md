@@ -1953,8 +1953,11 @@ the float64 one, IEEE 754-2019; Goldberg, What Every Computer Scientist Should K
 the way: the ring-move test compared the float32 uniform with the float64 corner, so a cell size not exact in float32
 redrew the shadow maps every frame; and the bake placed a texel from its window's corner (`o * s - shift`), so off the
 grid a page's colours depended on where the window stood when it baked (36 pixels of a flight differed from the same
-pose at rest; `origin.test.js` checks that a texel bakes at one float32 point from any window). Missing: other GPUs, blend and stream on the GPU
-under the option, frame cost.
+pose at rest; `origin.test.js` checks that a texel bakes at one float32 point from any window). The same GPU check
+covers blend (a box placed with `FloatingOrigin.place`) and stream: identical pictures at 0 and 1e7, and within 1 of
+255 and 99.9 percent after a rebase in place. It found blend's fade noise reading local XZ, so a rebase slid the
+noise along the box (82 of 255 on 0.27 percent of pixels); the noise now reads local XZ plus the cache frame's
+`anchor` (world less the terrain's anchor), checked in `origin.test.js` across a rebase. Missing: other GPUs, frame cost.
 
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,

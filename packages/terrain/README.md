@@ -943,8 +943,11 @@ Checked on a real GPU by `test/origin.browser.mjs` (in `test:gpu`, RTX A6000, Ed
 moved with its camera by 0, 100,352 and 10,000,384 m: with the origin at the offset every picture is the zero case's,
 pixel for pixel, with the same draw calls and 1,324,960 texels baked; rebased onto the camera at 1e7, rebased in place
 (which bakes nothing that frame) and after a 400 m flight that rebases on the way, every pixel is within 1 of 255 of it
-(99.93, 99.93 and 99.83 percent equal). Cached imagery with an overlay polygon, layer materials with displacement,
-footprints, and imagery on the lit path each draw the same picture at 1e7 as at zero. `test/origin.test.js` checks
+(99.93, 99.93 and 99.84 percent equal; the flight ends on an origin 2/3 m off the metre grid, and the same pose drawn
+at rest on that origin, with no rebase at all, is 99.83 percent equal: float32 rounding of the frame, not the rebase,
+which changes 0.004 percent of pixels). Cached imagery with an overlay polygon, layer materials with displacement,
+footprints, imagery on the lit path, a mesh blended into the ground and a streamed terrain each draw the same picture
+at 1e7 as at zero, and blend and stream stay within 1 of 255 after a rebase in place. `test/origin.test.js` checks
 `planRings` and `planWindows` bit for bit at those offsets, the layer wrap and tone, a rebase rewriting the rules once
 and redrawing shadows once, and `TerrainQuery` at the offsets.
 

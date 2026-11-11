@@ -20,6 +20,7 @@
 //    255 on every pixel and has no more pixels off than the rest control plus bar 2's 0.1 percent. The rest control's
 //    own share (99.83 percent equal on the RTX A6000, 2026-11-11) is float32 rounding of a frame off the metre grid,
 //    present with no rebase at all, so that bar comes from the control and the share is reported.
+// 5. every other terrain entry, blend and stream included, at 0 and 1e7 (the last loop below).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -130,22 +131,32 @@ await runSuite(
         `${offset}: the picture after the flight matches as the control does: ${JSON.stringify({ m, control })}`,
       );
     }
-    // 4. Every other terrain entry under the origin, exact at 0 and 1e7: cached imagery and an overlay polygon; layer
-    // materials with displacement; footprints; imagery on the lit path. The same numbers reach the GPU, so the same
-    // pictures (bar 1), and each differs from the scene without it (the entry draws: the cache alone for overlays, the
-    // bare terrain for the others).
+    // 5. Every other terrain entry under the origin, exact at 0 and 1e7: cached imagery and an overlay polygon; layer
+    // materials with displacement; footprints; imagery on the lit path; a box placed in world coordinates and blended
+    // into the ground; the ground streamed in tiles. The same numbers reach the GPU, so the same pictures (bar 1), and
+    // each differs from the scene without it (the entry draws: the cache alone for overlays, the unblended box for
+    // blend, the bare terrain for the others; the stream's window has no hole and reaches past the heightmap). Blend
+    // and stream also rebase in place onto the camera at 1e7 (bar 2: the box and the window follow the origin).
     out.stacks = {};
-    const plain = await load(0, 'exact', 'plain');
-    for (const stack of ['overlays', 'pbr', 'deform', 'imagery']) {
+    const plain = await load(0, 'exact', 'plain'),
+      mesh = await load(0, 'exact', 'mesh');
+    for (const stack of ['overlays', 'pbr', 'deform', 'imagery', 'blend', 'stream']) {
       const a = await load(0, 'exact', stack),
         b = await load(OFFSETS[2], 'exact', stack),
         m = compare(b.image, a.image),
-        drawn = compare(a.image, (stack === 'overlays' ? zero : plain).image);
+        drawn = compare(a.image, ({ overlays: zero, blend: mesh }[stack] ?? plain).image);
       out.stacks[stack] = { ...m, changed: 1 - drawn.equal, draws: a.stats.draws };
-      console.log(`terrain origin ${stack}: ${JSON.stringify(out.stacks[stack])}`);
       assert.equal(m.max, 0, `${stack}: 1e7 equals the zero case: ${JSON.stringify(m)}`);
       assert.equal(b.stats.draws, a.stats.draws, `${stack}: the same draw calls`);
       assert.ok(drawn.equal < 0.999, `${stack}: the entry changes the picture: ${JSON.stringify(drawn)}`);
+      if (stack === 'blend' || stack === 'stream') {
+        const r = await page.evaluate(() => window.check.rebase()),
+          after = compare(await shot(), b.image);
+        out.stacks[stack].rebase = { ...after, rebases: r.rebases };
+        assert.equal(r.rebases, 1, `${stack}: one rebase in place`);
+        assert.ok(close(after), `${stack}: the picture after a rebase in place matches: ${JSON.stringify(after)}`);
+      }
+      console.log(`terrain origin ${stack}: ${JSON.stringify(out.stacks[stack])}`);
     }
     assert.deepEqual(pageErrors, []);
     await writeFile(

@@ -120,11 +120,13 @@ fn terrainVirtualColor(position:vec3f,footprint:f32)->vec4f {
   if(t>0.0){c=mix(c,textureSampleLevel(terrainVirtualCache,terrainVirtualSampler,uv*0.5,i32(a)+1,0.0).rgb,t);}
   return vec4f(c,1.0-clamp((far-top)*2.0,0.0,1.0));
 }`;
-  // A floating origin: the frame adds `map` (the terrain's origin and height offset, local), and the level periods
-  // read the local position plus `params.zw`, the shift modulo the coarsest period, so texels stay world texels.
+  // A floating origin: the frame adds `map` (the terrain's origin and height offset, local) and `anchor` (xy: the shift
+  // less the terrain's anchor, so local XZ plus it is world XZ less the anchor whatever the rebases, as the terrain's
+  // own `Frame.anchor`), and the level periods read the local position plus `params.zw`, the shift modulo the coarsest
+  // period, so texels stay world texels.
   return origin
     ? code
-        .replace('params:vec4f}', 'params:vec4f,map:vec4f}')
+        .replace('params:vec4f}', 'params:vec4f,map:vec4f,anchor:vec4f}')
         .replace('let uv=position.xz/', 'let uv=(position.xz+terrainVirtual.params.zw)/')
     : code;
 };
@@ -346,7 +348,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     if (!terrain?.options?.layers || typeof terrain.addLighting !== 'function')
       throw new TypeError('Invalid terrain virtual texture; pass a Terrain');
     this.#floating = !!terrain.options.floatingOrigin;
-    this.#frameValues = new Float32Array(this.#floating ? 12 : 8);
+    this.#frameValues = new Float32Array(this.#floating ? 16 : 8);
     const o = options ?? {};
     this.texel = o.texel ?? 0.05;
     this.size = o.size ?? 1024;
@@ -674,7 +676,14 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     if (floating) {
       const o = this.terrain.options;
       this.#frameValues.set(
-        [(o.origin?.[0] ?? 0) - shift[0], (o.origin?.[1] ?? 0) - shift[2], (o.heightOffset ?? 0) - shift[1], 0],
+        [
+          (o.origin?.[0] ?? 0) - shift[0],
+          (o.origin?.[1] ?? 0) - shift[2],
+          (o.heightOffset ?? 0) - shift[1],
+          0,
+          shift[0] - this.terrain.anchor![0],
+          shift[2] - this.terrain.anchor![1],
+        ],
         8,
       );
       const d = this.#decalShift;
