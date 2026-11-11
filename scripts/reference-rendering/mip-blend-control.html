@@ -1,0 +1,165 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Raw mip blend control</title>
+<script type="module">
+  // Raw WebGL2 and raw WebGPU, no Margo code: level 0 white, levels 1+ black, so a trilinear sample's red channel is
+  // 1 - (the hardware's level-1 weight). Explicit: textureLod / textureSampleLevel at `lod`. Implicit: texture /
+  // textureSample with the UV scaled per draw so the derivative footprint gives `lod` (uv = fragCoord * 2^lod / size).
+  const SIZE = 64,
+    LEVELS = 7,
+    STEPS = 64;
+  const lods = Array.from({ length: STEPS + 1 }, (_, i) => i / STEPS);
+  const levelData = (l) => new Uint8Array((SIZE >> l) ** 2 * 4).fill(l === 0 ? 255 : 0).map((v, i) => (i % 4 === 3 ? 255 : v));
+
+  async function webgl2(powerPreference) {
+    const canvas = new OffscreenCanvas(2 * lods.length, 4),
+      gl = canvas.getContext('webgl2', { powerPreference, antialias: false });
+    if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('EXT_color_buffer_float missing');
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    const renderer = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texStorage2D(gl.TEXTURE_2D, LEVELS, gl.RGBA8, SIZE, SIZE);
+    for (let l = 0; l < LEVELS; l++)
+      gl.texSubImage2D(gl.TEXTURE_2D, l, 0, 0, SIZE >> l, SIZE >> l, gl.RGBA, gl.UNSIGNED_BYTE, levelData(l));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    const target = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, target);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, 2 * lods.length, 4);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
+    const compile = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const vs = `#version 300 es
+      void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.0-1.0,0,1);}`;
+    const fs = `#version 300 es
+      precision highp float; uniform sampler2D t; uniform float lod; uniform int explicitLod; out vec4 o;
+      void main(){
+        vec2 uv=gl_FragCoord.xy*exp2(lod)/${SIZE}.0;
+        o=explicitLod==1?textureLod(t,vec2(0.5),lod):texture(t,uv);
+      }`;
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, vs));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    const out = {};
+    for (const mode of ['explicit', 'implicit']) {
+      gl.uniform1i(gl.getUniformLocation(program, 'explicitLod'), mode === 'explicit' ? 1 : 0);
+      lods.forEach((lod, i) => {
+        gl.viewport(2 * i, 0, 2, 4);
+        gl.uniform1f(gl.getUniformLocation(program, 'lod'), lod);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      });
+      const pixels = new Float32Array(2 * lods.length * 4 * 4);
+      gl.readPixels(0, 0, 2 * lods.length, 4, gl.RGBA, gl.FLOAT, pixels);
+      out[mode] = lods.map((_, i) => 1 - pixels[(2 * lods.length + 2 * i) * 4]);
+    }
+    if (gl.getError()) throw new Error('GL error');
+    return { renderer, ...out };
+  }
+
+  async function webgpu(powerPreference) {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference }),
+      device = await adapter.requestDevice();
+    try {
+      const tex = device.createTexture({
+        size: [SIZE, SIZE],
+        format: 'rgba8unorm',
+        mipLevelCount: LEVELS,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      for (let l = 0; l < LEVELS; l++)
+        device.queue.writeTexture({ texture: tex, mipLevel: l }, levelData(l), { bytesPerRow: (SIZE >> l) * 4 }, [
+          SIZE >> l,
+          SIZE >> l,
+        ]);
+      const width = 2 * lods.length,
+        target = device.createTexture({
+          size: [width, 4],
+          format: 'rgba32float',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        });
+      const lodBuffer = device.createBuffer({ size: 256 * lods.length * 2, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      const module = device.createShaderModule({
+        code: `@group(0)@binding(0)var t:texture_2d<f32>;@group(0)@binding(1)var s:sampler;
+        struct P{lod:f32,explicitLod:u32}@group(0)@binding(2)var<uniform> p:P;
+        @vertex fn vs(@builtin(vertex_index)i:u32)->@builtin(position) vec4f{let q=vec2f(f32((i<<1u)&2u),f32(i&2u));return vec4f(q*2.0-1.0,0,1);}
+        @fragment fn fs(@builtin(position) c:vec4f)->@location(0) vec4f{
+          let uv=c.xy*exp2(p.lod)/${SIZE}.0;let a=textureSampleLevel(t,s,vec2f(0.5),p.lod);let b=textureSample(t,s,uv);
+          return select(b,a,p.explicitLod==1u);}`,
+      });
+      const pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vs' },
+        fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba32float' }] },
+      });
+      const sampler = device.createSampler({
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipmapFilter: 'linear',
+        addressModeU: 'repeat',
+        addressModeV: 'repeat',
+      });
+      const out = { adapter: { vendor: adapter.info.vendor, architecture: adapter.info.architecture, description: adapter.info.description } };
+      for (const [m, mode] of ['explicit', 'implicit'].entries()) {
+        const groups = lods.map((lod, i) => {
+          const offset = 256 * (m * lods.length + i);
+          const data = new ArrayBuffer(8);
+          new Float32Array(data, 0, 1)[0] = lod;
+          new Uint32Array(data, 4, 1)[0] = mode === 'explicit' ? 1 : 0;
+          device.queue.writeBuffer(lodBuffer, offset, data);
+          return device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: tex.createView() },
+              { binding: 1, resource: sampler },
+              { binding: 2, resource: { buffer: lodBuffer, offset, size: 8 } },
+            ],
+          });
+        });
+        const rowBytes = Math.ceil((width * 16) / 256) * 256;
+        const readBuffer = device.createBuffer({ size: rowBytes * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        const e = device.createCommandEncoder(),
+          pass = e.beginRenderPass({
+            colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+          });
+        pass.setPipeline(pipeline);
+        groups.forEach((g, i) => {
+          pass.setViewport(2 * i, 0, 2, 4, 0, 1);
+          pass.setBindGroup(0, g);
+          pass.draw(3);
+        });
+        pass.end();
+        e.copyTextureToBuffer({ texture: target }, { buffer: readBuffer, bytesPerRow: rowBytes }, [width, 4]);
+        device.queue.submit([e.finish()]);
+        await readBuffer.mapAsync(GPUMapMode.READ);
+        const rows = new Float32Array(readBuffer.getMappedRange().slice(0));
+        readBuffer.unmap();
+        readBuffer.destroy();
+        // Row 0 at the top in WebGPU, row 3 at the top in GL readPixels: both read the same 2x2 quad's lower-left pixel
+        // up to orientation; every pixel of a viewport has the same footprint, so any one is the sample.
+        out[mode] = lods.map((_, i) => 1 - rows[(rowBytes / 4) * 1 + 2 * i * 4]);
+      }
+      return out;
+    } finally {
+      device.destroy();
+    }
+  }
+
+  window.probe = async ({ powerPreference }) => ({
+    lods,
+    webgl2: await webgl2(powerPreference),
+    webgpu: navigator.gpu ? await webgpu(powerPreference).catch((e) => ({ error: String(e) })) : null,
+  });
+</script>

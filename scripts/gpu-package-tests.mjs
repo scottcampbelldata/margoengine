@@ -144,6 +144,8 @@ export const RUNNER_SMOKE = [
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'scripts/reference-rendering/mip-blend-control.mjs':
+    'raw WebGL2 and WebGPU trilinear blend control quoted by docs/known-bugs.md, not a gate; run directly under the GPU lock',
   'packages/culling/test/gpu/compat-cost.mjs':
     'per-frame cost measurement of the WebGL2-layer culling paths for the speed phase, not a gate; run directly under the GPU lock',
   'packages/text/scripts/make-readme-atlas.mjs':
