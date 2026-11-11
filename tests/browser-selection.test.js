@@ -6,6 +6,7 @@ import {
   chromiumExecutablePath,
   chromiumLaunchOptions,
   FIREFOX_WEBGPU_PREFS,
+  FIREFOX_WARNING_PREFS,
   firefoxExecutable,
   firefoxLaunchOptions,
   LAUNCH_FAILED,
@@ -166,10 +167,14 @@ test('a WebGPU step in Firefox launches headed with the WebGPU prefs, by the rea
   assert.deepEqual(options, {
     headless: false,
     timeout: 5,
-    firefoxUserPrefs: { 'dom.webgpu.enabled': true, 'gfx.webgpu.ignore-blocklist': true },
+    firefoxUserPrefs: {
+      'dom.webgpu.enabled': true,
+      'gfx.webgpu.ignore-blocklist': true,
+      'webgl.max-warnings-per-context': 1_000_000,
+    },
     executablePath: 'C:/real/ms-playwright/firefox-1/firefox/firefox.exe',
   });
-  assert.deepEqual({ ...FIREFOX_WEBGPU_PREFS }, options.firefoxUserPrefs);
+  assert.deepEqual({ ...FIREFOX_WEBGPU_PREFS, ...FIREFOX_WARNING_PREFS }, options.firefoxUserPrefs);
   // Through launchBrowser, as every suite calls it: needs defaults to 'webgpu'.
   const opened = await launchBrowser({
     env: { MARGO_BROWSER: 'firefox' },
@@ -193,7 +198,12 @@ test('Firefox: a step that needs no WebGPU keeps its headless choice; caller pre
   const firefox = pick({ MARGO_BROWSER: 'firefox' });
   const none = firefoxLaunchOptions(firefox, { headless: true, firefoxUserPrefs: { 'dom.webgpu.enabled': false, 'x.y': 1 } }, { needs: 'none', launcher, realpath: same });
   assert.equal(none.headless, true);
-  assert.deepEqual(none.firefoxUserPrefs, { 'dom.webgpu.enabled': false, 'gfx.webgpu.ignore-blocklist': true, 'x.y': 1 });
+  assert.deepEqual(none.firefoxUserPrefs, {
+    'dom.webgpu.enabled': false,
+    'gfx.webgpu.ignore-blocklist': true,
+    'webgl.max-warnings-per-context': 1_000_000,
+    'x.y': 1,
+  });
   assert.equal(none.executablePath, '/pw/firefox');
   const fromEnv = pick({ MARGO_BROWSER: 'firefox', BROWSER_EXECUTABLE: '/own/firefox' });
   assert.equal(firefoxLaunchOptions(fromEnv, {}, { launcher, realpath: same }).executablePath, '/own/firefox');

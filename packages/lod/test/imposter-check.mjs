@@ -4,14 +4,14 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { expectedContextLosses, watchConsole } from '../../../scripts/support/browser-advisories.mjs';
 const label = process.argv[2] ?? 'current',
   context = await openBrowser({ startPath: '/packages/lod/test/imposter-check.html', port: 5221 }),
   { page, hardware } = context,
-  pageErrors = [];
-page.on('pageerror', (e) => pageErrors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error' || m.type() === 'warning') pageErrors.push(m.text());
-});
+  // Every warning fails but Firefox's final-row advisory (KBL3c, exact line, versions seen); Firefox's report of the
+  // layer probe's deliberate context loss is counted instead (scripts/support/browser-advisories.mjs).
+  watch = watchConsole(page, hardware),
+  pageErrors = watch.problems;
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   const results = { label, adapter: hardware.webgpu, browser: hardware.browserVersion, sweeps: [] };
@@ -66,6 +66,7 @@ try {
   }
   assert.deepEqual(await page.evaluate(() => window.check.errors()), []);
   assert.deepEqual(pageErrors, []);
+  assert.equal(watch.lost, expectedContextLosses(hardware), 'deliberate WebGL context losses');
   await writeFile(`test-results/imposter-check-${label}.json`, JSON.stringify(results));
   console.log('imposter check finished');
 } finally {

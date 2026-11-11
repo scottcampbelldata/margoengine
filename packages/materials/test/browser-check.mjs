@@ -4,14 +4,14 @@
 // instances: milestone M5 of docs/webgl2-compat-roadmap.md).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { expectedContextLosses, watchConsole } from '../../../scripts/support/browser-advisories.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 const context = await openBrowser({ startPath: '/packages/materials/test/browser-check.html', port: 5207 }),
   { page, hardware } = context,
-  pageErrors = [];
-page.on('pageerror', (e) => pageErrors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error' || m.type() === 'warning') pageErrors.push(m.text());
-});
+  // Every warning fails but Firefox's final-row advisory (KBL3c, exact line, versions seen); Firefox's report of the
+  // layer probe's deliberate context loss is counted instead (scripts/support/browser-advisories.mjs).
+  watch = watchConsole(page, hardware),
+  pageErrors = watch.problems;
 const pixel = async (y = 0.5, x = 0.5) => {
   const image = await decodePNG(await page.locator('canvas').screenshot()),
     o = (Math.floor(image.height * y) * image.width + Math.floor(image.width * x)) * 4;
@@ -403,6 +403,7 @@ try {
     await page.evaluate(() => window.check.clear());
   }
   assert.deepEqual(pageErrors, []);
+  assert.equal(watch.lost, expectedContextLosses(hardware), 'deliberate WebGL context losses');
   console.log('materials browser check passed');
 } finally {
   await context.close();

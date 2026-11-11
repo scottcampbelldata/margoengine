@@ -377,6 +377,12 @@ export function withBoundedClose(
 export const FIREFOX_WEBGPU_PREFS = Object.freeze({ 'dom.webgpu.enabled': true, 'gfx.webgpu.ignore-blocklist': true });
 
 /**
+ * Firefox reports 32 WebGL warnings a context, then prints "After reporting 32, no further warnings will be reported"
+ * and hides the rest; a check that fails on any warning must see them all, so the cap is lifted.
+ */
+export const FIREFOX_WARNING_PREFS = Object.freeze({ 'webgl.max-warnings-per-context': 1_000_000 });
+
+/**
  * The real path of Playwright's Firefox, or undefined. A process of an MSIX-packaged app on Windows (the Claude
  * desktop app, for one) sees %LOCALAPPDATA% through the package's file-system redirection: Playwright installed the
  * browser into the package's private LocalCache folder, and every path under %LOCALAPPDATA%\ms-playwright opens there.
@@ -402,7 +408,7 @@ export function firefoxExecutable(launcher, { realpath = realpathSync.native } =
 }
 
 /**
- * Launch options for Playwright's Firefox: the caller's options with FIREFOX_WEBGPU_PREFS under the caller's own
+ * Launch options for Playwright's Firefox: the caller's options with FIREFOX_WEBGPU_PREFS and FIREFOX_WARNING_PREFS under the caller's own
  * `firefoxUserPrefs`, headed when the step needs WebGPU (headless Firefox has none), and the executable: the caller's
  * `executablePath`, else BROWSER_EXECUTABLE, else Playwright's install by its real path (see firefoxExecutable).
  */
@@ -411,7 +417,7 @@ export function firefoxLaunchOptions(browser, options = {}, { needs = 'webgpu', 
   return {
     ...options,
     ...(needs === 'webgpu' ? { headless: false } : {}),
-    firefoxUserPrefs: { ...FIREFOX_WEBGPU_PREFS, ...options.firefoxUserPrefs },
+    firefoxUserPrefs: { ...FIREFOX_WEBGPU_PREFS, ...FIREFOX_WARNING_PREFS, ...options.firefoxUserPrefs },
     ...(executablePath ? { executablePath } : {}),
   };
 }
