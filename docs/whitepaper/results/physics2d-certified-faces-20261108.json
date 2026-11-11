@@ -7093,7 +7093,7 @@
       "db8ed688217cdf1f"
     ],
     "productionPinsRemainUnchanged": true,
-    "module": "@fs/C:/Development/Projects/margoengine-lane-P/.lane/p/hybrid-interleave.wasm",
+    "module": "@fs/../margoengine-lane-P/.lane/p/hybrid-interleave.wasm",
     "rustflags": "-C target-feature=+simd128",
     "rapier2d": "0.21.0",
     "box2d": "v3.2.0 Wasm (BOX2D_WASM)",

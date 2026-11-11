@@ -2400,6 +2400,7 @@ Known rendering gaps:
 This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they differ.
 
 - **Fast gate before a push:** lint, hygiene, check:banned-terms, build:packages, api:check, quality, and the tests of the changed packages and the packages that depend on them, with their GPU tests on WebGPU and the WebGL2 compatibility layer. Exports changed: commit the api:update output.
+- **Machine paths (2026-11-11):** check:banned-terms also fails on any tracked text file that names an absolute machine path (a drive-letter or Git Bash path into a home folder or the dev PC's project folder). Name sibling checkouts as `../name` and tool caches by their environment variable; scripts resolve outside folders from `import.meta.url`. The allow list with its reasons is in `scripts/machine-paths.mjs`; the regression is `tests/machine-paths.test.js`.
 - **No full verify in any lane.** Local CI on the dev PC runs the one full `npm run verify` on the newest `main` (scheduled task "Margo CI (CPU)"). Running it in a lane doubles the work: eleven lanes doing so held the CPU at 94% and stretched verify from 12 to 40 minutes. A red `main` is fixed forward by the lane that caused it within about 2 hours, or that commit is reverted.
 - **No README work until the features are built.** No `check:readme-run`, no README example writing or fixing. Each job adds one line per changed package to `docs/work-lists/readme-owed.md`; the README phase before release clears it.
 - **Only complete jobs reach `main`,** squashed into one commit: no checkpoint, evidence-only or partial pushes.
@@ -3466,7 +3467,7 @@ shaping and arbitrary bevel topology changes are not proved by those checks.
     target is exactly still (`kernel/tests/sleep.rs`), so what rests on it sleeps.
 33. Coloured voxel block light (`@margoengine/voxel/light-rgb`, a `VoxelRenderer` lighting effect sampling a wrapping 3D texture) is proved on the M6 Mac mini (Metal) only: a dark room is red by a red torch and blue by a blue lamp with it, black without; its frame cost and the upload cost when the camera crosses chunks are not measured.
 34. Local CI replaces GitHub Actions while the repository is private (2026-11-07; the CI, Browser checks and Biomes
-    digests workflows are disabled on GitHub). It runs in its own worktree, `C:\Development\Projects\margoengine-ci`, from
+    digests workflows are disabled on GitHub). It runs in its own worktree, `../margoengine-ci`, from
     a script in its git-excluded `.ci/` folder (`ci.mjs`, `quiet.mjs`, `register-tasks.ps1`), as Scott's user, not elevated,
     through Windows Task Scheduler (folder `\Margo\`):
     - CPU set at 08:00, 12:00, 14:00, 16:00, 18:00, 20:00 and 22:00 on the newest `origin/main` (skipped when that commit

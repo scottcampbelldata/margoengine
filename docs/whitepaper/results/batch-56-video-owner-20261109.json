@@ -77,7 +77,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 8.7,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-material.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-video-rest-material.log"
     },
     {
       "id": "record",
@@ -89,7 +89,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 21.368,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-record.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-video-rest-record.log"
     },
     {
       "id": "panorama",
@@ -101,7 +101,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 9.361,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-panorama.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-video-rest-panorama.log"
     },
     {
       "id": "codecs",
@@ -113,7 +113,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 19.944,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-codecs.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-video-rest-codecs.log"
     },
     {
       "id": "alpha",
@@ -125,7 +125,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 8.631,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-alpha.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-video-rest-alpha.log"
     },
     {
       "id": "readme",
@@ -138,7 +138,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 15.899,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-video-rest-readme.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-video-rest-readme.log"
     }
   ],
   "sizes": {

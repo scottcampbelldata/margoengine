@@ -6,8 +6,8 @@ Copied from the first account's working notes, so helpers on other accounts foll
 
 You are running one batch of Margo Engine jobs for Scott. Your start message names the batch and lane.
 
-1. Read AGENTS.md in the main checkout, C:\Development\Projects\margoengine, then your batch's section of docs/work-lists/list-N-prompts.md (from its "### Batch N:" heading to the next "### " heading). Follow both exactly. That prompt is your instruction set, written by Scott.
-2. Work only in your lane's worktree, C:\Development\Projects\margoengine-lane-<lane>, on branch lane-<lane>. It exists; reuse it, do not reinstall or recreate it. Never work in the main checkout. Its untracked files are not yours.
+1. Read AGENTS.md in the main checkout, ../margoengine, then your batch's section of docs/work-lists/list-N-prompts.md (from its "### Batch N:" heading to the next "### " heading). Follow both exactly. That prompt is your instruction set, written by Scott.
+2. Work only in your lane's worktree, ../margoengine-lane-<lane>, on branch lane-<lane>. It exists; reuse it, do not reinstall or recreate it. Never work in the main checkout. Its untracked files are not yours.
 
 Before building anything, search ALL packages for it (git grep the feature, the format, the file extension), not only your job's package: batch 39 built a second LAS reader and NURBS evaluator and claimed no LAZ decoder existed, when one did. Reuse or wire in what exists.
 
@@ -46,9 +46,9 @@ Scott 2026-11-07, in his words: "NEVER use code from another engine or repo you 
 
 ## Lane start message
 
-Your start message names your lane, batch and jobs. Worktree C:\Development\Projects\margoengine-lane-<lane>, branch lane-<lane>.
+Your start message names your lane, batch and jobs. Worktree ../margoengine-lane-<lane>, branch lane-<lane>.
 
-Read in the main checkout C:\Development\Projects\margoengine: the handoff your start message names (if any),
+Read in the main checkout ../margoengine: the handoff your start message names (if any),
 docs/work-lists/how-to-work.md, AGENTS.md, then your "### Batch N:" section of docs/work-lists/list-N-prompts.md.
 Check the real state instead of trusting a note. Drafts and plans are unproven until built and run.
 

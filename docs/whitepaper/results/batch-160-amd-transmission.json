@@ -12,7 +12,7 @@
   "proofs": [
     {
       "backend": "native",
-      "report": "C:\\Development\\Projects\\engine-bench\\batch-160\\transmission\\proof-native-1794248936932-84496/proof.json",
+      "report": "../engine-bench/batch-160/transmission/proof-native-1794248936932-84496/proof.json",
       "reportSha256": "44b98aace467cd372527429f69ffb8f5ba0e1ad9d6c870c39f59eea4b30d195a",
       "processes": 3,
       "devicesPerProcess": 4,
@@ -112,7 +112,7 @@
     },
     {
       "backend": "compat",
-      "report": "C:\\Development\\Projects\\engine-bench\\batch-160\\transmission\\proof-compat-1794249014924-83452/proof.json",
+      "report": "../engine-bench/batch-160/transmission/proof-compat-1794249014924-83452/proof.json",
       "reportSha256": "9bb826dfe78b527efe53eeecac0f4033ebe49695a0b701333b5c3eef1e25bf6b",
       "processes": 3,
       "devicesPerProcess": 4,

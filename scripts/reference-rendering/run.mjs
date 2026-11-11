@@ -1,5 +1,6 @@
 // Black-box Sample Viewer screenshot. Run through gpu-lock.mjs; images remain outside this repository.
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,7 +11,10 @@ import { pictureError, assertBudget } from './compare.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { saveReference } from './reference.mjs';
 
-const root = join(process.env.MARGO_ENGINE_BENCH ?? 'C:/Development/Projects/engine-bench', 'batch-160');
+const root = join(
+  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
+  'batch-160',
+);
 const family = process.argv.find((a) => a.startsWith('--case='))?.slice(7) ?? 'metallic-roughness';
 const entry = referenceCase(family),
   SETTINGS = { ...entry.settings, powerPreference: process.env.GPU_POWER };

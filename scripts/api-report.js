@@ -39,7 +39,7 @@ import { execFileSync } from 'node:child_process';
 import { assessChange, checkCoverage, classify, enrollWatch, readLock } from './api-lock.mjs';
 
 // The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
-// name (C:\Users\\..., what os.tmpdir() gives) matched no package and every cross-package import line
+// name (an 8.3 name such as ABCDEF~1 inside the home folder, what os.tmpdir() gives) matched no package and every cross-package import line
 // vanished from the reports (found by the fresh-clone check).
 const root = realpathSync.native(resolve(import.meta.dirname, '..'));
 const { update, packageSelector, entrySelector } = parseApiReportArguments(process.argv.slice(2));

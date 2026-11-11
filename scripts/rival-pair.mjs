@@ -2,11 +2,11 @@
 // fastest round. Wall-clock numbers on a loaded PC are diagnostic: print "busy machine" next to them.
 // Rival packages stay outside the repository. This file never imports one.
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /** Folder that holds the black-box installs. `MARGO_ENGINE_BENCH` overrides the usual path. */
 export function benchRoot() {
-  return process.env.MARGO_ENGINE_BENCH ?? 'C:\\Development\\Projects\\engine-bench';
+  return process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../engine-bench', import.meta.url));
 }
 
 /** `file:` URL of a runner under `<bench>/batch-167/`. */

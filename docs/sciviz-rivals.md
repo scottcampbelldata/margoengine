@@ -8,7 +8,7 @@ Use Node and the repository dependencies specified in package.json. Install VTK.
 38.0.5 as a black box outside this repository, at engine-bench/batch-167:
 
 ```powershell
-npm install --prefix C:/Development/Projects/engine-bench/batch-167 --no-save @kitware/vtk.js@38.0.5
+npm install --prefix ../engine-bench/batch-167 --no-save @kitware/vtk.js@38.0.5
 npm run build:packages
 node --test --test-timeout=120000 packages/sciviz/tests/rival-contract.test.js packages/sciviz/tests/volume-field.test.js packages/sciviz/tests/volume-workcount.test.js
 node scripts/gpu-lock.mjs run --gpu=sciviz-volume-image-smoke --owner=volume-smoke --max=8 --wait-max=15 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=legacy-64

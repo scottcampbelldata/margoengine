@@ -127,7 +127,7 @@ test('this checkoutâ€™s tool caches are its own, not links to another checkoutâ€
   }
 });
 
-// check:fresh-clone clones into os.tmpdir(), a Windows short (8.3) path on this PC (C:\Users\\...), and Vite
+// check:fresh-clone clones into os.tmpdir(), a Windows short (8.3) path on this PC (C:\Users\RUNNER~1\...), and Vite
 // answered 403 for every file there until startDevServer served the working directory's real path.
 test('a checkout reached through a Windows short path serves its pages', () => {
   const dir = `test-results/vite-short-path-${process.pid}`;

@@ -1,6 +1,6 @@
 // A file URL's `.pathname` is not a file path: it is percent-encoded and, on Windows, starts with '/C:'. geometry's
 // tree-shake test imported `new URL('../dist/index.js', import.meta.url).pathname`, which resolved nowhere once the
-// checkout sat under an 8.3 or spaced folder ('/C:/Users/%7E1/...'; the fresh-clone check clones into
+// checkout sat under an 8.3 or spaced folder ('/C:/PROGRA%7E1/...'; the fresh-clone check clones into
 // os.tmpdir()). Use fileURLToPath(). This catches the pattern anywhere in the repository's own scripts and tests.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

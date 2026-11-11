@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { skyCases, radianceError } from './sunsky-scene.mjs';
 
-const root = process.env.MARGO_ENGINE_BENCH ?? 'C:\\Development\\Projects\\engine-bench';
+const root = process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../../engine-bench', import.meta.url));
 const external = join(root, 'batch-168');
 const python = process.env.MARGO_MITSUBA_PYTHON ?? join(external, 'mitsuba-venv', 'Scripts', 'python.exe');
 const out = join(external, 'data', 'sunsky');

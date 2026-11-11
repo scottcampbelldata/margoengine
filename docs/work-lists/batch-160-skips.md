@@ -28,7 +28,7 @@ CC-BY-4.0; Niantic SPZ and samples are MIT. The complete suite retains its exist
 one-subtest specification disagreement; downloading data does not change its assertions.
 
 Reproduce with `node scripts/reference-rendering/fetch-skip-assets.mjs`, then set
-`MARGO_SPLAT_SAMPLES=C:/Development/Projects/engine-bench/batch-160/gltf-gpu-samples` before verify.
+`MARGO_SPLAT_SAMPLES=../engine-bench/batch-160/gltf-gpu-samples` before verify.
 The downloader records a URL and SHA-256 for every outside file. Its per-request timeout is 90 s;
 run the whole acquisition with a 15-minute process-tree deadline. Test logs remain in
 test-results/batch-160. No test was weakened or changed to pass this audit.

@@ -1,4 +1,4 @@
-// `npm run api:check` from a checkout reached through a Windows 8.3 short name (C:\Users\\..., the form
+// `npm run api:check` from a checkout reached through a Windows 8.3 short name (C:\Users\RUNNER~1\..., the form
 // os.tmpdir() returns): the checker reports declaration files by their real long path, api-report.js compared them
 // with its unresolved root, so no file matched a package and every cross-package import line vanished from the
 // reports. The fresh-clone check (a clone under os.tmpdir()) found it. Needs `npm run build:packages` (verify builds

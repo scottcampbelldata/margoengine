@@ -38,7 +38,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 5.209,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-stats-stats-browser.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-stats-stats-browser.log"
     },
     {
       "id": "stats-readme",
@@ -51,7 +51,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 12.166,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-stats-stats-readme.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-stats-stats-readme.log"
     }
   ],
   "units": {
@@ -115,7 +115,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 2.714,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-gate-repair-rooted-compute-owner-gate.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-gate-repair-rooted-compute-owner-gate.log"
     },
     {
       "id": "compute-browser",
@@ -127,7 +127,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 21.907,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-gate-repair-rooted-compute-browser.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-gate-repair-rooted-compute-browser.log"
     },
     {
       "id": "compute-readme",
@@ -140,7 +140,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 6.887,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-gate-repair-rooted-compute-readme.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-gate-repair-rooted-compute-readme.log"
     }
   ],
   "finalCpu": {
@@ -277,7 +277,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 352.053,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-final-rebase-compute-owner-final.log",
+      "log": "../margoengine-lane-P/test-results/56fix/owed-final-rebase-compute-owner-final.log",
       "state": "passed; shared slot released",
       "maxMinutes": 0.5,
       "waitMaxMinutes": 60,

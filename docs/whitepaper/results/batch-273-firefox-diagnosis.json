@@ -5,7 +5,7 @@
   "event": {
     "TimeCreated": "/Date(1794265453853)/",
     "Id": 33,
-    "Message": "Activation context generation failed for \"\\AppData\\Local\\ms-playwright\\firefox-1555\\firefox\\firefox.exe\". Dependent Assembly mozglue,language=\"&#x2a;\",type=\"win32\",version=\"1.0.0.0\" could not be found. Please use sxstrace.exe for detailed diagnosis."
+    "Message": "Activation context generation failed for \"%LOCALAPPDATA%\\ms-playwright\\firefox-1555\\firefox\\firefox.exe\". Dependent Assembly mozglue,language=\"&#x2a;\",type=\"win32\",version=\"1.0.0.0\" could not be found. Please use sxstrace.exe for detailed diagnosis."
   },
   "files": [
     {

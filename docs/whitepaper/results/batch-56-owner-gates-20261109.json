@@ -1326,7 +1326,7 @@
         "code": 0,
         "timedOut": false,
         "seconds": 5.756,
-        "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-lock-environment-test-gpu-mirror-13.log"
+        "log": "../margoengine-lane-P/test-results/56fix/owed-landing-lock-environment-test-gpu-mirror-13.log"
       },
       {
         "id": "view-compat",
@@ -1339,7 +1339,7 @@
         "code": 0,
         "timedOut": false,
         "seconds": 30.385,
-        "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-view-compat.log"
+        "log": "../margoengine-lane-P/test-results/56fix/owed-landing-view-compat.log"
       },
       {
         "id": "umbrella-readme",
@@ -1352,7 +1352,7 @@
         "code": 0,
         "timedOut": false,
         "seconds": 140.439,
-        "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-umbrella-readme.log"
+        "log": "../margoengine-lane-P/test-results/56fix/owed-landing-umbrella-readme.log"
       }
     ],
     "api": {
@@ -1458,7 +1458,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 179.01,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-pathtrace.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-trs-pathtrace.log"
         },
         {
           "id": "hdr-native",
@@ -1470,7 +1470,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 36.847,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-hdr-native.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-trs-hdr-native.log"
         },
         {
           "id": "hdr-compat",
@@ -1483,7 +1483,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 14.249,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-hdr-compat.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-trs-hdr-compat.log"
         },
         {
           "id": "readmes",
@@ -1496,7 +1496,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 38.408,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-trs-readmes.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-trs-readmes.log"
         }
       ],
       "readmeExamples": 27,
@@ -1565,7 +1565,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 3.744,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-post-native.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-tiers-post-native.log"
         },
         {
           "id": "post-compat",
@@ -1577,7 +1577,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 124.444,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-post-compat.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-tiers-post-compat.log"
         },
         {
           "id": "view-compat",
@@ -1590,7 +1590,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 20.186,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-view-compat.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-tiers-view-compat.log"
         },
         {
           "id": "compute-owner",
@@ -1602,7 +1602,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 7.585,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-compute-owner.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-tiers-compute-owner.log"
         },
         {
           "id": "readmes-post",
@@ -1615,7 +1615,7 @@
           "code": 0,
           "timedOut": false,
           "seconds": 46.682,
-          "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-landing-tiers-readmes-post.log"
+          "log": "../margoengine-lane-P/test-results/56fix/owed-landing-tiers-readmes-post.log"
         }
       ],
       "api": {

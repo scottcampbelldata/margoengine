@@ -1,5 +1,6 @@
 // Complete frozen reference scenes, exact repeats across three fresh browser processes; GPU lock required.
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +14,10 @@ import { assertReferenceProof } from './proof-contract.mjs';
 
 const family = process.argv.find((arg) => arg.startsWith('--case='))?.slice(7) ?? 'volume';
 const entry = referenceCase(family);
-const root = join(process.env.MARGO_ENGINE_BENCH ?? 'C:/Development/Projects/engine-bench', 'batch-160');
+const root = join(
+  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
+  'batch-160',
+);
 const out = join(
   root,
   family,

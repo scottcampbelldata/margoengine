@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -8,7 +9,8 @@ import { saveReference } from './reference.mjs';
 import { encodePNG } from '../support/visual-image.js';
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
-export const benchRoot = process.env.MARGO_ENGINE_BENCH ?? 'C:/Development/Projects/engine-bench';
+export const benchRoot =
+  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url));
 /** Only public Mitsuba APIs; bounded CPU reference execution, independent from the browser renderer. */
 export async function capturePathReference(script, folder) {
   await new Promise((resolve, reject) => {

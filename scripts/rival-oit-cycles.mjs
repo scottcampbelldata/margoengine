@@ -9,7 +9,10 @@ import { oitRivalPlugin } from './rival-oit-alias.mjs';
 import { OIT_SCENE, srgbByte, tracePixel } from '../packages/oit/scripts/oit-scene.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
-const external = join(process.env.MARGO_ENGINE_BENCH ?? 'C:\\Development\\Projects\\engine-bench', 'batch-168');
+const external = join(
+  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../engine-bench', import.meta.url)),
+  'batch-168',
+);
 const out = join(external, 'data', 'oit-cycles');
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'scene.json'), JSON.stringify(OIT_SCENE));

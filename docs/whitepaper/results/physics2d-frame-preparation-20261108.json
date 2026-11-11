@@ -19,7 +19,7 @@
         {
           "target": "packages/physics2d/kernel/src/world.rs",
           "candidate": {
-            "path": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\frame-preparation-v2\\source\\packages\\physics2d\\kernel\\src\\world.rs",
+            "path": "../margoengine-lane-P/.lane/p/frame-preparation-v2/source/packages/physics2d/kernel/src/world.rs",
             "sha256": "0531c7431064e3ae8cd5f2fc2aa0a0f3fca012b4142021f3878f8786a31b20f8",
             "bytes": 44266
           },
@@ -28,7 +28,7 @@
         {
           "target": "packages/physics2d/kernel/src/world_bounds_tests.rs",
           "candidate": {
-            "path": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\frame-preparation-v2\\source\\packages\\physics2d\\kernel\\src\\world_bounds_tests.rs",
+            "path": "../margoengine-lane-P/.lane/p/frame-preparation-v2/source/packages/physics2d/kernel/src/world_bounds_tests.rs",
             "sha256": "62c4eb4efa097fd7b4d781bd1e92b9b2f39cbe6f0f7d4c9d566e6bc2ebf238b5",
             "bytes": 5600
           },
@@ -37,7 +37,7 @@
         {
           "target": "packages/physics2d/kernel/src/solver/path_support.rs",
           "candidate": {
-            "path": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\frame-preparation-v2\\source\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
+            "path": "../margoengine-lane-P/.lane/p/frame-preparation-v2/source/packages/physics2d/kernel/src/solver/path_support.rs",
             "sha256": "69f0e41dbaac31a29dbf5e0996b942fb744f5a3056d2c2c7400d8b7390144d1b",
             "bytes": 56443
           },
@@ -46,7 +46,7 @@
         {
           "target": "packages/physics2d/kernel/src/solver/planner_laziness_tests.rs",
           "candidate": {
-            "path": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\frame-preparation-v2\\source\\packages\\physics2d\\kernel\\src\\solver\\planner_laziness_tests.rs",
+            "path": "../margoengine-lane-P/.lane/p/frame-preparation-v2/source/packages/physics2d/kernel/src/solver/planner_laziness_tests.rs",
             "sha256": "cbe2368182080fa51c74d24b0d449249b82a8a46f9b5f643dcc199c424d30af0",
             "bytes": 12350
           },
@@ -87,8 +87,8 @@
       }
     ],
     "bars": {
-      "source": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\frame-preparation-v2\\source\\packages\\physics2d\\kernel",
-      "common": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\frame-preparation-v2\\source\\packages\\physics\\kernel-common",
+      "source": "../margoengine-lane-P/.lane/p/frame-preparation-v2/source/packages/physics2d/kernel",
+      "common": "../margoengine-lane-P/.lane/p/frame-preparation-v2/source/packages/physics/kernel-common",
       "modes": [
         "block"
       ],
@@ -13334,14 +13334,14 @@
       "artifacts": [
         {
           "name": "control",
-          "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-control\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+          "original": "../margoengine-lane-P/.lane/p/current-step-profile-v1/target-control/wasm32-unknown-unknown/release/margoengine_physics2d_wasm_check.wasm",
           "file": ".lane/p/current-step-profile-v1/measured-control.wasm",
           "sha256": "80334704f8039982cddb90bbf8ff9427e2297ad0daf1830cf4825f33b426f6b5",
           "bytes": 271846
         },
         {
           "name": "instrumented",
-          "original": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\current-step-profile-v1\\target-instrumented\\wasm32-unknown-unknown\\release\\margoengine_physics2d_wasm_check.wasm",
+          "original": "../margoengine-lane-P/.lane/p/current-step-profile-v1/target-instrumented/wasm32-unknown-unknown/release/margoengine_physics2d_wasm_check.wasm",
           "file": ".lane/p/current-step-profile-v1/measured-instrumented.wasm",
           "sha256": "12ebcc557bd82dc5ee27af8df4f4f1221c53b316fb883f4e3e673f352bb6d689",
           "bytes": 273730

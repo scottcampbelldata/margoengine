@@ -107,7 +107,7 @@
       "code": 0,
       "timedOut": false,
       "seconds": 20.682,
-      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-animator-gpu-game.log"
+      "log": "../margoengine-lane-P/test-results/56fix/owed-animator-gpu-game.log"
     },
     {
       "command": "node scripts/run-readme-examples.mjs --packages=animator",

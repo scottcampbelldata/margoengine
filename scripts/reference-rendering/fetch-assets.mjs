@@ -1,11 +1,15 @@
 // Downloads standard test data and its legal notice, never renderer source.
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { referenceCase, assetCommit } from './cases.mjs';
 import { packGLTF } from './pack.mjs';
-const root = join(process.env.MARGO_ENGINE_BENCH ?? 'C:/Development/Projects/engine-bench', 'batch-160');
+const root = join(
+  process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
+  'batch-160',
+);
 mkdirSync(root, { recursive: true });
 const family = process.argv.find((a) => a.startsWith('--case='))?.slice(7) ?? 'metallic-roughness';
 const entry = referenceCase(family);

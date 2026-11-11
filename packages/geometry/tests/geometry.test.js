@@ -1127,7 +1127,7 @@ test('module is side-effect free, SSR safe and small', async () => {
 
 test('consumers tree-shake to what they import', async (t) => {
   const { build } = await import('vite');
-  // A file path, not URL.pathname: that is percent-encoded ('/C:/Users/%7E1/...' under an 8.3 or spaced folder)
+  // A file path, not URL.pathname: that is percent-encoded ('/C:/PROGRA%7E1/...' under an 8.3 or spaced folder)
   // and resolves nowhere (found by the fresh-clone check, which clones into os.tmpdir()).
   const entry = fileURLToPath(new URL('../dist/index.js', import.meta.url)).replaceAll('\\', '/');
   const { mkdtemp, writeFile, rm } = await import('node:fs/promises'),

@@ -73,7 +73,7 @@ export async function startDevServer({
 } = {}) {
   if (port === 'free') port = await freePort();
   // The working directory's real path: Vite refuses to serve a file named by a Windows short (8.3) path, so a checkout
-  // reached through one (os.tmpdir() is C:\Users\\... here, where check:fresh-clone clones) would answer every
+  // reached through one (os.tmpdir() is an 8.3 short path inside the home folder here, where check:fresh-clone clones) would answer every
   // page with 403 "outside of Vite serving allow list".
   const root = realpathSync.native(process.cwd()),
     caches = join(root, DEV_CACHE_ROOT);

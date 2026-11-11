@@ -11601,38 +11601,38 @@
     ],
     "changedStrings": {
       "frozen": [
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\joint.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\mass.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\colour.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold\\four.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\smooth.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\shape.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\tree.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver\\wide.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold\\face_distance.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\island.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\world.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\broad.rs"
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver/path_support.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/joint.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/mass.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/colour.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold/four.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/smooth.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/shape.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/tree.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver/wide.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold/face_distance.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/island.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/world.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold.rs",
+        "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/broad.rs"
       ],
       "rebuilt": [
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\joint.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\mass.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\colour.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold\\four.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\smooth.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\shape.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\tree.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver\\wide.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold\\face_distance.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\island.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\world.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold.rs",
-        "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\broad.rs"
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver/path_support.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/joint.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/mass.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/colour.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold/four.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/smooth.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/shape.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/tree.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver/wide.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold/face_distance.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/island.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/world.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold.rs",
+        "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/broad.rs"
       ]
     },
     "identicalCodeSection": false,
@@ -11679,7 +11679,7 @@
               "length": 113,
               "line": 147,
               "column": 13,
-              "filename": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\shape.rs"
+              "filename": "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/shape.rs"
             },
             "current": {
               "address": 1052564,
@@ -11687,7 +11687,7 @@
               "length": 113,
               "line": 147,
               "column": 13,
-              "filename": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\shape.rs"
+              "filename": "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/shape.rs"
             },
             "oldFirstNineBytes": "�\u0004\u0010\u0000q\u0000\u0000\u0000�",
             "newFirstNineBytes": "�\u0004\u0010\u0000q\u0000\u0000\u0000�"
@@ -22759,8 +22759,8 @@
     }
   },
   "physicalBars": {
-    "source": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\source\\packages\\physics2d\\kernel",
-    "common": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\source\\packages\\physics\\kernel-common",
+    "source": "../margoengine-lane-P/.lane/p/speed-cert-trim/source/packages/physics2d/kernel",
+    "common": "../margoengine-lane-P/.lane/p/speed-cert-trim/source/packages/physics/kernel-common",
     "modes": [
       "block"
     ],
@@ -26572,38 +26572,38 @@
       },
       "sourcePathStrings": {
         "frozen": [
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\joint.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\mass.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\colour.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold\\four.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\smooth.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\shape.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\tree.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver\\wide.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold\\face_distance.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\island.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\world.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\broad.rs"
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver/path_support.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/joint.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/mass.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/colour.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold/four.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/smooth.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/shape.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/tree.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver/wide.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold/face_distance.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/island.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/world.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/broad.rs"
         ],
         "rebuilt": [
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\joint.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\mass.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\colour.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold\\four.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\smooth.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\shape.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\tree.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver\\wide.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold\\face_distance.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\island.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\world.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\broad.rs"
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver/path_support.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/joint.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/mass.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/colour.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold/four.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/smooth.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/shape.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/tree.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver/wide.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold/face_distance.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/island.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/world.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/broad.rs"
         ]
       },
       "frozenVersusRebuiltControl": {
@@ -26648,7 +26648,7 @@
               "length": 113,
               "line": 147,
               "column": 13,
-              "filename": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\shape.rs"
+              "filename": "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/shape.rs"
             },
             "current": {
               "address": 1052564,
@@ -26656,7 +26656,7 @@
               "length": 113,
               "line": 147,
               "column": 13,
-              "filename": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\shape.rs"
+              "filename": "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/shape.rs"
             },
             "oldFirstNineBytes": "�\u0004\u0010\u0000q\u0000\u0000\u0000�",
             "newFirstNineBytes": "�\u0004\u0010\u0000q\u0000\u0000\u0000�"
@@ -27074,38 +27074,38 @@
       },
       "sourcePathStrings": {
         "frozen": [
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\joint.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\mass.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\colour.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold\\four.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\smooth.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\shape.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\tree.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\solver\\wide.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold\\face_distance.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\island.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\world.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\manifold.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common\\src\\broad.rs"
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver/path_support.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/joint.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/mass.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/colour.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold/four.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/smooth.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/shape.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/tree.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/solver/wide.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold/face_distance.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/island.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/world.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/manifold.rs",
+          "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common/src/broad.rs"
         ],
         "rebuilt": [
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver\\path_support.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\joint.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\mass.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\colour.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold\\four.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\smooth.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\shape.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\tree.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\solver\\wide.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold\\face_distance.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\island.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\world.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\manifold.rs",
-          "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics\\kernel-common\\src\\broad.rs"
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver/path_support.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/joint.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/mass.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/colour.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold/four.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/smooth.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/shape.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/tree.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/solver/wide.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold/face_distance.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/island.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/world.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/manifold.rs",
+          "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics/kernel-common/src/broad.rs"
         ]
       },
       "frozenVersusRebuiltControl": {
@@ -27150,7 +27150,7 @@
               "length": 113,
               "line": 147,
               "column": 13,
-              "filename": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel\\src\\shape.rs"
+              "filename": "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel/src/shape.rs"
             },
             "current": {
               "address": 1052564,
@@ -27158,7 +27158,7 @@
               "length": 113,
               "line": 147,
               "column": 13,
-              "filename": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-cert-trim\\control\\packages\\physics2d\\kernel\\src\\shape.rs"
+              "filename": "../margoengine-lane-P/.lane/p/speed-cert-trim/control/packages/physics2d/kernel/src/shape.rs"
             },
             "oldFirstNineBytes": "�\u0004\u0010\u0000q\u0000\u0000\u0000�",
             "newFirstNineBytes": "�\u0004\u0010\u0000q\u0000\u0000\u0000�"
@@ -27202,7 +27202,7 @@
     "busy": true,
     "concurrentRootWork": "CPU-only post-rebase verification; all root GPU jobs had completed before release.",
     "blackBoxSourceInspected": false,
-    "box2dWasm": "C:/Development/Projects/physics-refs/out/box2d3-wasm/box2d3-pyramid.mjs"
+    "box2dWasm": "../physics-refs/out/box2d3-wasm/box2d3-pyramid.mjs"
   },
   "staticCountLimit": "Counts are static emitted operations across branches/call sites, not per-contact dynamic instructions or micro-ops. Absolute source-filename/panic metadata and static addresses differ between named builds; no layout-independent timing claim.",
   "noCcdClaim": "Owned-2D CCD stays separate T-11/127.y."

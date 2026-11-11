@@ -3109,8 +3109,8 @@
     "accepted": false
   },
   "physicalBars": {
-    "source": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics2d\\kernel",
-    "common": "C:\\Development\\Projects\\margoengine-lane-P\\.lane\\p\\speed-plan-reuse\\source\\packages\\physics\\kernel-common",
+    "source": "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics2d/kernel",
+    "common": "../margoengine-lane-P/.lane/p/speed-plan-reuse/source/packages/physics/kernel-common",
     "modes": [
       "block"
     ],
@@ -6675,7 +6675,7 @@
         "paired": 180000,
         "browser": 600000
       },
-      "box2dWasm": "C:/Development/Projects/physics-refs/out/box2d3-wasm/box2d3-pyramid.mjs",
+      "box2dWasm": "../physics-refs/out/box2d3-wasm/box2d3-pyramid.mjs",
       "rivalSourceInspected": false,
       "expectedCurrentHashes": [
         "9ffefc83c3a99be4",
@@ -6736,7 +6736,7 @@
         "browser": 600000
       },
       "blackBoxSourceInspected": false,
-      "box2dWasm": "C:/Development/Projects/physics-refs/out/box2d3-wasm/box2d3-pyramid.mjs",
+      "box2dWasm": "../physics-refs/out/box2d3-wasm/box2d3-pyramid.mjs",
       "supersededNestedEvidence": ".lane/p/speed-plan-reuse-ab-v1/superseded.json"
     },
     "beforeAfter": {

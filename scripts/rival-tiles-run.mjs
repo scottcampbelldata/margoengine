@@ -9,7 +9,7 @@ import { TILES_SCENE, buildTilesScene } from './rival-tiles-scene.mjs';
 
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 
-const bench = process.env.MARGO_ENGINE_BENCH ?? 'C:\\Development\\Projects\\engine-bench';
+const bench = process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../engine-bench', import.meta.url));
 const modules = realpathSync.native(`${bench}\\batch-168\\node_modules`);
 const repo = realpathSync.native(process.cwd());
 const version = JSON.parse(readFileSync(`${modules}\\3d-tiles-renderer\\package.json`, 'utf8')).version;

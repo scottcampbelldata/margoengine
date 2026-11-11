@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { machinePathAllowed, machinePathLines } from './machine-paths.mjs';
 import { pdfText } from './pdf-text.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '../..');
@@ -73,7 +74,9 @@ export function scanRepo() {
   for (const file of files) {
     for (const id of new Set(hitsInPath(file)))
       out.push(`${file}: banned term ${id} in the file or folder name; rename or remove it`);
-    if (allowed(file)) continue;
+    const termsAllowed = allowed(file),
+      pathsAllowed = machinePathAllowed(file);
+    if (termsAllowed && pathsAllowed) continue;
     let data;
     try {
       data = readFileSync(resolve(root, file));
@@ -81,6 +84,7 @@ export function scanRepo() {
       continue;
     }
     if (file.endsWith('.pdf')) {
+      if (termsAllowed) continue;
       const text = pdfText(data);
       if (text === null) out.push(`${file}: no readable text; the banned-terms check must be able to read every PDF`);
       else
@@ -88,6 +92,12 @@ export function scanRepo() {
           out.push(`${file}: banned term ${id} in the printed text; remove it from the page it is printed from`);
       continue;
     }
+    if (!pathsAllowed)
+      for (const line of machinePathLines(data))
+        out.push(
+          `${file}:${line}: absolute machine path; name a sibling checkout as ../name, a tool cache by its environment variable (see scripts/machine-paths.mjs)`,
+        );
+    if (termsAllowed) continue;
     for (const { line, id } of scan(data))
       out.push(`${file}:${line}: banned term ${id}; remove it from this public file (see scripts/banned-terms.json)`);
   }

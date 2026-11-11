@@ -12,7 +12,7 @@ import { game } from '../examples/arena/game.js';
 
 const here = resolve(import.meta.dirname, '..'),
   // The repository by its canonical path. Reached through a Windows 8.3 short name (the fresh-clone check runs under
-  // os.tmpdir(), C:/Users//...), Vite compares the short root of its file-serving allow list with each file's
+  // os.tmpdir(), an 8.3 path inside the home folder), Vite compares the short root of its file-serving allow list with each file's
   // long real path and refuses every file with 403.
   root = realpathSync.native(resolve(here, '../..')),
   page = readFileSync(resolve(here, 'examples/arena/index.html'), 'utf8'),

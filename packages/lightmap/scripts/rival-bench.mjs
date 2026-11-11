@@ -31,7 +31,7 @@ import {
 const blender = process.env.MARGO_BLENDER || 'C:\\blender\\blender.exe';
 const outDir = process.env.MARGO_ENGINE_BENCH
   ? join(process.env.MARGO_ENGINE_BENCH, 'data', 'cornell')
-  : 'C:\\Development\\Projects\\engine-bench\\batch-168\\data\\cornell';
+  : fileURLToPath(new URL('../../../../engine-bench/batch-168/data/cornell', import.meta.url));
 
 const bakeOptions = (light, bounces) => ({
   radiometry: 'physical',
