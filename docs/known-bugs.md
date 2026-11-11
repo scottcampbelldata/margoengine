@@ -6172,9 +6172,14 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
   (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play. Documented 2026-11-11 in
   `docs/limits.md` ("Stale copies on failure"); the cache README already states it.
 - Fixed, lane S (2026-11-10): RangeCache captures request start time for a miss and a 304 revalidation and passes it to the existing RFC 9111 freshness calculation. Age plus transit now consumes the correct lifetime. Two controlled-clock regressions in packages/cache/test/freshness.test.js fail on the parent and cover both partly consumed and entirely expired responses without real waits or speed assertions.
-- Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
-  duplicated; Vary name records are never
-  evicted; 27 throws carry no help link.
+- Fixed, sweep L6 (2026-11-11, KB5974e): index.ts keeps its own copies of http.ts `transact` and the range parsing;
+  `isEntry` and `defaultFetch` were duplicated; Vary name records were never evicted; 27 throws carried no help link.
+  index.ts now uses http.ts `transact` and `byteRange`, `isEntry` lives in http.ts, LoadingManager uses
+  `defaultFetch`. Each entry lists the records `keys` wrote with it, and both eviction paths delete a record with the
+  last entry that lists it (default: a reference count over the batch; `evictionIndex`: a read of the URL's own keys).
+  Every throw goes through typeError, rangeError or fault with the `#cache` help entry. Regressions:
+  packages/cache/test/vary-evict.test.js (fails before: the names record outlived its entries), tests/errors-page.test.js
+  (now scans packages/cache/src).
 - Verified, lane S (2026-11-10): decoded.ts's max-age=3153600000 is not a 2^31-cap defect. RFC 9111 section 1.2.2 defines an overflow fallback rather than an absolute cap; this value and its millisecond deadline are exact safe JavaScript integers. The literal introduced in 4f7774957 is unchanged. The current freshUntil calculation returns an exact 3153600000000-ms lifetime with no wrap. Source: https://www.rfc-editor.org/rfc/rfc9111.html#section-1.2.2. This review does not certify arbitrarily large delta-seconds values.
 
 ### Fixed: webgl2-compat explicit-gradient footprint (materials stochastic tiling)

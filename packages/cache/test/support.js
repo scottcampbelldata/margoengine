@@ -10,9 +10,14 @@
  * `refuseBlobs` makes a readwrite transaction that puts a Blob fail with UnknownError, as WebKit's ephemeral sessions do.
  * `refuseBlobs: 'webkit'` also models WebKit's stall (Playwright WebKit, 2026-11-11): when the refused Blob put is not
  * the first request of its transaction, that transaction never completes or aborts, and neither does any later one.
- * `counts.reads` counts the records handed out by get, getAll and cursors; `counts.requests` counts every request,
- * cursor steps included.
+ * getAll takes an optional key range. `counts.reads` counts the records handed out by get, getAll and cursors;
+ * `counts.requests` counts every request, cursor steps included.
  */
+// Node has no IDBKeyRange; the cache reads key ranges with bound() and the fake store tests them with includes().
+globalThis.IDBKeyRange ??= {
+  bound: (lower, upper) => ({ lower, upper, includes: (key) => key >= lower && key <= upper }),
+};
+
 export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = false } = {}) {
   const databases = new Map(),
     counts = { reads: 0, requests: 0 },
@@ -42,10 +47,11 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
           if (map.has(key)) counts.reads++;
           return copy(map.get(key));
         }),
-      getAll: () =>
+      getAll: (range) =>
         request(() => {
-          counts.reads += map.size;
-          return [...map.values()].map(copy);
+          const rows = [...map.entries()].filter(([key]) => !range || range.includes(key));
+          counts.reads += rows.length;
+          return rows.map(([, value]) => copy(value));
         }),
       getAllKeys: () => request(() => [...map.keys()]),
       count: () => request(() => map.size),
@@ -170,13 +176,19 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
                 };
                 const next = new Map([...staged.keys()].map((n) => [n, after(n)]));
                 if (refuseBlobs && mode === 'readwrite' && tally.blob) {
-                  t.error = new DOMException('Error preparing Blob/File data to be stored in object store', 'UnknownError');
+                  t.error = new DOMException(
+                    'Error preparing Blob/File data to be stored in object store',
+                    'UnknownError',
+                  );
                   t.onabort?.();
                   return;
                 }
                 const bytes = [...next.values()]
                   .flatMap((map) => [...map.values()])
-                  .reduce((sum, v) => sum + (v instanceof Blob ? v.size : v instanceof ArrayBuffer ? v.byteLength : 0), 0);
+                  .reduce(
+                    (sum, v) => sum + (v instanceof Blob ? v.size : v instanceof ArrayBuffer ? v.byteLength : 0),
+                    0,
+                  );
                 if (bytes > quota && mode === 'readwrite') {
                   t.error = new DOMException('quota', 'QuotaExceededError');
                   t.onabort?.();

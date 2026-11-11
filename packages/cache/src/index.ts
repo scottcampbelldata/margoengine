@@ -1,6 +1,7 @@
+import { rangeError } from '../../shared/errors.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import { asBlob, blobRefused, storesBlobs } from './bytes.js';
-import { defaultFetch, failure, freshnessPolicy, ifRange } from './http.js';
+import { byteRange, defaultFetch, freshnessPolicy, ifRange, isEntry as isEntryOf, transact } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
@@ -34,6 +35,11 @@ export interface AssetCacheEntry {
   size: number;
   /** Last use, ms since the epoch. */
   used: number;
+  /**
+   * Keys of the records `keys` wrote with it (a URL's `Vary` names): eviction deletes a record with the last entry that
+   * lists it. Absent when there are none, and on entries stored before 2026-11-11.
+   */
+  records?: readonly string[];
 }
 /**
  * Bookkeeping for eviction kept inside AssetCache's own transactions. `@margoengine/cache/eviction` provides one that keeps
@@ -138,12 +144,13 @@ interface Entry {
   expires?: string | null;
   used: number;
   final: string;
+  records?: string[];
 }
 
 const M = 'meta',
   D = 'data',
   VERSION = '\0version';
-const isEntry = (value: unknown): value is Entry => typeof (value as Entry | null)?.size === 'number';
+const isEntry = (value: unknown): value is Entry => isEntryOf<Entry>(value);
 
 /**
  * IndexedDB cache for large assets (GLB, .bin, textures, STEP) behind a fetch-compatible `cache.fetch`, which every
@@ -194,7 +201,7 @@ export class AssetCache {
     freshness = 'http',
   }: AssetCacheOptions = {}) {
     if (!(maxBytes >= 0) || !(timeout >= 0))
-      throw new RangeError('AssetCache maxBytes and timeout must be non-negative');
+      throw rangeError('AssetCache maxBytes and timeout must be non-negative', 'cache');
     this.maxBytes = maxBytes;
     this.timeout = timeout;
     this.network = fetch ?? defaultFetch();
@@ -251,12 +258,7 @@ export class AssetCache {
   ): Promise<boolean> {
     db ??= await this.db;
     if (!db) return false;
-    const t = db.transaction([M, D], mode);
-    body(t.objectStore(M), t.objectStore(D));
-    await new Promise<void>((ok, no) => {
-      t.oncomplete = () => ok();
-      failure(t, no);
-    });
+    await transact(db, [M, D], mode, body);
     return true;
   }
 
@@ -279,7 +281,8 @@ export class AssetCache {
     // stored copy; no-cache (also `Cache-Control: no-cache` on the request) revalidates the stored copy before using it.
     if (request.cache === 'no-store') return this.network(request);
     const reload = request.cache === 'reload',
-      revalidate = request.cache === 'no-cache' || /(?:^|,)\s*no-cache\b/i.test(request.headers.get('cache-control') ?? '');
+      revalidate =
+        request.cache === 'no-cache' || /(?:^|,)\s*no-cache\b/i.test(request.headers.get('cache-control') ?? '');
     const key = this.keys ? await this.keys.lookup(request, url, (k) => this.read(k)) : url;
     if (key === undefined) return this.network(request);
     const hit = reload ? undefined : await this.lookup(key);
@@ -412,15 +415,15 @@ export class AssetCache {
   private respond(entry: Entry, blob: Blob, range: string | null): Response {
     const size = blob.size,
       headers: Record<string, string> = { 'content-type': entry.type },
-      match = range && /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+      span = byteRange(range, size);
     if (entry.etag) headers.etag = entry.etag;
     if (entry.modified) headers['last-modified'] = entry.modified;
     let body = blob,
       status = 200;
-    if (match && (match[1] || match[2])) {
-      const start = match[1] ? +match[1] : Math.max(0, size - +match[2]),
-        end = match[1] && match[2] ? Math.min(+match[2], size - 1) : size - 1;
-      if (start > end) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+    if (span === 'unsatisfiable')
+      return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+    if (span) {
+      const [start, end] = span;
       body = blob.slice(start, end + 1);
       status = 206;
       headers['content-range'] = `bytes ${start}-${end}/${size}`;
@@ -457,6 +460,7 @@ export class AssetCache {
       used: now,
       final: response.url || url,
     };
+    if (target?.records?.length) entry.records = target.records.map(([k]) => k);
     this.checked.add(entry.url);
     if (target && entry.size <= this.maxBytes) {
       // Misses stored back to back share one transaction, written in arrival order, as separate writes would leave them.
@@ -560,7 +564,18 @@ export class AssetCache {
           all.onsuccess = () => {
             const stored = ((all.result ?? []) as unknown[]).filter(isEntry),
               live = new Map(stored.map((e) => [e.url, e])),
-              order = stored.sort((a, b) => a.used - b.used);
+              order = stored.sort((a, b) => a.used - b.used),
+              // How many live entries, stored or in this batch, list each record; a record goes with the last of them.
+              refs = new Map<string, number>(),
+              count = (e: Entry, by: number) => {
+                for (const k of e.records ?? []) {
+                  const n = (refs.get(k) ?? 0) + by;
+                  refs.set(k, n);
+                  if (n === 0) meta.delete(k);
+                }
+              };
+            for (const e of stored) count(e, 1);
+            for (const { entry } of items) count(entry, 1);
             let total = stored.reduce((sum, e) => sum + e.size, 0),
               at = 0;
             for (const { entry, blob } of items) {
@@ -568,6 +583,7 @@ export class AssetCache {
               if (old) {
                 total -= old.size;
                 live.delete(entry.url);
+                count(old, -1);
               }
               const limit = squeeze ? Math.min(this.maxBytes, total) : this.maxBytes;
               while (total + entry.size > limit && at < order.length) {
@@ -577,6 +593,7 @@ export class AssetCache {
                 live.delete(e.url);
                 meta.delete(e.url);
                 data.delete(e.url);
+                count(e, -1);
                 evicted++;
               }
               data.put(blob, entry.url);

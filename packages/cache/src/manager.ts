@@ -1,6 +1,7 @@
 // One progress, error and abort source for every loader, through the `fetch` option they all take. Each request is one
 // item; its body is passed through chunk by chunk (no copy, no read-ahead) so byte progress follows the loader's reads.
-import { margoError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { defaultFetch } from './http.js';
 
 /** A fetch-compatible function, as every loader's `fetch` option takes. */
 export type LoadingFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -75,10 +76,8 @@ export class LoadingManager {
   /** @throws TypeError when `fetch` is given and is not a function. */
   constructor({ fetch, onStart, onProgress, onLoad, onError }: LoadingManagerOptions = {}) {
     if (fetch !== undefined && typeof fetch !== 'function')
-      throw new TypeError('LoadingManager fetch is not a function; pass a fetch-compatible function');
-    // globalThis.fetch as it is now: read later, `globalThis.fetch = x.fetch` would make this call itself without end.
-    const base = globalThis.fetch;
-    this.network = fetch ?? ((input, init) => (base ?? globalThis.fetch)(input, init));
+      throw typeError('LoadingManager fetch is not a function; pass a fetch-compatible function', 'cache');
+    this.network = fetch ?? defaultFetch();
     Object.assign(this, { onStart, onProgress, onLoad, onError });
   }
 
@@ -121,7 +120,7 @@ export class LoadingManager {
    */
   setURLModifier(modifier?: URLModifier): this {
     if (modifier !== undefined && typeof modifier !== 'function')
-      throw new TypeError('LoadingManager URL modifier is not a function; pass (url) => string or undefined');
+      throw typeError('LoadingManager URL modifier is not a function; pass (url) => string or undefined', 'cache');
     this.modifier = modifier;
     return this;
   }
@@ -134,7 +133,7 @@ export class LoadingManager {
     if (!this.modifier) return url;
     const mapped = this.modifier(url);
     if (typeof mapped !== 'string' && !(mapped instanceof URL))
-      throw new TypeError(`LoadingManager URL modifier returned ${typeof mapped} for ${url}; return a string URL`);
+      throw typeError(`LoadingManager URL modifier returned ${typeof mapped} for ${url}; return a string URL`, 'cache');
     return String(mapped);
   }
 
@@ -206,9 +205,10 @@ export class LoadingManager {
       else
         this.fail(
           item,
-          margoError(
+          fault(
             'failed',
             `${requested} answered HTTP ${response.status}; check the URL and that the server serves it`,
+            'cache',
           ),
         );
       return response;
@@ -309,7 +309,10 @@ export class LoadingManager {
   private custom(url: string, name: string): Item {
     const item = this.batch.find((i) => !i.done && !i.fetched && i.url === String(url));
     if (!item)
-      throw new RangeError(`LoadingManager ${name}(${JSON.stringify(url)}) has no pending item; call itemStart first`);
+      throw rangeError(
+        `LoadingManager ${name}(${JSON.stringify(url)}) has no pending item; call itemStart first`,
+        'cache',
+      );
     return item;
   }
 }

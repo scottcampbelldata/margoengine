@@ -116,6 +116,10 @@ export function freshnessPolicy(
   };
 }
 
+/** Whether a meta record is a stored file's entry (the other records are the version and what `keys` writes). */
+export const isEntry = <T extends { size: number }>(value: unknown): value is T =>
+  typeof (value as T | null)?.size === 'number';
+
 /** Runs body in one transaction over the given stores; resolves when it commits, rejects when it aborts. */
 export async function transact(
   db: IDBDatabase,

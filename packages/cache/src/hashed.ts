@@ -1,4 +1,4 @@
-import { margoError } from '../../shared/errors.js';
+import { fault } from '../../shared/errors.js';
 import type { AssetCache } from './index.js';
 
 /** The hash of a file's bytes, as lowercase SHA-256 hex; for building a manifest. */
@@ -43,9 +43,10 @@ export class HashedAssets {
     const actual = await hashBytes(await response.clone().arrayBuffer());
     if (actual !== hash) {
       await this.cache.delete(name);
-      throw margoError(
+      throw fault(
         'failed',
         `${url} has hash ${actual}, not the manifest's ${hash}; publish the file and manifest together`,
+        'cache',
       );
     }
     this.checked.add(name);

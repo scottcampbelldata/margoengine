@@ -23,6 +23,7 @@ export interface AssetCacheEntry {
     url: string;
     size: number;
     used: number;
+    records?: readonly string[];
 }
 
 export interface AssetCacheEviction {

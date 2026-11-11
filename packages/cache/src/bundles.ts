@@ -1,4 +1,4 @@
-import { margoError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { HashedAssets } from './hashed.js';
 import type { AssetCache } from './index.js';
 
@@ -80,18 +80,22 @@ export class AssetBundles {
     const hashes: Record<string, string> = {},
       bundles = manifest?.bundles;
     if (!bundles || typeof bundles !== 'object')
-      throw new TypeError('Bundle manifest needs a bundles object; pass {bundles: {name: {files, deps}}}');
+      throw typeError('Bundle manifest needs a bundles object; pass {bundles: {name: {files, deps}}}', 'cache');
     for (const [name, bundle] of Object.entries(bundles)) {
       for (const dep of bundle?.deps ?? [])
         if (!Object.hasOwn(bundles, dep))
-          throw new TypeError(`Bundle ${name} depends on ${dep}, which the manifest does not list; add it`);
+          throw typeError(`Bundle ${name} depends on ${dep}, which the manifest does not list; add it`, 'cache');
       for (const [url, hash] of Object.entries(bundle?.files ?? {})) {
         const key = this.resolve(url);
         if (!/^[0-9a-f]{64}$/.test(hash))
-          throw new TypeError(`Bundle ${name} gives ${url} hash ${hash}; use the lowercase SHA-256 hex of hashBytes`);
+          throw typeError(
+            `Bundle ${name} gives ${url} hash ${hash}; use the lowercase SHA-256 hex of hashBytes`,
+            'cache',
+          );
         if (hashes[key] && hashes[key] !== hash)
-          throw new TypeError(
+          throw typeError(
             `${url} has two hashes in the manifest; one URL is one file, give each version its own URL`,
+            'cache',
           );
         hashes[key] = hash;
       }
@@ -112,9 +116,9 @@ export class AssetBundles {
     const visit = (current: string, path: string[]) => {
       if (out.includes(current)) return;
       if (visiting.has(current))
-        throw new TypeError(`Bundle dependencies form a cycle (${[...path, current].join(' -> ')}); remove one`);
+        throw typeError(`Bundle dependencies form a cycle (${[...path, current].join(' -> ')}); remove one`, 'cache');
       if (!Object.hasOwn(bundles, current))
-        throw new TypeError(`No bundle named ${current}; the manifest lists ${Object.keys(bundles).join(', ')}`);
+        throw typeError(`No bundle named ${current}; the manifest lists ${Object.keys(bundles).join(', ')}`, 'cache');
       visiting.add(current);
       for (const dep of bundles[current].deps ?? []) visit(dep, [...path, current]);
       visiting.delete(current);
@@ -143,7 +147,7 @@ export class AssetBundles {
    * @throws MargoError `'failed'` when a file's bytes do not match the manifest or the server answers an error status.
    */
   async load(name: string, { signal, onProgress, concurrency = 4 }: BundleLoadOptions = {}): Promise<void> {
-    if (!(concurrency >= 1)) throw new RangeError('Bundle load concurrency must be at least 1');
+    if (!(concurrency >= 1)) throw rangeError('Bundle load concurrency must be at least 1', 'cache');
     const queue = this.files(name),
       total = queue.length;
     let loaded = 0;
@@ -156,9 +160,10 @@ export class AssetBundles {
         const response = await this.assets.fetch(url, { signal: stop });
         if (!response.ok) {
           void response.body?.cancel().catch(() => {});
-          throw margoError(
+          throw fault(
             'failed',
             `Bundle ${name}: ${url} answered HTTP ${response.status}; publish the files with the manifest`,
+            'cache',
           );
         }
         await response.arrayBuffer();

@@ -16,6 +16,7 @@ const sources = [
     'packages/ui/src',
     'packages/mcp/src',
     'packages/biomes/src',
+    'packages/cache/src',
   ].flatMap((dir) =>
     readdirSync(dir)
       .filter((f) => f.endsWith('.ts'))

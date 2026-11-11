@@ -66,6 +66,7 @@ interface AssetCacheEntry {
     url: string;
     size: number;
     used: number;
+    records?: readonly string[];
 }
 
 interface AssetCacheEviction {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15095128,
+  "total": 15095518,
   "history": [
     {
       "date": "2026-10-24",
@@ -8511,7 +8511,7 @@
     {
       "date": "2026-11-11",
       "commit": "5179414773",
-      "reason": "compute/decomp 3579 to 3602 B gzip (budget 3835 to 3858): KB5588a coded MargoError with cause for a missing or corrupt decomp-kernel.wasm (c859962c92); the error path is the whole growth, a split would add a request for 23 B",
+      "reason": "compute/decomp measured 3707 to 3858 B gzip (budget 3835 to 4114; corrected 2026-11-11, the first text took budgets for sizes): KB5588a coded MargoError with cause for a missing or corrupt decomp-kernel.wasm (c859962c92) is the whole 151 B growth (parent decomp.ts rebuilt and measured); a split would add a request on the failing path",
       "grew": 1
     },
     {
@@ -8524,6 +8524,12 @@
       "date": "2026-11-11",
       "commit": "61dbadfab8",
       "reason": "decoders/draco-native measured 68335 B gzip, over its 67462 B budget (new budget 70386 B): historical Draco predictor 3, bit-stream bounds and wrap-span rule (bug sweep L5b, KB4824b); one Wasm per feature, a split would add a second fetch for 873 B",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "8d63008b2a",
+      "reason": "KB5974e: cache/eviction measured 772 to 927 B gzip (budget 793 to 1183): evictionIndex deletes a Vary names record with the last entry that lists it (release(): one getAll of the URL's keys per evicted entry with records); help links on cache throws add 38 to 203 B to the other cache entries, within their budgets",
       "grew": 1
     }
   ],
@@ -8644,7 +8650,7 @@
     "@margoengine/cache": 4658,
     "@margoengine/cache/bundles": 1883,
     "@margoengine/cache/decoded": 5898,
-    "@margoengine/cache/eviction": 793,
+    "@margoengine/cache/eviction": 1183,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,

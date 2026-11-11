@@ -1,3 +1,4 @@
+import { rangeError } from '../../shared/errors.js';
 /// <reference lib="esnext.disposable" preserve="true" />
 import { asBlob, blobRefused, storesBlobs } from './bytes.js';
 import { byteRange, contentRange, defaultFetch, freshnessPolicy, ifRange, transact } from './http.js';
@@ -112,7 +113,7 @@ export class RangeCache {
     fetch,
   }: RangeCacheOptions = {}) {
     if (!(maxBytes >= 0) || !(timeout >= 0) || !(block >= 1) || !Number.isInteger(block))
-      throw new RangeError('RangeCache maxBytes and timeout must be non-negative and block a positive integer');
+      throw rangeError('RangeCache maxBytes and timeout must be non-negative and block a positive integer', 'cache');
     this.maxBytes = maxBytes;
     this.block = block;
     this.timeout = timeout;
@@ -205,8 +206,7 @@ export class RangeCache {
     for (let i = first; i <= last; i++) if (!have.has(i)) missing.push(i);
     // RFC 9111 section 3.4: stored parts combine only under one strong validator. Under a weak ETag or none, a miss
     // fetches every block of this range again, and the write replaces the old blocks, so no answer mixes two versions.
-    if (missing.length && !strong(file))
-      missing = Array.from({ length: last - first + 1 }, (_, k) => first + k);
+    if (missing.length && !strong(file)) missing = Array.from({ length: last - first + 1 }, (_, k) => first + k);
     let fetched = new Map<number, Blob>();
     if (missing.length) {
       const got = await this.download(request, file, missing);
@@ -436,7 +436,10 @@ export class RangeCache {
     }
     const now = record?.result as Stored | undefined;
     // RFC 9111 section 3.4: stored parts combine only under the validators they were stored with.
-    if (stored && !(isStored(now) && now.size === file.size && now.etag === file.etag && now.modified === file.modified))
+    if (
+      stored &&
+      !(isStored(now) && now.size === file.size && now.etag === file.etag && now.modified === file.modified)
+    )
       throw CHANGED;
     // A block evicted between the lookup and this read (another tab's write): fetch it once more.
     if (gone.length) {
@@ -492,7 +495,12 @@ export class RangeCache {
     });
     const records = ((all?.result ?? []) as unknown[]).filter(isStored),
       current = records.find((r) => r.url === file.url),
-      same = strong(file) && current && current.size === file.size && current.etag === file.etag && current.modified === file.modified,
+      same =
+        strong(file) &&
+        current &&
+        current.size === file.size &&
+        current.etag === file.etag &&
+        current.modified === file.modified,
       blocks = [...new Set([...(same ? current.blocks : []), ...blobs.keys()])].sort((a, b) => a - b),
       next: Stored = {
         ...(same ? current : file),
@@ -505,7 +513,9 @@ export class RangeCache {
     let values: Map<number, Blob | ArrayBuffer> = blobs;
     // WebKit's ephemeral sessions refuse Blobs in IndexedDB: once one is refused, keep the bytes (see bytes.ts).
     const toBytes = async () =>
-      (values = new Map(await Promise.all([...blobs].map(async ([i, blob]) => [i, await blob.arrayBuffer()] as const))));
+      (values = new Map(
+        await Promise.all([...blobs].map(async ([i, blob]) => [i, await blob.arrayBuffer()] as const)),
+      ));
     if (this.bytes) await toBytes();
     const attempt = async (limit: number) => {
       const evict: Stored[] = [];

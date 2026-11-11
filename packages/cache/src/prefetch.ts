@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { margoError } from '../../shared/errors.js';
+import { fault, rangeError } from '../../shared/errors.js';
 
 /** Options for `new Prefetcher(...)`. A `concurrency` under 1 or a negative `idleTimeout` throws a RangeError. */
 export interface PrefetcherOptions {
@@ -78,7 +78,7 @@ export class Prefetcher {
 
   constructor({ fetch, concurrency = 2, idle = true, idleTimeout = 2000, signal }: PrefetcherOptions = {}) {
     if (!(concurrency >= 1) || !(idleTimeout >= 0))
-      throw new RangeError('Prefetcher concurrency must be at least 1 and idleTimeout non-negative');
+      throw rangeError('Prefetcher concurrency must be at least 1 and idleTimeout non-negative', 'cache');
     // globalThis.fetch as it is now: read later, `globalThis.fetch = x.fetch` would make this call itself without end.
     const base = globalThis.fetch;
     this.network = fetch ?? ((input, init) => (base ?? globalThis.fetch)(input, init));
@@ -206,7 +206,7 @@ export class Prefetcher {
       const response = await this.network(job.url, { signal: job.controller.signal, priority: 'low' } as RequestInit);
       if (!response.ok) {
         void response.body?.cancel().catch(() => {});
-        throw margoError('failed', `Prefetch of ${job.url} answered HTTP ${response.status}; check the URL`);
+        throw fault('failed', `Prefetch of ${job.url} answered HTTP ${response.status}; check the URL`, 'cache');
       }
       const reader = response.body?.getReader();
       for (let chunk = await reader?.read(); chunk && !chunk.done; chunk = await reader!.read())
@@ -267,7 +267,7 @@ export function throttle(
   { bytesPerSecond, burst = bytesPerSecond / 4 }: ThrottleOptions,
 ): typeof globalThis.fetch {
   if (!(bytesPerSecond > 0) || !(burst >= 0))
-    throw new RangeError('throttle bytesPerSecond must be positive and burst non-negative');
+    throw rangeError('throttle bytesPerSecond must be positive and burst non-negative', 'cache');
   // When the bytes read so far are paid for at the rate; reading waits while that runs ahead by more than the burst.
   let paid = 0;
   const wait = (bytes: number, signal?: AbortSignal | null) => {

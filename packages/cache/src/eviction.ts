@@ -3,9 +3,27 @@ import type { AssetCacheEntry, AssetCacheEviction } from './index.js';
 const USED = 'used',
   TOTAL = '\0bytes',
   FILES = '\0files';
+// Its own copy of http.ts isEntry: importing that shared chunk would add about 390 B gzip to this entry.
 const isEntry = (value: unknown): value is AssetCacheEntry =>
   typeof (value as AssetCacheEntry | null)?.size === 'number';
 const count = (value: unknown) => (typeof value === 'number' ? value : 0);
+
+/**
+ * After `gone` is deleted, deletes each record it lists that no other entry of its URL lists, and no file of the batch
+ * still to be written. Entries that share a record share a URL (`varyKeys` keys both as `url` newline hash), so only
+ * that URL's keys are read, not the whole store.
+ */
+function release(meta: IDBObjectStore, gone: AssetCacheEntry, pending: readonly { entry: AssetCacheEntry }[]): void {
+  if (!gone.records?.length) return;
+  const url = gone.url.replace(/\n[^]*/, ''),
+    siblings = meta.getAll(IDBKeyRange.bound(`${url}\n`, `${url}\n\uffff`));
+  siblings.onsuccess = () => {
+    const kept = new Set<string>();
+    for (const e of [...(siblings.result ?? []).filter(isEntry), ...pending.map((p) => p.entry)])
+      for (const k of e.records ?? []) kept.add(k);
+    for (const k of gone.records!) if (!kept.has(k)) meta.delete(k);
+  };
+}
 interface Removal {
   total: IDBRequest;
   files: IDBRequest;
@@ -84,6 +102,7 @@ export function evictionIndex(): AssetCacheEviction {
                 evicted++;
                 data.delete(at.primaryKey);
                 at.delete();
+                release(meta, at.value, items.slice(i));
               }
               at.continue();
               return;

@@ -253,7 +253,10 @@ console.log(strings.status);
   origin), the `partition`, the `headers` values and the values of the request headers the stored response's `Vary`
   names (RFC 9111 section 4.1). Values go into keys as SHA-256 hashes: no token or user id is written to storage.
 - Each URL and credential set remembers the last `Vary` it was answered with; after a server changes its `Vary`, the
-  entries stored under the old one are no longer found and are evicted in time. `Vary: *` is never stored.
+  entries stored under the old one are no longer found and are evicted in time. `Vary: *` is never stored. That
+  remembered `Vary` is a small record beside the entries; it is evicted with the last entry that uses it, with the
+  default eviction and with `evictionIndex()` alike (entries stored before 2026-11-11 do not list it, so their records
+  stay until `delete(url)`).
 - `delete(url)` removes every entry of the URL. Revalidation and the background fill of a range miss send the request's
   own headers, so they land in the same entry. `varyNames(value)` parses a `Vary` value.
 - `HashedAssets` and `LoadingManager` work on top unchanged. `RangeCache` (above) is keyed by URL only.

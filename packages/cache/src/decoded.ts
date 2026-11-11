@@ -1,3 +1,4 @@
+import { typeError } from '../../shared/errors.js';
 import { AssetCache, type AssetCacheOptions } from './index.js';
 
 /** Content and decoder identity. Change variant when decoder options or attribute mappings change. */
@@ -41,8 +42,9 @@ const identity = ({ sourceHash, deviceFormat, decoder, variant = '' }: DecodedAs
     !decoder ||
     typeof variant !== 'string'
   )
-    throw new TypeError(
+    throw typeError(
       'Decoded cache needs a SHA-256 sourceHash, nonempty deviceFormat and decoder; set variant for decoder options',
+      'cache',
     );
   return `https://decoded.margo.invalid/${encodeURIComponent(JSON.stringify([sourceHash.toLowerCase(), deviceFormat, decoder, variant]))}`;
 };
@@ -60,13 +62,14 @@ function pack(value: unknown): Blob {
     )
       return ['scalar', value];
     if (typeof value !== 'object' || value === null || active.has(value))
-      throw new TypeError(
+      throw typeError(
         'Decoded results must be acyclic plain records, arrays, finite scalars and binary arrays; remove unsupported values',
+        'cache',
       );
     if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
       const name = value instanceof ArrayBuffer ? 'ArrayBuffer' : Object.prototype.toString.call(value).slice(8, -1);
       if (name !== 'ArrayBuffer' && !Object.hasOwn(arrays, name))
-        throw new TypeError('Use a supported numeric typed array for decoded data');
+        throw typeError('Use a supported numeric typed array for decoded data', 'cache');
       const bytes =
         value instanceof ArrayBuffer
           ? new Uint8Array(value)
@@ -81,7 +84,7 @@ function pack(value: unknown): Blob {
       Object.getPrototypeOf(value) !== Object.prototype &&
       Object.getPrototypeOf(value) !== null
     )
-      throw new TypeError('Use plain records for decoded metadata; class instances cannot be cached');
+      throw typeError('Use plain records for decoded metadata; class instances cannot be cached', 'cache');
     active.add(value);
     const result: Node = Array.isArray(value)
       ? ['array', value.map(visit)]
@@ -98,7 +101,8 @@ function pack(value: unknown): Blob {
 function unpack(buffer: ArrayBuffer): unknown {
   const length = new DataView(buffer).getUint32(0, true),
     start = 4 + length;
-  if (start > buffer.byteLength) throw new TypeError('Decoded cache metadata is truncated; decode the source again');
+  if (start > buffer.byteLength)
+    throw typeError('Decoded cache metadata is truncated; decode the source again', 'cache');
   const visit = ([kind, data]: Node): unknown => {
     if (kind === 'scalar') return data;
     if (kind === 'undefined') return undefined;
@@ -113,11 +117,11 @@ function unpack(buffer: ArrayBuffer): unknown {
       size < 0 ||
       start + offset + size > buffer.byteLength
     )
-      throw new TypeError('Decoded cache array is truncated; decode the source again');
+      throw typeError('Decoded cache array is truncated; decode the source again', 'cache');
     const bytes = buffer.slice(start + offset, start + offset + size);
     if (kind === 'ArrayBuffer') return bytes;
     if (!Object.hasOwn(arrays, kind))
-      throw new TypeError('Decoded cache array type is unknown; decode the source again');
+      throw typeError('Decoded cache array type is unknown; decode the source again', 'cache');
     const Constructor: new (buffer: ArrayBuffer) => ArrayBufferView = arrays[kind as keyof typeof arrays];
     return new Constructor(bytes);
   };
@@ -158,7 +162,7 @@ export class DecodedAssetCache extends AssetCache {
   async set(key: DecodedAssetKey, value: unknown, { signal }: { signal?: AbortSignal } = {}): Promise<void> {
     signal?.throwIfAborted();
     if (value === undefined)
-      throw new TypeError('Use a defined decoded result; undefined is reserved for cache misses');
+      throw typeError('Use a defined decoded result; undefined is reserved for cache misses', 'cache');
     const url = identity(key),
       body = pack(value);
     signal?.throwIfAborted();
