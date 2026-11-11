@@ -225,7 +225,10 @@ export function bakeRects(
 /**
  * The window origins of a cache's levels in world texels, [x0, z0, x1, z1, ...]: level k's texel is `texel * 2^k`
  * wide and its window of `size` texels starts at the eye's float64 world texel less half the size. With a floating
- * origin, `base` gets each level's origin as a local point (origin * texel - shift, float64) and the function returns
+ * origin, `base` gets four numbers a level, [ax, az, bx, bz]: the world texel `a` at or below the shift and its corner
+ * as a local point, `b = a * texel - shift` (float64, under one texel). The bake places world texel w at
+ * `b + (w - a + 0.5) * texel`, so a texel's point depends on the shift alone, never on where the window stood when it
+ * baked (with the window corner in place of `a` a flight rounded each page by its own corner). The function returns
  * the wrap of the reader, `shift` modulo the coarsest level's period. Exported for the tests.
  */
 export function planWindows(
@@ -242,8 +245,9 @@ export function planWindows(
     out[k * 2] = Math.floor(eye[0] / s) - size / 2;
     out[k * 2 + 1] = Math.floor(eye[2] / s) - size / 2;
     if (base) {
-      base[k * 2] = out[k * 2] * s - shift[0];
-      base[k * 2 + 1] = out[k * 2 + 1] * s - shift[2];
+      const ax = Math.floor(shift[0] / s),
+        az = Math.floor(shift[2] / s);
+      base.set([ax, az, ax * s - shift[0], az * s - shift[2]], k * 4);
     }
   }
   const period = texel * size * 2 ** (levels - 1),
@@ -439,7 +443,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     });
     this.#layout = device.createBindGroupLayout({
       entries: [
-        { binding: 0, visibility: 2, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 32 } },
+        { binding: 0, visibility: 2, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: this.#floating ? 40 : 32 } },
         { binding: 1, visibility: 2, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: 2, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: 2, texture: { viewDimension: '2d-array' } },
@@ -448,7 +452,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     this.#group = device.createBindGroup({
       layout: this.#layout,
       entries: [
-        { binding: 0, resource: { buffer: this.#bake, size: 32 } },
+        { binding: 0, resource: { buffer: this.#bake, size: this.#floating ? 40 : 32 } },
         { binding: 1, resource: { buffer: this.#decalBuffer } },
         { binding: 2, resource: { buffer: this.#listBuffer } },
         { binding: 3, resource: pictures.createView({ dimension: '2d-array' }) },
@@ -654,7 +658,7 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     const texel = floating ? Math.fround(this.texel) : this.texel;
     if (this.#windows.length !== levels * 2) {
       this.#windows = new Float64Array(levels * 2);
-      this.#bases = new Float64Array(levels * 2);
+      this.#bases = new Float64Array(levels * 4);
     }
     const [wrapX, wrapZ] = planWindows(eye, shift, texel, n, levels, this.#windows, floating ? this.#bases : undefined);
     this.#frameValues.set([
@@ -682,7 +686,10 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
     device.queue.writeBuffer(this.#frame!, 0, this.#frameValues as Float32Array<ArrayBuffer>);
     if (this.#pipelineSource !== source.layout) {
       let code = splitTerrainColor(source.code) + bake;
-      if (floating) code = code.replace('let xz=(vec2f(w)+0.5)*e;', 'let xz=terrainBake.pad+(vec2f(w-o)+0.5)*e;');
+      if (floating)
+        code = code
+          .replace('pad:vec2f}', 'pad:vec2f,anchor:vec2i}')
+          .replace('let xz=(vec2f(w)+0.5)*e;', 'let xz=terrainBake.pad+(vec2f(w-terrainBake.anchor)+0.5)*e;');
       if (this.#surfaces.size)
         code =
           surface +
@@ -781,8 +788,10 @@ export class TerrainVirtualTexture implements EnginePlugin, TerrainLighting {
       floats[base + 4] = s;
       ints[base + 5] = start;
       if (floating) {
-        floats[base + 6] = this.#bases[k * 2];
-        floats[base + 7] = this.#bases[k * 2 + 1];
+        floats[base + 6] = this.#bases[k * 4 + 2];
+        floats[base + 7] = this.#bases[k * 4 + 3];
+        ints[base + 8] = this.#bases[k * 4];
+        ints[base + 9] = this.#bases[k * 4 + 1];
       }
       work.push([k, rects]);
     }

@@ -7,14 +7,19 @@
 // 1. exact (the origin at the offset): every number the GPU receives is the zero case's (planRings, planWindows and the
 //    layer wrap are computed in float64 from exact inputs, origin.test.js), so the pictures are identical, pixel for
 //    pixel, with the same draw calls and the same texels baked;
-// 2. camera (ratio 10, the origin rebases onto the camera at 1e7), the camera rebased in place, and a 400 m flight that
-//    rebases on the way (ratio 2): the local numbers differ from the zero case only by float32 rounding of positions
-//    that stay small, which moves a sample under a thousandth of a texel: at most 1 of 255 per channel on every pixel
-//    and 99.9 percent of pixels equal to the exact picture at the same offset. The flight rebases onto the camera a third
-//    of a metre off the metre grid, where every local position rounds differently in float32: 99.83 percent of pixels
-//    were equal there on the first run (RTX A6000, 2026-11-11), short of the planned 99.9, all within 1 of 255. Its bar
-//    is that 1 of 255 on every pixel, with at least 99 percent of pixels equal as a coarse check; the share is reported;
-// 3. a rebase in place bakes nothing that frame (the cache keeps every page) and rebases exactly once.
+// 2. camera (ratio 10, the origin rebases onto the camera at 1e7) and the camera rebased in place: the local numbers
+//    differ from the zero case only by float32 rounding of positions that stay small, which moves a sample under a
+//    thousandth of a texel: at most 1 of 255 per channel on every pixel and 99.9 percent of pixels equal to the exact
+//    picture at the same offset;
+// 3. a rebase in place bakes nothing that frame (the cache keeps every page) and rebases exactly once;
+// 4. a 400 m flight that rebases on the way (ratio 2) onto the camera two thirds of a metre off the metre grid, where
+//    every local position rounds differently in float32. Two controls with no rebase on the way, at the origin the
+//    flight ends on: the same flight (glide) and the final pose drawn at rest. The glide equals the rest picture pixel
+//    for pixel (a cached texel bakes at the same point wherever the window stood, origin.test.js), the flight equals
+//    the glide within bar 2 (what the rebase itself changes), and against the exact picture the flight is within 1 of
+//    255 on every pixel and has no more pixels off than the rest control plus bar 2's 0.1 percent. The rest control's
+//    own share (99.83 percent equal on the RTX A6000, 2026-11-11) is float32 rounding of a frame off the metre grid,
+//    present with no rebase at all, so that bar comes from the control and the share is reported.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -33,8 +38,8 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 const shot = async () => decodePNG(await page.locator('canvas').screenshot());
-async function load(offset, mode, stack = 'rvt') {
-  await page.goto(`${base}/packages/terrain/test/origin.html?offset=${offset}&mode=${mode}&stack=${stack}`);
+async function load(offset, mode, stack = 'rvt', start = '') {
+  await page.goto(`${base}/packages/terrain/test/origin.html?offset=${offset}&mode=${mode}&stack=${stack}${start}`);
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
   assert.deepEqual((await page.evaluate(() => window.check.info())).errors, [], `${mode} ${offset}: page errors`);
   const stats = await page.evaluate(() => window.check.settle());
@@ -97,12 +102,33 @@ await runSuite(
     }
     for (const offset of [OFFSETS[1], OFFSETS[2]]) {
       const f = await load(offset, 'flight'),
-        m = compare(f.image, exact[offset].image);
-      out.flight[offset] = { ...m, flight: f.stats.flight, rebases: f.stats.rebases, shift: f.stats.shift };
+        start = `&start=${f.stats.shift.map(String).join(',')}`,
+        glide = await load(offset, 'glide', 'rvt', start),
+        rest = await load(offset, 'exact', 'rvt', start),
+        m = compare(f.image, exact[offset].image),
+        control = compare(rest.image, exact[offset].image),
+        rebase = compare(f.image, glide.image),
+        path = compare(glide.image, rest.image);
+      out.flight[offset] = {
+        ...m,
+        control,
+        rebase,
+        path,
+        flight: f.stats.flight,
+        rebases: f.stats.rebases,
+        shift: f.stats.shift,
+      };
       console.log(`terrain origin flight ${offset}: ${JSON.stringify(out.flight[offset])}`);
-      // One rebase from the explicit start origin, and one on the way.
+      // One rebase from the explicit start origin, and one on the way; the glide only the start one.
       assert.equal(f.stats.flight.length, 1, `${offset}: the flight rebases once: ${f.stats.flight}`);
-      assert.ok(m.max <= 1 && m.equal >= 0.99, `${offset}: the picture after the flight matches: ${JSON.stringify(m)}`);
+      assert.deepEqual([glide.stats.flight, glide.stats.rebases], [[], 1], `${offset}: the glide never rebases`);
+      assert.deepEqual(glide.stats.shift, f.stats.shift, `${offset}: the glide ends on the flight's origin`);
+      assert.equal(path.max, 0, `${offset}: the glide draws the rest picture: ${JSON.stringify(path)}`);
+      assert.ok(close(rebase), `${offset}: the flight matches the glide: ${JSON.stringify(rebase)}`);
+      assert.ok(
+        m.max <= 1 && control.max <= 1 && m.equal >= control.equal - 0.001,
+        `${offset}: the picture after the flight matches as the control does: ${JSON.stringify({ m, control })}`,
+      );
     }
     // 4. Every other terrain entry under the origin, exact at 0 and 1e7: cached imagery and an overlay polygon; layer
     // materials with displacement; footprints; imagery on the lit path. The same numbers reach the GPU, so the same

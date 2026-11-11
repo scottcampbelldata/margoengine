@@ -98,26 +98,30 @@ test('planWindows: cache windows, local bake bases and the reader wrap match the
     levels = 6,
     eye = [12.34, 5, -7.89],
     windows0 = new Float64Array(levels * 2),
-    bases0 = new Float64Array(levels * 2);
+    bases0 = new Float64Array(levels * 4);
   assert.deepEqual(planWindows(eye, [0, 0, 0], texel, size, levels, windows0, bases0), [0, 0]);
   for (const d of OFFSETS) {
     const windows = new Float64Array(levels * 2),
-      bases = new Float64Array(levels * 2),
+      bases = new Float64Array(levels * 4),
       wrap = planWindows([eye[0] + d, eye[1], eye[2] + d], [d, 0, d], texel, size, levels, windows, bases);
     assert.deepEqual(wrap, [0, 0], 'the offset is a whole number of the coarsest period');
-    assert.equal(bits(bases), bits(bases0), `${d}: local bake bases`);
-    for (let k = 0; k < levels; k++)
+    for (let k = 0; k < levels; k++) {
+      const t = d / (texel * 2 ** k);
       assert.deepEqual(
-        [windows[k * 2] - d / (texel * 2 ** k), windows[k * 2 + 1] - d / (texel * 2 ** k)],
+        [windows[k * 2] - t, windows[k * 2 + 1] - t],
         [windows0[k * 2], windows0[k * 2 + 1]],
         `${d}: level ${k}`,
       );
+      // The bake anchor is the offset's texel and its local corner the zero case's, bit for bit.
+      assert.deepEqual([bases[k * 4] - t, bases[k * 4 + 1] - t], [bases0[k * 4], bases0[k * 4 + 1]], `${d}: anchor ${k}`);
+      assert.equal(bits(bases.subarray(k * 4 + 2, k * 4 + 4)), bits(bases0.subarray(k * 4 + 2, k * 4 + 4)), `${d}: base ${k}`);
+    }
   }
-  // A general shift: the wrap is the shift modulo the coarsest period, and each base is the window corner less it.
+  // A general shift: the wrap is the shift modulo the coarsest period, and each base is the anchor texel less it.
   const shift = [10000017.3, 3, -9999990.7],
     period = texel * size * 2 ** (levels - 1),
     windows = new Float64Array(levels * 2),
-    bases = new Float64Array(levels * 2),
+    bases = new Float64Array(levels * 4),
     wrap = planWindows([shift[0] + 3, 0, shift[2] - 4], shift, texel, size, levels, windows, bases);
   for (const [w, s] of [
     [wrap[0], shift[0]],
@@ -126,7 +130,37 @@ test('planWindows: cache windows, local bake bases and the reader wrap match the
     assert.ok(w >= 0 && w < period);
     assert.ok(Math.abs((s - w) / period - Math.round((s - w) / period)) < 1e-9);
   }
-  assert.equal(bases[0], windows[0] * texel - shift[0]);
+  for (let k = 0; k < levels; k++) {
+    const s = texel * 2 ** k;
+    assert.equal(bases[k * 4 + 2], bases[k * 4] * s - shift[0]);
+    assert.ok(bases[k * 4 + 2] <= 0 && bases[k * 4 + 2] > -s, `level ${k}: the corner sits within a texel of the shift`);
+  }
+});
+
+test('a cached texel bakes at the same float32 point wherever the window stood (a flight keeps its pages)', () => {
+  // The bake's arithmetic as the GPU does it: base and texel in float32, (w - anchor + 0.5) * texel, then the sum.
+  const f = Math.fround,
+    texel = f(0.05),
+    size = 512,
+    levels = 5,
+    shift = [100208.66666666667, 45, 100262.3];
+  const point = (eye) => {
+    const windows = new Float64Array(levels * 2),
+      bases = new Float64Array(levels * 4);
+    planWindows(eye, shift, texel, size, levels, windows, bases);
+    return (k, w) => {
+      const e = f(texel * 2 ** k);
+      return f(f(bases[k * 4 + 2]) + f((w - bases[k * 4] + 0.5) * e));
+    };
+  };
+  // Two poses 9 m apart (a flight's frames): every level's windows differ, both cover the world texels compared.
+  const a = point([shift[0] - 140, 0, shift[2] - 90]),
+    b = point([shift[0] - 131, 0, shift[2] - 90]);
+  for (let k = 0; k < levels; k++) {
+    const s = texel * 2 ** k,
+      centre = Math.floor((shift[0] - 135) / s);
+    for (let w = centre - 40; w <= centre + 40; w++) assert.equal(a(k, w), b(k, w), `level ${k} texel ${w}`);
+  }
 });
 
 function originRig(d, extra = {}) {

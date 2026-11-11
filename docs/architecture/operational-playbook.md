@@ -1932,8 +1932,8 @@ Clipmap terrain far from zero (`TerrainOptions.floatingOrigin`, 2026-11-11, larg
 `FloatingOrigin`; the terrain forms the float64 world eye (local plus `terrain.shift`) and plans in world space: the ring
 corners snap to the world lattice and only `corner - shift` is uploaded (`planRings`), the heightmap corner and height
 offset go up less the shift, and the virtual texture plans its windows in world texels on the float32 texel the GPU
-holds (`planWindows`), bakes each texel at `base + (w - o + 0.5) * e` with `base = o * s - shift` (float64, then
-float32), and reads at `(local + shift mod P) / period`, P the coarsest period, so a rebase keeps every cached page and
+holds (`planWindows`), bakes each texel at `base + (w - a + 0.5) * e` with `a` the world texel at or below the shift
+and `base = a * s - shift` (float64, then float32, under one texel), and reads at `(local + shift mod P) / period`, P the coarsest period, so a rebase keeps every cached page and
 bakes nothing. Layer samples that repeat with position add a per-layer `wrap` (the shift from the terrain's anchor less
 whole 24 / scale macro repeats) and the macro tone adds `fract(k * 0.302)`, so every texture coordinate equals the
 terrain-relative one at any distance. Cache surfaces, overlays and imagery read `local + Frame.anchor.xy`, XZ relative
@@ -1941,10 +1941,19 @@ to the anchor; decal boxes and the deformation window are rewritten local on a r
 from the cache's frame. Without the option every shader, uniform and rule is unchanged (the uniform work-count digest
 pins it). Evidence: `packages/terrain/test/origin.test.js` (planners bit for bit at 0, 100,352 and 10,000,384 m, rules,
 rebase uploads, queries) and `origin.browser.mjs` on an RTX A6000, Edge 157, WebGPU and the WebGL2 layer (identical
-pictures at those offsets with the origin there; within 1 of 255 rebased onto the camera, in place and after a flight;
-overlays, layer materials with displacement, footprints and lit-path imagery identical at 1e7), plus a 1e5 case in
-`compat.browser.mjs`. A fix found on the way: the ring-move test compared the float32 uniform with the float64 corner,
-so a cell size not exact in float32 redrew the shadow maps every frame. Missing: other GPUs, blend and stream on the GPU
+pictures at those offsets with the origin there; within 1 of 255 and 99.9 percent equal rebased onto the camera in
+place; overlays, layer materials with displacement, footprints and lit-path imagery identical at 1e7), plus a 1e5 case
+in `compat.browser.mjs`. The 400 m flight that rebases on the way ends on an origin 2/3 m off the metre grid; it is
+checked against two controls with no rebase at that origin: the same flight without a rebase draws the final pose at
+rest pixel for pixel, and the flight is within 1 of 255 and 99.996 percent equal to it (99.961 on the WebGL2 layer).
+Against the exact picture the flight is 99.836 percent equal (99.828), the rest control 99.832 (99.867): float32
+rounding of a frame off the grid, present without any rebase (each local number is the correctly rounded float32 of
+the float64 one, IEEE 754-2019; Goldberg, What Every Computer Scientist Should Know About Floating-Point Arithmetic,
+1991, https://doi.org/10.1145/103162.103163), so that bar is the control's share less 0.1 percent. Two fixes found on
+the way: the ring-move test compared the float32 uniform with the float64 corner, so a cell size not exact in float32
+redrew the shadow maps every frame; and the bake placed a texel from its window's corner (`o * s - shift`), so off the
+grid a page's colours depended on where the window stood when it baked (36 pixels of a flight differed from the same
+pose at rest; `origin.test.js` checks that a texel bakes at one float32 point from any window). Missing: other GPUs, blend and stream on the GPU
 under the option, frame cost.
 
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that

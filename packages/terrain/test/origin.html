@@ -10,7 +10,8 @@
 // One terrain scene per page load, moved with its camera by ?offset= metres along X and Z, under a FloatingOrigin
 // (test/origin.browser.mjs compares the canvases). ?mode=exact: the origin sits at the offset (every number the GPU gets
 // is the zero case's); camera: ratio 10, the origin rebases onto the camera; flight: ratio 2, the camera flies 400 m to
-// the same pose and rebases on the way. The scene: rules with bump and macro over mipmapped layers, a hole, and a
+// the same pose and rebases on the way; glide: the same flight with no rebase. ?start=x,y,z sets the origin the exact,
+// flight and glide modes start on (the controls of the flight start on the origin it ends on). The scene: rules with bump and macro over mipmapped layers, a hole, and a
 // runtime virtual texture with a decal and a road.
 import { Engine } from '/packages/core/dist/index.js';
 import { FloatingOrigin } from '/packages/cameras/dist/origin.js';
@@ -102,9 +103,10 @@ async function main() {
     camera: { position: [-60, 45, -90], target: [10, 8, 20], near: 0.5, far: 1000 },
   });
   engine.lighting.direction.set([0.4, 0.8, 0.3, 3]);
-  const origin = FloatingOrigin.attach(engine, { ratio: mode === 'camera' ? 10 : mode === 'flight' ? 2 : 1e9 });
-  if (mode === 'exact') origin.rebase([d, 0, d]);
-  if (mode === 'flight') origin.rebase([d - 400, 0, d]);
+  const origin = FloatingOrigin.attach(engine, { ratio: mode === 'camera' ? 10 : mode === 'flight' ? 2 : 1e9 }),
+    start = q.get('start')?.split(',').map(Number);
+  if (mode === 'exact') origin.rebase(start ?? [d, 0, d]);
+  if (mode === 'flight' || mode === 'glide') origin.rebase(start ?? [d - 400, 0, d]);
   const terrain = Terrain.attach(engine, {
     origin: [-128 + d, -128 + d],
     size: [256, 256],
@@ -180,7 +182,7 @@ async function main() {
     await device().queue.onSubmittedWorkDone();
   };
   const flight = [];
-  if (mode === 'flight')
+  if (mode === 'flight' || mode === 'glide')
     for (let k = 0; k <= 24; k++) {
       const x = -400 + (400 * k) / 24,
         before = origin.rebases;
