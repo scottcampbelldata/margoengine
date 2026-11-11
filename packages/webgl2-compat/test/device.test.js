@@ -9,6 +9,7 @@ import {
   COMPAT_VENDOR,
   CompatCanvasContext,
   CompatDevice,
+  CompatOutOfMemoryError,
   CompatQueue,
   createCompatGPU,
   isCompatDevice,
@@ -665,4 +666,44 @@ test('pipelines whose WGSL differs only in binding numbers share a GL program bu
   } finally {
     device.destroy();
   }
+});
+
+// WebGL2 reports a store the driver could not make only through getError (GL_OUT_OF_MEMORY), and the buffer or texture
+// then reads as empty: the layer never asked, so a failed allocation drew silently (docs/known-bugs.md, the path
+// tracer's analytic lows). It is now an out-of-memory error, as WebGPU reports one, to its scope or uncapturederror.
+test('an allocation the driver refuses is an out-of-memory error, to its scope or uncaptured', async () => {
+  const errors = [];
+  let calls = 0;
+  const context = Object.assign(fakeContext(), {
+    RGBA8: 0x8058,
+    TEXTURE_2D: 0x0de1,
+    getError: () => (calls++, errors.shift() ?? 0),
+    isContextLost: () => false,
+  });
+  const gl = new Proxy(context, { get: (c, key) => (key in c ? c[key] : () => ({})) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  const before = calls;
+  device.pushErrorScope('out-of-memory');
+  errors.push(0x0505);
+  device.createBuffer({ label: 'huge', size: 1 << 20, usage: 0x80 | 0x8 });
+  const error = await device.popErrorScope();
+  assert.equal(error?.name, 'GPUOutOfMemoryError');
+  assert.ok(error instanceof CompatOutOfMemoryError);
+  assert.match(error.message, /out of memory for buffer 'huge'/);
+  // A texture's storage too; with no scope open it is uncaptured.
+  const uncaptured = [];
+  device.addEventListener('uncapturederror', (event) => (event.preventDefault(), uncaptured.push(event.error)));
+  errors.push(0x0505);
+  device.createTexture({ label: 'big', size: [4096, 4096], format: 'rgba8unorm', usage: 0x4 });
+  assert.equal(uncaptured.length, 1);
+  assert.equal(uncaptured[0].name, 'GPUOutOfMemoryError');
+  assert.match(uncaptured[0].message, /texture 'big'/);
+  // A clean allocation reports nothing, and costs one getError.
+  device.pushErrorScope('out-of-memory');
+  const n = calls;
+  device.createBuffer({ size: 256, usage: 0x80 | 0x8 });
+  assert.equal(calls - n, 1);
+  assert.equal(await device.popErrorScope(), null);
+  assert.ok(calls > before);
 });

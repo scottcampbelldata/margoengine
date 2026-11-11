@@ -295,9 +295,10 @@ class CompatDevice extends EventTarget {
     compare(f: GPUCompareFunction): number;
     unsupported(what: string): Error;
     pushErrorScope(filter: ErrorFilter): void;
-    popErrorScope(): Promise<CompatValidationError | CompatInternalError | null>;
+    popErrorScope(): Promise<CompatError | null>;
     validationError(message: string): void;
     internalError(message: string): void;
+    allocated(what: string): void;
     lose(reason: 'destroyed' | 'unknown', message: string): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -333,6 +334,8 @@ class CompatDevice extends EventTarget {
     importExternalTexture(descriptor: GPUExternalTextureDescriptor): CompatExternalTexture;
 }
 
+type CompatError = CompatValidationError | CompatOutOfMemoryError | CompatInternalError;
+
 type CompatExtension = (typeof COMPAT_EXTENSIONS)[number];
 
 class CompatExternalTexture {
@@ -348,6 +351,10 @@ class CompatInternalError extends Error {
 }
 
 type CompatLimit = (typeof COMPAT_LIMITS)[number];
+
+class CompatOutOfMemoryError extends Error {
+    constructor(message: string);
+}
 
 class CompatPipelineLayout {
     label: string;

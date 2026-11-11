@@ -11,6 +11,7 @@ import {
   CompatGPU,
   type CompatGPUOptions,
   CompatInternalError,
+  CompatOutOfMemoryError,
   CompatQueue,
   CompatValidationError,
 } from './device/device.js';
@@ -39,7 +40,13 @@ import {
 /** The WGSL front end's types, under the names its own entry gives them (the IR this entry's types refer to). */
 export type * from './wgsl.js';
 export { COMPAT_VENDOR, CompatAdapter, CompatCanvasContext, CompatDevice, CompatGPU, type CompatGPUOptions };
-export { CompatInternalError, CompatValidationError, CompatQueue, CPU_WORK_BUDGET } from './device/device.js';
+export {
+  CompatInternalError,
+  CompatOutOfMemoryError,
+  CompatValidationError,
+  CompatQueue,
+  CPU_WORK_BUDGET,
+} from './device/device.js';
 /** @internal The layer's external-texture storage, exported for its tests. */
 export { ExternalCopies, SPARE_EXTERNALS } from './device/externals.js';
 export {
@@ -131,6 +138,7 @@ const INTERFACES: Record<string, unknown> = {
   GPUCanvasContext: CompatCanvasContext,
   GPUValidationError: CompatValidationError,
   GPUInternalError: CompatInternalError,
+  GPUOutOfMemoryError: CompatOutOfMemoryError,
 };
 
 type Restore = () => void;

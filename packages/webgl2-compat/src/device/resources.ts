@@ -102,12 +102,14 @@ export class CompatBuffer {
     if (this.gl) {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
       gl.bufferData(gl.COPY_WRITE_BUFFER, glSize, gl.DYNAMIC_DRAW);
+      device.allocated(`buffer '${this.label}' (${glSize} bytes)`);
     }
     this.element = usage & BufferUsage.INDEX ? own(gl.createBuffer()) : null;
     if (this.element) {
       device.state.bindVertexArray(null);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.element);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, glSize, gl.DYNAMIC_DRAW);
+      device.allocated(`index buffer '${this.label}' (${glSize} bytes)`);
     }
     const needsShadow =
       usage &
@@ -225,6 +227,7 @@ export class CompatBuffer {
       const texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w, h);
+      this.device.allocated(`the data texture of buffer '${this.label}' (${w} x ${h})`);
       this.data = { texture, shift, version: -1 };
     }
     const d = this.data;
@@ -464,6 +467,7 @@ export class CompatTexture {
       this.renderbuffer = device.objects.own(this, gl.createRenderbuffer());
       gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
       gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, device.enum(info.internal), w, h);
+      device.allocated(`multisampled texture '${this.label}' (${w} x ${h})`);
       this.resolved =
         descriptor.usage & TextureUsage.TEXTURE_BINDING ? this.allocate(gl.TEXTURE_2D, info, 1, w, h, 1) : null;
       return;
@@ -493,6 +497,7 @@ export class CompatTexture {
     const internal = this.device.enum(info.internal);
     if (target === gl.TEXTURE_3D || target === gl.TEXTURE_2D_ARRAY) gl.texStorage3D(target, levels, internal, w, h, d);
     else gl.texStorage2D(target, levels, internal, w, h);
+    this.device.allocated(`texture '${this.label}' (${w} x ${h} x ${d}, ${levels} levels)`);
     return t;
   }
 
@@ -1026,6 +1031,7 @@ export class CompatBindGroup {
         texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
+      this.device.allocated(`the storage texture of bind group '${this.label}'`);
       this.shared = { texture, shift, rows, versions: new Map() };
     }
     const d = this.shared;

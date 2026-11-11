@@ -152,7 +152,11 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   samples. Buffers, textures (2D, 2D array, 3D, cube, 4x multisampled, depth and stencil formats), samplers, bind
   groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
-  `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. `device.destroy()` frees the
+  `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. A buffer, texture or
+  renderbuffer the driver cannot allocate (WebGL2's `GL_OUT_OF_MEMORY`, read once after each allocation) is reported as
+  an `out-of-memory` error, a `GPUOutOfMemoryError` (`CompatOutOfMemoryError`), to its error scope or else as
+  `uncapturederror`, as WebGPU reports a failed allocation; any other GL error the layer leaves is an `internal` one.
+  `device.destroy()` frees the
   context and, as in WebGPU, leaves the last frame on the canvas (one copy into a 2D context of the page). Texture views GL has no view
   for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a
   cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Compressed

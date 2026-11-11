@@ -53,10 +53,12 @@
   share the route but run one after another; the learned horizon is checked by a census at the horizon in every part;
   each occlusion query is held until its resolve reads it. Two flaws found on the way are fixed: dispatches of more than
   2,048 parts were stopped at the horizon without that check (they now run adaptively to the loop's limit), and disposed
-  tracers were never collected (above), which put the page under heavy memory pressure. Still unchecked: the WebGL2
-  layer never reads `GL_OUT_OF_MEMORY`, so a texture or buffer the driver could not allocate would draw silently.
+  tracers were never collected (above), which put the page under heavy memory pressure. A third flaw that fits the
+  symptom is fixed: the WebGL2 layer never read `GL_OUT_OF_MEMORY`, so a buffer or texture the driver could not allocate
+  read as empty and drew silently; it now reads `getError()` once after each allocation and reports an `out-of-memory`
+  error (`GPUOutOfMemoryError`) to its scope or as `uncapturederror` (packages/webgl2-compat/test/device.test.js).
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
-  results kept; have the layer report `out-of-memory` from `gl.getError()` after its allocations.
+  results kept, watching for an `out-of-memory` error.
 
 ### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
 

@@ -242,11 +242,19 @@ export class CompatAdapter {
 }
 
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
+type CompatError = CompatValidationError | CompatOutOfMemoryError | CompatInternalError;
 /** The error object of a validation error (GPUValidationError's shape: `message`). */
 export class CompatValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GPUValidationError';
+  }
+}
+/** The error object of an allocation the driver could not make (GPUOutOfMemoryError's shape). */
+export class CompatOutOfMemoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GPUOutOfMemoryError';
   }
 }
 /** The error object of an internal error (GPUInternalError's shape), with a MargoError code. */
@@ -291,7 +299,7 @@ export class CompatDevice extends EventTarget {
   /** The sampler that loads and size queries use (no filtering, every level). */
   readonly loadSampler: WebGLSampler;
   private resolveLost!: (info: { reason: 'destroyed' | 'unknown'; message: string }) => void;
-  private readonly scopes: { filter: ErrorFilter; error: CompatValidationError | CompatInternalError | null }[] = [];
+  private readonly scopes: { filter: ErrorFilter; error: CompatError | null }[] = [];
   /** Cached framebuffers by attachment key, with how to attach them again and the frame they were last attached in. */
   private readonly framebuffers = new Map<
     string,
@@ -399,7 +407,7 @@ export class CompatDevice extends EventTarget {
   pushErrorScope(filter: ErrorFilter): void {
     this.scopes.push({ filter, error: null });
   }
-  popErrorScope(): Promise<CompatValidationError | CompatInternalError | null> {
+  popErrorScope(): Promise<CompatError | null> {
     const scope = this.scopes.pop();
     if (!scope) return Promise.reject(new DOMException('No error scope to pop', 'OperationError'));
     return Promise.resolve(scope.error);
@@ -412,7 +420,21 @@ export class CompatDevice extends EventTarget {
   internalError(message: string): void {
     this.report('internal', new CompatInternalError(message));
   }
-  private report(filter: ErrorFilter, error: CompatValidationError | CompatInternalError): void {
+  /**
+   * After an allocation (bufferData, texStorage, renderbufferStorage): WebGL2 reports a store the driver could not make
+   * only as GL_OUT_OF_MEMORY from getError, and the object then draws as if empty. That becomes an `out-of-memory` error
+   * (to its scope, else `uncapturederror`), as WebGPU reports a failed allocation; any other GL error left by the layer
+   * becomes an `internal` one. One getError per allocation, never per draw or submit.
+   */
+  allocated(what: string): void {
+    for (let i = 0, e = this.gl.getError(); e !== 0 && i < 8; i++, e = this.gl.getError()) {
+      if (e === 0x0505) this.report('out-of-memory', new CompatOutOfMemoryError(`WebGL2 is out of memory for ${what}`));
+      else if (typeof e === 'number' && !this.gl.isContextLost())
+        this.report('internal', new CompatInternalError(`WebGL2 error 0x${e.toString(16)} at ${what}`));
+      else return;
+    }
+  }
+  private report(filter: ErrorFilter, error: CompatError): void {
     for (let i = this.scopes.length - 1; i >= 0; i--)
       if (this.scopes[i].filter === filter) {
         this.scopes[i].error ??= error;
