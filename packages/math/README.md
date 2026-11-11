@@ -46,7 +46,8 @@ and scale along the box's own axes, folded into `halfSize`). Queries: `containsP
 `intersectsBox3`, `intersectsSphere`, `intersectsPlane`, `intersectsOBB(other, epsilon = 1e-6)` (separating-axis test
 over the 15 face and edge axes; `epsilon` keeps near-parallel edges from reporting a false gap), and `intersectRay(ray,
 out)` / `intersectsRay(ray)` (the nearest entry point, the origin when the ray starts inside, null on a miss). Touching
-boxes intersect. `set`, the constructor, `fromBox3` and `applyMatrix4` throw `TypeError` or `RangeError` with the fix
+boxes intersect. A ray through a corner, edge or a box of zero size hits: hit or miss is decided on the box grown by
+8 machine epsilons of its farthest corner from the ray origin, as `Ray.intersectBox` does, and the distance is the exact one. `set`, the constructor, `fromBox3` and `applyMatrix4` throw `TypeError` or `RangeError` with the fix
 for non-finite values, a negative half size, a rotation that is not orthonormal, an empty box, a projective or
 zero-scale matrix, or a scale that would shear the box.
 

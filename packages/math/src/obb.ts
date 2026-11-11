@@ -260,13 +260,22 @@ export class OBB {
   private distanceToRay(ray: { origin: Vec3Like; direction: Vec3Like }): number | null {
     this.toLocal(ray.origin, 0);
     this.toLocal(ray.direction, 3, true);
-    const h = this.halfSize;
+    const h = this.halfSize,
+      // As Ray.intersectBox: decide on the box grown by 8 epsilons of its farthest corner, return the exact entry.
+      reach = Math.hypot(
+        Math.abs(local[0]) + Math.abs(h.x),
+        Math.abs(local[1]) + Math.abs(h.y),
+        Math.abs(local[2]) + Math.abs(h.z),
+      ),
+      pad = reach < Infinity ? 8 * Number.EPSILON * reach : 0;
     let near = -Infinity,
-      far = Infinity;
+      far = Infinity,
+      entry = -Infinity;
     for (let k = 0; k < 3; k++) {
       const origin = local[k],
         direction = local[3 + k],
-        extent = k === 0 ? h.x : k === 1 ? h.y : h.z;
+        extent = k === 0 ? h.x : k === 1 ? h.y : h.z,
+        slack = pad / Math.abs(direction);
       if (direction === 0) {
         if (origin < -extent || origin > extent) return null;
         continue;
@@ -274,11 +283,12 @@ export class OBB {
       let t0 = (-extent - origin) / direction,
         t1 = (extent - origin) / direction;
       if (t0 > t1) [t0, t1] = [t1, t0];
-      if (t0 > near) near = t0;
-      if (t1 < far) far = t1;
+      if (t0 > entry) entry = t0;
+      if (t0 - slack > near) near = t0 - slack;
+      if (t1 + slack < far) far = t1 + slack;
       if (near > far) return null;
     }
-    return far < 0 ? null : Math.max(near, 0);
+    return far < 0 ? null : Math.max(entry, 0);
   }
   equals(obb: OBB, epsilon = 0): boolean {
     return (

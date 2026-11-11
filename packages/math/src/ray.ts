@@ -119,11 +119,25 @@ export class Ray {
   intersectsBox(box: BoxLike): boolean {
     return this.distanceToBox(box) !== null;
   }
+  /**
+   * The three slab entry times of an inclusive corner or point hit can round one step apart, so hit or miss is decided
+   * on the box grown by 8 machine epsilons of its farthest corner from the origin, which covers the subtraction, the
+   * division and the rounded direction (as the Rust engine's region rays do). The distance returned is the exact
+   * entry, so ordinary hits keep their values.
+   */
   private distanceToBox(box: BoxLike): number | null {
     const o = this.origin,
-      d = this.direction;
+      d = this.direction,
+      reach = Math.hypot(
+        Math.max(Math.abs(box.min.x - o.x), Math.abs(box.max.x - o.x)),
+        Math.max(Math.abs(box.min.y - o.y), Math.abs(box.max.y - o.y)),
+        Math.max(Math.abs(box.min.z - o.z), Math.abs(box.max.z - o.z)),
+      ),
+      // An empty or unbounded box (infinite corners) keeps the plain test.
+      pad = reach < Infinity ? 8 * Number.EPSILON * reach : 0;
     let near = -Infinity,
-      far = Infinity;
+      far = Infinity,
+      entry = -Infinity;
     for (let axis = 0; axis < 3; axis++) {
       const origin = axis === 0 ? o.x : axis === 1 ? o.y : o.z,
         direction = axis === 0 ? d.x : axis === 1 ? d.y : d.z;
@@ -133,7 +147,8 @@ export class Ray {
         if (origin < lo || origin > hi) return null;
         continue;
       }
-      const inverse = 1 / direction;
+      const inverse = 1 / direction,
+        slack = pad * Math.abs(inverse);
       let t0 = (lo - origin) * inverse,
         t1 = (hi - origin) * inverse;
       if (t0 > t1) {
@@ -141,11 +156,12 @@ export class Ray {
         t0 = t1;
         t1 = t;
       }
-      if (t0 > near) near = t0;
-      if (t1 < far) far = t1;
+      if (t0 > entry) entry = t0;
+      if (t0 - slack > near) near = t0 - slack;
+      if (t1 + slack < far) far = t1 + slack;
       if (near > far) return null;
     }
-    return far < 0 ? null : Math.max(near, 0);
+    return far < 0 ? null : Math.max(entry, 0);
   }
   /** Möller-Trumbore. With `backfaceCulling`, triangles wound clockwise as seen from the ray are skipped. */
   intersectTriangle<T extends Vec3Like>(
