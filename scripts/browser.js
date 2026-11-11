@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { settleWgslReports, watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
+import { holdStaleDocumentGpu } from './support/stale-document.js';
 import { compatIgnoredLine, compatRun, compatShim } from './support/compat-shim.js';
 import { closeAll, traceShutdown } from './support/shutdown.mjs';
 
@@ -523,6 +524,9 @@ export async function openBrowser({
     else browser = await webkit.launch({ headless });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     page.setDefaultTimeout(30000);
+    // First, so every GPU wrapper below sees held promises: a document the tab has left runs no more of its GPU
+    // continuations, which in WebKit wrote into the next document's window (support/stale-document.js, KB-L4-W1).
+    await page.addInitScript(holdStaleDocumentGpu);
     // Every shader module the page creates is compiled for diagnostics; close() fails on a WGSL error.
     await page.addInitScript(wgslGuard);
     // A device the driver takes away (a GPU reset) fails the next wait at once, naming the loss (support/device-loss.js).

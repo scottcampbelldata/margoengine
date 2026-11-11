@@ -274,6 +274,36 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
+### Fixed 2026-11-11: in WebKit a check's first run could be the previous document's, at 300 x 150 (KB-L4-W1)
+
+- **Repro:** on the Apple M6 Mac, `MARGO_BROWSER=webkit node packages/sky/test/browser-check.mjs` in a freshly copied
+  checkout failed `night-citadel 4x frame 0 scene vs control` in about 1 run in 10 (3 of 21, then 1 of 19 and 1 of
+  12): the `full` frames were 300 x 150 (45,000 pixels) against 256 x 192. Smaller: tests/stale-document.test.js
+  under `MARGO_BROWSER=webkit` fails both its cases without the fix.
+- **Cause:** Playwright's WebKit keeps resolving the WebGPU promises of a document after the tab has navigated away
+  from it. openBrowser loads the check's page, and the check navigates to it again at once; on a first load (Vite
+  transforms every module) the first document was still starting up, so it finished in the background with no page
+  (hidden, innerWidth 0, devicePixelRatio 0, so the engine kept the canvas default 300 x 150). Every document of a tab
+  shares one `window` object, so its `window.ready = true` and `window.check = {...}` landed on the new document, and
+  the check's first `check.run` was the old document's. Traced by logging each document's `performance.timeOrigin`
+  and state inside one run: the run started in a 346 ms old hidden document and its frames read the 48 ms old one. No
+  canvas size was ever written to 300; core's resize is not involved and needs no change. No page reload happened, and
+  the dependency scan message was a separate defect (fixed below).
+- **Fix:** openBrowser installs `holdStaleDocumentGpu` (scripts/support/stale-document.js) first in every page: once a
+  document's `pagehide` has fired, each WebGPU promise it settles is held, so its script stops at its next GPU wait; a
+  document the back/forward cache shows again gets the held results. Chromium and Firefox already stop a left
+  document's script. Before the fix 5 of 52 fresh-folder sky runs on the Mac failed; after it 60 of 60 passed.
+  Regression: tests/stale-document.test.js.
+
+### Fixed 2026-11-11: the browser teardown test failed on main over a standalone upstream repro runner
+
+- **Repro:** `node --test tests/browser-teardown.test.js` after c456fb6d05 named `docs/upstream-reports/run-page.mjs`
+  as a script that starts a browser and a server without `closeAll`.
+- **Cause:** the runner opens repro pages for other projects' bug trackers and must carry no Margo code, so it cannot
+  import `scripts/support/shutdown.mjs`; the checker covered every tracked script.
+- **Fix:** the checker skips `docs/upstream-reports/`, with the reason beside the rule (49e7d087c5). Those scripts run
+  by hand, never in a suite or gate. Regression: tests/browser-teardown.test.js.
+
 ### Fixed 2026-11-11: every suite dev server scanned every HTML page in the checkout for dependencies
 
 - **Repro:** `startDevServer({ startPath: '/LICENSE', port: 0 })` from `scripts/browser.js`; its
