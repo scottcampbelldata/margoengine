@@ -276,7 +276,10 @@ for (const name of packages) {
 // fitToBoundingBox past near) took core 21,775 -> 21,828 B (+53 B). e8f3decf6 recorded 21,812 B, a figure no build of
 // its sources gives: this build of packages/core and packages/shared at e8f3decf6^ measures 21,775 B and at e8f3decf6
 // 21,828 B (Node 26.12.0, zlib 1.3.2.1-motley, rolldown 1.2.13), and nothing core bundles changed after it.
-const CORE_ONLY_CEILING = 21_829;
+// 2026-11-10: Scott approved these core bug fixes (camera validate-before-publish, outward-rounded bounds, restore
+// budget) under the same rulings; they took core 21,828 -> 22,031 B (+203 B with the rebuilt kernel
+// Wasm), shrunk from the 22,041 B draft. Strict ceiling one byte above it. The 7b core shrink pass wins it back.
+const CORE_ONLY_CEILING = 22_032;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();

@@ -4,6 +4,9 @@ import { rangeError } from '../../shared/errors.js';
 // Holds a plane's squared length on its way to Math.sqrt. V8 13 (Node 24) Maglev calls Math.sqrt with a boxed
 // number; fed straight from the summing loop, the loop's sum was boxed on every step (288 B per frame), not once.
 const squared = new Float64Array(1);
+// The next matrix and planes, checked before either is published, so a rejected update keeps the last good ones.
+const next = new Float32Array(16),
+  nextPlanes = new Float32Array(24);
 /** Three components `[x, y, z]`, usually a point or direction in world units. */
 export type Vec3 = readonly [number, number, number];
 /** Initial {@link Camera} settings. */
@@ -109,7 +112,7 @@ export class Camera {
       projection[11] = -1;
       projection[14] = webgpu ? (-this.far * this.near) / d : (2 * this.far * this.near) / d;
     }
-    const m = this.matrix;
+    const m = next;
     for (let c = 0; c < 4; c++)
       for (let r = 0; r < 4; r++)
         m[c * 4 + r] =
@@ -124,14 +127,16 @@ export class Camera {
       let length2 = 0;
       for (let c = 0; c < 4; c++) {
         const value = plane === 4 && webgpu ? m[c * 4 + 2] : m[c * 4 + 3] + sign * m[c * 4 + row];
-        this.planes[plane * 4 + c] = value;
+        nextPlanes[plane * 4 + c] = value;
         if (c < 3) length2 += value * value;
       }
       squared[0] = length2;
       const norm = Math.sqrt(squared[0]);
       if (!norm) throw rangeError('Invalid frustum', 'camera');
-      for (let c = 0; c < 4; c++) this.planes[plane * 4 + c] /= norm;
+      for (let c = 0; c < 4; c++) nextPlanes[plane * 4 + c] /= norm;
     }
+    this.matrix.set(m);
+    this.planes.set(nextPlanes);
   }
   fitToBoundingBox(
     min: Vec3,
