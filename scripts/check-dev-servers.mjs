@@ -18,29 +18,30 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'no
 import { networkInterfaces, tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { humanEnv, probe, runToEnd } from './support/dev-server-probe.mjs';
+import { freePort, humanEnv, probe, runToEnd } from './support/dev-server-probe.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packageDir = (name) => dirname(fileURLToPath(import.meta.resolve(`${name}/package.json`)));
 const viteBin = join(packageDir('vite'), 'bin', 'vite.js');
-const BASE_PORT = 5400;
 const SERVER_NAME = /^(modern:)?(dev|serve|preview|start|server)\b/;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'test-results', 'private', '.lane', '.next']);
 
 /**
- * Plain Node servers, by `<package.json path> <script>`. `args` get the port; `page` is the first URL ('' for a server
- * with no web page, which is then probed by a TCP connection to `port`).
+ * Plain Node servers, by `<package.json path> <script>`. `args` get the free ports the check picked (`ports` of them);
+ * `page` is the first URL ('' for a server with no web page, which is then probed by a TCP connection to the first port).
  */
 const NODE_SERVERS = {
   'examples/gameplay-sandbox/package.json dev:lan': {
-    needsLan: true, // binds to the machine's private IPv4 address and writes a certificate; fixed ports 5200 and 5201
-    page: (lan) => `https://${lan}:5200/`,
+    needsLan: true, // binds to the machine's private IPv4 address and writes a certificate; 5200 and 5201 by default
+    ports: 2,
+    args: ([port, certPort]) => [`--port=${port}`, `--cert-port=${certPort}`],
+    page: (lan, [port]) => `https://${lan}:${port}/`,
     insecure: true,
     isolatedHome: true,
   },
   'examples/voxel-sandbox/package.json server': {
-    args: (port) => [`--port=${port}`],
-    port: 8787,
+    ports: 1,
+    args: ([port]) => [`--port=${port}`],
     page: () => '',
   },
 };
@@ -126,8 +127,12 @@ function firstPage(server) {
   return '/';
 }
 
-async function runServer(server, assigned, report) {
+// Every server starts on a port the operating system reports free at that moment, never a fixed one: other work on
+// the machine (another lane's dev server or GPU suite) holds fixed ports, and probe() fails a server that exits
+// because its port was taken, so an answer from someone else's server never passes.
+async function runServer(server, report) {
   if (server.kind === 'vite') {
+    const assigned = await freePort();
     return probe({
       command: process.execPath,
       args: [viteBin, ...server.args, '--host', '127.0.0.1', '--port', String(assigned), '--strictPort', '--force'],
@@ -145,6 +150,7 @@ async function runServer(server, assigned, report) {
       const built = await runToEnd({ command: process.execPath, args: [next, ...buildCommand], cwd: server.cwd, env });
       if (built.problems.length) return { problems: built.problems.map((p) => `build: ${p}`), lines: built.lines };
     }
+    const assigned = await freePort();
     return probe({ command: process.execPath, args: [next, server.mode, ...withoutPort, '--port', String(assigned)], cwd: server.cwd, env, page: `http://127.0.0.1:${assigned}/` });
   }
   const config = server.config;
@@ -166,14 +172,16 @@ async function runServer(server, assigned, report) {
     env.HOME = home;
     env.USERPROFILE = home;
   }
-  const port = config.port ?? assigned;
+  const ports = [];
+  for (let i = 0; i < config.ports; i += 1) ports.push(await freePort(lan || '127.0.0.1'));
+  if (new Set(ports).size !== ports.length) return { problems: [`the operating system gave the same free port twice: ${ports.join(', ')}`], lines: [] };
   return probe({
     command: process.execPath,
-    args: [script, ...(config.args?.(port) ?? [])],
+    args: [script, ...config.args(ports)],
     cwd: server.cwd,
     env,
-    page: config.page(lan),
-    tcpPort: port,
+    page: config.page(lan, ports),
+    tcpPort: ports[0],
     insecure: config.insecure,
   });
 }
@@ -284,8 +292,8 @@ if (listOnly) {
 let failures = 0;
 const report = { notRun: [] };
 if (!docsOnly) {
-  for (const [index, server] of runnable.entries()) {
-    const { problems, lines } = await runServer(server, BASE_PORT + index, report);
+  for (const server of runnable) {
+    const { problems, lines } = await runServer(server, report);
     if (problems.length === 0) console.log(`ok   ${server.label}`);
     else {
       failures += 1;

@@ -6,21 +6,40 @@
 // every dev server in the repository).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createNetServer } from 'node:net';
 import { readFileSync, statSync, utimesSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 
-test('the root dev server starts without a dependency scan failure', { timeout: 150_000 }, () => {
-  const run = spawnSync(process.execPath, [join(root, 'scripts/check-dev-servers.mjs'), '--only=package.json modern:dev:extensions'], {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 140_000,
-    killSignal: 'SIGKILL',
+// Local CI (2026-11-11, commit 2a4eb62dbe) failed 16 servers with "Port 5401 ... 5416 is already in use": the check
+// gave server n the fixed port 5400 + n, and other work on the dev PC (GPU suites such as packages/toon on 5400 and
+// 5401, another lane's dev servers) held those ports. The check now asks the operating system for a free port per
+// server, so it passes while its old first port is held by another process.
+test('the root dev server starts without a dependency scan failure, while port 5400 is held by another process', { timeout: 150_000 }, async () => {
+  const holder = createNetServer();
+  // Already held by someone else serves the test just as well.
+  const held = await new Promise((done, fail) => {
+    holder.once('error', (error) => (error.code === 'EADDRINUSE' ? done(false) : fail(error)));
+    holder.listen(5400, '127.0.0.1', () => done(true));
   });
-  assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
-  assert.match(run.stdout, /ok\s+package\.json modern:dev:extensions/);
+  try {
+    const run = await new Promise((done) => {
+      const child = spawn(process.execPath, [join(root, 'scripts/check-dev-servers.mjs'), '--only=package.json modern:dev:extensions'], { cwd: root });
+      let stdout = '',
+        stderr = '';
+      child.stdout.on('data', (chunk) => (stdout += chunk));
+      child.stderr.on('data', (chunk) => (stderr += chunk));
+      const timer = setTimeout(() => killTree(child), 140_000);
+      child.on('close', (status) => (clearTimeout(timer), done({ status, stdout, stderr })));
+    });
+    assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
+    assert.match(run.stdout, /ok\s+package\.json modern:dev:extensions/);
+  } finally {
+    if (held) await new Promise((done) => holder.close(done));
+  }
 });
 
 test('the root Vite config leaves the rival comparison pages out of the dependency scan', () => {
@@ -129,7 +148,7 @@ test('the root dev server watches only what it serves, so three demo tabs open a
 // and a server that never answers each fail it.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { probe } from '../scripts/support/dev-server-probe.mjs';
+import { freePort, killTree, probe } from '../scripts/support/dev-server-probe.mjs';
 
 function fixture(source) {
   const dir = mkdtempSync(join(tmpdir(), 'margo-probe-'));
@@ -146,8 +165,10 @@ http.createServer((request, response) => {
   else { response.statusCode = 404; response.end(); }
 }).listen(port, '127.0.0.1', () => { ${body} });
 `;
-async function run(source, port) {
-  const dir = fixture(source);
+// Each probe runs on a free port: fixed ones collided with other servers on the machine (see the first test).
+async function run(source) {
+  const dir = fixture(source),
+    port = await freePort();
   try {
     return await probe({ command: process.execPath, args: ['server.mjs', String(port)], cwd: dir, page: `http://127.0.0.1:${port}/`, settleMs: 200, listenLimitMs: 10_000, limitMs: 30_000 });
   } finally {
@@ -156,24 +177,52 @@ async function run(source, port) {
 }
 
 test('the probe passes a clean server and follows the modules a page loads', async () => {
-  const { problems } = await run(serverSource("console.log('Local: ready');"), 5701);
+  const { problems } = await run(serverSource("console.log('Local: ready');"));
   assert.deepEqual(problems, []);
 });
 
 test('the probe fails on a warning line in the server output', async () => {
-  const { problems } = await run(serverSource("console.warn('(!) Failed to run dependency scan.');"), 5702);
+  const { problems } = await run(serverSource("console.warn('(!) Failed to run dependency scan.');"));
   assert.ok(problems.some((p) => p.startsWith('output:')), problems.join('\n'));
 });
 
 test('the probe fails on a module the page loads that does not exist', async () => {
   const source = serverSource('', 'import "/missing.js";');
-  const { problems } = await run(source, 5703);
+  const { problems } = await run(source);
   assert.ok(problems.some((p) => /missing\.js answered 404/.test(p)), problems.join('\n'));
 });
 
 test('the probe fails on a server that exits before it answers', async () => {
-  const { problems } = await run('process.exit(3);', 5704);
+  const { problems } = await run('process.exit(3);');
   assert.ok(problems.some((p) => /exited 3/.test(p)), problems.join('\n'));
+});
+
+// A server that loses its port exits while another process on that port answers the probe's requests. The probe used
+// to pass on those answers; it now fails a server that is no longer running when the probe ends.
+test('the probe fails a server that exited while another process answered on its port', { timeout: 60_000 }, async () => {
+  const other = createHttpServer((request, response) => (response.writeHead(200, { 'content-type': 'text/plain' }), response.end('someone else')));
+  await new Promise((done) => other.listen(0, '127.0.0.1', done));
+  try {
+    const { problems } = await probe({
+      command: process.execPath,
+      args: ['-e', 'setTimeout(() => process.exit(1), 500)'],
+      cwd: root,
+      page: `http://127.0.0.1:${other.address().port}/`,
+      settleMs: 1_500,
+      limitMs: 30_000,
+    });
+    assert.ok(problems.some((p) => /exited 1 during the probe, so another process answered/.test(p)), problems.join('\n'));
+  } finally {
+    await new Promise((done) => other.close(done));
+  }
+});
+
+test('freePort gives a port that can be listened on at once', async () => {
+  const port = await freePort(),
+    server = createNetServer();
+  assert.ok(Number.isInteger(port) && port > 0 && port < 65536, String(port));
+  await new Promise((done, fail) => (server.once('error', fail), server.listen(port, '127.0.0.1', done)));
+  await new Promise((done) => server.close(done));
 });
 
 test('every start command in the documentation maps to a checked server', { timeout: 60_000 }, () => {

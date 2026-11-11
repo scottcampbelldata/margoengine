@@ -132,6 +132,8 @@ then open the HTTPS URL in a WebGPU-capable browser. The certificate expires aft
 which test PCs need the new certificate. Git's bundled OpenSSL or an `openssl`
 executable on PATH is required to generate it. The private key stays outside the
 workspace in the user's local application data. The server runs until stopped.
+When 5200 or 5201 is taken, pick other ports:
+`npm run dev:lan --workspace examples/gameplay-sandbox -- --port=5300 --cert-port=5301`.
 
 Vite and TypeScript resolve the packages through their public distribution exports,
 without source aliases. Run `npm run build:packages` before standalone workspace

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync
 import { join, resolve } from 'node:path';
 import { readTarball, startRegistry } from './publish-rehearsal.mjs';
 import { run, installedEnginePackages, requiredClosure } from './kit-install-check.mjs';
-import { BAD_LINE, humanEnv, probe } from './support/dev-server-probe.mjs';
+import { BAD_LINE, freePort, humanEnv, probe } from './support/dev-server-probe.mjs';
 
 // Besides installing and building, every server script of each template is started the way the template README says
 // (`npm run dev`, `npm run preview`, `npm start`): the first page and what it loads answer 200 and the output holds no
@@ -12,14 +12,13 @@ import { BAD_LINE, humanEnv, probe } from './support/dev-server-probe.mjs';
 // for template-browser-check.mjs. No GPU is used here.
 const cleanup = process.argv.includes('--cleanup');
 const serverProblems = [];
-let nextPort = 5600;
 
 /** The server scripts of a template: dev, preview and start (the `build` script runs separately, above them). */
 function serverScripts(manifest) {
   return Object.keys(manifest.scripts).filter((script) => /^(dev|preview|start)$/.test(script));
 }
 
-/** The command a template script runs, started directly from the app's own install on a chosen port. */
+/** The command a template script runs, started directly from the app's own install on a free port (freePort: a fixed one collides with other servers on the machine). */
 function serverCommand(app, script, port) {
   const next = join(app, 'node_modules/next/dist/bin/next'),
     vite = join(app, 'node_modules/vite/bin/vite.js'),
@@ -105,7 +104,7 @@ try {
     for (const line of built.split(/\r?\n/)) if (BAD_LINE.test(line)) serverProblems.push(`${name}: build output: ${line.trim().slice(0, 240)}`);
     serverProblems.push(...viteOutputProblems(name, app));
     for (const script of serverScripts(manifest)) {
-      const { problems } = await probe({ ...serverCommand(app, script, nextPort++), cwd: app, env: { ...humanEnv(env), NEXT_TELEMETRY_DISABLED: '1' }, limitMs: 150_000 });
+      const { problems } = await probe({ ...serverCommand(app, script, await freePort()), cwd: app, env: { ...humanEnv(env), NEXT_TELEMETRY_DISABLED: '1' }, limitMs: 150_000 });
       for (const problem of problems) serverProblems.push(`${name} npm run ${script}: ${problem}`);
       console.log(`${name}: npm run ${script} ${problems.length ? 'FAILED' : 'started clean'}`);
     }

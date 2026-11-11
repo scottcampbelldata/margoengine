@@ -6,6 +6,17 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
 
+// `--port=<n>` (default 5200) is the HTTPS page, `--cert-port=<n>` (default 5201) the certificate download.
+const option = (name, fallback) => {
+  const text = process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+  if (text === undefined) return fallback;
+  const value = Number(text);
+  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(`--${name} must be a port from 1 to 65535, got "${text}".`);
+  return value;
+};
+const port = option('port', 5200),
+  certPort = option('cert-port', 5201);
+if (port === certPort) throw new Error(`--port and --cert-port must differ; both are ${port}.`);
 const addresses = Object.values(networkInterfaces())
   .flat()
   .filter((a) => a.family === 'IPv4' && !a.internal && /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address))
@@ -62,7 +73,7 @@ writeFileSync(join(directory, 'afterlight.cer'), publicCertificate);
 const server = await createViteServer({
   root: import.meta.dirname,
   configFile: resolve(import.meta.dirname, 'vite.config.ts'),
-  server: { host, port: 5200, strictPort: true, https: { key: readFileSync(keyPath), cert: readFileSync(certPath) } },
+  server: { host, port, strictPort: true, https: { key: readFileSync(keyPath), cert: readFileSync(certPath) } },
 });
 const download = createServer((request, response) => {
   if (request.url !== '/afterlight.cer') {
@@ -79,7 +90,7 @@ const download = createServer((request, response) => {
 try {
   await new Promise((ok, fail) => {
     download.once('error', fail);
-    download.listen(5201, host, ok);
+    download.listen(certPort, host, ok);
   });
   await server.listen();
 } catch (error) {

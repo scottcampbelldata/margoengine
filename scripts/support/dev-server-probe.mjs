@@ -31,6 +31,22 @@ export function get(url, { insecure = false, timeout = 30_000 } = {}) {
   });
 }
 
+/**
+ * A TCP port nothing listens on at `host` right now, from the operating system. The checks start each server on one of
+ * these instead of a fixed number: a fixed port collided with every other server on the machine (another lane's GPU
+ * suite or dev server), and the check then failed with "Port 5413 is already in use" for a server that was fine.
+ */
+export function freePort(host = '127.0.0.1') {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, host, () => {
+      const { port } = server.address();
+      server.close((error) => (error ? reject(error) : resolve(port)));
+    });
+  });
+}
+
 const tcpOpen = (port, host) =>
   new Promise((done) => {
     const socket = net.connect({ port, host });
@@ -97,6 +113,10 @@ export async function probe({ command, args, cwd, env = process.env, page, tcpPo
     }
     // The dependency scan and pre-bundling report after the first request; give them time to settle.
     await new Promise((r) => setTimeout(r, settleMs));
+    // Only a server still running now answered: one that lost its port to another process exits, and the pages read
+    // above came from that other process.
+    if (child.exitCode !== null || child.signalCode !== null)
+      throw new Error(`exited ${child.exitCode ?? child.signalCode} during the probe, so another process answered on its port`);
   } catch (error) {
     problems.push(error instanceof Error ? error.message : String(error));
   } finally {
