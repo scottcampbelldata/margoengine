@@ -856,7 +856,9 @@ console.log(planet.altitude(engine.camera.position)); // metres above the ground
   `planetNoise({radius, relief, seed})`, fractal value noise); `relief` 8,000 m; `seed` 1; `seaLevel` 0 (or `false`);
   `resolution` 32 quads a patch side (even, 4 to 64); `maxLevel` 20 (vertices 0.3 m apart on the Earth); `screenError`
   4 px; `budget` 4 ms of patch building a frame (at least one patch; `Infinity` builds everything a view needs in one
-  frame); `maxPatches` 2,048 on the GPU at once (about 24 KB each at resolution 32, so 50 MB); `origin` a
+  frame); `maxPatches` 2,048 on the GPU at once (about 24 KB each at resolution 32, so 50 MB; when every slot holds a
+  patch the view uses, the planet keeps drawing the coarser parents where it wanted finer ones, never a hole, and
+  `stats.resident` equals `maxPatches`: raise it, up to 16,384, for more detail); `origin` a
   `FloatingOrigin` to follow. Invalid values throw `RangeError` or `TypeError`.
 - Your own ground: `height(x, y, z, detail)` gets a unit direction from the centre (float64) and returns metres above
   `radius`; `detail` is the spacing of the vertices being built there, so a procedural height can skip finer detail.

@@ -467,7 +467,7 @@ canvas.addEventListener('pointerdown', async (event) => {
 - `hit.cloud`, `hit.point` and `hit.position` name the point. `hit.mesh` is the mesh the cloud follows, or else an empty mesh made for that cloud, which draws nothing and which `cloudOf` maps back; stand-ins go with their cloud or with `dispose()`. Attach `PointsPlugin` to the engine first.
 - A point hits where it shows: its shape, map, `alphaTest` and clipping planes apply, and fully transparent points such as a hidden class do not hit. A sphere impostor hits at its curved depth. Like every pick, the 3 x 3 tile also finds a neighbouring pixel when the exact one is empty.
 - Only points drawn in the view's latest frame pick, at their level of detail and transform, so an `OctreeCloud` picks through its nodes on screen. It answers the nearest thing only. Sprites and `SurfelPlugin` clouds do not pick.
-- Clouds at most 268,435,456 points in all per pick. While an overlay is registered, each pick draws every drawn point of that view again, with no culling to the pixel.
+- Clouds at most 268,435,456 points in all per pick (the ID range `Picking` gives an overlay); the drawn clouds after the one that would pass it are not hit. A default device cannot reach it: that is 24 clouds at the 11,184,810-point cap, 3 GB of positions. While an overlay is registered, each pick draws every drawn point of that view again, with no culling to the pixel.
 
 ## Potree folders (`margoengine/points/potree`)
 
