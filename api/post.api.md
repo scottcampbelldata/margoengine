@@ -145,6 +145,8 @@ export class LensFlare implements EnginePlugin {
 
 export interface LensFlareOptions {
     sun?: () => ArrayLike<number>;
+    position?: () => ArrayLike<number>;
+    elements?: readonly LensFlareElement[];
     color?: readonly [number, number, number];
     intensity?: number;
     occlusionRadius?: number;
@@ -352,6 +354,13 @@ export function bloomWeights(radius: number, levels: number): number[];
 // Not exported from this entry, but used by the exports above:
 
 type BloomImageContext = Pick<PostPassContext, 'device' | 'encoder' | 'width' | 'height'>;
+
+interface LensFlareElement {
+    texture?: GPUTexture;
+    size: number;
+    distance?: number;
+    color?: readonly [number, number, number];
+}
 
 type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';

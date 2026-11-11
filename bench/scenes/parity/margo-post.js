@@ -65,6 +65,35 @@ async function yard(canvas, data, marks, attach, { single = false, floorMaterial
   };
 }
 
+/** A radial gradient image (the scene's glow or ring), sRGB, as a texture of `device`. */
+async function flareTexture(device, size, ring) {
+  const c = new OffscreenCanvas(size, size),
+    g = c.getContext('2d'),
+    grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  const stops = ring
+    ? [
+        [0, 'rgba(255,255,255,0)'],
+        [0.7, 'rgba(255,255,255,0)'],
+        [0.85, 'rgba(255,240,220,0.6)'],
+        [1, 'rgba(255,255,255,0)'],
+      ]
+    : [
+        [0, 'rgba(255,255,255,1)'],
+        [0.2, 'rgba(255,230,200,0.5)'],
+        [1, 'rgba(255,200,150,0)'],
+      ];
+  for (const [at, colour] of stops) grad.addColorStop(at, colour);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  const texture = device.createTexture({
+    size: [size, size],
+    format: 'rgba8unorm-srgb',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  device.queue.copyExternalImageToTexture({ source: await createImageBitmap(c) }, { texture }, [size, size]);
+  return texture;
+}
+
 const post = {
   stack: () => import('@margoengine/post/stack'),
   tonemap: async () => new (await import('@margoengine/tonemap')).Tonemap({ curve: 'neutral' }),
@@ -340,9 +369,27 @@ export const builders = {
     });
   },
 
-  async 'p-lensflare'() {
-    throw new Error(
-      'unsupported: lens flare from a point light (post LensFlare follows the sun direction only; it has no point-light flare or configurable elements)',
-    );
+  async 'p-lensflare'(canvas, data, marks) {
+    const light = data.effect.light;
+    return yard(canvas, data, marks, async (engine) => {
+      const { LensFlare } = await import('@margoengine/post/lens-flare'),
+        glow = await flareTexture(engine.gpu, 512, false),
+        ring = await flareTexture(engine.gpu, 128, true);
+      await stack(engine, [
+        new LensFlare({
+          position: () => light,
+          elements: [
+            { texture: glow, size: 512 },
+            { texture: ring, size: 60, distance: 0.6 },
+            { texture: ring, size: 90, distance: 0.7 },
+            { texture: ring, size: 120, distance: 0.9 },
+          ],
+        }),
+        await post.tonemap(),
+      ]);
+      return {
+        note: `PostStack [LensFlare {position (${light}), glow 512 px + rings 60/90/120 px at 0.6/0.7/0.9}, Tonemap]; the light adds no lighting (flare only), as three's intensity-0 PointLight; the flare is added in HDR before the display curve.`,
+      };
+    });
   },
 };

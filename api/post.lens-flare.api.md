@@ -19,8 +19,17 @@ export class LensFlare implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export interface LensFlareElement {
+    texture?: GPUTexture;
+    size: number;
+    distance?: number;
+    color?: readonly [number, number, number];
+}
+
 export interface LensFlareOptions {
     sun?: () => ArrayLike<number>;
+    position?: () => ArrayLike<number>;
+    elements?: readonly LensFlareElement[];
     color?: readonly [number, number, number];
     intensity?: number;
     occlusionRadius?: number;

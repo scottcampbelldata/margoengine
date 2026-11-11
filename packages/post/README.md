@@ -444,7 +444,7 @@ taa = TAA.attach(stage.engine, {depth: () => stack.depthTexture});
 
 ## Lens flare: `LensFlare`
 
-`@margoengine/post/lens-flare` (5,776 B min+gzip, its own entry; it carries the stack) adds a lens flare for the sun:
+`@margoengine/post/lens-flare` (7,673 B min+gzip, its own entry; it carries the stack) adds a lens flare for the sun:
 a glow around it, a halo ring about the screen centre on its side, and six tinted ghosts (the lens's internal
 reflections) on the line from the sun through the screen centre. It is an HDR `PostStack` effect; put it after SSR and
 before Bloom so the flare glows. `LensFlare.attach(engine, options)` runs it alone.
@@ -457,6 +457,36 @@ import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 PostStack.attach(stage.engine, [new LensFlare({intensity: 0.1}), new Bloom()]);   // follows engine.lighting
 // With @margoengine/sky: new LensFlare({sun: () => sky.lights[0].direction})    // w = 0 below the horizon hides it
+```
+
+A flare from a point light with your own images: `position` in place of `sun`, and `elements` in place of the
+built-in glow, halo and ghosts.
+
+```ts
+import {PostStack} from 'margoengine/post/stack';
+import {LensFlare} from 'margoengine/post/lens-flare';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const device = stage.engine.gpu!;
+// Any 2D texture of this device with a filterable format; here a small white disc fading to its edge.
+const glow = device.createTexture({size: [64, 64], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+const pixels = new Uint8Array(64 * 64 * 4);
+for (let i = 0; i < 64 * 64; i++) {
+  const r = Math.hypot((i % 64) - 31.5, Math.floor(i / 64) - 31.5) / 32;
+  pixels.set([255, 255, 255, Math.max(0, 1 - r) * 255], i * 4);
+}
+device.queue.writeTexture({texture: glow}, pixels, {bytesPerRow: 64 * 4}, [64, 64]);
+const lamp = [0, 6, 0];
+PostStack.attach(stage.engine, [
+  new LensFlare({
+    position: () => lamp,                                 // a world point; its w, when given, scales the flare
+    elements: [
+      {texture: glow, size: 512},                         // at the light, 512 px across
+      {size: 60, distance: 0.6, color: [0.6, 0.8, 1]},    // no texture: a soft round glow
+      {texture: glow, size: 120, distance: 0.9},          // 0.5 is the screen centre, 1 the light's mirror image
+    ],
+  }),
+]);
 ```
 
 - **The sun.** `sun()` gives the direction toward it (default `engine.lighting.direction`); its w, when given, scales
@@ -474,8 +504,22 @@ PostStack.attach(stage.engine, [new LensFlare({intensity: 0.1}), new Bloom()]); 
   the frame unchanged (0); a box whose edge splits the disc leaves 0.4998 of the flare where 26 of the 52 depth
   samples see past it (0.5); behind the camera and at strength 0, nothing; orthographic, the peak at the projected
   pixel; in a stack with SSR and Bloom and alone, no errors.
-- **Limits.** One light (the sun), a fixed ghost set (positions, sizes and tints are not options), no starburst or
-  aperture-shaped ghosts, no flare from point or spot lights. A transparent surface in front of the sun that writes no
+- **A point light and your own elements** (2026-11-11). `position()` gives a world point (x, y, z, and a strength in w)
+  in place of `sun`; the same depth disc hides it behind anything drawn nearer, and behind the camera there is no
+  flare. Its tint defaults to white rather than the engine light. `elements` (at most 16, at most 15 of them with a
+  texture) replace the built-in flare:
+  each is a square of `size` pixels on the line from the light through the screen centre at `distance` (0 the light,
+  0.5 the centre, 1 its mirror image), drawing its `texture` (rgb times alpha, linear filtering) or, with none, a soft
+  round glow, times its `color`. With elements, `intensity` defaults to 1, so each image adds at its own brightness.
+  Every element with a texture takes one sampled texture binding; the caller owns the textures. Element values are
+  written each frame (32 B each); a new texture rebuilds the bind group, and adding or removing a texture rebuilds
+  the pipeline. Checked on a real GPU (NVIDIA RTX A6000, Chromium 157, WebGPU and the WebGL2 layer with the same
+  values; `npm run test:gpu:flare` in packages/post): an element at distance 0 peaks at the light's pixel and one at
+  1 at its mirror pixel (both within one pixel), with its tint (green and blue 0.49995 and 0.24997 of red for 0.5 and
+  0.25); a textured element adds its texel times alpha (0.3936 for 0.3937, within 0.002); nothing changes outside the
+  element squares; a covered point light or one behind the camera adds nothing.
+- **Limits.** One light per `LensFlare`, a fixed built-in ghost set (use `elements` for your own), no starburst or
+  aperture-shaped ghosts, no flare from spot-light cones. A transparent surface in front of the sun that writes no
   depth does not hide it; one that writes depth hides it fully. Options: `intensity` 0-10, `occlusionRadius` 1-64,
   `color` three finite values >= 0 (`RangeError`); a zero direction throws `MargoError` code `state`. GPU cost not
   measured yet. WebGPU only.

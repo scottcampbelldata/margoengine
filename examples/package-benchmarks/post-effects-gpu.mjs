@@ -20,6 +20,8 @@
 //   motion from a velocity texture (HDR stage, 4x and 1x); a box moving 40 px/frame under TAA (taa.velocity, blurred
 //   after TAA's resolve); TAA's resolved frame is identical with and without MotionBlur (no blurred frame in its history);
 //   at rest under TAA the velocity texture equals taa.velocity.jitter everywhere and MotionBlur changes nothing.
+// flare (point light): elements of a point light sit at their distance on the line through the centre, with their
+//   tint and texture value (texel rgb times alpha), nothing outside their squares, none when covered or behind the eye.
 // flare: the flare (frame with LensFlare minus without, linear) peaks at the sun's projected pixel; it is mirror-
 //   symmetric about the line from the sun through the screen centre, with its ghosts on that line; a box over the sun
 //   hides it exactly (no change); a box whose edge splits the occlusion disc leaves exactly the share of the disc's
@@ -435,6 +437,66 @@ const sections = {
       ],
     });
     await run({ scene: 'sun', sunPixel, probe: false, alone: flare, aloneEffect: 'flare' });
+    // A point light with your own elements (KB6250c, three.js Lensflare parity): each element is a square of its size
+    // centred on the line from the light through the screen centre, at its distance (0 the light, 1 the mirror image).
+    const lit = async (elements, config = {}) => {
+      const info = await run({ scene: 'sun', sunPixel, point: true, stack: [['flare', { elements }]], ...config }),
+        on = await read();
+      await set('flare', { enabled: false });
+      const off = await read(),
+        diff = (x, y) => on.at(x, y).map((v, i) => v - off.at(x, y)[i]);
+      let energy = 0,
+        peak = -1,
+        at = null,
+        outside = 0;
+      const [px, py] = info.sun.pixel;
+      for (let y = 0; y < on.height; y++)
+        for (let x = 0; x < on.width; x++) {
+          const d = diff(x, y)[1];
+          energy += Math.max(0, d);
+          if (d > peak) [peak, at] = [d, [x, y]];
+          // Only the elements' squares may change (one pixel of slack for their edges).
+          const inside = elements.some((e) => {
+            const d0 = e.distance ?? 0,
+              cx = px + (on.width - 2 * px) * d0,
+              cy = py + (on.height - 2 * py) * d0;
+            return Math.abs(x + 0.5 - cx) <= e.size / 2 + 1 && Math.abs(y + 0.5 - cy) <= e.size / 2 + 1;
+          });
+          if (!inside && Math.abs(d) > 1e-4) outside++;
+        }
+      return { info, diff, energy, peak, at, outside };
+    };
+    const atLight = await lit([{ size: 64 }]),
+      [lx, ly] = atLight.info.sun.pixel;
+    const mirrored = await lit([{ size: 64, distance: 1, color: [1, 0.5, 0.25] }]),
+      tint = mirrored.diff(...mirrored.at);
+    const image = [200, 100, 50, 128],
+      textured = await lit([{ size: 100, distance: 0.5, texture: image }]),
+      centre = textured.diff(textured.info.canvas[0] / 2, textured.info.canvas[1] / 2),
+      expected = image.slice(0, 3).map((v) => ((v / 255) * image[3]) / 255);
+    const hidden = await lit([{ size: 64 }], { occluder: 'full' }),
+      behindEye = await lit([{ size: 64 }], { pointAt: [0, 1, 12] });
+    report.checks.point = {
+      pixel: [lx, ly].map((v) => round(v, 2)),
+      peakAt: atLight.at,
+      mirrorPeakAt: mirrored.at,
+      tint: tint.slice(0, 3).map((v) => round(v, 4)),
+      texturedCentre: centre.slice(0, 3).map((v) => round(v, 4)),
+      expectedTextured: expected.map((v) => round(v, 4)),
+      outside: [atLight.outside, mirrored.outside, textured.outside],
+      hidden: hidden.energy,
+      behind: behindEye.energy,
+    };
+    console.log('point', JSON.stringify(report.checks.point));
+    assert.ok(Math.hypot(atLight.at[0] + 0.5 - lx, atLight.at[1] + 0.5 - ly) <= 1.5, 'element 0 not at the light');
+    const [mx, my] = [atLight.info.canvas[0] - lx, atLight.info.canvas[1] - ly];
+    assert.ok(Math.hypot(mirrored.at[0] + 0.5 - mx, mirrored.at[1] + 0.5 - my) <= 1.5, 'element 1 not at the mirror');
+    assert.ok(Math.abs(tint[1] / tint[0] - 0.5) < 0.01 && Math.abs(tint[2] / tint[0] - 0.25) < 0.01, 'element tint');
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs(centre[i] - expected[i]) < 0.002, 'textured element value');
+    assert.deepEqual(report.checks.point.outside, [0, 0, 0], 'light outside the element squares');
+    assert.ok(atLight.energy > 0);
+    assert.equal(hidden.energy, 0, 'a covered point light still flares');
+    assert.equal(behindEye.energy, 0, 'a point behind the camera flares');
     return report;
   },
   async 'ssr-surfaces'() {

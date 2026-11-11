@@ -60,3 +60,79 @@ test('LensFlare takes the sun from a callback (sky.lights[0].direction) and vali
   attached.dispose();
   assert.ok(!alone.engine.hasPlugin('post:stack'));
 });
+
+test('LensFlare from a point light: its position projects as is, white by default, and validates (KB6250c)', () => {
+  const h = harness(),
+    point = new Float32Array([1, 2, -3, 4]),
+    flare = new LensFlare({ position: () => point, intensity: 0.5 });
+  h.engine.use(new PostStack([flare]));
+  const log = h.gpu.record(() => h.frame()),
+    v = written(log, 144);
+  assert.deepEqual([...v.subarray(20, 24)], [1, 2, -3, 2], 'the point as given (not normalized), w times intensity');
+  assert.deepEqual([...v.subarray(28, 32)], [1, 1, 1, 1], 'white, and the point flag');
+  const composite = modules(log).find((c) => c.includes('fn sunPosition'));
+  assert.match(composite, /select\(f\.eye\.xyz\+f\.sun\.xyz\*f\.eye\.w,f\.sun\.xyz,f\.color\.w>0\.5\)/);
+  point[0] = Number.NaN;
+  assert.throws(() => h.frame(), { name: 'MargoError', code: 'state', message: /finite point/ });
+  assert.throws(() => new LensFlare({ position: () => point, sun: () => point }), RangeError);
+  assert.throws(() => new LensFlare({ position: 1 }), RangeError);
+});
+
+test('LensFlare elements replace the built-in flare: one binding per texture, values every frame, rebuilt on change', async () => {
+  const h = harness(),
+    ring = h.gpu.device.createTexture({ size: [8, 8], format: 'rgba8unorm', usage: 4 }),
+    glow = h.gpu.device.createTexture({ size: [8, 8], format: 'rgba8unorm', usage: 4 }),
+    elements = [
+      { texture: glow, size: 512 },
+      { size: 60, distance: 0.6, color: [1, 0.5, 0.25] },
+      { texture: ring, size: 90, distance: 0.7 },
+    ],
+    flare = new LensFlare({ position: () => [0, 6, 0], elements });
+  h.engine.use(new PostStack([flare]));
+  let log = h.gpu.record(() => h.frame());
+  const v = written(log, 144);
+  assert.equal(v[23], 1, 'intensity 1 by default with elements');
+  const composite = modules(log).find((c) => c.includes('var<storage,read> elements'));
+  assert.ok(composite && !composite.includes('GHOSTS[i]'), 'the elements replace the built-in glow and ghosts');
+  assert.match(composite, /var image0:texture_2d<f32>;.*var image1:texture_2d<f32>;/s);
+  assert.ok(!composite.includes('image2'), 'one texture binding per textured element');
+  assert.match(composite, /textureSampleLevel\(image1,flareSampler,uv,0\.0\);light\+=t\.rgb\*t\.a\*elements\[5\]\.rgb;/);
+  const values = written(log, 96);
+  assert.deepEqual(
+    [...values],
+    [0, 512, 0, 0, 1, 1, 1, 0, 0.6, 60, 0, 0, 1, 0.5, 0.25, 0, 0.7, 90, 0, 0, 1, 1, 1, 0].map(Math.fround),
+  );
+  const groups = log.filter((e) => e[0] === 'group').length;
+  // Steady frames: one element write, no new pipeline or bind group.
+  log = h.gpu.record(() => h.frame());
+  assert.equal(log.filter((e) => e[0] === 'group' || e[0] === 'renderPipeline').length, 0);
+  assert.ok(written(log, 96));
+  // A new texture rebuilds the group only; a new layout (texture removed) rebuilds the pipeline too.
+  elements[2] = { ...elements[2], texture: glow };
+  log = h.gpu.record(() => h.frame());
+  assert.equal(log.filter((e) => e[0] === 'group').length, 1);
+  assert.equal(log.filter((e) => e[0] === 'renderPipeline').length, 0);
+  elements[2] = { size: 90, distance: 0.7 };
+  log = h.gpu.record(() => h.frame());
+  assert.equal(log.filter((e) => e[0] === 'renderPipeline').length, 1);
+  assert.ok(groups > 0);
+  for (const bad of [
+    [{ size: 0 }],
+    [{ size: 9000 }],
+    [{ size: 10, distance: Number.NaN }],
+    [{ size: 10, color: [1, 1] }],
+    [{ size: 10, texture: {} }],
+    Array.from({ length: 17 }, () => ({ size: 1 })),
+    // The frame's texture plus 16 images is 17 sampled textures in one fragment stage, over a default device's 16.
+    Array.from({ length: 16 }, () => ({ size: 1, texture: glow })),
+  ])
+    assert.throws(() => new LensFlare({ elements: bad }), RangeError);
+  new LensFlare({ elements: [...Array.from({ length: 15 }, () => ({ size: 1, texture: glow })), { size: 1 }] });
+  h.engine.removePlugin('post:stack');
+  await null;
+  assert.deepEqual(
+    h.live().filter((r) => r !== ring && r !== glow),
+    [],
+    'disposal releases every resource it made (the caller owns the textures)',
+  );
+});

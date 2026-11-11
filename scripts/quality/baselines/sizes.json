@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15127576,
+  "total": 15128489,
   "history": [
     {
       "date": "2026-10-24",
@@ -8585,6 +8585,12 @@
       "commit": "746ee1ba68",
       "reason": "bug sweep L3a: points/surfels 16742 to 17028 B; the half-float tier packs the surfel front depth (shader variant key) and the LDR tier is refused with a coded error (requireCompatTier and the shared errors module); a split would need a second entry for one tier check",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "938e738f94",
+      "reason": "KB6250c: LensFlare gains a point-light position and up to 16 configurable elements (16 with at most 15 textured, per-layout pipeline, element storage buffer), the point-light flare with your own images that the web rivals give. Canonical built-entry gzip before/after: @margoengine/post/lens-flare 6829->7673 B, ceiling 7016->7929. A separate elements entry would repeat the occlusion compute pass, the sun/point projection and the stack wiring (most of the entry) and make the sun and point flares two effects to stack; core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -9300,7 +9306,7 @@
     "@margoengine/post/halftone": 6556,
     "@margoengine/post/image": 12478,
     "@margoengine/post/lens": 7078,
-    "@margoengine/post/lens-flare": 7016,
+    "@margoengine/post/lens-flare": 7929,
     "@margoengine/post/mask": 6262,
     "@margoengine/post/material-decals": 8835,
     "@margoengine/post/motion-blur": 8245,

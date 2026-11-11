@@ -10,7 +10,8 @@
 //   moving:  a white 1 m box in front of a dark wall, seen head on; `speed` moves it along +x every frame (metres).
 //            vectors: 'taa' feeds MotionBlur taa.velocity; [x, y] a uniform motion in pixels per frame (own texture).
 //   sun:     the same view, empty but for an occluder box ('none', 'full' over the sun, 'half': its left edge through the
-//            sun); sunPixel: the screen point the sun's direction projects to (or sunDirection), sunStrength its w.
+//            sun); sunPixel: the screen point the sun's direction projects to (or sunDirection), sunStrength its w;
+//            point: a point light on that ray at z = -1 (behind the occluder) in place of the sun, or at pointAt.
 //   reflect: a red 1 m box floating at y 0.7..1.7 over a surface at y = 0: surface 'terrain' (flat, grey layers,
 //            roughness 0.05, albedo 0.04) or 'water' (no waves, a uniform grey (0.5) sky texture to reflect, over a dark seabed at y = -2), added to SSR (ssr.add). Returns the
 //            box mirrored through y = 0, projected.
@@ -33,7 +34,14 @@ let state;const state0={};
 // Inverse of a column-major 4x4 (Cramer's rule), for unprojecting a pixel.
 function invert(m){const a=[...m],o=new Array(16),d=(r,c)=>{const s=[0,1,2,3].filter(i=>i!==r),t=[0,1,2,3].filter(i=>i!==c),g=(i,j)=>a[t[j]*4+s[i]];return g(0,0)*(g(1,1)*g(2,2)-g(1,2)*g(2,1))-g(0,1)*(g(1,0)*g(2,2)-g(1,2)*g(2,0))+g(0,2)*(g(1,0)*g(2,1)-g(1,1)*g(2,0));};
   let det=0;for(let c=0;c<4;c++)det+=a[c*4]*((c%2)?-1:1)*d(0,c);for(let r=0;r<4;r++)for(let c=0;c<4;c++)o[r*4+c]=((r+c)%2?-1:1)*d(r,c)/det;return o;}
-const effects={flare:o=>new LensFlare({...o,sun:()=>state?.sun}),motion:o=>new MotionBlur({...o,velocity:()=>state?.vectors?.()}),ssgi:o=>new SSGI(o),gtao:o=>new GTAO(o),ssao:o=>new SSAO(o),ssr:o=>new SSR(o),bloom:o=>new Bloom(o)};
+// LensFlare options of a check: a point light (run's point/pointAt) or the sun; element textures named by a solid
+// rgba8 colour ([r, g, b, a] bytes) become 4 x 4 textures of the engine's device.
+function flareOptions(o){const {elements,...rest}=o,out={...rest};
+  if(state0.point)out.position=()=>state0.point;else out.sun=()=>state?.sun;
+  if(elements)out.elements=elements.map(e=>{if(!e.texture)return e;const t=state0.device.createTexture({size:[4,4],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+    state0.device.queue.writeTexture({texture:t},new Uint8Array(64).map((_,i)=>e.texture[i%4]),{bytesPerRow:16},[4,4]);return {...e,texture:t};});
+  return out;}
+const effects={flare:o=>new LensFlare(flareOptions(o)),motion:o=>new MotionBlur({...o,velocity:()=>state?.vectors?.()}),ssgi:o=>new SSGI(o),gtao:o=>new GTAO(o),ssao:o=>new SSAO(o),ssr:o=>new SSR(o),bloom:o=>new Bloom(o)};
 const display=`fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var v=input-offset;let peak=max(v.r,max(v.g,v.b));if(peak<0.76){return v;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);v*=newPeak/peak;return mix(v,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
 fn toDisplay(c:vec3f)->vec3f {let x=pbrNeutral(max(c,vec3f(0)));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}`;
 // A last HDR stage: copies its input into an rgba32float texture for read(), then passes it on (display-encoded when last).
@@ -64,12 +72,13 @@ function plane(){
 async function teardown(){if(!state)return;const s=state;state=undefined;await s.engine.gpu.queue.onSubmittedWorkDone();s.engine.dispose();s.canvas.remove();}
 async function frames(n){for(let i=0;i<n;i++){state.tick?.();state.engine.render({delta:1/60});await state.engine.gpu.queue.onSubmittedWorkDone();}await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}
 window.check={
-  async run({scene='creases',camera='persp',floor='core',speed=0,vectors=null,sunPixel=null,sunDirection=null,sunStrength=1,occluder='none',surface='terrain',stack=[],alone=null,aloneEffect='gtao',probe:withProbe=true,taa=false,samples=4,size=[1024,1024],frames:n=4,light=false}={}){
+  async run({scene='creases',camera='persp',floor='core',speed=0,vectors=null,sunPixel=null,sunDirection=null,sunStrength=1,point=false,pointAt=null,occluder='none',surface='terrain',stack=[],alone=null,aloneEffect='gtao',probe:withProbe=true,taa=false,samples=4,size=[1024,1024],frames:n=4,light=false}={}){
     await teardown();
     if(samples===1)globalThis.margoLow=1;else delete globalThis.margoLow;
     const canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=size[0]+'px';canvas.style.height=size[1]+'px';
     const view=scene==='reflect'?{position:[0,2.2,6],target:[0,0.4,0]}:scene==='moving'||scene==='sun'?{position:[0,1,8],target:[0,1,0]}:scene==='wall'?{position:[0,4.5,9],target:[0,0.8,1]}:{position:[0,6,8],target:[0,0,0.8]};
     const engine=await Engine.create(canvas,{backend:'webgpu',camera:{...view,near:0.1,far:200}}),errors=[];
+    state0.device=engine.gpu;state0.point=undefined;
     engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
     if(camera==='ortho')CameraProjection.attach(engine,{height:10});
     // Ambient light only, unless asked: the linear result is then the ambient term times the occlusion.
@@ -99,6 +108,8 @@ window.check={
       const len=Math.hypot(...dir);dir=dir.map(v=>v/len);
       info.sun={direction:dir};
       const z=0.5,t=(z-eye[2])/dir[2],hit=[eye[0]+dir[0]*t,eye[1]+dir[1]*t];
+      // A point light instead: on the same ray at z = -1, behind the occluder's front face, or at pointAt.
+      if(point||pointAt){const at=pointAt??[0,1,2].map(i=>eye[i]+dir[i]*(-1-eye[2])/dir[2]);info.point=at;state0.point=[...at,sunStrength];}
       // Occluders: a dark box whose front face (z = 0.5) covers the sun, or has its left edge through it.
       if(occluder!=='none')engine.createMesh().setGeometry(box(3,3,1)).setPosition([occluder==='half'?hit[0]+1.5:hit[0],hit[1],0]).setMaterial(new PbrMaterial({color:'#303030',roughness:1,metalness:0}));
     }
@@ -127,7 +138,7 @@ window.check={
     for(const model of models)if(model instanceof Terrain||model instanceof Water)engine.use(model);
     for(const model of models)for(const effect of Object.values(made))effect.add?.(model);
     if(withProbe)list.push(made.probe=probe());
-    const owner=!alone?PostStack.attach(engine,list):aloneEffect==='motion'?MotionBlur.attach(engine,{...alone,velocity:()=>state?.vectors?.()}):aloneEffect==='flare'?LensFlare.attach(engine,{...alone,sun:()=>state?.sun}):{gtao:GTAO,ssgi:SSGI}[aloneEffect].attach(engine,alone);
+    const owner=!alone?PostStack.attach(engine,list):aloneEffect==='motion'?MotionBlur.attach(engine,{...alone,velocity:()=>state?.vectors?.()}):aloneEffect==='flare'?LensFlare.attach(engine,flareOptions(alone)):{gtao:GTAO,ssgi:SSGI}[aloneEffect].attach(engine,alone);
     if(alone)made[aloneEffect]=owner;
     if(info.sun)state0.sun=[...info.sun.direction,sunStrength];
     const temporal=taa?TAA.attach(engine,{depth:()=>(alone?owner.depthTexture:owner.depthTexture)}):undefined;
@@ -166,7 +177,7 @@ window.check={
       info.mirror=[Math.min(...corners.map(c=>c[0])),Math.min(...corners.map(c=>c[1])),Math.max(...corners.map(c=>c[0])),Math.max(...corners.map(c=>c[1]))].map(Math.round);
       info.center=project([0,-1.2,0]).map(Math.round);
     }
-    if(info.sun){const far=engine.camera.far*0.5,p=[0,1,2].map(i=>engine.camera.position[i]+info.sun.direction[i]*far);info.sun.pixel=project(p);}
+    if(info.sun){const far=engine.camera.far*0.5,p=info.point??[0,1,2].map(i=>engine.camera.position[i]+info.sun.direction[i]*far);info.sun.pixel=project(p);}
     if(info.box){info.boxRow=Math.round(project([0,1,0.5])[1]);info.pixelsPerMetre=project([1,1,0.5])[0]-project([0,1,0.5])[0];}
     if(info.wall)info.floor=[-1,0,1].flatMap(x=>[0.05,0.1,0.25,0.5,1,2].map(d=>({x,d,pixel:project([x,0,info.wall.front+d])})));
     return {errors:errors.splice(0),canvas:[canvas.width,canvas.height],...info,boxes:undefined,box:undefined};

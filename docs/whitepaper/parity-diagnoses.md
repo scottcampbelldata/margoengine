@@ -46,7 +46,7 @@ The following failures remain for the next complete jobs:
 | Margo compute | The old adapter rejects storage-buffer drawing, although shader/raw now exposes storage inputs. Build the adapter using that supported API. |
 | Margo light probe | The scene supplies nine SH coefficients; the current adapter only knows baked LightProbes. Add the missing coefficient-source API in environment if no supported input fits. |
 | Margo grading | The adapter rejects hue rotation although shader utilities and tonemap/hue now supply hue operations. Wire the matching grading arithmetic and verify output. |
-| Margo lens flare | The adapter needs a point position and four configurable screen-size elements; the existing sun-direction/fixed-ghost API does not satisfy that job. Build in post, never core. |
+| Margo lens flare | Built in post (2026-11-11, KB6250c): `LensFlare` takes a point `position` and up to 16 configurable screen-size `elements`, and the adapter now builds the scene's light and four elements. Proved by packages/post/test/lens-flare.test.js and `npm run test:gpu:flare` (WebGPU and the WebGL2 layer); the matrix row updates at the next parity run, which the build phase defers. |
 | Margo meshopt | Fixed in round 2: the owning gltf-pro parser and async resolver now apply the fallback contract to EXT and KHR. See the regression and reproduction below. |
 | Reference depth material, WebGPU | Closed in round 3 as rival unsupported (KB6250f): three.js 0.186.1 WebGPURenderer refuses MeshDepthMaterial. The WebGL comparison stands. |
 | Reference USDZ, both | Closed in round 3 as rival unsupported (KB6250d): three.js 0.186.1 USDZLoader throws reading `isVector3` on the shared fixture in both backends. |
