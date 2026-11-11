@@ -6,6 +6,7 @@ import { engineRuntime } from '../../core/dist/extension.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
 import { sphereGeometry } from '../../geometry/dist/index.js';
 import { ContactShadows } from '../dist/index.js';
+import { AmbientShadows } from '../dist/accumulate-ambient.js';
 import { waitForPipelines } from '../../../scripts/support/gpu-ready.js';
 import { CONTACT_SCENE as s } from './contact-reference.mjs';
 try {
@@ -20,9 +21,13 @@ try {
   engine.scene.background='#ffffff';
   const sphere=createMesh(engine,sphereGeometry(s.radius,96,48),new Material({shading:'basic',color:[0,0,0]}));
   sphere.root.setPosition(s.center);
-  const contact=ContactShadows.attach(engine);contact.add(sphere);
+  // ?ambient: AmbientShadows with all-sky visibility, 1024 cosine directions, full darkness at total occlusion.
+  const ambient=new URLSearchParams(location.search).has('ambient');
+  const contact=ambient?AmbientShadows.attach(engine,{ambient:1,frames:1024,opacity:1}):ContactShadows.attach(engine);contact.add(sphere);
   const device=engineRuntime(engine).gpu;
   await waitForPipelines(async()=>{engine.render();await device.queue.onSubmittedWorkDone();});
+  while(ambient&&contact.samples<1024){engine.render();if(contact.samples%64===0)await device.queue.onSubmittedWorkDone();}
+  if(ambient){engine.render();await device.queue.onSubmittedWorkDone();}
   const bitmap=await createImageBitmap(await (await fetch(canvas.toDataURL('image/png'))).blob());
   const read=new OffscreenCanvas(s.width,s.height),g=read.getContext('2d',{willReadFrequently:true});
   g.drawImage(bitmap,0,0); bitmap.close();

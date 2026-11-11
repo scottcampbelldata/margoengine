@@ -4038,7 +4038,9 @@ The optional audio/doppler controller registers after its positional sound and s
 The default contact cue now has a numerical comparison with cosine ray-traced ground occlusion.
 The tracer agrees with the independent projected-solid-angle integral; blank renders fail explicit
 caster/background/shadow checks. Across 15,472 exposed-ground pixels the darkness MAE is 0.048174.
-The fixed-blur nearness field does not reproduce broad hemispherical occlusion; the loss remains open.
+The fixed-blur nearness field does not reproduce broad hemispherical occlusion. Accepted difference
+(KB3193, 2026-11-11): the default is a footprint cue by design; AmbientShadows with `ambient: 1` measures MAE
+0.001561 on the same scene and reference, both backends (`packages/staging/test/sky-occlusion-browser.mjs`).
 No runtime/core/stage changes and no speed or directional-light parity claim.
 
 

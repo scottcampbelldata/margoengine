@@ -1977,7 +1977,7 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 
 | Claim | Evidence | Scope |
 | --- | --- | --- |
-| Default contact shadows have measured error against ray-traced visibility | [Entry 111](perf-history.md), [raw result](results/batch-168-staging.json), `packages/staging/test/contact-reference.test.js` | Uniform hemisphere, sphere, exposed ground; normalized darkness MAE 0.048174; no full physical-lighting or speed parity |
+| Default contact shadows have measured error against ray-traced visibility | [Entry 111](perf-history.md), [raw result](results/batch-168-staging.json), `packages/staging/test/contact-reference.test.js` | Uniform hemisphere, sphere, exposed ground; normalized darkness MAE 0.048174 (footprint cue, accepted difference KB3193); AmbientShadows ambient 1 MAE 0.001561, `packages/staging/test/sky-occlusion-browser.mjs`; no full physical-lighting or speed parity |
 
 
 ## Batch 168 independent OIT path trace

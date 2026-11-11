@@ -187,9 +187,11 @@ pixel; its largest difference from the independent analytic projected solid angl
 Compare normalized shadow-catcher darkness over display white; no exposure or opacity is fitted.
 MAE 0.048174, RMSE 0.074416, max 0.288788. Mean darkness is 0.000177 (contact) versus 0.048351 (reference).
 The nearness map's fixed blur and height falloff produce a local contact cue rather than broad hemispherical
-occlusion. The loss remains open. No directional area-light or speed equivalence is claimed.
+occlusion. Accepted difference (KB3193, 2026-11-11): the default is a footprint cue by design (one pass,
+cacheable), and a sphere's footprint lies under the sphere. AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer
+(`packages/staging/test/sky-occlusion-browser.mjs`). No directional area-light or speed equivalence is claimed.
 [Raw result](results/batch-168-staging.json). Rerun under the shared GPU lock:
-`node packages/staging/scripts/rival-bench.mjs`.
+`node packages/staging/scripts/rival-bench.mjs`, and `--ambient` for AmbientShadows.
 
 
 The closing batch 168 check also path-traces the OIT panes independently in Cycles (Blender 5.3.0 Beta,

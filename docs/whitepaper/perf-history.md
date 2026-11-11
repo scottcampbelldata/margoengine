@@ -2854,7 +2854,9 @@ Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner
   per pixel. Independent analytic projected-solid-angle checks validate the tracer (max grid error 0.001734).
 - **Result:** picture loss, normalized darkness MAE 0.048174, RMSE 0.074416, max 0.288788. Mean darkness
   0.000177 versus 0.048351. Fixed blur of nearness is local and does not integrate hemispherical visibility.
-  [Raw result](results/batch-168-staging.json). No speed measurement. Publishing does not close the loss.
+  [Raw result](results/batch-168-staging.json). No speed measurement. Accepted difference (KB3193, 2026-11-11):
+  the default is a footprint cue by design; AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer (`packages/staging/test/sky-occlusion-browser.mjs`;
+  `rival-bench.mjs --ambient`).
 - **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
   Oracle: `node --test packages/staging/test/contact-reference.test.js`.
 

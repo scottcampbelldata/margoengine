@@ -3283,7 +3283,7 @@ The first Doppler verify found the limits index still at LIM-602 and the generat
 
 ### Batch 168 closing reference losses
 
-- **Default contact shadow misses broad ray-traced ground occlusion** (`@margoengine/staging`, perf history 111):
+- **Closed, accepted difference (KB3193, 2026-11-11): default contact shadow misses broad ray-traced ground occlusion** (`@margoengine/staging`, perf history 111):
   a radius-0.5 sphere touches ground under uniform hemispherical lighting. Across 15,472 visible ground pixels,
   normalized darkness MAE 0.048174, RMSE 0.074416, max 0.288788 against 4096 cosine rays per pixel.
   Reference quadrature differs from projected solid angle by at most 0.001734. Mean darkness is 0.000177
@@ -3294,6 +3294,11 @@ The first Doppler verify found the limits index still at LIM-602 and the generat
   Lane G's current-main correctness-only contact comparison retains all
   15,472 pixels and 4096 rays: MAE 0.04817386029045438, mean darkness
   0.00017742360646430213 against 0.048351283896918625. No shadow option changed.
+
+  Closed 2026-11-11 (L4): working as designed, not a defect. The pictured mean darkness matches the footprint
+  model (darkness 0.6 x (1 - underside height), Gaussian sigma 0.03: the brightest exposed pixel, 0.047, is the blur
+  tail one sigma outside a 0.3 edge). AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer, so Margo draws the broad occlusion through that entry. Pinned
+  by `packages/staging/test/sky-occlusion-browser.mjs` (MAE below one 8-bit step). Recorded in docs/limits.md.
 
 
 The batch 168 OIT image loss above is also confirmed against an independent Cycles path trace:

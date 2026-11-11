@@ -137,8 +137,12 @@ linked `unsupported`. The viewport and rounding repairs live in environment, the
 After building, run `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
 The default effect is compared with 4096 cosine rays per exposed-ground pixel around a sphere under uniform
 hemispherical lighting. Independent projected-solid-angle tests validate the ray tracer. Normalized darkness
-MAE is 0.048174; the local contact cue differs from broad physical occlusion. This remains an open picture
-loss. [Scene, metrics and scope](../../docs/whitepaper/perf-vs-rivals.md).
+MAE is 0.048174: the default effect is a footprint cue by design. It darkens the ground under a caster by how
+near the caster's underside is, which is cheap, one pass and cacheable with `static`, and a sphere's footprint
+lies under the sphere itself. Broad sky occlusion beside a caster is `AmbientShadows` with `ambient: 1` (below):
+on the same scene, pixels and 4096-ray reference it measures MAE 0.001561, mean darkness 0.048200 against
+0.048351, on WebGPU and the WebGL2 compatibility layer (`test/sky-occlusion-browser.mjs`; add `--ambient` to the
+command above for the full metrics). [Scene, metrics and scope](../../docs/whitepaper/perf-vs-rivals.md).
 
 ## A product on the HDR floor
 
@@ -230,6 +234,38 @@ an additional 4096-texel PBR caster case, resize, removal, actual device replace
 and coexistence with ContactShadows. This Windows oracle includes Direct3D's
 specified eight-bit coordinate snapping; it is not an assertion of subpixel identity across other GPU
 backends. The geometry is a stand-in. Native WebGL2 throws coded `unsupported` with a help link.
+
+## Sky occlusion and several soft lights
+
+`@margoengine/staging/accumulate-ambient` mixes up to 64 disk lights with cosine-weighted sky visibility. Each
+frame projects one sample (a disk point, or a sky direction drawn from the cosine hemisphere) and the accumulator
+averages them. With `ambient: 1` the ground darkens by the share of the sky the casters hide, so a ball resting
+on the floor gets the soft ring a photograph shows, which the default footprint `ContactShadows` cannot draw.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {createMesh, PbrMaterial} from 'margoengine/materials';
+import {sphereGeometry} from 'margoengine/geometry';
+import {AmbientShadows} from 'margoengine/staging/accumulate-ambient';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 3, 5], target: [0, 0.5, 0]},
+});
+const ball = createMesh(engine, sphereGeometry(0.5, 64, 32), new PbrMaterial({color: '#c04030'}));
+ball.root.setPosition([0, 0.5, 0]);
+const shadow = AmbientShadows.attach(engine, {ambient: 1, opacity: 1, frames: 256});
+shadow.add(ball);
+engine.start();
+// Mix in a soft key light: AmbientShadows.attach(engine, {ambient: 0.5, lights: [{position: [2, 8, 1], radius: 2}]}).
+```
+
+Added defaults: `ambient: 0.5` (sky share of the visibility, 0..1), `lights` one disk from `lightPosition` and
+`lightRadius`, each disk `radius: 2` and `intensity: 1` (relative weight). Up to 64 disks, each above the whole
+caster slab; an empty list needs `ambient: 1`. Everything else is inherited from `AccumulatedShadows`. The result is
+monochrome visibility on the receiver, with no per-light colour, inverse-square falloff or shadow on the product
+itself. Measured on the ray-traced reference scene: exposed-ground MAE 0.001561, max 0.007994 at 1024 frames,
+both GPU backends (`test/sky-occlusion-browser.mjs`). Method: Pharr and Green, "Ambient Occlusion", GPU Gems
+chapter 17 (2004), visibility accumulated from many shadow projections; cosine sampling from Pharr, Jakob and
+Humphreys, Physically Based Rendering 4th edition (2023), section A.5.3. No speed claim.
 
 ## Studio softboxes
 

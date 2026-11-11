@@ -1779,8 +1779,11 @@ Classical instantaneous stationary-medium approximation with each radial Mach nu
 Default ContactShadows is a height-faded, fixed-Gaussian local contact cue. Under a radius-0.5 sphere,
 against ray-traced uniform-hemisphere visibility, exposed-ground darkness MAE is 0.048174, RMSE 0.074416,
 max 0.288788 (15,472 pixels, 4096 rays each; reference quadrature max error 0.001734). Defaults are retained:
-size 4, height 1, blur 0.06, opacity 0.6, resolution 256. No physical lighting or area-light parity is claimed;
-the measured picture loss remains open.
+size 4, height 1, blur 0.06, opacity 0.6, resolution 256. No physical lighting or area-light parity is claimed.
+Accepted difference (KB3193, 2026-11-11): the default darkens the ground under a caster by how near its underside
+is, a footprint cue by design (one pass, cacheable with `static`); a sphere's footprint lies under the sphere, so
+the exposed ground stays nearly white (mean darkness 0.000177 against 0.048351). Sky occlusion beside a caster is
+staging/accumulate-ambient: AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer (`packages/staging/test/sky-occlusion-browser.mjs`).
 
 
 The independent Cycles OIT reference (1024 samples, seed 168) gives Margo MAE 1.632960 versus Babylon
