@@ -129,7 +129,8 @@ Mix several sounds into one Web Audio destination for reliable single-track outp
 
 The canvas must be origin-clean. Keep rendering normally during capture. `stop()` and
 `result` share one `Promise<Blob>`, resolved after the final chunk; repeated stops are
-safe. The optional `signal` aborts and discards the file; `dispose()` and `Symbol.dispose`
+safe. A recording stopped before the browser encoded its first frame holds only a container
+header, which no player opens, so it rejects with code `state` instead of resolving. The optional `signal` aborts and discards the file; `dispose()` and `Symbol.dispose`
 discard an unfinished recording. The complete compressed recording stays in memory.
 There is no duration, frame-count, codec, audio-mixing or cross-player compatibility
 guarantee: this is real-time capture, so overloaded or background pages can drop frames.

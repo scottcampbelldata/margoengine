@@ -30,6 +30,69 @@ export interface CanvasRecording extends Disposable {
   dispose(): void;
 }
 
+/** EBML IDs (RFC 9559): Segment and Cluster hold the frames, each in a SimpleBlock or a BlockGroup. */
+const SEGMENT = 0x18538067,
+  CLUSTER = 0x1f43b675,
+  SIMPLE_BLOCK = 0xa3,
+  BLOCK_GROUP = 0xa0;
+/** WebM and MP4 headers fit far inside this; the first frame follows them. */
+const HEAD = 1 << 20;
+
+/**
+ * True when a recording holds at least one encoded frame. MediaRecorder stopped before its encoder's first frame still
+ * hands over the container header (Chromium: 110 bytes of WebM), which no decoder opens. WebM: a SimpleBlock or
+ * BlockGroup inside a Cluster (an EBML walk that steps into Segment and Cluster, which MediaRecorder writes with unknown
+ * size, and over every other element). MP4 (ISO/IEC 14496-12): an `mdat` box with a payload. Reads only box headers
+ * and the first MiB, so a long recording is not copied.
+ */
+async function hasEncodedFrame(blob: Blob, mp4: boolean): Promise<boolean> {
+  if (mp4) {
+    for (let p = 0; p + 8 <= blob.size; ) {
+      const head = new DataView(await blob.slice(p, p + 16).arrayBuffer());
+      let size = head.getUint32(0),
+        header = 8;
+      if (size === 1 && head.byteLength >= 16) {
+        size = Number(head.getBigUint64(8));
+        header = 16;
+      } else if (size === 0) size = blob.size - p;
+      if (size < header) return false;
+      if (head.getUint32(4) === 0x6d646174 /* mdat */) return size > header && p + header < blob.size;
+      p += size;
+    }
+    return false;
+  }
+  const b = new Uint8Array(await blob.slice(0, HEAD).arrayBuffer()),
+    vint = (p: number, id: boolean): { value: number; next: number; unknown: boolean } | undefined => {
+      if (p >= b.length || !b[p]) return;
+      const width = Math.clz32(b[p]!) - 23;
+      if (width > 8 || p + width > b.length) return;
+      let value = id ? b[p]! : b[p]! & (255 >> width),
+        all = value === 255 >> width;
+      for (let i = 1; i < width; i++) {
+        value = value * 256 + b[p + i]!;
+        all &&= b[p + i] === 255;
+      }
+      return { value, next: p + width, unknown: !id && all };
+    };
+  let inCluster = false;
+  for (let p = 0; p < b.length; ) {
+    const id = vint(p, true),
+      size = id && vint(id.next, false);
+    if (!id || !size) break;
+    if (id.value === SEGMENT || id.value === CLUSTER) {
+      inCluster ||= id.value === CLUSTER;
+      p = size.next;
+      continue;
+    }
+    if (inCluster && (id.value === SIMPLE_BLOCK || id.value === BLOCK_GROUP) && !size.unknown && size.value > 4)
+      return true;
+    if (size.unknown) break;
+    p = size.next + size.value;
+  }
+  // Cut off inside the first MiB with no frame seen: a header that long is not one MediaRecorder writes.
+  return blob.size > HEAD;
+}
+
 /**
  * Starts recording an origin-clean page canvas and optional audio with MediaRecorder.
  * Works with WebGPU, WebGL2 and 2D canvases; does not create or change an engine.
@@ -101,11 +164,25 @@ export function recordCanvas(canvas: HTMLCanvasElement, options: CanvasRecording
     recorder.addEventListener('error', () =>
       fail(fault('state', 'MediaRecorder failed; check the capture source and codecs')),
     );
-    recorder.addEventListener('stop', () => {
+    recorder.addEventListener('stop', async () => {
       if (settled) return;
-      const blob = new Blob(chunks, { type: recorder!.mimeType || mimeType });
+      const type = recorder!.mimeType || mimeType,
+        blob = new Blob(chunks, { type });
       if (!blob.size) {
         fail(fault('state', 'Recording produced no data; render frames before stop()'));
+        return;
+      }
+      // A recording stopped before its first encoded frame is a container header that nothing can play.
+      let framed: boolean;
+      try {
+        framed = await hasEncodedFrame(blob, type.startsWith('video/mp4'));
+      } catch (error) {
+        fail(fault('state', `Recording could not be read back: ${String(error)}`));
+        return;
+      }
+      if (settled) return;
+      if (!framed) {
+        fail(fault('state', 'Recording holds no encoded frame; render frames for longer before stop()'));
         return;
       }
       settled = true;

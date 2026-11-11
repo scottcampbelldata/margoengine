@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15076037,
+  "total": 15076637,
   "history": [
     {
       "date": "2026-10-24",
@@ -8477,6 +8477,12 @@
       "commit": "c3ac3d3672",
       "reason": "KB5700a: opacity 1 is exactly opaque in the multi-volume march (and the shared volume shader it bundles); +28 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "893910c96f",
+      "reason": "video/record checks for an encoded frame before resolving (KB5116): 1396 to 1740 B gzip; a lazy chunk would add a request at stop() for a 60-line walk",
+      "grew": 1
     }
   ],
   "items": {
@@ -9677,7 +9683,7 @@
     "@margoengine/video/dome": 2026,
     "@margoengine/video/material": 1407,
     "@margoengine/video/playback": 1725,
-    "@margoengine/video/record": 1396,
+    "@margoengine/video/record": 1996,
     "@margoengine/viewcube": 5321,
     "@margoengine/viewcube/axes": 6029,
     "@margoengine/viewcube/compass": 7914,

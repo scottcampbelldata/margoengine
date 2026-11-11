@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recordCanvas } from '../dist/record.js';
 
+// Minimal containers as MediaRecorder writes them. WebM: EBML header, Segment and Cluster of unknown size, then one
+// SimpleBlock of 5 bytes; the header-only file stops after Tracks, as a recording stopped before its first frame does.
+const UNKNOWN = [0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+const WEBM_HEAD = [0x1a, 0x45, 0xdf, 0xa3, 0x80, 0x18, 0x53, 0x80, 0x67, ...UNKNOWN, 0x16, 0x54, 0xae, 0x6b, 0x80];
+const WEBM_CLUSTER = Uint8Array.from([0x1f, 0x43, 0xb6, 0x75, ...UNKNOWN, 0xa3, 0x85, 0x81, 0, 0, 0x80, 0x9d]);
+const WEBM = Uint8Array.from([...WEBM_HEAD, ...WEBM_CLUSTER]);
+const box = (type, payload = []) => [0, 0, 0, 8 + payload.length, ...[...type].map((c) => c.charCodeAt(0)), ...payload];
+const MP4_HEAD = [...box('ftyp', [0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]), ...box('moov')];
+const MP4 = Uint8Array.from([...MP4_HEAD, ...box('mdat', [1, 2, 3, 4])]);
 class Track {
   readyState = 'live';
   clone() {
@@ -31,7 +40,7 @@ class Recorder extends EventTarget {
     assert.notEqual(this.state, 'inactive');
     this.state = 'inactive';
     queueMicrotask(() => {
-      this.data('final');
+      this.data(Recorder.final ?? (this.mimeType.startsWith('video/mp4') ? MP4 : WEBM));
       this.dispatchEvent(new Event('stop'));
     });
   }
@@ -66,13 +75,16 @@ test('records all chunks including the final one, clones audio and releases only
   try {
     const audio = new Track(),
       recording = recordCanvas(canvas, { audio: { getAudioTracks: () => [audio] } });
-    Recorder.last.data('first');
+    // The header comes first, as MediaRecorder's first dataavailable carries it; the final chunk holds the cluster.
+    Recorder.final = WEBM_CLUSTER;
+    Recorder.last.data(Uint8Array.from(WEBM_HEAD));
     const result = recording.stop();
     assert.equal(result, recording.result);
     assert.equal(recording.stop(), result);
     const blob = await result;
     assert.equal(blob.type, 'video/webm');
-    assert.equal(await blob.text(), 'firstfinal');
+    Recorder.final = undefined;
+    assert.deepEqual(new Uint8Array(await blob.arrayBuffer()), WEBM);
     assert.equal(video.readyState, 'ended');
     assert.equal(audio.readyState, 'live');
     assert.equal(audio.copy.readyState, 'ended');
@@ -169,6 +181,30 @@ test('mp4 asks for H.264, with AAC when there is audio, and leaves the codec to 
     offered = () => true;
     assert.equal(await stopped(recordCanvas(canvas, { format: 'webm' })), 'video/webm');
   } finally {
+    Recorder.isTypeSupported = supported;
+    restore();
+  }
+});
+
+// KB5116: stopped before Chromium encoded its first frame, a recording was 110 bytes of WebM header that no decoder
+// opens (DEMUXER_ERROR_COULD_NOT_OPEN), and recordCanvas resolved it because its size was not 0.
+test('a recording with no encoded frame rejects, in WebM and in MP4', async () => {
+  const { canvas, video, restore } = setup();
+  const supported = Recorder.isTypeSupported;
+  try {
+    for (const [format, head] of [['webm', WEBM_HEAD], ['mp4', MP4_HEAD]]) {
+      Recorder.final = Uint8Array.from(head);
+      await assert.rejects(
+        recordCanvas(canvas, { format }).stop(),
+        (e) => e.code === 'state' && /no encoded frame/.test(e.message) && /https:/.test(e.message),
+        format,
+      );
+      assert.equal(video.readyState, 'ended');
+    }
+    Recorder.final = MP4;
+    assert.equal((await recordCanvas(canvas, { format: 'mp4' }).stop()).size, MP4.length);
+  } finally {
+    Recorder.final = undefined;
     Recorder.isTypeSupported = supported;
     restore();
   }
