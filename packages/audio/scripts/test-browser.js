@@ -37,24 +37,47 @@ try {
   });
   await page.goto(`${server.resolvedUrls.local[0]}tests/audio.html`);
   await page.waitForFunction(() => typeof window.runOfflineTests === 'function');
+  // Each page call has a hard limit and a name (KB5029b: a run sat 211 s in one of these with nothing named, until the
+  // GPU monitor reclaimed it). Far past what each takes (9 s for the whole suite on the dev PC, 2026-11-11). On a
+  // stall the AudioContext states the page can see are printed with the step's name.
+  const CALL_LIMIT = 60_000;
+  const call = async (name, run) => {
+    let timer;
+    try {
+      return await Promise.race([
+        page.evaluate(run),
+        new Promise((_, reject) => {
+          timer = setTimeout(async () => {
+            const states = await Promise.race([
+              page.evaluate(() => JSON.stringify(window.__audioStates?.() ?? 'no state probe')).catch((e) => String(e)),
+              new Promise((resolve) => setTimeout(resolve, 5000, 'page did not answer')),
+            ]);
+            reject(new Error(`audio browser step ${name} took over ${CALL_LIMIT / 1000} s; page: ${states}`));
+          }, CALL_LIMIT);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   const report = { checks: [] };
-  report.offline = await page.evaluate(() => window.runOfflineTests());
+  report.offline = await call('runOfflineTests', () => window.runOfflineTests());
   report.checks.push(...report.offline.checks);
-  report.engine = await page.evaluate(() => window.runEngineTests());
+  report.engine = await call('runEngineTests', () => window.runEngineTests());
   report.checks.push(...report.engine.checks);
-  report.occlusion = await page.evaluate(() => window.runOcclusionTests());
-  report.doppler = await page.evaluate(() => window.runDopplerTests());
-  report.events = await page.evaluate(() => window.runEventTests());
-  report.music = await page.evaluate(() => window.runMusicTests());
-  report.zones = await page.evaluate(() => window.runZoneTests());
-  report.ambisonics = await page.evaluate(() => window.runAmbisonicTests());
-  report.pan = await page.evaluate(() => window.runPanTests());
-  report.binaural = await page.evaluate(() => window.runBinauralTests());
-  report.voices = await page.evaluate(() => window.runVoiceManagerTests());
-  report.sprites = await page.evaluate(() => window.runSpriteTests());
-  assert.equal(await page.evaluate(() => window.prepareGesture()), 'suspended');
+  report.occlusion = await call('runOcclusionTests', () => window.runOcclusionTests());
+  report.doppler = await call('runDopplerTests', () => window.runDopplerTests());
+  report.events = await call('runEventTests', () => window.runEventTests());
+  report.music = await call('runMusicTests', () => window.runMusicTests());
+  report.zones = await call('runZoneTests', () => window.runZoneTests());
+  report.ambisonics = await call('runAmbisonicTests', () => window.runAmbisonicTests());
+  report.pan = await call('runPanTests', () => window.runPanTests());
+  report.binaural = await call('runBinauralTests', () => window.runBinauralTests());
+  report.voices = await call('runVoiceManagerTests', () => window.runVoiceManagerTests());
+  report.sprites = await call('runSpriteTests', () => window.runSpriteTests());
+  assert.equal(await call('prepareGesture', () => window.prepareGesture()), 'suspended');
   await page.mouse.click(20, 20);
-  assert.equal(await page.evaluate(() => window.checkGesture()), 'running');
+  assert.equal(await call('checkGesture', () => window.checkGesture()), 'running');
   report.checks.push('A suspended context resumes on the first real pointer gesture');
   report.browser = browser.version();
   assert.deepEqual(errors, []);

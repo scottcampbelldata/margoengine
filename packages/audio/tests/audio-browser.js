@@ -20,6 +20,15 @@ import {
   coneGain,
 } from '@margoengine/audio';
 
+// Every real AudioContext the checks make, so a step the runner ends at its limit can print their states (KB5029b).
+const liveContexts = [];
+window.AudioContext = class extends window.AudioContext {
+  constructor(...args) {
+    super(...args);
+    liveContexts.push(this);
+  }
+};
+window.__audioStates = () => liveContexts.map((context) => ({ state: context.state, time: context.currentTime }));
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
