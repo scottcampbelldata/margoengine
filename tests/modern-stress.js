@@ -167,14 +167,16 @@ window.runStress = async (profile, options) => {
       if (scenario === 'recovery-failure') gpu.failAdapter = true;
       else gpu.delay = 40;
       old.destroy();
-      await wait(() => Boolean(engine.recovery) || expected.length > 0);
+      // Only public API: Engine's recovery field is private and the build renames it. rebootDevice() returns the
+      // restore already pending after the loss, or starts it; a restore runs once either way.
       if (scenario === 'dispose-recovery') {
-        const recovery = engine.recovery;
+        const recovery = engine.rebootDevice();
         app.dispose();
         await recovery;
         checks.push('dispose during pending recovery');
       } else {
-        await wait(() => expected.length === 1 && !engine.recovery);
+        // onError runs after the failed restore settles, so the error marks its end.
+        await wait(() => expected.length === 1);
         assert(/adapter unavailable/.test(expected[0]), 'Unexpected recovery error');
         checks.push('failed recovery reports once');
       }
@@ -226,7 +228,8 @@ window.runStress = async (profile, options) => {
           engine.render();
           remove();
         } else old.destroy();
-        await wait(() => engine.gpu !== old && !engine.recovery);
+        // The restore assigns the new device after its last await; a timer poll runs after the rest of it settles.
+        await wait(() => engine.gpu !== old);
         assert(
           engine.store === store && store.matrices.buffer === memory && first === engine.meshes.get(0),
           'Device loss replaced CPU objects',
