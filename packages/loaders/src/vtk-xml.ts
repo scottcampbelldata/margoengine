@@ -586,7 +586,8 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
     let cells = 0;
     const offsetIndex = (corners: number[]): number[] => corners.map((corner) => corner + base);
     if (type === 'PolyData') {
-      for (const name of ['Verts', 'Lines', 'Strips', 'Polys']) {
+      // VTK's cell order for PolyData (cell ids and CellData follow it): verts, lines, polys, strips.
+      for (const name of ['Verts', 'Lines', 'Polys', 'Strips']) {
         const owner = child(piece, name);
         if (!owner) continue;
         const { connectivity, offsets } = await cellArrays(owner, context);

@@ -50,9 +50,27 @@ test('a polygon fan, a strip and a polyline read from ascii arrays', async () =>
   assert.equal(model.kind, 'mesh');
   assert.equal(model.type, 'PolyData');
   assert.deepEqual([...model.lines], [0, 1, 1, 2]);
-  assert.deepEqual([...model.indices], [1, 4, 2, 2, 4, 5, 0, 1, 2, 0, 2, 3]);
+  // VTK numbers PolyData cells verts, lines, polys, strips, whatever order the file writes them in.
+  assert.deepEqual([...model.indices], [0, 1, 2, 0, 2, 3, 1, 4, 2, 2, 4, 5]);
   assert.equal(model.cellCount, 3);
   assert.deepEqual([...model.triangleCells], [1, 1, 2, 2]);
+});
+
+test('PolyData triangleCells follow VTK cell order: verts, lines, polys, then strips', async () => {
+  // One vert (cell 0), one line (1), a polygon on 0/1/2 (2) and a strip on 3/4/5 (3), the strip written first.
+  const model = await parseVTKXML(
+    poly(
+      points([0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 0, 3, 0, 0, 2, 1, 0]) +
+        cells('Verts', [0], [1]) +
+        cells('Lines', [0, 1], [2]) +
+        cells('Strips', [3, 4, 5], [3]) +
+        cells('Polys', [0, 1, 2], [3]),
+      'NumberOfPoints="6"',
+    ),
+  );
+  assert.equal(model.cellCount, 4);
+  assert.deepEqual([...model.indices], [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual([...model.triangleCells], [2, 3]);
 });
 
 test('only vertices make a point cloud', async () => {

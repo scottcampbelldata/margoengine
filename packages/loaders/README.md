@@ -611,7 +611,7 @@ console.log(positions.length, indices);
 ```
 
 - **Encodings.** ascii, binary and appended arrays, raw or base64, either byte order, 32 or 64-bit headers, and zlib or LZ4 blocks. Several pieces in a file are merged.
-- **Cells.** Polygons and strips become triangles over the file's points, and polylines become `lines`. Volume cells are reduced to the faces only one cell owns, their outer surface; `surface: 'all'` keeps every face. `triangleCells` names the cell each triangle came from, so a cell field can colour them.
+- **Cells.** Polygons and strips become triangles over the file's points, and polylines become `lines`. Volume cells are reduced to the faces only one cell owns, their outer surface; `surface: 'all'` keeps every face. `triangleCells` names the cell each triangle came from, numbered as VTK does (PolyData: verts, lines, polys, then strips, whatever order the file writes them in), so a cell field can colour them.
 - **Data.** Every array is in `pointData` or `cellData` by name. `Normals`, `TCoords` and a 3 or 4 component `UInt8` `Scalars` array also fill `normals`, `uvs` and `colors`.
 - **Not read.** Other dataset types, such as image and structured grids, are `unsupported` errors. The legacy text format is `parseVTK`. LZMA blocks (`vtkLZMADataCompressor`) need `@margoengine/decoders`.
 
