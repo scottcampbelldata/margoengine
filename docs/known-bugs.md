@@ -5929,7 +5929,7 @@ Batch 186 job 2: no open correctness defect found in shared atlas packing/filter
 ## Batch 136 encoder boundary
 
 No new open correctness defect in the implemented encoder is known from its current fixtures. Normal quantization at one bit is not a representable octahedral format and returns RangeError; the new encoder's 30-bit path is covered without invoking the upstream build that aborts on that option. Universal compression dominance and end-to-end timing are not established by finite corpus tests; the remaining proof and deferred speed rows are recorded in limits.md and the work lists.
-- Batch 191 optional normal-provider reconfiguration: attach Pixelate or Curvature with {normal: () => texture}, then delete effect.options.normal and render. The default normal capture is not registered, so normal highlights/curvature disappear; setup selected the external path and frame does not activate the owned SceneTargets. Nonblocking fix-phase item; constructor defaults and stable providers work.
+- Fixed 2026-11-11 (bug sweep L3b, KB5641a): Batch 191 optional normal-provider reconfiguration. Repro: attach Pixelate or Curvature with {normal: () => texture}, then delete effect.options.normal and render; normal highlights/curvature disappeared. Cause: only setup chose between the supplied and the owned normals, and frame cannot add the owned SceneTargets (the frame graph refuses new passes while it runs). Fix: both effects check in onPreUpdate, which the engine runs before the graph, and attach the owned capture once the provider is gone; nothing changes per frame while a provider is set. Regression: packages/post/test/pixelate.test.js and packages/post/test/curvature.test.js ("provider is deleted mid-run").
 
 
 ## Batch 178 vector publication

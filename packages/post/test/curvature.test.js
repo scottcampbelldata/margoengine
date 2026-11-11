@@ -43,3 +43,23 @@ test('Curvature validates strengths, normals, sampling and live options', () => 
   assert.throws(() => h.frame(), RangeError);
   e.dispose();
 });
+test('Curvature falls back to its owned normal capture when the normal provider is deleted mid-run (KB5641a)', async () => {
+  const h = harness(),
+    supplied = h.gpu.device.createTexture({ size: [4, 4], format: 'rgba16float', usage: 0x4 | 0x10 }),
+    effect = Curvature.attach(h.engine, { normal: () => supplied });
+  const before = h.gpu.record(() => h.frame());
+  assert.ok(!modules(before).some((s) => s.includes('MargoCapture')), 'a supplied provider needs no owned capture');
+  delete effect.options.normal;
+  h.frame();
+  const after = h.gpu.record(() => h.frame());
+  assert.ok(
+    modules(after).some((s) => s.includes('normal') && s.includes('MargoCapture')) ||
+      [...h.plugins.keys()].some((k) => k.startsWith('scene-targets:')),
+    'the owned SceneTargets capture is active once the provider is gone',
+  );
+  assert.ok([...h.plugins.keys()].some((k) => k.startsWith('scene-targets:')));
+  effect.dispose();
+  supplied.destroy();
+  await null;
+  assert.deepEqual(h.live(), []);
+});

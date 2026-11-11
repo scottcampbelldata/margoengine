@@ -70,6 +70,13 @@ export class Curvature extends ScreenEffect {
   }
   override setup(engine: Engine): void {
     super.setup(engine);
+    this.capture(engine);
+  }
+  /** A provider removed after setup falls back to the owned capture before the next frame's graph runs. */
+  onPreUpdate(): void {
+    if (this.engine) this.capture(this.engine);
+  }
+  private capture(engine: Engine): void {
     if (!this.options.normal && !engine.sceneOf(this.targets)) engine.use(this.targets);
   }
   protected check(): void {

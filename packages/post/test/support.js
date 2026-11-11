@@ -66,6 +66,8 @@ export function harness({ samples = 4, shader = wgsl, format = 'bgra8unorm', lig
     host = false;
     view.c.bindings.push(...bindings);
     view.c.draw = (o) => draws.push({ ...o, color: view.c.color, descriptor: view.c.descriptor });
+    // The engine runs every plugin's onPreUpdate before the graph executes (core engine.ts prepare).
+    for (const plugin of [...plugins.values()]) plugin.onPreUpdate?.(0);
     graph.execute(view.c);
   };
   return { gpu, engine, view, plugins, draws, frame, live: () => resources.filter((r) => !r.destroyed) };

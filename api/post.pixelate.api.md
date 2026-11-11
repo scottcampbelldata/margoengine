@@ -14,6 +14,7 @@ export class Pixelate extends ScreenEffect {
     static attach(engine: EngineKernel, options?: PixelateOptions): Pixelate;
     add(model: SSRModel): () => void;
     setup(engine: Engine): void;
+    onPreUpdate(): void;
     protected check(): void;
     protected frame(c: ScreenContext, input: GPUTextureView, output: StageOutput): void;
     dispose(): void;

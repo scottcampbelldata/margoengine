@@ -14,6 +14,7 @@ export class Curvature extends ScreenEffect {
     static attach(engine: EngineKernel, options?: CurvatureOptions): Curvature;
     add(model: SSRModel): () => void;
     setup(engine: Engine): void;
+    onPreUpdate(): void;
     protected check(): void;
     protected frame(c: ScreenContext, input: GPUTextureView, output: StageOutput): void;
     protected release(): void;
