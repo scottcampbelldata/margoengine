@@ -5967,7 +5967,7 @@ Batch 186 job 3: no open correctness defect found in cube projection or mixed sp
 
 Batch 186 job 3 regression: toggling cubes while spot images keep the shared hook active now invalidates cached shader declarations and bind layouts. The CPU regression fails on the pre-fix build, and live removal/reactivation is checked on both GPU backends.
 
-Batch 186 composition follow-up: all three clustered list buffers plus rectangle, shape, directional, IES, spot-cookie and cube-cookie storage total nine fragment storage bindings, above the minimum WebGPU device limit of eight. Repro: activate all those optional hooks together on a default-limits device. Cause: cube cookies currently retain a separate pixel buffer beside spot storage, even for cube-only lists. Ordinary cube and mixed spot/cube projection passes; consolidate cookie storage in the fix phase without changing core.
+Fixed 2026-11-11 (bug sweep L3b, KB5663d): Batch 186 composition follow-up: all three clustered list buffers plus rectangle, shape, directional, IES, spot-cookie and cube-cookie storage totalled nine fragment storage bindings, above the minimum WebGPU device limit of eight. Repro: activate all those optional hooks together on a default-limits device. Cause: cube cookies kept a separate pixel buffer (binding 152) beside spot storage, even for cube-only lists. Fix: the cube block now follows the spot words in the one projector buffer (binding 143), whose header word 2 names where it starts; the upload stays one pass, so all hooks together take eight fragment storage bindings. Regression: packages/clustered/test/cube-projector.test.js ("one fragment storage binding") and the pixel check scripts/clustered-cube-projector-gpu.mjs.
 
 
 

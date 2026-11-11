@@ -28,16 +28,16 @@ test('cube-only and mixed spot cookies share the hook, uploads restore, empty an
  const cookies=CubeProjectorLights.attach(h.engine,{lights}),image=cube();
  assert.equal(lights.projector,undefined);
  cookies.setCubes([image]);assert.equal(lights.projector,cookies);
- assert.deepEqual(cookies.bindings().map(b=>b.binding),[143,152]);
+ assert.deepEqual(cookies.bindings().map(b=>b.binding),[143],'cube cookies share the spot storage binding (KB5663d)');
  assert.match(cookies.term,/clusterProjector.*clusterCubeProjector/);
  assert.match(cookies.declarations(0),/cubeCookieDirection/);
  cookies.setProjectors([{width:1,height:1,data:new Uint8Array([255,255,255,255])}]);
-  assert.match(lights.pbr(0).declarations,/struct CubeCookieData/);
+  assert.match(lights.pbr(0).declarations,/fn cubeWord/);
  cookies.setCubes([]);assert.equal(lights.projector,cookies);
-  assert.doesNotMatch(lights.pbr(0).declarations,/struct CubeCookieData/,'spot-only activation invalidates cached cube declarations');
+  assert.doesNotMatch(lights.pbr(0).declarations,/fn cubeWord/,'spot-only activation invalidates cached cube declarations');
  assert.deepEqual(cookies.bindings().map(b=>b.binding),[143]);
-  cookies.setCubes([image]);assert.match(lights.pbr(0).declarations,/struct CubeCookieData/,'reactivated cubes rebuild cached declarations');const old=cookies.cubeBuffer;
- cookies.onDeviceRestored(h.engine);assert.ok(old.destroyed);assert.notEqual(cookies.cubeBuffer,old);
+  cookies.setCubes([image]);assert.match(lights.pbr(0).declarations,/fn cubeWord/,'reactivated cubes rebuild cached declarations');const old=cookies.bindings()[0].resource.buffer;
+ cookies.onDeviceRestored(h.engine);assert.ok(old.destroyed);assert.notEqual(cookies.bindings()[0].resource.buffer,old);
  cookies.setCubes([]);cookies.setProjectors([]);assert.equal(lights.projector,undefined);
  cookies.dispose();assert.throws(()=>cookies.setCubes([image]),/disposed/);lights.dispose();
 });
@@ -48,7 +48,7 @@ test('cubes supplied before attachment respect the eventual device storage limit
  h.engine.gpu.limits.maxStorageBufferBindingSize=4096;
  cookies.setCubes([{faces:Array(6).fill(face)}]);
  const buffers=h.counts.buffers;
- assert.throws(()=>cookies.setup(h.engine),/device storage limits/);
+ assert.throws(()=>cookies.setup(h.engine),/device storage buffer limit/);
  assert.equal(h.counts.buffers,buffers);
  assert.equal(lights.projector,undefined);
  cookies.dispose();lights.dispose();
@@ -79,4 +79,30 @@ test('the small WebGL2 preview is refused during setup with a coded WebGPU error
    e=>e.code==='unsupported'&&/CubeProjectorLights needs WebGPU/.test(e.message)&&/https:\/\/margoengine\.com\/errors#webgpu/.test(e.message));
   assert.equal(engine.plugins.size,0);
  }finally{engine.dispose();}
+});
+
+test('spot and cube cookies use one fragment storage binding, so every clustered hook fits eight (KB5663d)',async()=>{
+ // The cube pixels had their own storage buffer (binding 152) beside the spot images (143): with the three cluster
+ // lists, rectangle, shape, directional and IES storage that made nine fragment storage bindings, one over the
+ // WebGPU default limit of eight. The cube block now follows the spot block in binding 143.
+ const {wgsl}=await import('../../core/src/shaders.ts');
+ const h=optionalGPU(),lights=new Clustered({grid:[1,1,1]});h.engine.use(lights);
+ lights.setLights([{position:[0,3,0],range:10,direction:[0,-1,0],outerAngle:0.6},{position:[4,3,0],range:10}]);
+ const cookies=CubeProjectorLights.attach(h.engine,{lights}),image=cube();
+ cookies.setProjectors([{width:2,height:1,data:new Uint8Array([0,255,0,255,9,8,7,255])}]);cookies.setCubes([null,{image,rotation:[0,1,0,1]}]);
+ const declarations=lights.pbr(0).declarations;
+ assert.doesNotMatch(declarations,/@binding\(152\)/);
+ assert.equal((declarations.match(/@binding\(143\)/g)??[]).length,1,'one projector storage declaration');
+ assert.deepEqual(cookies.bindings().map(b=>b.binding),[143]);
+ h.context.shader=wgsl;h.context.bindings.length=0;h.engine.frameGraph.execute(h.context);
+ const gpu=new Uint32Array(cookies.bindings()[0].resource.buffer.data),floats=new Float32Array(gpu.buffer);
+ // The spot header names where the cube block starts (header.z, in words after the 68 header words).
+ const base=gpu[2],cubeAt=68+base;
+ assert.equal(base,1*4+2,'cube block follows one spot entry and two texels');
+ assert.deepEqual([gpu[cubeAt],gpu[cubeAt+1]],[2,1],'cube header: two entries, one image');
+ assert.deepEqual([...gpu.subarray(cubeAt+68+8,cubeAt+68+9)],[1],'light 1 uses cube image 1');
+ assert.ok(Math.abs(floats[cubeAt+68+8+5]-Math.SQRT1_2)<1e-7,'rotation stored');
+ const pixels=cubeAt+gpu[cubeAt+4];
+ assert.deepEqual([...new Uint8Array(gpu.buffer,(68+pixels)*4,4)],[0,0,0,255],'first face texel');
+ cookies.dispose();lights.dispose();
 });

@@ -43,6 +43,8 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
     bindings(): GPUBindGroupEntry[];
     setup(engine: Engine): void;
     protected get enabled(): boolean;
+    protected storage(tail: number, what?: string): number;
+    protected setTail(words: Uint32Array | undefined): void;
     protected sync(): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

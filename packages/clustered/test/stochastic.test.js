@@ -48,7 +48,8 @@ test('cube cookies and stochastic shadows compose with distinct shader and resou
     const declarations = lights.pbr(0).declarations;
     const bindings = [...declarations.matchAll(/@group\(0\)\s*@binding\((\d+)\)/g)].map((match) => Number(match[1]));
     assert.equal(new Set(bindings).size, bindings.length, 'the composed shader must not alias resources');
-    assert.match(declarations, /cubeCookie:CubeCookieData/);
+    assert.match(declarations, /fn cubeWord\(/);
+    assert.doesNotMatch(declarations, /@binding\(152\)/, 'cube cookies share the projector binding (KB5663d)');
     assert.match(declarations, /clusterStochastic:ClusterStochastic/);
     assert.match(declarations, /clusterCubeProjector\(index,light,position\)/);
   } finally {

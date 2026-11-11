@@ -47,8 +47,10 @@ const MAX_LIGHTS = 1024,
   HEADER_WORDS = 4 + MAX_PROJECTOR_IMAGES * 4,
   BINDING = 143;
 
-// Header: light entries; per image its word offset, width, height and sRGB flag; per light its image (index + 1, 0 for
-// none), the tangent of its vertical half-angle (0: the cone's) and its aspect; then the texels.
+// Header: light entries, image count, the word (after the header) where an extension's block starts (0: none); per
+// image its word offset, width, height and sRGB flag; per light its image (index + 1, 0 for none), the tangent of its
+// vertical half-angle (0: the cone's) and its aspect; then the texels; then an extension's block (CubeProjectorLights),
+// so spot and cube cookies take one storage binding.
 // sRGB decode per IEC 61966-2-1.
 const sampling = (group: number) => /* wgsl */ `
 struct ClusterProjectorData {header:vec4u,images:array<vec4u,${MAX_PROJECTOR_IMAGES}>,words:array<u32>}
@@ -90,6 +92,7 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   private buffer?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
   private words = new Uint32Array(HEADER_WORDS);
+  private tail?: Uint32Array;
   private listValue: readonly (ProjectorImage | ProjectorEntry | null | undefined)[] = Object.freeze([]);
   private active = false;
   private dirty = true;
@@ -214,18 +217,30 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   // The buffer grows (to a power of two) when the images need more room, and is kept when they need less.
   /** @internal Whether this projector or an optional extension has images. */
   protected get enabled(): boolean { return this.active; }
+  /**
+   * @internal Bytes of storage the spot words plus `tail` more words need (a power of two, at least 1 KiB); a
+   * RangeError naming `what` when the device cannot bind that much.
+   */
+  protected storage(tail: number, what = 'Projector images'): number {
+    const size = Math.max(1024, 2 ** Math.ceil(Math.log2(this.words.byteLength + tail * 4))),
+      limits = this.device?.limits;
+    if (limits && (size > limits.maxStorageBufferBindingSize || size > limits.maxBufferSize))
+      throw new RangeError(`${what} exceed the device storage buffer limit; use fewer or smaller images`);
+    return size;
+  }
+  /** @internal An extension's words, stored after the spot words in the same buffer (undefined: none). */
+  protected setTail(words: Uint32Array | undefined): void {
+    this.tail = words;
+    this.dirty = true;
+  }
   /** @internal Synchronize storage and the shared projector hook. */
   protected sync(): void {
-    const active = !!this.device && !this.disposed && this.enabled;
-    if (active && (!this.buffer || this.buffer.size < this.words.byteLength)) {
+    const active = !!this.device && !this.disposed && this.enabled,
+      bytes = this.words.byteLength + (this.tail?.byteLength ?? 0);
+    if (active && (!this.buffer || this.buffer.size < bytes)) {
       this.buffer?.destroy();
-      const size = Math.max(1024, 2 ** Math.ceil(Math.log2(this.words.byteLength))),
-        limits = this.device!.limits;
-      if (size > limits.maxStorageBufferBindingSize || size > limits.maxBufferSize)
-        throw new RangeError(
-          'Projector images exceed the device storage buffer limit; use fewer or smaller projector images',
-        );
-      const buffer = (this.buffer = this.device!.createBuffer({
+      const size = this.storage(this.tail?.length ?? 0, this.tail ? 'Projector and cube images' : undefined),
+        buffer = (this.buffer = this.device!.createBuffer({
         size,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       }));
@@ -243,7 +258,10 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
         // `enabled`, not `active`: a subclass (CubeProjectorLights) keeps the hook with no spot images, and the emptied
         // spot list must still reach the GPU, or the old image stays projected onto its spot.
         if (c.backend !== 'webgpu' || !this.buffer || !this.dirty || !this.enabled) return;
+        this.words[2] = this.tail ? this.words.length - HEADER_WORDS : 0;
         c.device.queue.writeBuffer(this.buffer, 0, this.words as Uint32Array<ArrayBuffer>);
+        if (this.tail)
+          c.device.queue.writeBuffer(this.buffer, this.words.byteLength, this.tail as Uint32Array<ArrayBuffer>);
         this.dirty = false;
       },
     });

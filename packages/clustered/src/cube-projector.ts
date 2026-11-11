@@ -1,5 +1,5 @@
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type FrameGraph } from '@margoengine/core/extension';
+import { engineRuntime, type Engine } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { ProjectorLights, type ProjectorImage, type ProjectorLightOptions } from './projector.js';
@@ -20,8 +20,10 @@ export const MAX_CUBE_PROJECTORS = 16;
 export const MAX_CUBE_PROJECTOR_TEXELS = 1 << 24;
 const HEADER = 4 + MAX_CUBE_PROJECTORS * 4;
 const sampling=(group:number)=>/* wgsl */`
-struct CubeCookieData {header:vec4u,images:array<vec4u,16>,words:array<u32>}
-@group(${group}) @binding(152) var<storage,read> cubeCookie:CubeCookieData;
+// The cube block follows the spot words in clusterProjectorData (binding 143); its header.z is the block's first word.
+fn cubeWord(i:u32)->u32{return clusterProjectorData.words[clusterProjectorData.header.z+i];}
+fn cubeImage(i:u32)->vec4u{let a=4u+i*4u;return vec4u(cubeWord(a),cubeWord(a+1u),cubeWord(a+2u),cubeWord(a+3u));}
+fn cubeData(i:u32)->u32{return cubeWord(${HEADER}u+i);}
 fn cubeCookieCoord(d:vec3f)->vec3f {
  let a=abs(d);var f=0.0;var p=vec2f(0);var m=a.x;
  if(a.x>=a.y&&a.x>=a.z){if(d.x>=0.0){p=vec2f(-d.z,-d.y);}else{f=1.0;p=vec2f(d.z,-d.y);}}
@@ -36,7 +38,7 @@ fn cubeCookieDirection(face:u32,p:vec2f)->vec3f {
 }
 fn cubeCookieDecoded(image:vec4u,coord:vec3f)->vec3f {
  let pixel=clamp(vec2i(coord.xy*f32(image.y)),vec2i(0),vec2i(i32(image.y)-1));
- let packed=cubeCookie.words[image.x+u32(coord.z)*image.y*image.y+u32(pixel.y)*image.y+u32(pixel.x)];let c=unpack4x8unorm(packed);
+ let packed=cubeData(image.x+u32(coord.z)*image.y*image.y+u32(pixel.y)*image.y+u32(pixel.x));let c=unpack4x8unorm(packed);
  let rgb=select(c.rgb,select(c.rgb/12.92,pow((c.rgb+0.055)/1.055,vec3f(2.4)),c.rgb>vec3f(0.04045)),image.z==1u);return rgb*c.a;
 }
 fn cubeCookieTexel(image:vec4u,face:u32,p:vec2i)->vec3f {
@@ -50,10 +52,10 @@ fn cubeCookieTexel(image:vec4u,face:u32,p:vec2i)->vec3f {
  return cubeCookieDecoded(image,vec3f((vec2f(pixel)+0.5)/f32(side),f32(f)));
 }
 fn clusterCubeProjector(index:u32,light:ClusterLight,position:vec3f)->vec3f {
- if(index>=cubeCookie.header.x||light.params.y>=0.5){return vec3f(1);}let at=index*8u;let id=cubeCookie.words[at];
- if(id==0u){return vec3f(1);}let image=cubeCookie.images[id-1u];let world=position-light.positionRange.xyz;
+ if(index>=cubeWord(0u)||light.params.y>=0.5){return vec3f(1);}let at=index*8u;let id=cubeData(at);
+ if(id==0u){return vec3f(1);}let image=cubeImage(id-1u);let world=position-light.positionRange.xyz;
  if(dot(world,world)<1e-30){return vec3f(1);}
- let q=vec4f(bitcast<f32>(cubeCookie.words[at+4u]),bitcast<f32>(cubeCookie.words[at+5u]),bitcast<f32>(cubeCookie.words[at+6u]),bitcast<f32>(cubeCookie.words[at+7u]));
+ let q=vec4f(bitcast<f32>(cubeData(at+4u)),bitcast<f32>(cubeData(at+5u)),bitcast<f32>(cubeData(at+6u)),bitcast<f32>(cubeData(at+7u)));
  let v=-q.xyz;let d=world+2.0*cross(v,cross(v,world)+q.w*world);let coord=cubeCookieCoord(d);let face=u32(coord.z);
  let t=coord.xy*f32(image.y)-0.5;let p=vec2i(floor(t));let f=fract(t);
  return mix(mix(cubeCookieTexel(image,face,p),cubeCookieTexel(image,face,p+vec2i(1,0)),f.x),
@@ -68,12 +70,7 @@ export class CubeProjectorLights extends ProjectorLights {
   /** Per-light product for coexisting spot and cube images. */
   override readonly term='clusterProjector(index,light,position)*clusterCubeProjector(index,light,position)';
   private cubeWords=new Uint32Array(HEADER);
-  private cubeBuffer?:GPUBuffer;
-  private cubeEntries:GPUBindGroupEntry[]=[];
-  private cubeBase?:GPUBindGroupEntry[];
-  private joined?:GPUBindGroupEntry[];
   private cubesActive=false;
-  private cubesDirty=true;
   private cubesDisposed=false;
   private cubesList:readonly (CubeProjectorImage|CubeProjectorEntry|null|undefined)[]=[];
   /** Attach spot and cube cookies to one clustered light list. */
@@ -116,41 +113,19 @@ export class CubeProjectorLights extends ProjectorLights {
       for(const face of image.faces){new Uint8Array(words.buffer,(HEADER+offset)*4,face.data.length).set(face.data);offset+=side*side;}
     });
     values.forEach((v,i)=>{words[HEADER+i*8]=v[0];floats.set(v.slice(4),HEADER+i*8+4);});
-    const size=Math.max(1024,2**Math.ceil(Math.log2(words.byteLength)));
-    if(this.device&&(size>this.device.limits.maxBufferSize||size>this.device.limits.maxStorageBufferBindingSize))
-      throw new RangeError('Cube cookies exceed device storage limits; use fewer or smaller cubes');
+    this.storage(images.length?words.length:0,'Cube cookies');
     const installed=this.lights.projector===this,changed=this.cubesActive!==(images.length>0);
-    this.cubeWords=words;this.cubesActive=images.length>0;this.cubesDirty=true;this.cubesList=Object.freeze([...entries]);this.sync();
+    this.cubeWords=words;this.cubesActive=images.length>0;this.setTail(this.cubesActive?words:undefined);this.cubesList=Object.freeze([...entries]);this.sync();
     // Spot images can keep the composite hook installed while its cube declarations/bindings change.
     if(installed&&changed&&this.lights.projector===this)this.lights.projector=this;
     return this;
   }
   /** @internal Cube-only lights still activate the inherited projector upload and light hook. */
   protected override get enabled():boolean{return super.enabled||this.cubesActive;}
-  /** @internal Allocate cube storage before publishing the composite hook. */
-  protected override sync():void {
-    if(this.device&&this.cubesActive&&(!this.cubeBuffer||this.cubeBuffer.size<this.cubeWords.byteLength)){
-      const size=Math.max(1024,2**Math.ceil(Math.log2(this.cubeWords.byteLength))),limits=this.device.limits;
-      if(size>limits.maxBufferSize||size>limits.maxStorageBufferBindingSize)
-        throw new RangeError('Cube cookies exceed device storage limits; use fewer or smaller cubes');
-      this.cubeBuffer?.destroy();this.cubeBuffer=this.device.createBuffer({size,usage:128|8});
-      this.cubeEntries=[{binding:152,resource:{buffer:this.cubeBuffer}}];this.joined=undefined;this.cubesDirty=true;
-    }
-    super.sync();
-  }
   /** Shader declarations for both projector kinds. */
   override declarations(group:number):string{return super.declarations(group)+(this.cubesActive?sampling(group):'\nfn clusterCubeProjector(index:u32,light:ClusterLight,position:vec3f)->vec3f{return vec3f(1);}\n');}
-  /** Storage bindings for active cube cookies and inherited spot images. */
-  override bindings():GPUBindGroupEntry[]{const base=super.bindings();if(!this.cubesActive)return base;
-    if(base!==this.cubeBase||!this.joined){this.cubeBase=base;this.joined=[...base,...this.cubeEntries];}return this.joined;}
   /** Refuse the small WebGL2 preview before inheriting GPU storage: cube cookies upload through a WebGPU queue. */
   override setup(engine:Engine):void{requireWebGPU(engine,'CubeProjectorLights');super.setup(engine);}
-  /** Upload changed cube pixels before the clustered light loop. */
-  override registerPasses(graph:FrameGraph):void {super.registerPasses(graph);graph.add({name:'clustered:cube-cookie-upload',order:-3.6,execute:c=>{
-    if(c.backend==='webgpu'&&this.cubeBuffer&&this.cubesActive&&this.cubesDirty){c.device.queue.writeBuffer(this.cubeBuffer,0,this.cubeWords as Uint32Array<ArrayBuffer>);this.cubesDirty=false;}
-  }});}
-  /** Recreate cube storage on restoration, preserving the copied image bytes and rotations. */
-  override onDeviceRestored(engine:Engine):void{this.cubeBuffer?.destroy();this.cubeBuffer=undefined;this.joined=undefined;super.onDeviceRestored(engine);}
-  /** Release owned pixel storage and both projector hooks. */
-  override dispose():void{this.cubesDisposed=true;super.dispose();this.cubeBuffer?.destroy();this.cubeBuffer=undefined;}
+  /** Release both projector hooks and the shared storage. */
+  override dispose():void{this.cubesDisposed=true;super.dispose();}
 }
