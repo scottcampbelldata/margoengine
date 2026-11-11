@@ -96,7 +96,7 @@ for speed runs; correctness continues to exercise its values and work counts.
 | netcode-rtt | `packages/netcode/tests/transports.test.js` | <250 ms localhost RTT |
 | sandbox-finds | `examples/voxel-sandbox/test/finds.test.js` | <1000 ms, seeds 1, 2 and 3 |
 | quickstart | `scripts/quickstart-timing.mjs` | <300 s default to verified interactive frame |
-| biomes-slow-sends | `packages/biomes/tests/flythrough-speed.mjs` | max <=2 ms send +1.5 ms |
+| biomes-slow-sends | `packages/biomes/tests/flythrough-speed.mjs` | max <=2 ms send +1.5 ms; first decide wall clock or page-thread CPU time from a trace and attribute the 7.4 ms frame (known-bugs: biomes flythrough on laptops) |
 | biomes-flight-p99 | `packages/biomes/tests/flythrough-speed.mjs` | added p99 <=0.3 ms; original settle function |
 | biomes-flight-max | `packages/biomes/tests/flythrough-speed.mjs` | added worst <=1 ms; original settle function |
 | biomes-camera01 | `packages/biomes/tests/objects-frame-speed.mjs` | <=0.7 * RTX A6000 baseline (19.8/53.2 ms) |

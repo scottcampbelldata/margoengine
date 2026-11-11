@@ -407,7 +407,21 @@ checks.presets = async (page, samples) => {
   );
   return r;
 };
+// Named cases, each with its own hard limit: test:gpu runs the checks in groups of at most three (one browser each), so
+// no single command carries all eleven at both sample counts (KB1042h: the monolithic run passed every value check
+// but outlived its 98 s bound).
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
+for (const name of names) if (!checks[name]) throw new Error(`unknown sky feature check ${name}`);
+const CASE_LIMIT_MS = 60000;
+const limited = (label, work) => {
+  let timer;
+  return Promise.race([
+    work.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`sky feature check ${label} passed its ${CASE_LIMIT_MS} ms limit`)), CASE_LIMIT_MS);
+    }),
+  ]);
+};
 const context = await openBrowser({ startPath: '/packages/sky/test/volumetric-check.html', port: 5213 }),
   { page, hardware } = context,
   pageErrors = [],
@@ -420,16 +434,21 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   for (const name of names) {
     for (const samples of [4, 1]) {
-      await page.goto(`http://127.0.0.1:5213/packages/sky/test/${name}-check.html${samples === 1 ? '?samples=1' : ''}`);
-      await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
-      assert.equal(await page.evaluate(() => window.check.samples()), samples);
-      report.results[`${name} ${samples}x`] = await checks[name](page, samples);
+      report.results[`${name} ${samples}x`] = await limited(
+        `${name} ${samples}x`,
+        (async () => {
+          await page.goto(`http://127.0.0.1:5213/packages/sky/test/${name}-check.html${samples === 1 ? '?samples=1' : ''}`);
+          await page.waitForFunction(() => window.ready, null, { timeout: CASE_LIMIT_MS });
+          assert.equal(await page.evaluate(() => window.check.samples()), samples);
+          return checks[name](page, samples);
+        })(),
+      );
     }
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/sky-features-check.json', JSON.stringify(report, null, 1));
-  console.log('sky features check passed');
+  await writeFile(`test-results/sky-features-check-${names.join('-')}.json`, JSON.stringify(report, null, 1));
+  console.log(`sky features check passed: ${names.join(', ')}`);
 } finally {
   await context.close();
 }

@@ -153,6 +153,42 @@ window.runTests = async () => {
     c.dispose();
     report.checks.push('mixed sizes: the output takes the larger source; set() swaps sources');
   }
+  // 5. Regression (KB0340): two unscaled sources (radianceScale 1) whose weighted stored peaks pass the largest half
+  // float. One 50,000 texel at intensity 2 used to write Inf into the rgba16float output; the output is now divided by
+  // its weighted stored peak / 60,000 and lighting multiplies that back.
+  {
+    const hot = equirect(64, 32, day);
+    hot.data.set([50000, 25000, 12500, 1], (10 * 64 + 40) * 4);
+    const c = await Environment.create(device, hot, small);
+    assert(c.radianceScale === 1 && c.storedPeak === 50000, `source scale ${c.radianceScale}, peak ${c.storedPeak}`);
+    c.intensity = 2;
+    const blend = await EnvironmentBlend.create(device, a, c, { t: 1 });
+    const out = blend.environment,
+      scale = out.radianceScale;
+    assert(Math.abs(scale - 100000 / 60000) < 1e-6, `output scale ${scale}`);
+    for (const key of ['cubeTexture', 'specularTexture'])
+      for (let mip = 0; mip < out[key].mipLevelCount; mip++) {
+        const [o, x] = await Promise.all([readTexture(device, out[key], mip), readTexture(device, c[key], mip)]);
+        for (let i = 0; i < o.data.length; i += 4)
+          for (let k = 0; k < 3; k++) {
+            assert(Number.isFinite(o.data[i + k]), `${key} mip ${mip} texel ${i / 4} is ${o.data[i + k]}`);
+            const want = (2 * x.data[i + k]) / scale;
+            assert(near(o.data[i + k], want), `${key} mip ${mip} texel ${i / 4}: ${o.data[i + k]} vs ${want}`);
+          }
+      }
+    for (const n of [
+      [0, 1, 0],
+      [0.48, -0.6, 0.64],
+    ]) {
+      const got = out.irradianceAt(n),
+        want = c.irradianceAt(n);
+      for (let k = 0; k < 3; k++)
+        assert(Math.abs(got[k] - want[k]) <= 1e-5 * Math.max(1, want[k]), `irradiance at ${n}: ${got} vs ${want}`);
+    }
+    blend.dispose();
+    c.dispose();
+    report.checks.push('unscaled sources past half-float range: the output is scaled down, finite, and lights the same');
+  }
   await finish();
   a.dispose();
   b.dispose();

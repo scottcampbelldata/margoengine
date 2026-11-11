@@ -297,14 +297,17 @@ export class EnvironmentBlend implements EnginePlugin {
       b = this.toValue,
       sa = a.radianceScale,
       sb = b.radianceScale,
-      // A source divided into half-float range (a sun) holds a stored peak of 60,000 at most, so the output is
-      // divided by the weighted sum of the source scales and stays in range; otherwise the output is unscaled.
-      bound = sa > 1 || sb > 1 ? Math.max(1, (1 - this.tValue) * a.intensity * sa + this.tValue * b.intensity * sb) : 1;
+      // The output texel is at most the weighted sum of the sources' stored peaks (in radiance: peak x scale). Past
+      // the largest half float it is divided down to 60,000 (HALF_PEAK); otherwise it is unscaled. Before KB0340 only
+      // a scaled source counted, so two unscaled sources at intensity 2 with a 50,000 texel wrote Inf.
+      peak = (1 - this.tValue) * a.intensity * sa * a.storedPeak + this.tValue * b.intensity * sb * b.storedPeak,
+      bound = peak > 65504 ? peak / 60000 : 1;
     this.environment.radianceScale = bound;
     // The stored factor (a float32), so the texels and SH below are divided by exactly what lighting multiplies back.
     const scale = this.environment.radianceScale,
       wa = ((1 - this.tValue) * a.intensity * sa) / scale,
       wb = (this.tValue * b.intensity * sb) / scale;
+    this.environment.storedPeak = Math.min(65504, peak / scale);
     const w = this.weightData;
     w.set([Math.cos(a.rotation), Math.sin(a.rotation), wa, 0, Math.cos(b.rotation), Math.sin(b.rotation), wb, 0]);
     device.queue.writeBuffer(state.weights, 0, w);

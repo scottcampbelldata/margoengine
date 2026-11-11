@@ -126,7 +126,7 @@
     "build": "node ../../scripts/build-optional.js sky",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/sky/test/browser-check.mjs && node packages/sky/test/dither-check.mjs && node packages/sky/test/features-check.mjs",
+    "test:gpu": "cd ../.. && node packages/sky/test/browser-check.mjs && node packages/sky/test/dither-check.mjs && node packages/sky/test/features-check.mjs weather volumetric cloud-shadows && node packages/sky/test/features-check.mjs aerial shafts weather-fx && node packages/sky/test/features-check.mjs sleet astro hillaire && node packages/sky/test/features-check.mjs albedo presets",
     "test:gpu:planet": "cd ../.. && node packages/sciviz/tests/atmosphere-browser.mjs"
   }
 }

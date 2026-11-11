@@ -38,7 +38,13 @@ export function riverStep(m, dt, sources = [], pipe = 'reconstructed') {
         const j = ny * w + nx,
           old = m.flux[i * 4 + k] * Math.exp(-dt * 0.12);
         if (pipe === 'surface') {
-          q[k] = surface > b[j] ? Math.max(0, old + (dt * 9.81 * d[i] * (surface - d[j] - b[j])) / l) : 0;
+          q[k] =
+            surface > b[j]
+              ? Math.min(
+                  Math.max(0, old + (dt * 9.81 * d[i] * (surface - d[j] - b[j])) / l),
+                  d[i] * Math.min(4 * Math.sqrt(9.81 * d[i]), (0.5 * l) / dt),
+                )
+              : 0;
         } else {
           const brink = Math.max(b[i], b[j]),
             a = Math.max(0, surface - brink),

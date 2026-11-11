@@ -82,8 +82,11 @@ fn join(a:u32,b:u32){
  let size=textureDimensions(terrain);if(any(id.xy>=size)){return;}let index=id.y*size.x+id.x+1u;if(atomicLoad(&connected[index])!=0xffffffffu){atomicStore(&connected[index],root(index));}
 }`;
 // Virtual-pipe shallow water (O'Brien & Hodgins 1995; Mei, Decaudin & Hu 2007) with g = 9.81; the damping 0.12, the
-// Froude breaker band 0.45-1.0 and the 0.65-2.4 depth band are Margo's.
-const flow =
+// Froude breaker band 0.45-1.0 and the 0.65-2.4 depth band are Margo's. Each pipe's speed q / depth is capped at Froude 4
+// and at the Courant-Friedrichs-Lewy bound (Courant, Friedrichs & Lewy 1928) of half a cell per step, as water/rivers
+// caps its reconstructed pipe, so a fall of any height stays bounded.
+/** Water's own coast flow kernel (water/rivers swaps in its reconstructed pipe). */
+export const coastFlowShader =
   waterFrame +
   `
 @group(0) @binding(1) var state:texture_2d<f32>;
@@ -95,7 +98,9 @@ fn surface(p:vec2i)->vec2f {let v=textureLoad(state,p,0);return vec2f(v.x+v.y,v.
  let v=textureLoad(state,p,0);let h=v.x+v.y;let dt=frame.flow.x;
  let l=surface(max(p-vec2i(1,0),vec2i(0)));let r=surface(min(p+vec2i(1,0),size-1));
  let u=surface(max(p-vec2i(0,1),vec2i(0)));let d=surface(min(p+vec2i(0,1),size-1));
- var q=max(vec4f(0),textureLoad(previous,p,0)*exp(-dt*0.12)+dt*9.81*v.x*(vec4f(h)-vec4f(l.x,r.x,u.x,d.x))/frame.flow.yyzz);
+ // Pipe speed is capped by Froude 4 and the Courant bound of half a cell per step (KB5736a: a 10 m fall reached 240 m/s).
+ let cap=v.x*min(4.0*sqrt(9.81*v.x),0.5*min(frame.flow.y,frame.flow.z)/dt);
+ var q=clamp(textureLoad(previous,p,0)*exp(-dt*0.12)+dt*9.81*v.x*(vec4f(h)-vec4f(l.x,r.x,u.x,d.x))/frame.flow.yyzz,vec4f(0),vec4f(cap));
  q*=vec4f(select(0.0,1.0,h>l.y),select(0.0,1.0,h>r.y),select(0.0,1.0,h>u.y),select(0.0,1.0,h>d.y));
  if(p.x==0){q.x=0;}if(p.x==size.x-1){q.y=0;}if(p.y==0){q.z=0;}if(p.y==size.y-1){q.w=0;}
  // Limit the complete outflow together so a cell cannot spend more water than it owns.
@@ -200,7 +205,7 @@ export class CoastalFlow {
       this.views = this.states.map((t) => t.createView());
       const fluxViews = this.fluxes.map((t) => t.createView());
       this.initializer = compute(device, initialize);
-      this.flowing = compute(device, river?.flow ?? flow);
+      this.flowing = compute(device, river?.flow ?? coastFlowShader);
       this.integrating = compute(device, river?.integrate ?? integrate);
       if (river) {
         this.device = device;

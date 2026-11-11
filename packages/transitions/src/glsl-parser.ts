@@ -109,6 +109,7 @@ export class GLSLParser {
   private i = 0;
   private depth = 0;
   private readonly known = new Set(types);
+  private readonly globals: Declaration[] = [];
   constructor(source: string) {
     this.tokens = lex(source);
   }
@@ -148,10 +149,40 @@ export class GLSLParser {
     while (this.match('[')) {
       const count = this.expression(2);
       this.expect(']');
-      if (count.op !== 'literal' && count.op !== 'name') this.fail('Array dimensions must be integer constants');
-      type += `[${count.value}]`;
+      // A literal or a named constant stays as written; a constant expression (`weights[2+2]`, `[N*2]`) is folded here
+      // over literals and earlier global initializers, so every array type has one integer or name length (KB5433).
+      type += `[${count.op === 'literal' || count.op === 'name' ? count.value : this.fold(count)}]`;
     }
     return type;
+  }
+  private fold(e: Expression, depth = 0): number {
+    if (depth > 64) this.fail('Array dimensions must be integer constants');
+    if (e.op === 'literal' && /^\d+$/.test(e.value)) return Number(e.value);
+    if (e.op === 'name') {
+      const d = this.globals.find((g) => g.name === e.value && /\bconst\b/.test(g.qualifier));
+      if (d?.init) return this.fold(d.init, depth + 1);
+    }
+    if (e.op === 'prefix' && e.value === '-' && e.args[0]) return -this.fold(e.args[0], depth + 1);
+    if (e.op === 'prefix' && e.value === '+' && e.args[0]) return this.fold(e.args[0], depth + 1);
+    if (e.op === 'binary' && e.args[0] && e.args[1]) {
+      const a = this.fold(e.args[0], depth + 1),
+        b = this.fold(e.args[1], depth + 1);
+      switch (e.value) {
+        case '+':
+          return a + b;
+        case '-':
+          return a - b;
+        case '*':
+          return a * b;
+        case '/':
+          if (b !== 0) return Math.trunc(a / b);
+          break;
+        case '%':
+          if (b !== 0) return a % b;
+          break;
+      }
+    }
+    return this.fail('Array dimensions must be integer constants');
   }
   private declarations(type: string, qualifier: string, name?: string) {
     const out: Declaration[] = [];
@@ -165,7 +196,7 @@ export class GLSLParser {
     return out;
   }
   parse(): Program {
-    const result: Program = { globals: [], functions: [], structs: new Map() };
+    const result: Program = { globals: this.globals, functions: [], structs: new Map() };
     while (this.peek()) {
       if (this.match('precision')) {
         this.take();
@@ -198,7 +229,9 @@ export class GLSLParser {
           } else {
             do {
               const p = this.qualified();
-              const n = this.identifier();
+              // GLSL allows an unnamed parameter (`float f(float, vec2 uv)`); it gets a name no source can use.
+              const unnamed = [',', ')', '['].includes(this.peek());
+              const n = unnamed ? `margo_unnamed${params.length}` : this.identifier();
               params.push({ name: n, type: this.array(p.type), qualifier: p.qualifier });
             } while (this.match(','));
             this.expect(')');

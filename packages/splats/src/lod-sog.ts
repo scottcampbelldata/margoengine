@@ -27,6 +27,7 @@ interface SpatialNode {
 }
 interface Manifest {
   version?: number;
+  model?: string;
   lodLevels: number;
   filenames: string[];
   tree: SpatialNode;
@@ -108,6 +109,13 @@ export class StreamedSogSource implements SplatLodSource {
       manifest.filenames.some((f) => typeof f !== 'string' || !f)
     )
       throw new RangeError('Invalid streamed SOG levels or filenames; supply a complete lod-meta.json');
+    // The manifest's model covers every chunk, including chunks whose meta.json omits it: a 2D Gaussian (2dgs) capture
+    // is refused before any chunk is fetched, never drawn as ordinary 3D Gaussians (KB5472a).
+    if (manifest.model !== undefined && manifest.model !== 'antialiased')
+      throw new MargoError(
+        'unsupported',
+        `Streamed SOG model ${manifest.model} is not supported; 2D Gaussian scenes cannot be drawn here.`,
+      );
     const filenames = [...manifest.filenames];
     if (manifest.environment != null) {
       if (typeof manifest.environment !== 'string' || !manifest.environment)

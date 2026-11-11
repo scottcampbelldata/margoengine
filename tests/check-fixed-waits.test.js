@@ -24,6 +24,17 @@ test('a counted loop of frames is a fixed wait; a frame loop that waits for a co
   assert.deepEqual(kinds('for (let i = 0; i < 20; i++) { const t = performance.now(); engine.render(); }'), []);
 });
 
+// Regression (KB5765b): packages/biomes/tests/water-check.html steps 90 frames of 1/30 s through a helper to advance the
+// river flow 3 s, after view.ready, whenIdle and waitForPipelines; that loop steps simulated time, not a readiness wait.
+test('a counted loop through a frame helper that steps time is not a wait; the same helper at delta 0 is', () => {
+  const helper = (delta) => `const frame=async()=>{e.render({delta:${delta}});await e.gpu.queue.onSubmittedWorkDone();};
+`;
+  assert.deepEqual(kinds(helper('1/30') + 'for(let i=0;i<90;i++)await frame();'), []);
+  assert.deepEqual(kinds(helper('0') + 'for(let i=0;i<90;i++)await frame();'), ['2:frames']);
+  const page = readFileSync(new URL('../packages/biomes/tests/water-check.html', import.meta.url), 'utf8');
+  assert.ok(!fixedWaits(page).some((w) => /i<90/.test(w.text)), 'biomes water-check 90-frame flow step read as a wait');
+});
+
 // Regression (2026-11-07): tests/modern-xr-passes.ts drew one reference render per eye in `for (let i = 0; i < 2; i++)
 // { const view = eyes()[i]; engine.render(...) }`, and the check read that walk over two eyes as a two-frame wait.
 test('a counted loop that reads a list item by its counter walks the list; recording each frame does not', () => {

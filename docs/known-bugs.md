@@ -169,7 +169,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   ended, the covered region copied (or resolved) to a texture, and a new pass begun, or the whole composite moved to
   an extra target: a new copy and an extra render pass per frame, which Scott's ruling (2026-11-10) does not allow.
 
-### The transitions GLSL oracle and the WGSL port disagree at a texel edge (list 5 R6 row 21, 2026-11-10, open)
+### Fixed 2026-11-11: the transitions GLSL oracle and the WGSL port disagreed at a texel edge (list 5 R6 row 21)
 
 - **What:** `packages/transitions` `test:gpu` (`test/glsl-browser.js`) on the Beelink (Radeon 680M): fixture `matrix`
   at p = 0.25, texel (12, 2) channel 0: the native WebGL2 oracle gives 145, the WGSL port 133.
@@ -184,6 +184,13 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   so the harness would no longer test the product (manager's ruling, 2026-11-10). Fixing it means choosing one rule for
   the product: keep the exact floor (and give the oracle comparison a documented edge allowance) or sample through a
   nearest sampler as GLSL transitions do.
+- **Fix (coordinator ruling 2026-11-11, under Scott's "fix everything else"):** the product keeps its rule, the WebGPU
+  spec's nearest texel selection (the texel containing the coordinate: truncate uv * size, clamp), and the oracle now
+  applies the same rule with `texelFetch` (`margoFetch` in `test/glsl-browser.js`, the GLSL bottom-left flip included,
+  `texture2D` and `texture2DProj` mapped to it), so oracle and port agree exactly at the edge. No allowance added. New
+  fixture `texel edge` reads 6e-4 of a texel either side of an edge. Regression: `test/glsl.test.js` "the GLSL oracle
+  reads texels by the product rule, not through a sampler"; the GPU fixture passes native and compat on the RTX A6000
+  (whose sampler truncates, so the old oracle passed there too); the Radeon 680M rerun is the hardware proof still owed.
 
 ### Radeon 680M: the 4x MSAA resolve rounds an exact .5 average by draw history (list 5 R6 row 8, 2026-11-10, worked around in the checks)
 
@@ -375,16 +382,18 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   KTX2 version 2, materials envMap). Now 3.6e-7 and 1.9e-4. Regression: `packages/environment/tests/bright-browser.js`
   and `packages/environment/tests/half-upload.test.js`.
 
-### EnvironmentBlend output can overflow half floats when unscaled sources' intensities sum above 1 (2026-11-10, open)
+### Fixed 2026-11-11: EnvironmentBlend output overflowed half floats when unscaled sources' intensities summed above 1
 
-- **What:** the blend output holds `(1 - t) * from.intensity * A + t * to.intensity * B` in rgba16float. Sources with
-  `radianceScale` above 1 are divided into range (the output takes the weighted sum of their scales), but two unscaled
-  sources keep scale 1, so a source with a peak above 32,752 and `intensity` 2 writes Inf.
-- **Repro:** an equirect with one texel of 50,000, `environment.intensity = 2`, `EnvironmentBlend.create(device, a, b,
-  { t: 1 })`; the output cube holds Inf at that texel.
-- **Cause and next step:** the blend does not know the sources' stored peaks. Record the stored peak per Environment
-  and divide the output by max(1, weighted peaks / 60000); the blend test that compares stored texels at intensity 2
-  then compares them times `radianceScale`.
+- **What:** the blend output holds `(1 - t) * from.intensity * A + t * to.intensity * B` in rgba16float. Only a source
+  with `radianceScale` above 1 counted towards the output's scale, so two unscaled sources with a peak above 32,752 and
+  `intensity` 2 wrote Inf. Repro: an equirect with one texel of 50,000, `intensity = 2`, `EnvironmentBlend.create(device,
+  a, b, { t: 1 })`.
+- **Cause:** the blend did not know the sources' stored peaks.
+- **Fix:** every Environment records `storedPeak`, the largest RGB value its textures hold (exact for equirect and
+  CubeFaces sources, 65,504 for GPU textures and baked files). The blend sums the weighted peaks in radiance; past
+  65,504 it divides its output down to 60,000 and sets its own `radianceScale` and `storedPeak`. The 50,000 texel at
+  intensity 2 now stores 60,000 with `radianceScale` 1.667 and lights the same. Regression:
+  `packages/environment/tests/blend-browser.js` case 5 (fails with "output scale 1" before the fix).
 
 ### Fixed 2026-11-10: GGX importance samples collapsed onto the normal at low roughness
 
@@ -397,7 +406,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   tan^2 theta = alpha^2 xi / (1 - xi) (Walter et al. 2007). Worst cell now 4.9e-4, within one f16 step, on WebGPU and
   WebGL2 compat. Regression: `packages/environment/tests/environment-browser.js` section 4c.
 
-### The weather lens long-time parity bound is below the shader's own f32 rounding (list 5 R6 row 24, 2026-11-10, open)
+### Fixed 2026-11-11: the weather lens long-time parity bound was below the shader's own f32 rounding (list 5 R6 row 24)
 
 - **What:** `packages/weather` `test:browser:parity` lens case (`tests/parity-browser.mjs`, `tests/lens-check.html`)
   on the Beelink (Radeon 680M, Chrome on D3D12): `longTime` worst 1.374e-4 over 2,400 cases, over its bound 1e-4.
@@ -412,6 +421,13 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   the case guards (c9b0a86ba) works: the raw time * speed product it replaced is off by far more.
 - **Open:** needs Scott's ruling. The bound is not loosened here. Options: an f32 reference (the model above) with a
   bound from WGSL's accuracy rules, or a bound derived from the f32 analysis.
+- **Fix (coordinator ruling 2026-11-11):** the long-time case compares the GPU with an f32 reference of `lens_field`
+  (`packages/weather/tests/lens-f32.js`: every WGSL operation rounded once as written, `fma` once, the inputs
+  `lensSettings` packs) at the unchanged 1e-4 bound. On the RTX A6000: 1.8e-6 native, 8.6e-6 on the WebGL2
+  compatibility layer. The f64 `lensField` stays the truth for that reference: `tests/lens-f32.test.js` holds it within
+  1e-4 of the f64 field on the same 2,400 cases (5.2e-5 measured) and fails it with the raw time * speed product (over
+  100 times worse), so a broken packing still fails. The short-time `math` case still compares with f64 at 1e-4. The
+  Radeon 680M rerun is still owed.
 
 ### Fixed 2026-11-11: the instanced frame allocated 4,048 B, over its 292 B floor (list 5 R6 row 15, Radeon 680M, then RTX A6000)
 
@@ -1227,17 +1243,10 @@ passes. The following additional failures remain with batch 273:
   either compute route runs; asynchronous pipeline errors also avoid assigning
   DOMException's read-only name. Five regressions and the unchanged full readback
   leaf pass on native WebGPU and full compat, including validation and recovery.
-- `sky/test:gpu`: sky and dither checks pass; features stop after cloud-shadows
-  4x at the 98 s body bound. This mixed fixture also printed frame diagnostics;
-  those timing values are not accepted evidence during the build phase.
-  Current sweep: weather, volumetric, cloud-shadows, aerial and shafts now pass
-  at both sample counts before the unchanged 98 s investigation lease ends.
-  A second disjoint run passes the unfinished weather-fx, sleet, astro,
-  hillaire, albedo and presets at both sample counts, with teardown. All 22
-  feature groups have unchanged passing value assertions; no permanently
-  stalled await was found. The monolithic command's 98 s investigation limit
-  still expires and is not raised or claimed passed. Frame timings remain
-  diagnostics, not speed acceptance.
+- Fixed 2026-11-11 `sky/test:gpu`: the one features-check command ran all eleven feature checks at both sample
+  counts and outlived its 98 s bound though every value assertion passed. test:gpu now runs them as four named
+  groups of at most three, one browser each, and every case has its own 60 s hard limit inside features-check.mjs
+  (unknown names are refused). Regression: packages/sky/test/features-groups.test.js.
 - Fixed 2026-11-11 (`splats/test:gpu`): the command exited only at its 62 s body bound after every check had printed success. The complete compatibility command now passes and exits through the host teardown of 919fdc09ef (Playwright browser server in a host process; regressions in `tests/browser-host.test.js` and `tests/browser-teardown.test.js`). No browser or shutdown code and no bound changed in the sweep that closed it.
 - Resolved reference selection for failures 21 and 25: the outer forced shim
   replaced the native baseline in seven comparison drivers. Each now opts out
@@ -2421,6 +2430,12 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   than the hardware threads, a throughput loss, and even 2 of 4 failed one run in 2 here; Scott's call. The
   diagnostics (per-post timing by busy workers, the trace reader, the wake page) are kept on the box in
   `~/margo-test/repo` (`diag-flythrough.mjs`, `wake-check.html`, `wake-check.mjs`).
+- **Held for the speed phase (2026-11-11, bug sweep lane L4):** the slow sends assertion is a timing budget, and
+  `scripts/speed-phase.json` defers every timing assertion from the correctness gates until Scott ends the build
+  phase (row `biomes-slow-sends` in `docs/work-lists/speed-phase.md`). The measured cause above is the operating
+  system taking the page thread's core, not Margo code, so no code change is a fix now. The open choice (time the
+  view's frame by the page thread's CPU time from a trace, or keep the wall clock) is made on the quiet machine at the
+  start of the speed phase, before the budget is run there; the budget itself is not changed.
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
@@ -3972,7 +3987,10 @@ changed here. Full verify passes 13,534/13,534 with zero skips. Both repaired
 README groups and all 16 effect-package GPU scripts pass; runtime validation is
 complete for this landing group. Earlier queued/blocker notes above are history.
 The separate 7.4 ms flythrough attribution remains open and is next per the
-coordinator; it is not a busy exemption. Durable results:
+coordinator; it is not a busy exemption. Held for the speed phase with the slow sends entry above (2026-11-11, lane L4):
+the 7.4 ms frame had zero sends and 0.1 ms in the real write, the same shape as the measured page-thread stops on
+the laptops (heading "biomes flythrough on laptops"); it is attributed on the quiet machine with the same trace
+method before the budget runs there. Durable results:
 whitepaper/results/missing-items-landing-20261109.json.
 
 ### Fixed: test-page 44 bevel output validity
@@ -5446,7 +5464,7 @@ The importer also has regression fixtures for struct members named like vector s
 
 Native reference defect found during GLSL import testing: on the recorded NVIDIA ANGLE WebGL2 backend, an out argument points[j++].x increments j again during copy-back. Repro is indexed-output-once in glsl-fixtures.js: native direct form yields j=2 while GLSL ES 1.00 section 6.1.1 requires a call-time l-value reused at return. Margo evaluates the address once. That fixture uses an independently written native oracle with the address explicitly stored before the call, preserving the specified semantics; the translated input retains its indexed side effect. No input is special-cased in the importer.
 
-GLSL importer fix-phase syntax edge cases (batch 218, rule 22): uniform float weights[2+2]; followed by a transition rejects at parsing even though the length is a constant expression. Cause: GLSLParser.array currently admits only literal or named lengths. Helpers with unnamed parameters also reject because parameter parsing requires an identifier. Canonical numeric/named array lengths and named helper parameters work and are tested. Expand these source forms and their negative/property-based corpus in the fix phase; the transition import API and all requested modes are built.
+Fixed 2026-11-11, GLSL importer syntax edge cases (batch 218, rule 22): `uniform float weights[2+2];` followed by a transition rejected at parsing, because GLSLParser.array admitted only literal or named lengths, and helpers with unnamed parameters rejected because parameter parsing required an identifier. The parser now folds a constant-expression length (+, -, *, /, %, unary signs, parentheses, integer literals and earlier `const` globals) to one integer and refuses anything else (a division by zero, a uniform, a float, a non-const name); an unnamed parameter gets a name no source can spell. Regression: packages/transitions/test/glsl.test.js "constant-expression array lengths fold and unnamed helper parameters are accepted".
 
 ### Batch 244 job 3
 The CRT composite-video look is built with signal invariants and native/compatibility GPU readback regressions. No open defect identified in this job's scope; the intentionally stylized baseband model and unshifted glow ordering are documented in limits.
@@ -5484,7 +5502,7 @@ Fixed 2026-11-10: Batch 214 unrelated GPU planner repro. GPU planner registratio
 
 Batch 238 job 4: no open modifier defect found by independent SH/position/opacity probes, repeated seek, lifecycle and real-image restoration checks. Source centre/opacity changes require explicit setRest, as documented; RGB, SH and covariance remain live inputs.
 
-Batch 238 finish-phase validation gap: a streamed manifest with top-level model "2dgs" and chunk metadata omitting model is treated as ordinary 3D. Repro: add model:"2dgs" only to a valid lod-meta.json and open it. Cause: the adapter currently validates the per-chunk SOG model, but ignores the manifest model; propagate/reject that unsupported model before loading images. This does not add 2D Gaussian rendering to the requested 3D reader.
+Fixed 2026-11-11 (batch 238 finish-phase validation gap): a streamed manifest with top-level model "2dgs" and chunk metadata omitting model was treated as ordinary 3D. Cause: the adapter validated only the per-chunk SOG model. `loadStreamedSog` now refuses any manifest model other than `antialiased` with code `unsupported` before it fetches a chunk. Regression: packages/splats/test/lod-sog.test.js "streamed SOG refuses a manifest model it cannot draw before fetching any chunk".
 
 
 
@@ -5741,9 +5759,9 @@ Batch 177 job 5: no open correctness defect in the checked live-data paths. Sour
 packages/water/test/query.browser.mjs wrote docs/whitepaper/results/batch234-water-query-<mode>.json on every GPU run, so a landing's refresh found a tracked file changed and stopped. It now writes test-results/water-query-<mode>.json; the committed record stays as recorded. Regression: packages/water/test/results-path.test.js fails on any water browser check that writes under docs/.
 
 
-### Open: Water's own coast flow is unbounded on steep falls (list 3 batch 66 job 8)
+### Fixed 2026-11-11: Water's own coast flow was unbounded on steep falls (list 3 batch 66 job 8)
 
-Water's built-in surface-driven pipe drives each pipe with the full surface difference, so water over a 10 m fall reaches 240 m/s (one cell per step, 1/dt at 240 steps per second) and can overshoot the Courant bound. It stays as it is for coasts and gentle beds; for rivers over falls and steep chutes attach @margoengine/water/rivers, which caps the same fall at 6.75 m/s. Regression: packages/water/test/rivers.test.js "the surface-driven coast pipe exceeds the Courant bound over the same fall" records both.
+Water's built-in surface-driven pipe drove each pipe with the full surface difference and no cap, so water over a 10 m fall reached 240 m/s (one cell per step, 1/dt at 240 steps per second) and could overshoot the Courant bound. Each coast pipe's speed is now capped at Froude 4 and at half a cell per step, the bounds water/rivers uses (`coastFlowShader` in `packages/water/src/coastal.ts`); below them coast dynamics are unchanged (flow.browser.mjs basins, surf and spray pass as before). The hydrostatically reconstructed pipe of water/rivers was tried for the coast too and refused: its weir-limited exchange did not drain the flow check's flooded basin back over its sill in 10 s. Regression: packages/water/test/rivers.test.js "Water's own coast pipe stays within the Froude and Courant bounds over the same fall".
 
 ### Fixed: water/rivers sources narrower than a cell fed nothing (list 3 batch 63 job 2)
 
@@ -5787,7 +5805,7 @@ relative accuracy the Jacobi method keeps for graded columns.
 Fixed 2026-11-10: review 3 SV4 transfer-binding reentrant abort. The abort listener now exists before the initial caller render callback; an already-disposed initialization cannot subscribe to later transfer changes. Failed initialization restores the previous classifier and releases listeners, with both errors retained if restoration also fails. Regression: packages/sciviz/tests/transfer.test.js covers initial synchronous abort, throwing render callbacks and failed restoration; all three fail on the parent. Default LUT work, numerical transfer tests and rendering bounds are unchanged.
 
 
-- Batch 120 incidental gate finding, base 2ed6fd460: node --test tests/check-fixed-waits.test.js flags packages/biomes/tests/water-check.html line 101, a fixed 90-frame loop absent from the baseline. Cause: the biomes test waits for frame count instead of GPU readiness; unrelated to profile installation, deferred to its owning lane under efficiency rule 21.
+- Closed 2026-11-11 (batch 120 incidental gate finding, base 2ed6fd460): tests/check-fixed-waits.test.js flagged the 90-frame loop in packages/biomes/tests/water-check.html. The loop is not a readiness wait: it steps the river flow 3 s (90 frames of 1/30 s) after `view.ready`, `whenIdle` and `waitForPipelines`. The checker now resolves the frame helper and reads a delta that steps time as simulation (scripts/check-fixed-waits.mjs), so the page is not flagged. Regression: tests/check-fixed-waits.test.js "a counted loop through a frame helper that steps time is not a wait; the same helper at delta 0 is".
 Batch 176 job 4: no open defect found in the supported Cartesian cell-centred AMR contract. Format extensions, block-edge reconstruction and explicit sample/index budgets are documented in limits.md; refinements remain on the private finish-later list.
 
 Fixed 2026-11-10: Batch 176 inspection. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.

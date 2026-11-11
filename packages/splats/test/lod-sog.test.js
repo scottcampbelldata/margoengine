@@ -177,6 +177,25 @@ test('streamed SOG rejects malformed trees, ranges, errors, and count totals', a
     await assert.rejects(loadStreamedSog('https://local/scene/lod-meta.json', { fetch: f.fetch }), RangeError);
   }
 });
+test('streamed SOG refuses a manifest model it cannot draw before fetching any chunk', async () => {
+  // Regression (KB5472a): a lod-meta.json with model "2dgs" and chunks whose meta omits model loaded as ordinary 3D.
+  for (const model of ['2dgs', 'unknown']) {
+    const f = scene(),
+      fetched = [];
+    f.manifest.model = model;
+    f.files.set('/scene/lod-meta.json', json(f.manifest));
+    const fetch = (url, init) => (fetched.push(new URL(url).pathname), f.fetch(url, init));
+    await assert.rejects(loadStreamedSog('https://local/scene/lod-meta.json', { fetch }), {
+      code: 'unsupported',
+      message: new RegExp(`model ${model}`),
+    });
+    assert.deepEqual(fetched, ['/scene/lod-meta.json']);
+  }
+  const f = scene();
+  f.manifest.model = 'antialiased';
+  f.files.set('/scene/lod-meta.json', json(f.manifest));
+  (await loadStreamedSog('https://local/scene/lod-meta.json', { fetch: f.fetch })).dispose();
+});
 test('structural SplatLod sources validate their minimum coverage budget and enforce occupied slot counts', () => {
   const node = (count, children, error = 1) => ({ count, children, error, center: [0, 0, 0], radius: 1 });
   const nodes = [node(0, [1, 2]), node(4, []), node(1, [3, 4]), node(1, []), node(1, [])];

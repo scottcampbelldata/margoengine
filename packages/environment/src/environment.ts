@@ -3,7 +3,7 @@
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { engineRuntime, type Engine } from '@margoengine/core/extension';
 import type { FloatImage } from './hdr.js';
-import { lightingScale, sanitizeLighting, toHalfLighting } from './half.js';
+import { HALF_MAX, lightingPeak, lightingScale, sanitizeLighting, toHalfLighting } from './half.js';
 import { evaluateSH } from './sh.js';
 import * as wgsl from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -101,6 +101,8 @@ export interface Resources {
   irradiance: Float32Array;
   /** Stored texels and SH are radiance / radianceScale (Environment.radianceScale). */
   radianceScale: number;
+  /** The largest stored RGB texel (Environment.storedPeak). */
+  storedPeak: number;
 }
 
 /** One BRDF LUT, shared by every environment of a device with the same size and sample count, which are all it reads. */
@@ -354,7 +356,8 @@ async function build(
     sampler!: GPUSampler,
     readback!: GPUBuffer;
   let equirect: GPUTexture | undefined, equirectView: GPUTextureView | undefined, cubeView!: GPUTextureView;
-  let radianceScale = 1;
+  let radianceScale = 1,
+    storedPeak = HALF_MAX;
   const temporary: GPUBuffer[] = [];
   try {
     live();
@@ -411,6 +414,9 @@ async function build(
         : isCube(source)
           ? Math.max(...source.faces.map(lightingScale))
           : 1;
+      // The stored peak of a CPU source is known exactly; a GPU source is rgba16float and may hold up to HALF_MAX.
+      const peak = image ? lightingPeak(image.data) : isCube(source) ? Math.max(...source.faces.map(lightingPeak)) : 0;
+      storedPeak = image || isCube(source) ? Math.min(HALF_MAX, peak / radianceScale) : HALF_MAX;
       device.queue.writeBuffer(
         params,
         0,
@@ -623,6 +629,7 @@ async function build(
       reuse.radiance.set(radiance);
       reuse.irradiance.set(irradiance);
       reuse.radianceScale = radianceScale;
+      reuse.storedPeak = storedPeak;
       return reuse;
     }
     return {
@@ -641,6 +648,7 @@ async function build(
       radiance,
       irradiance,
       radianceScale,
+      storedPeak,
     };
   } catch (error) {
     // The fill may be what failed, so nothing joins this LUT again; an environment already holding it keeps it. An
@@ -852,6 +860,18 @@ export class Environment implements EnginePlugin {
       throw new RangeError('Invalid radianceScale; pass a finite number above 0');
     this.live.radianceScale = Math.fround(value);
     this.writeParams();
+  }
+  /**
+   * The largest RGB value the stored textures hold (in stored units, before `radianceScale`): exact for an equirect or
+   * CubeFaces source, 65,504 (the largest half float) for a GPU texture or baked source. EnvironmentBlend reads it to
+   * keep its rgba16float output finite. Code that fills the textures by hand sets it; a number from 0 to 65,504.
+   */
+  get storedPeak(): number {
+    return this.live.storedPeak;
+  }
+  set storedPeak(value: number) {
+    if (!(value >= 0 && value <= HALF_MAX)) throw new RangeError('Invalid storedPeak; pass a number from 0 to 65504');
+    this.live.storedPeak = value;
   }
   set intensity(value: number) {
     if (!Number.isFinite(value) || value < 0)

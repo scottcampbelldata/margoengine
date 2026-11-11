@@ -92,6 +92,17 @@ export async function glslChecks() {
     fullscreen +
     `@group(0) @binding(0) var<uniform> settings:vec4f;@group(0) @binding(1) var before:texture_2d<f32>;@group(0) @binding(2) var after:texture_2d<f32>;fn sample(t:texture_2d<f32>,uv:vec2f)->vec4f{let n=vec2i(textureDimensions(t));return textureLoad(t,clamp(vec2i(uv*vec2f(n)),vec2i(0),n-1),0);}`;
   let pixels = 0;
+  // The oracle reads a texel by the product's own rule (src/builtin.ts sample(): truncate uv * size, clamp, with the
+  // GLSL bottom-left flip), not through a NEAREST sampler, whose subtexel snap may round a lookup 6e-4 of a texel below
+  // an edge up to the next texel on some GPUs (KB0191, Radeon 680M). The WebGPU spec's nearest rule picks the texel that
+  // contains the coordinate; both sides now apply it in f32, so they agree exactly at the edge with no allowance.
+  const oracleFetch =
+    'vec4 margoFetch(sampler2D t,vec2 uv){ivec2 s=textureSize(t,0);ivec2 c=clamp(ivec2(vec2(uv.x,1.0-uv.y)*vec2(s)),ivec2(0),s-1);return texelFetch(t,ivec2(c.x,s.y-1-c.y),0);}' +
+    'vec4 margoFetch(sampler2D t,vec2 uv,float bias){return margoFetch(t,uv);}' +
+    'vec4 margoFetchProj(sampler2D t,vec3 p){return margoFetch(t,p.xy/p.z);}' +
+    'vec4 margoFetchProj(sampler2D t,vec4 p){return margoFetch(t,p.xy/p.w);}' +
+    'vec4 margoFetchProj(sampler2D t,vec3 p,float bias){return margoFetch(t,p.xy/p.z);}' +
+    'vec4 margoFetchProj(sampler2D t,vec4 p,float bias){return margoFetch(t,p.xy/p.w);}\n';
   try {
     for (const fixture of glslFixtures) {
       const source = fixture.oracleSource ?? fixture.source;
@@ -102,10 +113,11 @@ export async function glslChecks() {
       );
       const fs = compile(
         gl.FRAGMENT_SHADER,
-        '#version 300 es\nprecision highp float;precision highp int;\n#define texture2D texture\n#define texture2DProj textureProj\nin vec2 v_uv;out vec4 outputColor;\n' +
+        '#version 300 es\nprecision highp float;precision highp int;\n#define texture2D margoFetch\n#define texture2DProj margoFetchProj\nin vec2 v_uv;out vec4 outputColor;\n' +
           declarations +
           '\n' +
-          '\nvec4 getFromColor(vec2 uv){return texture(from,uv);}vec4 getToColor(vec2 uv){return texture(to,uv);}\n' +
+          oracleFetch +
+          '\nvec4 getFromColor(vec2 uv){return margoFetch(from,uv);}vec4 getToColor(vec2 uv){return margoFetch(to,uv);}\n' +
           nativeSource +
           '\nvoid main(){outputColor=transition(v_uv);}',
       );

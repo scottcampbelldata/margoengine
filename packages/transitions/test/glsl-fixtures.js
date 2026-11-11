@@ -61,6 +61,13 @@ export const glslFixtures = [
       'vec4 transition(vec2 uv){vec4 c=getFromColor(uv);c.rg=c.gr;c.ba=vec2(0.2,1.0);return mix(c,getToColor(uv),progress);}',
   },
   {
+    // KB0191: lookups 6e-4 of a texel below and above the edge between columns 10 and 11 (rows 2 and 3) of the 16 x 16
+    // images; a sampler whose subtexel snap rounds may read the other texel. Oracle and product truncate alike.
+    name: 'texel edge',
+    source:
+      'vec4 transition(vec2 uv){vec2 below=(vec2(11.0,3.0)-0.0006)/16.0;vec2 above=(vec2(11.0,3.0)+0.0006)/16.0;return uv.x<0.5?getFromColor(below):getToColor(above);}',
+  },
+  {
     name: 'matrix',
     source:
       'vec4 transition(vec2 uv){float a=progress;mat2 rotation=mat2(cos(a),sin(a),-sin(a),cos(a));vec2 q=rotation*(uv-0.5)+0.5;return mix(getFromColor(q),getToColor(q),progress);}',

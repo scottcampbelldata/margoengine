@@ -51,7 +51,7 @@ export function floatToHalf(value: number): number {
 }
 
 /** Largest finite binary16 value. */
-const HALF_MAX = 65504;
+export const HALF_MAX = 65504;
 
 /**
  * Peak radiance the rgba16float environment textures store as it is: 60,000, below 65,504 so the bilinear and box
@@ -65,13 +65,19 @@ export const HALF_PEAK = 60000;
  * energy and are stored as 0, so they are left out of the peak.
  */
 export function lightingScale(data: Float32Array): number {
+  const peak = lightingPeak(data);
+  // An f32, so a baked file (which stores it as float32) reloads the same factor.
+  return peak > HALF_PEAK ? Math.fround(peak / HALF_PEAK) : 1;
+}
+
+/** The largest finite positive RGB value of RGBA lighting texels (alpha is not radiance), 0 for none. */
+export function lightingPeak(data: Float32Array): number {
   let peak = 0;
   for (let i = 0; i < data.length; i++) {
     const v = data[i];
     if (v > peak && v < Infinity && (i & 3) !== 3) peak = v;
   }
-  // An f32, so a baked file (which stores it as float32) reloads the same factor.
-  return peak > HALF_PEAK ? Math.fround(peak / HALF_PEAK) : 1;
+  return peak;
 }
 
 /**

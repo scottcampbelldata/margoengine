@@ -80,6 +80,8 @@ class Environment implements EnginePlugin {
     get intensity(): number;
     get radianceScale(): number;
     set radianceScale(value: number);
+    get storedPeak(): number;
+    set storedPeak(value: number);
     set intensity(value: number);
     roughnessToLod(roughness: number): number;
     lodToRoughness(lod: number): number;
@@ -133,6 +135,7 @@ interface Resources {
     radiance: Float32Array;
     irradiance: Float32Array;
     radianceScale: number;
+    storedPeak: number;
 }
 
 interface Settings {

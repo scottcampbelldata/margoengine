@@ -348,6 +348,8 @@ function upload(device: GPUDevice, data: PrefilteredIBL): Resources {
       radiance: data.radiance.slice(),
       irradiance: data.irradiance.slice(),
       radianceScale: data.radianceScale ?? 1,
+      // Baked mips are half floats: up to the largest one, 65,504.
+      storedPeak: 65504,
     };
   } catch (error) {
     for (const r of owned) r.destroy();
