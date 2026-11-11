@@ -25,7 +25,8 @@ export interface RichSpan {
 /**
  * Parses markup: `<b>`, `<i>`, `<color=#f80>`, `<size=1.5>`, `<link=url>`, closed by `</b>` and so on, and `<img=name>`.
  * `\<` is a literal bracket.
- * @throws TypeError on an unknown tag, a closing tag that does not match, an unclosed tag or a size that is not above 0.
+ * @throws TypeError on an unknown tag, a closing tag that does not match, an unclosed tag or a size that is not a finite
+ * number above 0.
  */
 export function parseRichText(markup: string): RichSpan[] {
   if (typeof markup !== 'string') throw new TypeError('Rich text markup must be a string; pass text with tags');
@@ -76,8 +77,9 @@ export function parseRichText(markup: string): RichSpan[] {
     else if (name === 'i') apply = { italic: true };
     else if (name === 'color' && value) apply = { color: value };
     else if (name === 'link' && value) apply = { link: value };
-    else if (name === 'size' && Number(value) > 0) apply = { size: Number(value) };
-    else throw new TypeError(`Unknown rich text tag <${tag}>; use b, i, color, size, link or img`);
+    // Finite too (batch 132b): <size=Infinity> or <size=1e999> used to pass and lay every piece out at NaN.
+    else if (name === 'size' && Number(value) > 0 && Number.isFinite(Number(value))) apply = { size: Number(value) };
+    else throw new TypeError(`Unknown rich text tag <${tag}>; use b, i, color, size (a finite number above 0), link or img`);
     stack.push({ tag: name, apply });
     restyle();
   }

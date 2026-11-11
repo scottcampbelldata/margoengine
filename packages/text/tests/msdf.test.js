@@ -55,3 +55,23 @@ test('PNG loading preserves MTSDF RGB values even below transparent alpha and ob
   assert.deepEqual(font.glyph('A').msdf,raw);
   await assert.rejects(BitmapFont.load(json,{signal:AbortSignal.abort()}),{name:'AbortError'});
 });
+
+test('a relative pagesAt resolves against the JSON file (batch 132b)', async () => {
+  const { encodePNG } = await import('@margoengine/exporters/capture');
+  const png = await encodePNG({ width: 2, height: 1, data: pixels });
+  const asked = [], real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    asked.push(String(url));
+    if (String(url) === 'https://fonts.test/a/font.json') return new Response(JSON.stringify(data));
+    if (String(url) === 'https://fonts.test/pages/p.png') return new Response(png);
+    return new Response('', { status: 404 });
+  };
+  try {
+    // Before the fix new URL('p.png', '../pages/') threw TypeError: Invalid URL.
+    const font = await BitmapFont.load('https://fonts.test/a/font.json', { pagesAt: '../pages/' });
+    assert.deepEqual(font.glyph('A').msdf, pixels);
+    assert.deepEqual(asked, ['https://fonts.test/a/font.json', 'https://fonts.test/pages/p.png']);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

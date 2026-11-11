@@ -68,15 +68,20 @@ export class BitmapFont extends Font {
     for (const k of data.kernings ?? []) this.kernTable.set(k.first * 0x200000 + k.second, k.amount);
   }
 
-  /** Fetches a BMFont JSON file and its PNG pages, which sit next to it unless `pagesAt` says otherwise. Works in workers. */
+  /**
+   * Fetches a BMFont JSON file and its PNG pages, which sit next to it unless `pagesAt` says otherwise (a URL, or a path
+   * resolved against the JSON file's URL). Works in workers.
+   */
   static async load(url: string | URL, { signal, pagesAt }: { signal?: AbortSignal; pagesAt?: string | URL } = {}) {
     const base = new URL(url, globalThis.location?.href);
     const response = await fetch(base, { signal });
     if (!response.ok) throw new TypeError(`BitmapFont could not fetch ${base}: ${response.status}; check the URL`);
     const data = (await response.json()) as BitmapFontData;
+    // A relative pagesAt resolves against the JSON's URL (batch 132b: new URL(page, '../pages/') threw).
+    const folder = pagesAt === undefined ? base : new URL(pagesAt, base);
     const pages = await Promise.all(
       data.pages.map(async (page) => {
-        const reply = await fetch(new URL(page, pagesAt ?? base), { signal });
+        const reply = await fetch(new URL(page, folder), { signal });
         if (!reply.ok) throw new TypeError(`BitmapFont could not fetch page ${page}: ${reply.status}; check pagesAt`);
         const { decodePNG } = await import('@margoengine/decoders/png');
         signal?.throwIfAborted();

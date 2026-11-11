@@ -183,3 +183,10 @@ test('BitmapFont measures from the BMFont file and reads a median field', () => 
   assert.throws(() => new BitmapFont({ chars: [] }, []), TypeError);
   assert.throws(() => new BitmapFont({ ...data, pages: ['a', 'b'] }, []), /atlas pages/);
 });
+
+test('a size tag must be finite (batch 132b)', () => {
+  // Before the fix Number('Infinity') > 0 let these through, and every piece after them laid out at NaN.
+  for (const size of ['Infinity', '1e999'])
+    assert.throws(() => parseRichText(`<size=${size}>big</size>`), /size \(a finite number above 0\)/);
+  assert.equal(parseRichText('<size=1e3>big</size>')[0].size, 1000);
+});
