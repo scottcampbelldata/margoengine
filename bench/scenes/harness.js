@@ -419,8 +419,13 @@ export async function run(create) {
     result.resources = resources();
     result.jsBytes = result.resources.filter((r) => r.name.endsWith('.js')).reduce((s, r) => s + r.bytes, 0);
     // Final still frame at t = 0 for a screenshot, one frame step after the frame before it: motion vectors come from
-    // the last two frames, so a jump from wherever the timed loop stopped would blur by that engine's own jump.
+    // the last two frames, so a jump from wherever the timed loop stopped would blur by that engine's own jump. Each
+    // render is its own animation frame: three's WebGPU passes render once per frame, so a second render() in the same
+    // task showed the first one's picture, blurred by the jump (KB2864b, measured with a moving bar: the screenshot held
+    // the bar where the first render put it).
     app.render(1 / 60);
+    await app.idle();
+    await raf();
     app.render(0);
     await app.idle();
     await raf();

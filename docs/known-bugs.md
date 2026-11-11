@@ -3291,6 +3291,21 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Still open:** three's WebGPU took 0.66 ms in that busy run against 0.25 in the ledger, so whether 0.48 still loses needs
   a quiet run. three has no `p-motion-blur-velocity` scene yet, so that row compares with `p-motion-blur`'s three column.
   `p-motion-blur`'s image has not matched three's since its first run (SSIM 0.656, delta E 13.2); the cause is not known.
+- **Causes found (2026-11-11, KB2864b), both in the comparison, not in Margo:** a probe page in the rival's own folder
+  (a white 8-pixel bar moved 16 pixels between two renders, three 0.186.1, RTX A6000) showed (1) three's WebGPU scene
+  pass renders once per animation frame, so the still frame's second `render()` in the same task showed the first
+  render's picture: the bar stayed where the first render put it. three's still frame was the frame after the timed
+  loop, blurred by the jump from wherever that loop stopped. The harness now waits one animation frame between the
+  two still-frame renders (bench/scenes/harness.js). (2) three's `velocity` is in NDC (its docs: VelocityNode computes
+  "offsets in NDC space") and `motionBlur` steps by it in uv: the bar blurred over 16, 32 and about 53 pixels at
+  scales 0.5, 1 and 2 of a 16-pixel move, twice the motion times the scale. The adapter fed 0.5, a 360-degree
+  shutter; it now feeds 0.25, a 180-degree shutter as Margo's. Margo's scale is right: its vectors are uv and the
+  blur covers shutter x motion (the motion check of examples/package-benchmarks/post-effects-gpu.mjs).
+- **Accepted difference by method:** three's `motionBlur` gathers along each pixel's own vector, so a still
+  background next to a moving object takes none of the object's colour (no pixel outside the bar's own 8 lit at any
+  scale); Margo reconstructs after McGuire et al. 2012, so the object smears over the background it sweeps. The SSIM
+  of `p-motion-blur` with both fixes waits for the quiet speed-phase run (bench/cli.mjs is deferred in the build
+  phase); docs/work-lists/speed-phase.md lists it. Regression: tests/bench-still-frame.test.js.
 
 ### Build plus first frame of 100 morphed copies is still slower than three's WebGL backend
 

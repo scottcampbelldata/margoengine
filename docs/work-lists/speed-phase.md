@@ -611,3 +611,10 @@ Targets: 60 fps (16.7 ms) on the RTX A6000 natively and on the WebGL2 layer; mid
 and on the WebGL2 layer at 1280 x 720. Not timed yet (build phase). Candidates if a target misses, each with identical
 coverage: a tighter hull test before the extra rays, bands sorted in both directions so rays can start from the nearer side,
 and skipping the second axis where the first has no crossing near the pixel.
+
+### Motion blur picture against three (KB2864b, 2026-11-11)
+The parity still frame now waits an animation frame between its two renders, and the three adapter feeds NDC velocity
+x 0.25 (a 180-degree shutter). Rerun the picture of `p-motion-blur` and `p-motion-blur-velocity` on the quiet machine
+(`node bench/cli.mjs parity --cases=p-motion-blur,p-motion-blur-velocity --engines=margo,three-webgpu-parity --runs=3`)
+and record the new SSIM and delta E beside the old 0.656 and 13.2 in docs/whitepaper/perf-vs-threejs.md. Other parity
+scenes' three screenshots also move to their real still frame then.
