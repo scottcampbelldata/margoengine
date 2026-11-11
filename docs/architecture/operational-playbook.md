@@ -2536,6 +2536,17 @@ Batch 182 comparison: [sciviz-vs-rivals](../whitepaper/sciviz-vs-rivals.md) adds
 The optional series entry shares the existing Arrow/Parquet scalar decoders, retaining only format state between progressive batches. Exact scientific selection visits owned binary64 observations, independently of the line display reduction. M4 raster checks include independent integer-column pixel coverage and viewport neighbours. FFT/STFT use compute/fft; normalization before f32 upload and binary64 PSD readback preserves tiny GWOSC strain power. CPU analytic tones, original-data format equivalence and two-backend real-data render/selection/cancellation/resize checks are in series.test.js and series-browser.mjs. Fractional antialiasing is outside M4's pixel model, all loaded original observations remain resident for exact selection, and throughput timing remains owed in speed-phase.md. No core or stage rendering changes. See docs/sciviz-series.md for sources, limits and evidence.
 
 
+### 5. Float32 outward rounding of bounds and the kernel sphere (2026-11-10)
+
+`Geometry` computes its bounding sphere about the float32 centre it stores, over the float32 vertices it uploads, and
+rounds the radius up one float32 step when rounding to nearest made it smaller. The kernel's `sphere()` (`packages/kernel/src/lib.rs`) transforms
+the local centre in float64, rounds it to float32, grows the radius by the distance that rounding moved the centre, and rounds the radius up the same way. Before this, at coordinates near 2^24 the rounded centre and
+radius could leave a stored vertex outside the published sphere, so the CPU and Wasm cull could drop a mesh that was in
+view. Evidence: [bounds-outward.test.js](../../packages/core/tests/bounds-outward.test.js) checks geometry at 2^24 + k
+and a kernel world sphere at translation 2^24, scale 3; both fail on the old code. Cost: the sphere is up to one ulp and
+one centre rounding larger, so a mesh exactly at a plane may draw when it would not have; nothing in view is culled.
+Missing: no GPU test draws a mesh at 2^24 yet.
+
 ### 5. Stage GPU inventory registration (2026-11-10)
 
 Stage declares `test:gpu:viewer-extras`, so the global browser inventory and selected GPU plans agree. The leaf exercises native WebGPU and WebGL2 compatibility, exact viewer pixels, animation, variants, picking, hotspots and element lifecycle. `tests/modern-extension-suite.test.js` now checks every package `test/gpu/*-check.mjs` against that package's declared GPU scripts; the added assertion fails on the unregistered stage leaf before the fix. Existing check:merge inventory coverage remains active. No rendering code or public API changes.

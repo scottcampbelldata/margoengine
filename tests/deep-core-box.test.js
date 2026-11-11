@@ -15,7 +15,7 @@ test('Box compaction retains exact geometry and avoids per-face index maps', () 
   } finally {
     Array.prototype.map = original;
   }
-  assert.equal(maps, 1, 'Only the bounds center requires a map');
+  assert.equal(maps, 0, 'Neither the faces nor the bounds need a map');
   const positions = [],
     normals = [],
     indices = [];
@@ -49,7 +49,12 @@ test('Box compaction retains exact geometry and avoids per-face index maps', () 
     }
   assert.deepEqual(Buffer.from(geometry.vertices.buffer), Buffer.from(vertices.buffer));
   assert.deepEqual(geometry.indices, new Uint32Array(indices));
-  assert.deepEqual(geometry.bounds, new Float32Array([0, 0, 0, Math.hypot(1, 1.5, 2)]));
+  // The radius rounds up to the first float32 at or above the exact one, so the stored sphere holds every corner.
+  const exact = Math.hypot(1, 1.5, 2),
+    radius = new Float32Array([exact]);
+  if (radius[0] < exact) new Uint32Array(radius.buffer)[0]++;
+  assert.ok(radius[0] >= exact);
+  assert.deepEqual(geometry.bounds, new Float32Array([0, 0, 0, radius[0]]));
 });
 
 test('Material hex conversion uses one map and retains exact sRGB decoding', () => {

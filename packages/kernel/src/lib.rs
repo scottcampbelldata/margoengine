@@ -140,13 +140,20 @@ impl Kernel {
         let b = self.floats(LOCAL_SPHERE*self.capacity+id*4, 4);
         if b.iter().any(|v| !v.is_finite()) || b[3] < 0.0 { return None; }
         let mut out = [0.0; 4];
+        // The centre rounds to nearest float32; the radius grows by that shift and rounds up, so the published sphere
+        // holds every point the exact one does and the cull never drops a vertex on it.
+        let mut shift = 0.0;
         for row in 0..3 {
-            out[row] = (m[row] as f64*b[0] as f64 + m[4+row] as f64*b[1] as f64 + m[8+row] as f64*b[2] as f64 + m[12+row] as f64) as f32;
+            let c = m[row] as f64*b[0] as f64 + m[4+row] as f64*b[1] as f64 + m[8+row] as f64*b[2] as f64 + m[12+row] as f64;
+            out[row] = c as f32;
+            shift += (c - out[row] as f64) * (c - out[row] as f64);
         }
         if b[3]!=0.0 {let mut rows=[0.0;3];let mut cols=[0.0;3];
         for c in 0..3 {for r in 0..3 {let v=m[c*4+r].abs() as f64;rows[r]+=v;cols[c]+=v;}}
         let norm1=cols.into_iter().fold(0.0,f64::max);let norm_inf=rows.into_iter().fold(0.0,f64::max);
-        out[3] = (b[3] as f64 * sqrt(norm1*norm_inf)) as f32;}
+        let radius = b[3] as f64 * sqrt(norm1*norm_inf) + sqrt(shift);
+        out[3] = radius as f32;
+        if (out[3] as f64) < radius { out[3] = f32::from_bits(out[3].to_bits() + 1); }}
         out.iter().all(|v| v.is_finite()).then_some(out)
     }
 

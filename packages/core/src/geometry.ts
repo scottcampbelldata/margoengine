@@ -53,15 +53,17 @@ export class Geometry {
         max[a] = Math.max(max[a], positions[i * 3 + a]);
       }
     this.indices = Uint32Array.from(indices);
-    const center = count ? min.map((v, a) => (v + max[a]) / 2) : [0, 0, 0];
+    // The sphere as stored: about the float32 centre, over the float32 vertices, its radius rounded up, so the
+    // kernel's cull never drops a stored vertex.
+    const b = (this.bounds = new Float32Array(4)),
+      v = this.vertices;
+    if (count) for (let a = 0; a < 3; a++) b[a] = (min[a] + max[a]) / 2;
     let radius = 0;
     for (let i = 0; i < count; i++)
-      radius = Math.max(
-        radius,
-        Math.hypot(positions[i * 3] - center[0], positions[i * 3 + 1] - center[1], positions[i * 3 + 2] - center[2]),
-      );
-    this.bounds = new Float32Array([...center, radius]);
-    finite(this.bounds, 4, 'Bounds');
+      radius = Math.max(radius, Math.hypot(v[i * 6] - b[0], v[i * 6 + 1] - b[1], v[i * 6 + 2] - b[2]));
+    b[3] = radius;
+    if (b[3] < radius) new Uint32Array(b.buffer)[3]++;
+    finite(b, 4, 'Bounds');
   }
 }
 
