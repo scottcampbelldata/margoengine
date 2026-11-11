@@ -6715,9 +6715,16 @@ Update 2026-11-11 (bug sweep L2 round 2, KB6250d/e/f): closed as rival unsupport
 `npm run hygiene` in the lane-P worktree (bp-161, branch from 5ecb5ab1a, packages freshly built) failed once at
 `scripts/hygiene.js` gate 6 (`checker.getSymbolAtLocation(await program.getSourceFile(dts))`) with
 `Error: getNodeId requires a RemoteNode` while 14 packages' CPU tests ran beside it; the rerun on the same files passed,
-and a standalone pass over all 1,312 entry `.d.ts` files found every source file. Cause not found yet: a
-`getSourceFile` that resolves to a non-remote node under load in `typescript/unstable/async`. Repro attempt: run
+and a standalone pass over all 1,312 entry `.d.ts` files found every source file. Repro attempt: run
 `npm run hygiene` while `npm test` runs in several packages.
+Fixed 2026-11-11 (bug sweep L6b, KB6254a): cause found. 81 packages' `npm test` runs `npm run build` first, and
+`scripts/build-optional.js` builds with vite `emptyOutDir: true`, so a package's dist (its `.d.ts` included) is gone for
+part of each build. A gate 6 project opened in that window has no source file for the entry; `program.getSourceFile`
+returns undefined and `checker.getSymbolAtLocation(undefined)` throws "getNodeId requires a RemoteNode" (reproduced with a
+project listing a missing `.d.ts`). Gate 6 now checks the source file and fails with the cause by name: the entry, how
+many declaration files changed while it read them (modification times before and after,
+`scripts/support/declaration-snapshot.mjs`), and that a package build ran beside it. Running hygiene beside package
+builds stays unsupported, as the fast gate runs them in sequence. Regression: tests/declaration-snapshot.test.js.
 
 - **Fixed (2026-11-10, Mac lane E): wrong-scene dispose in creative, labels, points, tiles, lod, materials, rigging, usdz,
   gltf-pro, mcp and scatter.** `engine.removePlugin(name)` acts on the active scene, so disposing a plugin attached to
