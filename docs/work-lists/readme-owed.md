@@ -1560,3 +1560,4 @@ in the post README during the README phase (2026-11-10); all 28 runtime examples
 - @margoengine/fsm batch 132 audit (lane H): README prose on per-transition delay re-arm, SCXML transition refusals and `m:stay`; no new example.
 - @margoengine/webgl2-compat (lane L, 2026-11-10): textureSampleGrad with dpdx/dpdy of its own coordinate now samples implicitly (matches native Metal); note it in the WGSL support section. No new example.
 - @margoengine/webgl2-compat: document the indexed-buffer replacement repair and raw GL reproduction in tests/material-index-rebind-raw.html; unchanged indexed draws retain binding cache hits.
+- @margoengine/math (rust-port-c, 2026-11-11): document `primariesToLinearSRGB` (any CIE xy primaries and white to linear sRGB D65, Bradford adapted) in the Color section with a short example.

@@ -79,6 +79,8 @@ export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: Arra
 
 export function parseColor(value: ColorInput, out?: Float32Array | number[], offset?: number): Float32Array | number[];
 
+export function primariesToLinearSRGB(primaries: readonly number[]): number[];
+
 // Not exported from this entry, but used by the exports above:
 
 type ColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear';

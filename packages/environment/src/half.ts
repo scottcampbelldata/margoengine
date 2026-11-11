@@ -83,40 +83,33 @@ export function toHalfLighting(data: Float32Array, native = true, scale = 1): Ui
   // The built-in Float16Array store rounds to nearest even like floatToHalf (same bits), about 3x faster than the
   // bit-twiddling loop (p-pmrem converted its 1024 x 512 HDR in 7.4 ms, half of Environment.create's time).
   const F16 = native
-    ? (globalThis as { Float16Array?: new (length: number) => ArrayBufferView<ArrayBuffer> & { [i: number]: number } })
-        .Float16Array
-    : undefined;
-  // f32 first, so the Float16Array store and floatToHalf (which reads an f32) round the same value.
-  const inverse = 1 / scale;
-  if (F16) {
-    const half = new F16(data.length);
-    for (let i = 0; i < data.length; i++) {
-      const v = data[i];
-      if (v > 0 && v < Infinity) {
-        const s = scale === 1 || (i & 3) === 3 ? v : Math.fround(v * inverse);
-        half[i] = s < HALF_MAX ? s : HALF_MAX;
-      } else half[i] = 0;
-    }
-    return new Uint16Array(half.buffer);
-  }
-  const out = new Uint16Array(data.length);
+      ? (
+          globalThis as {
+            Float16Array?: new (length: number) => ArrayBufferView<ArrayBuffer> & { [i: number]: number };
+          }
+        ).Float16Array
+      : undefined,
+    out = F16 ? new F16(data.length) : new Uint16Array(data.length),
+    inverse = 1 / scale;
   for (let i = 0; i < data.length; i++) {
-    const v = data[i];
-    if (v > 0 && v < Infinity) {
-      const s = scale === 1 || (i & 3) === 3 ? v : Math.fround(v * inverse);
-      out[i] = floatToHalf(s < HALF_MAX ? s : HALF_MAX);
-    } else out[i] = 0;
+    const s = Math.min(stored(data, i, inverse), HALF_MAX);
+    out[i] = F16 ? s : floatToHalf(s);
   }
-  return out;
+  return F16 ? new Uint16Array(out.buffer) : (out as Uint16Array);
 }
+
+// Texel `i` as stored: finite positive RGB divided by the scale (`inverse` is 1 / scale) and rounded to f32 first,
+// so the Float16Array store and floatToHalf (which reads an f32) round the same value; alpha as it is; NaN,
+// infinities and negatives 0.
+const stored = (data: Float32Array, i: number, inverse: number) => {
+  const v = data[i];
+  return v > 0 && v < Infinity ? (inverse === 1 || (i & 3) === 3 ? v : Math.fround(v * inverse)) : 0;
+};
 
 /** Same sanitizing and scale as toHalfLighting, kept in float32 for rgba32float uploads. */
 export function sanitizeLighting(data: Float32Array, scale = 1): Float32Array {
   const out = new Float32Array(data.length),
     inverse = 1 / scale;
-  for (let i = 0; i < data.length; i++) {
-    const v = data[i];
-    out[i] = v > 0 && v < Infinity ? (scale === 1 || (i & 3) === 3 ? v : v * inverse) : 0;
-  }
+  for (let i = 0; i < data.length; i++) out[i] = stored(data, i, inverse);
   return out;
 }

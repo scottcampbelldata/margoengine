@@ -18,7 +18,7 @@ export interface HSL {
 
 export { SRGBToLinear, LinearToSRGB };
 
-function invert3(m: readonly number[]): number[] {
+/* @__NO_SIDE_EFFECTS__ */ function invert3(m: readonly number[]): number[] {
   const [a, b, c, d, e, f, g, h, i] = m,
     A = e * i - f * h,
     B = f * g - d * i,
@@ -28,7 +28,7 @@ function invert3(m: readonly number[]): number[] {
     (v) => v / det,
   );
 }
-const multiply3 = (a: readonly number[], b: readonly number[]): number[] =>
+const multiply3 = /* @__NO_SIDE_EFFECTS__ */ (a: readonly number[], b: readonly number[]): number[] =>
   a.map((_, k) => {
     const row = k - (k % 3),
       col = k % 3;
@@ -38,7 +38,7 @@ const multiply3 = (a: readonly number[], b: readonly number[]): number[] =>
  * Linear RGB to CIE XYZ (row-major 3x3) of three primaries and a white point, each a CIE 1931 `[x, y]` chromaticity: the
  * columns are the primaries' XYZ, scaled so that RGB (1, 1, 1) is the white point at luminance Y = 1.
  */
-function rgbToXYZ(r: number[], g: number[], b: number[], white: number[]): number[] {
+/* @__NO_SIDE_EFFECTS__ */ function rgbToXYZ(r: number[], g: number[], b: number[], white: number[]): number[] {
   const xyz = (p: number[]) => [p[0] / p[1], 1, (1 - p[0] - p[1]) / p[1]],
     [R, G, B, W] = [r, g, b, white].map(xyz),
     m = [R[0], G[0], B[0], R[1], G[1], B[1], R[2], G[2], B[2]],
@@ -49,14 +49,40 @@ function rgbToXYZ(r: number[], g: number[], b: number[], white: number[]): numbe
 // sRGB / Rec. 709 primaries (IEC 61966-2-1) and Display P3's (the DCI-P3 primaries, SMPTE EG 432-1), both with D65 white.
 const D65 = [0.3127, 0.329];
 /** Linear Display P3 to linear sRGB, row-major 3x3, derived from the two sets of primaries. */
-export const P3_TO_SRGB: readonly number[] = Object.freeze(
+// Pure, so a bundle that never converts Display P3 drops the derivation.
+export const P3_TO_SRGB: readonly number[] = /* @__PURE__ */ Object.freeze(
   multiply3(
     invert3(rgbToXYZ([0.64, 0.33], [0.3, 0.6], [0.15, 0.06], D65)),
     rgbToXYZ([0.68, 0.32], [0.265, 0.69], [0.15, 0.06], D65),
   ),
 );
 /** Linear sRGB to linear Display P3 (the inverse of {@link P3_TO_SRGB}). */
-export const SRGB_TO_P3: readonly number[] = Object.freeze(invert3(P3_TO_SRGB));
+export const SRGB_TO_P3: readonly number[] = /* @__PURE__ */ Object.freeze(invert3(P3_TO_SRGB));
+// Bradford cone response matrix, row-major (Lam 1985, as given by Susstrunk, Holm and Finlayson 2001).
+const BRADFORD = [0.8951, 0.2664, -0.1614, -0.7502, 1.7135, 0.0367, 0.0389, -0.0685, 1.0296];
+/**
+ * Linear RGB in the primaries `[rx, ry, gx, gy, bx, by, wx, wy]` (CIE 1931 xy chromaticities of red, green, blue and
+ * white) to linear sRGB with the D65 white, row-major 3x3: RGB to XYZ (SMPTE RP 177-1993), the white adapted to D65
+ * with the Bradford transform, then XYZ to sRGB (IEC 61966-2-1). Entries are not finite when the primaries span no
+ * colour space.
+ */
+export function primariesToLinearSRGB(primaries: readonly number[]): number[] {
+  const p = primaries,
+    cone = (x: number, y: number) =>
+      [0, 3, 6].map((r) => BRADFORD[r] * (x / y) + BRADFORD[r + 1] + (BRADFORD[r + 2] * (1 - x - y)) / y),
+    from = cone(p[6], p[7]),
+    to = cone(D65[0], D65[1]);
+  return multiply3(
+    invert3(rgbToXYZ([0.64, 0.33], [0.3, 0.6], [0.15, 0.06], D65)),
+    multiply3(
+      invert3(BRADFORD),
+      multiply3(
+        BRADFORD.map((v, k) => (v * to[(k / 3) | 0]) / from[(k / 3) | 0]),
+        rgbToXYZ([p[0], p[1]], [p[2], p[3]], [p[4], p[5]], [p[6], p[7]]),
+      ),
+    ),
+  );
+}
 function apply3(m: readonly number[], v: ArrayLike<number>, out: NumberArray, offset: number): void {
   const x = v[0],
     y = v[1],
