@@ -26,6 +26,11 @@ export interface EXRWriteImage {
   channels: readonly EXRWriteChannel[];
   /** Optional `colorInteropID` header string (1 to 255 printable ASCII characters), stored as given. */
   colorInteropID?: string;
+  /**
+   * Optional `chromaticities` header attribute: red, green, blue and white CIE xy, eight finite numbers, stored as
+   * float32. Leave it out for linear sRGB / Rec.709 data (the OpenEXR default); `parseEXR` converts other primaries.
+   */
+  chromaticities?: readonly number[];
 }
 
 /** Options for {@link encodeEXR}. */
@@ -70,7 +75,7 @@ const whole = (value: number, min: number, max: number, label: string) => {
  * when aborted.
  */
 export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions = {}): Promise<Uint8Array> {
-  const { width, height, channels, colorInteropID } = image,
+  const { width, height, channels, colorInteropID, chromaticities } = image,
     { nonFinite = 'reject', maxBytes = 1 << 28, signal, onProgress } = options;
   signal?.throwIfAborted();
   whole(width, 1, 16384, 'width');
@@ -80,6 +85,15 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
   whole(maxBytes, 1, 1 << 29, 'maxBytes');
   if (nonFinite !== 'reject' && nonFinite !== 'preserve')
     throw new TypeError("EXR nonFinite: pass 'reject' or 'preserve'");
+  if (
+    chromaticities !== undefined &&
+    !(
+      Array.isArray(chromaticities) &&
+      chromaticities.length === 8 &&
+      chromaticities.every((v) => Number.isFinite(v) && Number.isFinite(Math.fround(v)))
+    )
+  )
+    throw new TypeError('EXR chromaticities: pass eight finite numbers (red, green, blue and white CIE x and y)');
   if (colorInteropID !== undefined && !printable(colorInteropID, 255))
     throw new TypeError('EXR colorInteropID: pass 1 to 255 printable ASCII characters');
   const planes = [...channels].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -106,6 +120,8 @@ export async function encodeEXR(image: EXRWriteImage, options: EXRWriteOptions =
     ...planes.flatMap((c) => [...chars(c.name), 0, ...i32(TYPE_NAMES.indexOf(c.type), 0, 1, 1)]),
     0,
   ]);
+  if (chromaticities !== undefined)
+    attribute('chromaticities', 'chromaticities', Array.from(new Uint8Array(Float32Array.from(chromaticities).buffer)));
   if (colorInteropID !== undefined) attribute('colorInteropID', 'string', chars(colorInteropID));
   attribute('compression', 'compression', [0]); // NONE
   attribute('dataWindow', 'box2i', window);

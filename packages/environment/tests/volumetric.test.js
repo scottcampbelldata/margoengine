@@ -249,12 +249,21 @@ test("contract with clustered and shadows: the froxel light loop repeats cluster
   }
   for (const text of [
     'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}',
-    'var reference=projected.z-shadowFrame.settings.y;',
+    // The cascade bias: settings.y plus one texel of depth, the texel's world size read from the cascade matrix.
+    'let world=max(size.x/length(vec3f(matrix[0].x,matrix[1].x,matrix[2].x)),size.y/length(vec3f(matrix[0].y,matrix[1].y,matrix[2].y)));',
+    '-shadowFrame.settings.y-1*world*length(vec3f(matrix[0].z,matrix[1].z,matrix[2].z))',
     'let depth=-(shadowFrame.view*vec4f(position,1)).z;',
     'let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);',
     '@group(2) @binding(3) var shadowSampler:sampler_comparison;',
   ])
     assert.ok(cascades.includes(text), `shadows no longer has: ${text}`);
+  // Known bug it guards (fixed 2026-11-11): Shadows moved to texel-sized bias with settings.y default 0, and the fog
+  // still compared at settings.y alone, so it sampled with no bias at all.
+  for (const text of [
+    'let world=max(size.x/length(vec3f(matrix[0].x,matrix[1].x,matrix[2].x)),size.y/length(vec3f(matrix[0].y,matrix[1].y,matrix[2].y)));',
+    '-shadowFrame.settings.y-1*world*length(vec3f(matrix[0].z,matrix[1].z,matrix[2].z))',
+  ])
+    assert.ok(code.includes(text), `volumetric lost: ${text}`);
   lights.dispose();
 });
 

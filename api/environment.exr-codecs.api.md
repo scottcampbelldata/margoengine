@@ -15,6 +15,8 @@ export interface CodecEXRImage extends FloatImage {
         max: [number, number];
     };
     channelNames: string[];
+    primaries: number[] | null;
+    primariesConverted: boolean;
 }
 
 export interface EXRCodecOptions {

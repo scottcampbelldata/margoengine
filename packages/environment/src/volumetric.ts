@@ -142,9 +142,11 @@ ${
     ? `fn sunShadow(p:vec3f)->f32 {
   let depth=-(shadowFrame.view*vec4f(p,1)).z;if(depth<0.0||depth>shadowFrame.splits.w){return 1.0;}
   let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);
-  let q=shadowFrame.matrices[cascade]*vec4f(p,1);let uv=q.xy*vec2f(0.5,-0.5)+0.5;
+  let matrix=shadowFrame.matrices[cascade];let size=2.0/vec2f(textureDimensions(shadowMap));
+  let world=max(size.x/length(vec3f(matrix[0].x,matrix[1].x,matrix[2].x)),size.y/length(vec3f(matrix[0].y,matrix[1].y,matrix[2].y)));
+  let q=matrix*vec4f(p,1);let uv=q.xy*vec2f(0.5,-0.5)+0.5;
   if(any(uv<vec2f(0))||any(uv>vec2f(1))||q.z<=0.0||q.z>=1.0){return 1.0;}
-  return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(cascade),q.z-shadowFrame.settings.y);
+  return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(cascade),q.z-shadowFrame.settings.y-1*world*length(vec3f(matrix[0].z,matrix[1].z,matrix[2].z)));
 }`
     : ''
 }

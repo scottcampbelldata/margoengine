@@ -39,6 +39,10 @@ export interface CodecEXRImage extends FloatImage {
   displayWindow: { min: [number, number]; max: [number, number] };
   /** Names of the decoded R/G/B or Y and optional A channels. */
   channelNames: string[];
+  /** The part's `chromaticities` header attribute, `null` when it has none (Rec.709 with the D65 white). */
+  primaries: number[] | null;
+  /** True when the RGB was converted from other chromaticities to linear sRGB (D65, Bradford), as `parseEXR` does. */
+  primariesConverted: boolean;
 }
 
 const whole = (n: number, label: string, min: number) => {

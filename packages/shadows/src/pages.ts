@@ -25,6 +25,21 @@ const ENTRY_CACHED = 0x20000;
  */
 export const basePageSize = (distance: number, levels: number): number =>
   distance / (PAGES_PER_SIDE / 2 - 1) / 2 ** (levels - 1);
+/**
+ * The power of two the default reach (500) and caster margin (100) of a virtual shadow map scale by for a camera `h`
+ * world units from its target: 1 from 1 to 25, below that halved per octave so the finest level's pages stay no larger
+ * than about half of `h` (a model a millimetre across gets the texels a metre model gets), above it doubled per octave so the reach is
+ * at least 20 `h` (a model framed from kilometres away stays inside it). Powers of two keep page addresses still while
+ * the camera moves inside an octave. A camera on its target, or a distance that is not finite, keeps 1.
+ */
+export const reachScale = (h: number): number =>
+  !(h > 0 && h < Infinity)
+    ? 1
+    : h < 1
+      ? 2 ** -Math.min(64, Math.ceil(Math.log2(1 / h)))
+      : h > 25
+        ? 2 ** Math.min(64, Math.ceil(Math.log2(h / 25)))
+        : 1;
 /** World size of one page of `level`. */
 export const pageSize = (base: number, level: number): number => base * 2 ** level;
 /** The page index holding light-space coordinate `x` on a level with pages of `size`. */

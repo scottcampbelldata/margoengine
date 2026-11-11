@@ -10,8 +10,11 @@ camera's target distance. Evidence: `packages/shadows/test/scale-browser.mjs` re
 100 m and 1 km plus the Khronos BoomBox, native WebGPU and the WebGL2 layer, RTX A6000 Edge 157, with the same umbra
 and lit pixel counts at every scale (4,626 umbra, 335,079 lit, none darkened); every other shadows GPU test passes in
 both modes. Steady-frame GPU calls and written bytes are unchanged in the deformed-shadows, quality-presets and
-gltf-pro-lighting-hooks proofs; only uniform values and shader text differ. Missing: `VirtualShadows` keeps its world
-defaults (docs/known-bugs.md), other GPUs.
+gltf-pro-lighting-hooks proofs; only uniform values and shader text differ. `VirtualShadows` followed on 2026-11-11: receivers move a quarter
+texel of the page they read along the normal, the depth bias is 2^-20 of a range that follows the reach (a whole
+texel lifted deep shade off the coarsest level before feedback), and an unset reach scales with the camera's target distance in octaves
+(`reachScale`); the same scene passes `scale-browser.mjs --virtual` at every scale in both modes, and
+virtual-feedback-browser.mjs keeps its recorded pages per level (normal path: same pages, draws and uploads). Missing: other GPUs.
 
 ### Section 5 evidence: 100 device restores (2026-11-11)
 

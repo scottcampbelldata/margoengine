@@ -12,6 +12,7 @@ import {
   pageIndex,
   pageMatrix,
   pageSize,
+  reachScale,
   tableSlot,
 } from '../src/pages.ts';
 import { VirtualShadows } from '../dist/virtual.js';
@@ -28,6 +29,22 @@ test('page addresses: each level doubles the page, and a camera position names o
   assert.deepEqual([pageIndex(10.3, 0.5), pageIndex(-4.2, 0.5)], [20, -9]);
   assert.deepEqual([pageIndex(10.3, 1), pageIndex(-4.2, 1)], [10, -5]);
   assert.deepEqual([pageIndex(10.3, 2), pageIndex(-4.2, 2)], [5, -3]);
+});
+// Known bug it guards (docs/known-bugs.md, fixed 2026-11-11): the default reach was 500 at every camera distance, so
+// level 0 texels were 4.4 mm and a model a centimetre across, or one framed from kilometres, lost its shadow
+// (scale-browser.mjs --virtual renders it from 1 mm to 1 km).
+test('the default reach scales by octaves with the camera distance, and holds at 500 from 1 to 25', () => {
+  for (const h of [1, 3.2, 5.39, 10, 25]) assert.equal(reachScale(h), 1, `${h}`);
+  assert.equal(reachScale(0.99), 0.5);
+  assert.equal(reachScale(0.5), 0.5);
+  assert.equal(reachScale(0.0032), 2 ** -9);
+  assert.equal(reachScale(26), 2);
+  assert.equal(reachScale(3214.5), 256);
+  for (const h of [0, -1, Number.NaN, Infinity]) assert.equal(reachScale(h), 1, `${h}`);
+  assert.ok(reachScale(1e-300) > 0 && reachScale(1e300) < Infinity);
+  // The finest page stays under the camera distance and the reach at least 20 times it.
+  for (const h of [0.001, 0.0032, 0.064, 0.142, 0.9]) assert.ok(basePageSize(500 * reachScale(h), 8) <= h * 0.6, `${h}`);
+  for (const h of [26, 321.5, 3214.5]) assert.ok(500 * reachScale(h) >= 20 * h, `${h}`);
 });
 test('the coarsest window reaches `distance` from the camera wherever it sits in its centre page', () => {
   const distance = 500,

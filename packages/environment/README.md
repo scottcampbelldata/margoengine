@@ -642,6 +642,22 @@ const bytes = await (await fetch('/studio.exr')).arrayBuffer();
 const {width, height, data} = parseEXR(bytes); // data: Float32Array RGBA, row 0 at the top
 ```
 
+An EXR whose `chromaticities` attribute names other primaries, such as ACEScg (AP1), decodes to linear sRGB / Rec.709
+(D65) with the RP 177 matrix and a Bradford white adaptation, as `parseHDR` does for Radiance `PRIMARIES`, in all three
+readers (`parseEXR`, `parseTiledEXR` and `decodeEXR`). `image.primaries` reports the attribute (null when absent) and
+`image.primariesConverted` whether the RGB changed; luminance-only files are left as they are. `encodeEXR` writes the
+attribute when you pass `chromaticities`:
+
+```ts
+import {parseEXR} from 'margoengine/environment';
+import {encodeEXR} from 'margoengine/environment/exr-write';
+const red = new Float32Array([1]), zero = new Float32Array([0]);
+const ap1 = await encodeEXR({width: 1, height: 1, chromaticities: [0.713, 0.293, 0.165, 0.83, 0.128, 0.044, 0.32168, 0.33767],
+  channels: [{name: 'B', type: 'FLOAT', data: zero}, {name: 'G', type: 'FLOAT', data: zero}, {name: 'R', type: 'FLOAT', data: red}]});
+const image = parseEXR(ap1);
+console.log(image.primariesConverted, Array.from(image.data.subarray(0, 3), (v) => v.toFixed(3))); // true ['1.705', '-0.130', '-0.024']
+```
+
 ### Reading tiled and mipmapped EXR
 
 `parseTiledEXR(bytes, {levels?})` (from `@margoengine/environment/exr-tiled`, CPU only, Node or browser) reads single-part
@@ -809,7 +825,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 
 ## Limits
 
-WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled images (in the main entry; `/exr-tiled` reads them), multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE`, `GAMMA` and `COLORCORR` headers are reported (`image.exposure`, `image.gamma`, `image.colorCorrection`), not applied. A Radiance `PRIMARIES` line other than sRGB / Rec.709 or the Radiance standard primaries is converted to linear sRGB (D65) with the RP 177 RGB to XYZ matrix and a Bradford white adaptation; `diagnostics.primaries` and `diagnostics.primariesConverted` report it, and colours outside sRGB keep negative components (lighting reads them as 0). OpenEXR `chromaticities` are not converted yet (docs/known-bugs.md). Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression), and the split sum ignores multiple scattering. Source and specular sizes must be powers of two.
+WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled images (in the main entry; `/exr-tiled` reads them), multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE`, `GAMMA` and `COLORCORR` headers are reported (`image.exposure`, `image.gamma`, `image.colorCorrection`), not applied. A Radiance `PRIMARIES` line other than sRGB / Rec.709 or the Radiance standard primaries is converted to linear sRGB (D65) with the RP 177 RGB to XYZ matrix and a Bradford white adaptation; `diagnostics.primaries` and `diagnostics.primariesConverted` report it, and colours outside sRGB keep negative components (lighting reads them as 0). OpenEXR `chromaticities` are converted the same way (`image.primaries`, `image.primariesConverted`). Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression), and the split sum ignores multiple scattering. Source and specular sizes must be powers of two.
 
 Two portability measures are deliberate: the specular prefilter samples the cube in a fragment pass (cube sampling with explicit LOD in compute shaders returned wrong seam texels on SwiftShader), and the WGSL avoids `atan2(-0.0, x)` (SwiftShader returns PI).
 

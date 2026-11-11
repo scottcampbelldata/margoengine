@@ -30,7 +30,16 @@ import {
   solidVertexDepth,
   staleCaster,
 } from '../../shared/caster.js';
-import { PAGES_PER_SIDE, PAGE_TEXELS, PagePool, basePageSize, pageIndex, pageMatrix, pageSize } from './pages.js';
+import {
+  PAGES_PER_SIDE,
+  PAGE_TEXELS,
+  PagePool,
+  basePageSize,
+  pageIndex,
+  pageMatrix,
+  pageSize,
+  reachScale,
+} from './pages.js';
 import {
   shadowDepth,
   effectEntries,
@@ -68,17 +77,30 @@ export interface VirtualShadowOptions {
   poolSize?: number;
   /** Clipmap levels, 1 to 16 (default 8). Each level's pages are twice the size of the one before. */
   levels?: number;
-  /** Farthest shadowed distance from the camera in light space, world units, > 0. Default 500. */
+  /**
+   * Farthest shadowed distance from the camera in light space, world units, > 0. Unset: 500 while the camera is 1 to
+   * 25 units from its target, halved per octave closer (the finest pages follow the model down to a millimetre) and
+   * doubled per octave farther (at least 20 times that distance), so any model scale gets its shadow.
+   */
   distance?: number;
   /** Most resident pages, 1 up to the pool's. Default the pool's. */
   budgetPages?: number;
   /** Light size for the `'soft'` filter's penumbra width, 0 or more. Default 0.02. */
   lightSize?: number;
-  /** Constant depth bias along the light, world units, 0 or more. Default 0.002. */
+  /**
+   * Extra constant depth bias along the light, world units, 0 or more. Default 0. Every receiver already compares 2^-20
+   * of the depth range nearer the light, and the range follows the default reach, so any model scale works without it.
+   */
   bias?: number;
-  /** Receiver offset along its normal, world units, 0 or more. Default 0.02. */
+  /**
+   * Extra receiver offset along its normal, world units, 0 or more. Default 0. Every receiver already moves a quarter
+   * texel of its page along its normal, with the texel's world size, so any model scale works without it.
+   */
   normalBias?: number;
-  /** World units the depth range extends towards the light for off-screen casters, 0 or more. Default 100. */
+  /**
+   * World units the depth range extends towards the light for off-screen casters, 0 or more. Unset: 100, scaled with
+   * the default `distance`.
+   */
   casterMargin?: number;
   /** Edge filter (default `'soft'`), as `Shadows`. Read when receiver shaders are built. */
   filter?: ShadowFilter;
@@ -209,7 +231,8 @@ export class VirtualShadows implements EnginePlugin {
   private feedbackPipeline?: GPUComputePipeline;
   private feedbackGroup?: GPUBindGroup;
   private requestBuffer?: GPUBuffer;
-  private ring: { buffer: GPUBuffer; busy: boolean; centers: Int32Array }[] = [];
+  /** Feedback read buffers; `base` is the level 0 page size their marks were made with. */
+  private ring: { buffer: GPUBuffer; busy: boolean; centers: Int32Array; base: number }[] = [];
   private ringNext = 0;
   /** The newest feedback read back, and each level's window centre on the frame it was marked. */
   private requests = new Uint32Array(0);
@@ -452,6 +475,7 @@ export class VirtualShadows implements EnginePlugin {
     this.centers = new Int32Array(levels * 2);
     this.pages = new PagePool({
       levels,
+      // The first frame rescales a default reach to the camera (render).
       base: basePageSize(o.distance ?? 500, levels),
       poolPages: size / PAGE_TEXELS,
       budgetPages: o.budgetPages,
@@ -488,6 +512,7 @@ export class VirtualShadows implements EnginePlugin {
       buffer: device.createBuffer({ size: words * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
       busy: false,
       centers: new Int32Array(levels * 2),
+      base: 0,
     }));
     this.requests = new Uint32Array(words);
     this.requestCenters = new Int32Array(levels * 2);
@@ -526,6 +551,13 @@ export class VirtualShadows implements EnginePlugin {
         }
       },
     });
+  }
+  /** The default reach's power-of-two scale for `camera`'s distance to its target (`reachScale`). */
+  private scale(camera: { readonly position: ArrayLike<number>; readonly target: ArrayLike<number> }): number {
+    const x = camera.target[0] - camera.position[0],
+      y = camera.target[1] - camera.position[1],
+      z = camera.target[2] - camera.position[2];
+    return reachScale(Math.sqrt(x * x + y * y + z * z));
   }
   /** Light basis as `Shadows` builds it; a changed direction invalidates every page. */
   private basis(): void {
@@ -938,6 +970,7 @@ export class VirtualShadows implements EnginePlugin {
     c.encoder.copyBufferToBuffer(this.requestBuffer!, 0, slot.buffer, 0, slot.buffer.size);
     slot.busy = true;
     slot.centers.set(this.centers);
+    slot.base = this.pages!.base;
     this.ringNext ^= 1;
     // After this frame's submit, which runs synchronously once the frame graph returns: a buffer may not be mapped before.
     queueMicrotask(() => {
@@ -945,8 +978,10 @@ export class VirtualShadows implements EnginePlugin {
       if (!this.ring.includes(slot)) return;
       slot.buffer.mapAsync(GPUMapMode.READ).then(
         () => {
-          this.requests.set(new Uint32Array(slot.buffer.getMappedRange()));
-          this.requestCenters.set(slot.centers);
+          if (slot.base === this.pages?.base) {
+            this.requests.set(new Uint32Array(slot.buffer.getMappedRange()));
+            this.requestCenters.set(slot.centers);
+          }
           slot.buffer.unmap();
           slot.busy = false;
         },
@@ -959,16 +994,25 @@ export class VirtualShadows implements EnginePlugin {
   }
   private render(c: VirtualPassContext): void {
     this.validate();
-    const pages = this.pages!,
-      o = this.options,
+    const o = this.options,
       values = this.values,
-      levels = pages.levels,
-      distance = o.distance ?? 500,
+      scale = o.distance === undefined ? this.scale(c.camera) : 1,
+      distance = o.distance ?? 500 * scale,
       camera = c.camera.position;
+    let pages = this.pages!;
+    const levels = pages.levels,
+      base = basePageSize(distance, levels);
+    // The camera moved to another octave of the default reach: every page address changes, so a new pool, and feedback
+    // marked with the old pages is dropped.
+    if (base !== pages.base) {
+      pages = this.pages = new PagePool({ levels, base, poolPages: pages.poolPages, budgetPages: o.budgetPages });
+      this.requests.fill(0);
+      this.dirty = true;
+    }
     this.basis();
     // Depth is absolute along the light in steps of `distance`: pages keep their values while the camera stays in a step.
     const along = camera[0] * this.forward[0] + camera[1] * this.forward[1] + camera[2] * this.forward[2],
-      margin = o.casterMargin ?? 100,
+      margin = o.casterMargin ?? 100 * scale,
       origin = Math.floor((along - distance - margin) / distance) * distance,
       range = 3 * distance + margin;
     if (origin !== this.origin) {
@@ -996,8 +1040,8 @@ export class VirtualShadows implements EnginePlugin {
     invert(values.subarray(100, 116), flip);
     values[27] = origin;
     values[28] = o.lightSize ?? 0.02;
-    values[29] = o.bias ?? 0.002;
-    values[30] = o.normalBias ?? 0.02;
+    values[29] = o.bias ?? 0;
+    values[30] = o.normalBias ?? 0;
     values[31] = c.height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
     values[32] = range;
     values[33] = PAGE_TEXELS / (o.poolSize ?? 4096);

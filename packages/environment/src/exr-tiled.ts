@@ -12,6 +12,7 @@ import {
   type EXRImage,
 } from './exr.js';
 import { MAX_PIXELS, toBytes } from './hdr.js';
+import { convertRGBA, exrChromaticities, exrToSRGB } from './exr-primaries.js';
 
 /** One decoded resolution level of a tiled OpenEXR file: linear float RGBA, row 0 at the top. */
 export interface EXRLevel {
@@ -187,6 +188,9 @@ export function parseTiledEXR(
       }
     info.data = data;
   }
+  const primaries = exrChromaticities(bytes),
+    convert = layout === 'Y' ? null : exrToSRGB(primaries);
+  if (convert) for (let i = 0; i < wanted; i++) convertRGBA(levels[i].data, convert);
   return {
     width,
     height,
@@ -196,6 +200,8 @@ export function parseTiledEXR(
     layout,
     dataWindow,
     displayWindow,
+    primaries,
+    primariesConverted: !!convert,
     tiling: {
       tileWidth: xSize,
       tileHeight: ySize,

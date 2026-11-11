@@ -94,6 +94,8 @@ export interface EXRImage extends FloatImage {
     layout: 'RGBA' | 'RGB' | 'Y';
     dataWindow: [number, number, number, number];
     displayWindow: [number, number, number, number];
+    primaries: number[] | null;
+    primariesConverted: boolean;
 }
 
 export class Environment implements EnginePlugin {

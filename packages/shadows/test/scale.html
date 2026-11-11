@@ -3,12 +3,15 @@
 // One sphere resting on a floor, the whole scene built at a chosen scale (1 mm to 1 km), with default Shadows
 // settings. scale-browser.mjs reads the canvas in three states (window.check.show) and compares the floor's shadow with
 // the sphere's geometric shadow. Known bug it guards (docs/known-bugs.md, fixed 2026-11-11): a model a few centimetres
-// across, the Khronos BoomBox among them, cast no visible shadow at the default settings.
+// across, the Khronos BoomBox among them, cast no visible shadow at the default settings. With ?virtual the same scenes
+// use default VirtualShadows, whose bias, normal offset and 500 m reach were fixed world lengths too (fixed 2026-11-11).
 import {Engine,box} from '/packages/core/dist/index.js';
 import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {sphereGeometry} from '/packages/geometry/dist/index.js';
 import {PbrMaterial,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+const Kind=new URLSearchParams(location.search).has('virtual')?VirtualShadows:Shadows;
 const canvas=document.querySelector('canvas'),errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu'}),device=engine.gpu;
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -51,12 +54,12 @@ window.check={
     await render(1);
     return {position:[...cam.position],target:[...cam.target],fov:cam.fov,near:cam.near,width:canvas.width,height:canvas.height,sun,sphere,size,floor:size*10};
   },
-  // 'soft': default Shadows. 'open': no shadows. 'dark': no shadows, no sun.
+  // 'soft': default Shadows (VirtualShadows with ?virtual; their pages come from feedback read back a frame later). 'open': no shadows. 'dark': no shadows, no sun.
   async show(state,options={}){
     engine.lighting.radiance.set(state==='dark'?[0,0,0]:radiance.subarray(0,3));
     shadows?.dispose();shadows=undefined;
-    if(state==='soft'){shadows=Shadows.attach(engine,options);shadows.add(scene.source);shadows.add(scene.floor,{castShadow:false});}
-    await render();
+    if(state==='soft'){shadows=Kind.attach(engine,options);shadows.add(scene.source);shadows.add(scene.floor,{castShadow:false});}
+    await render(Kind===VirtualShadows?8:3);
     return errors.splice(0);
   },
 };

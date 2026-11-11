@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15069491,
+  "total": 15072480,
   "history": [
     {
       "date": "2026-10-24",
@@ -8453,6 +8453,12 @@
       "commit": "1ff2caa670",
       "reason": "shadows fix 2026-11-11: shadows at any model scale (texel-sized bias in WGSL, still models fit the cascades, cached local boxes); 19333 to 19572 B gzip; a separate lazy chunk would add a request on every shadowed page for 239 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "c10abc270f",
+      "reason": "EXR chromaticities in every reader (exr-tiled 8112 to 8799 B, exr-codecs worker 1835 to 2557 B: header scan plus the RP 177 and Bradford matrix; a lazy chunk would add a request to every EXR load); volumetric fog repeats the Shadows texel bias (9741 to 9799 B); VirtualShadows scale-free reach and bias (15956 to 16178 B)",
+      "grew": 4
     }
   ],
   "items": {
@@ -8740,11 +8746,11 @@
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/serialize": 4260,
     "@margoengine/environment": 32706,
-    "@margoengine/environment dist/workers/exr-codecs.js": 1835,
+    "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4999,
     "@margoengine/environment/cube-camera": 5882,
     "@margoengine/environment/exr-codecs": 1729,
-    "@margoengine/environment/exr-tiled": 8112,
+    "@margoengine/environment/exr-tiled": 9063,
     "@margoengine/environment/exr-write": 2084,
     "@margoengine/environment/fog-volumes": 1638,
     "@margoengine/environment/gi": 19260,
@@ -8755,7 +8761,7 @@
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/environment/refractor": 11397,
     "@margoengine/environment/studio": 1493,
-    "@margoengine/environment/volumetric": 9741,
+    "@margoengine/environment/volumetric": 10093,
     "@margoengine/exporters": 37300,
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
@@ -9431,7 +9437,7 @@
     "@margoengine/shadows/rt-alpha": 8816,
     "@margoengine/shadows/style": 799,
     "@margoengine/shadows/transmission": 1027,
-    "@margoengine/shadows/virtual": 15956,
+    "@margoengine/shadows/virtual": 16664,
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 18225,
     "@margoengine/sky/aerial": 6719,

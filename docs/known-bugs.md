@@ -134,14 +134,15 @@
 - **Next idea:** a D3D11 repro outside Margo (the trace shader alone, identical draws timed apart) to report upstream;
   the test and its exact assertion stay unchanged.
 
-### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
+### Fixed 2026-11-11: OpenEXR chromaticities were read as sRGB (Rust finding R10)
 
 - **Repro:** an EXR whose `chromaticities` attribute names ACEScg (AP1) primaries and one pixel (1, 0, 0): `parseEXR`,
-  `/exr-tiled` and the `/exr-codecs` worker return (1, 0, 0), where linear sRGB is about (1.705, -0.130, -0.024).
-- **Cause:** `packages/environment/src/exr.ts` skips the `chromaticities` attribute (OpenEXR technical introduction,
-  "chromaticities" standard attribute), so every decode path treats the data as Rec.709.
-- **Fix to build:** read the attribute in the shared header parser and apply the RP 177 plus Bradford matrix `parseHDR`
-  uses for Radiance PRIMARIES (`packages/environment/src/hdr.ts` `toSRGB`) in each decode path, with an AP1 test.
+  `/exr-tiled` and the `/exr-codecs` worker returned (1, 0, 0), where linear sRGB is about (1.705, -0.130, -0.024).
+- **Cause:** `packages/environment/src/exr.ts` skipped the attribute, so every decode path treated the data as Rec.709.
+- **Fix:** `packages/environment/src/exr-primaries.ts` reads the attribute from any part's header and converts RGB with
+  the RP 177 plus Bradford matrix `parseHDR` uses for Radiance PRIMARIES, in all three readers; images report
+  `primaries` and `primariesConverted`, and `encodeEXR` writes `chromaticities`. Regression:
+  `packages/environment/tests/exr-chromaticities.test.js`.
 
 
 Batch 170 React harness (2026-11-10): when an external engine module fails to evaluate (seen with an R3F build whose React bundle read `process.env`), `bench/scenes/page.js` top-level `await import(...)` rejects without setting `window.result`, so `bench/lib/browser.mjs` waits its full 600 s before the case errors. Repro: an engines.json entry whose module throws on import, then `scripts/parity-smoke-browser.mjs --standard=react --engines=margo,<that engine>`. Cause: the engine import is outside the harness's error reporting. Fix in the fix phase: report the import error as the case result, with a test that loads a throwing module.
@@ -328,6 +329,19 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   one traversal; the same image hashes on WebGPU, and `transparent` passes in 89.4 s. Regression:
   `packages/voxel-pathtracer/tests/compat-staged.test.js` ("layer-compiled kernels ... hold no constant-bound loop around
   a traversal").
+
+### Fixed 2026-11-11: VirtualShadows lost a centimetre model's shadow, and a model framed from kilometres
+
+- **Repro:** `node packages/shadows/test/scale-browser.mjs --virtual`: before the fix the 1 mm, 2 cm, 1 km, 2 cm with
+  core's default camera and BoomBox cases kept every umbra pixel lit (4,626 of 4,626; the BoomBox shaded 0 pixels).
+- **Cause:** `VirtualShadows` defaults were fixed world lengths: a depth bias of 0.002 and a normal offset of 0.02 (the
+  whole size of a 2 cm model), a 500 unit reach (a camera 3 km away was outside it) and with it level 0 texels of 4.4 mm.
+- **Fix:** each receiver moves a quarter texel of the page it reads along its normal and compares 2^-20 of the depth
+  range nearer the light, a range that scales with the reach (`bias` and `normalBias` add to them, default 0); an unset `distance` and `casterMargin` scale by powers of two
+  with the camera's target distance (`reachScale` in `packages/shadows/src/pages.ts`: 1 from 1 to 25 units, finer
+  closer, at least 20 times it farther), the pool rebuilt on an octave change. Regression:
+  `packages/shadows/test/scale-browser.mjs --virtual` (1 mm to 1 km, the default camera and the BoomBox, WebGPU and
+  MARGO_COMPAT=1) and `packages/shadows/test/virtual-pages.test.js`.
 
 ### Fixed 2026-11-11: a model a few centimetres across cast no visible directional shadow
 
@@ -2194,13 +2208,6 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   run, and the results recorded here.
 
 ## Open defects
-
-### VirtualShadows keeps world-length bias defaults, so a model a few centimetres across may lose its shadow
-
-- **What:** `VirtualShadows` (`@margoengine/shadows/virtual`) still offsets each receiver by `bias` 0.002 and `normalBias` 0.02 in world units, the same class of fixed world lengths that hid a centimetre model's shadow under `Shadows` (fixed 2026-11-11, above). Not yet measured: no test renders a virtual-shadowed model below 10 cm.
-- **Repro:** `packages/shadows/test/scale.html` with `VirtualShadows` in place of `Shadows` at the 2 cm case; expected an umbra under the cube, likely none, as the 2 cm normal offset is the model's whole size.
-- **Cause (expected):** `packages/shadows/src/virtual.ts` uniforms 29 and 30 take those world defaults; its page texels are not used to size the offsets as the root's `shadowPlace` now does.
-- **Needed to close:** size both offsets from the page's texel at the receiver, as `shadowPlace` does per cascade, and add the virtual case to `scale-browser.mjs` at every scale.
 
 ### A chain laid out level under a 1000:1 end mass stretches once it is taut
 

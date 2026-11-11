@@ -17,6 +17,9 @@
 // Run from the repository root after `npm run build:packages`: node packages/shadows/test/scale-browser.mjs
 // (--soft={"distance":40} adds options to the soft frame, for bisecting). Writes test-results/shadows-scale.json and
 // test-results/shadows-scale-<case>.png (the soft frame).
+// --virtual runs the same cases with default VirtualShadows (writes shadows-virtual-scale*). Known bug it guards
+// (docs/known-bugs.md, fixed 2026-11-11): its 0.002 m depth bias, 0.02 m normal offset and 500 m reach were fixed world
+// lengths, with level 0 texels of 4.4 mm.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -41,10 +44,11 @@ const CASES = [
 ];
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const name = 'shadows-scale';
+const virtual = process.argv.includes('--virtual'),
+  name = virtual ? 'shadows-virtual-scale' : 'shadows-scale';
 await mkdir('test-results', { recursive: true });
 const release = await acquire({ owner: name });
-const context = await openBrowser({ startPath: '/packages/shadows/test/scale.html', port: 5402 }),
+const context = await openBrowser({ startPath: `/packages/shadows/test/scale.html${virtual ? '?virtual' : ''}`, port: virtual ? 5403 : 5402 }),
   { page } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

@@ -1,6 +1,7 @@
 // OpenEXR scanline decoder for single-part scanline files with
 // NONE, RLE, ZIPS, ZIP or PIZ compression and HALF, FLOAT or UINT channels.
 import { halfFloats } from './half.js';
+import { convertRGBA, exrChromaticities, exrToSRGB } from './exr-primaries.js';
 import { inflateZlib } from '../../shared/inflate.js';
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -30,6 +31,17 @@ export interface EXRImage extends FloatImage {
   dataWindow: [number, number, number, number];
   /** Pixel bounds of the intended display area, inclusive: [xMin, yMin, xMax, yMax] (the data window when absent). */
   displayWindow: [number, number, number, number];
+  /**
+   * The `chromaticities` header attribute (red, green, blue and white CIE xy), `null` when the file has none (Rec.709
+   * with the D65 white).
+   */
+  primaries: number[] | null;
+  /**
+   * True when the RGB was converted from other chromaticities to linear sRGB / Rec.709 (D65), white adapted with the
+   * Bradford transform, as `parseHDR` does for PRIMARIES. Colours outside the sRGB gamut then carry negative components;
+   * lighting reads them as 0. Luminance-only (`'Y'`) images are not converted.
+   */
+  primariesConverted: boolean;
 }
 
 const COMPRESSION_NAMES = ['NONE', 'RLE', 'ZIPS', 'ZIP', 'PIZ', 'PXR24', 'B44', 'B44A', 'DWAA', 'DWAB', 'HTJ2K'];
@@ -369,7 +381,21 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     const raw = decodeEXRChunk(packed, lines * lineBytes, compression, channels, width, lines, `chunk ${block}`);
     copyEXRLines(raw, lines, width, channels, indices, data, width, 0, index * linesPerBlock);
   }
-  return { width, height, data, compression, channels, layout, dataWindow, displayWindow };
+  const primaries = exrChromaticities(bytes),
+    convert = layout === 'Y' ? null : exrToSRGB(primaries);
+  if (convert) convertRGBA(data, convert);
+  return {
+    width,
+    height,
+    data,
+    compression,
+    channels,
+    layout,
+    dataWindow,
+    displayWindow,
+    primaries,
+    primariesConverted: !!convert,
+  };
 }
 
 // ------------------------------------------------------------------ RLE, ZIP and ZIPS reconstruction

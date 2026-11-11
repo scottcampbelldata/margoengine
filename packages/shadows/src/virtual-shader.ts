@@ -35,6 +35,17 @@ const filters: Record<ShadowFilter, string> = {
   hard: /* wgsl */ `
   return textureSampleCompareLevel(shadowMap,shadowSampler,found.xy,reference);`,
 };
+// The receiver's own offsets follow the texel of the page it reads, so every model scale gets the same shadow (fixed
+// world lengths, 0.02 along the normal and 0.002 along the light, hid a model a few centimetres across): it moves
+// NORMAL_TEXELS texels along its normal (Holbert 2011, "Normal Offset Shadows": the offset scales with the world size
+// of a texel), as the root's shader.ts does with its cascades, and compares DEPTH_STEP of the depth range nearer the
+// light: 16 float32 steps at 1, a fixed share of a range that scales with the scene. The slope's part of the bias is the
+// receiver-plane term below (Isidoro 2006), which already reads the page's texel; a whole texel of constant depth bias
+// (Dou, Yan, Kerzner, Dai & Wyman 2014) would lift deep shade off the coarsest level's texels, half a metre wide, on
+// the frames before feedback names finer pages. The level is found from the receiver itself, then the offset receiver
+// walks again from that level. `normalBias` and `bias` add to them.
+const NORMAL_TEXELS = 0.25,
+  DEPTH_STEP = '0.00000095367431640625';
 const frame =
   'struct ShadowFrame {view:mat4x4f,right:vec4f,up:vec4f,forward:vec4f,settings:vec4f,info:vec4f,levels:array<vec4f,16>,inverse:mat4x4f,nearest:array<vec4f,4>}\nfn shadowReach()->f32 {return shadowFrame.info.w;}';
 const soft = /* wgsl */ `const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);
@@ -77,13 +88,16 @@ fn shadowTap(at:vec2f,level:u32,reference:f32)->f32 {
   return textureSampleCompareLevel(shadowMap,shadowSampler,page.xy,reference);
 }
 ${filter === 'soft' ? soft : ''}fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
-  let n=normalize(normal);let at=position+n*shadowFrame.settings.z;
+  let n=normalize(normal);
+  let first=shadowPage(vec2f(dot(shadowFrame.right.xyz,position),dot(shadowFrame.up.xyz,position)),shadowFirst(-(shadowFrame.view*vec4f(position,1)).z/shadowFrame.settings.w));
+  if(first.x<0){return 1;}
+  let at=position+n*(shadowFrame.settings.z+${NORMAL_TEXELS}*first.z);
   let light=vec3f(dot(shadowFrame.right.xyz,at),dot(shadowFrame.up.xyz,at),dot(shadowFrame.forward.xyz,at));
-  let range=shadowFrame.info.x;
-  var reference=(light.z-shadowFrame.forward.w-shadowFrame.settings.y)/range;
-  if(reference<=0||reference>=1){return 1;}
-  let found=shadowPage(light.xy,shadowFirst(-(shadowFrame.view*vec4f(position,1)).z/shadowFrame.settings.w));
+  let found=shadowPage(light.xy,u32(first.w));
   if(found.x<0){return 1;}
+  let range=shadowFrame.info.x;
+  var reference=(light.z-shadowFrame.forward.w-shadowFrame.settings.y)/range-${DEPTH_STEP};
+  if(reference<=0||reference>=1){return 1;}
   let facing=vec3f(dot(n,shadowFrame.right.xyz),dot(n,shadowFrame.up.xyz),dot(n,shadowFrame.forward.xyz));var slope=vec2f(0);
   if(abs(facing.z)>0.001){slope=clamp(-facing.xy/facing.z,vec2f(-2),vec2f(2));}
   reference-=(abs(slope.x)+abs(slope.y))*found.z*0.5/range;let level=u32(found.w);

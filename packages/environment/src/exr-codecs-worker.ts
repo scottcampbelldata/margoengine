@@ -1,4 +1,5 @@
 // Worker-only bridge to the standard prebuilt OpenEXR decoder. No image codec implementation is copied here.
+import { convertRGBA, exrChromaticities, exrToSRGB } from './exr-primaries.js';
 declare const process: { versions?: { node?: string } };
 interface Decoder {
   HEAPU8: Uint8Array;
@@ -116,6 +117,10 @@ async function run(job: Job) {
       for (let c = 0; c < 3; c++) data[i * 4 + c] = m.HEAPF32[output / 4 + (luminance ? 0 : c) * pixels + i];
       data[i * 4 + 3] = alpha < 0 ? 1 : m.HEAPF32[output / 4 + alpha * pixels + i];
     }
+    // The prebuilt decoder's header JSON leaves `chromaticities` out: read it from the file's own header.
+    const primaries = exrChromaticities(job.data, job.part),
+      convert = luminance ? null : exrToSRGB(primaries);
+    if (convert) convertRGBA(data, convert);
     return {
       width,
       height,
@@ -125,6 +130,8 @@ async function run(job: Job) {
       dataWindow: part.dataWindow,
       displayWindow: part.displayWindow,
       channelNames,
+      primaries,
+      primariesConverted: !!convert,
     };
   } finally {
     if (indices) m._free(indices);

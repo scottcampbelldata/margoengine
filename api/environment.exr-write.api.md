@@ -16,6 +16,7 @@ export interface EXRWriteImage {
     height: number;
     channels: readonly EXRWriteChannel[];
     colorInteropID?: string;
+    chromaticities?: readonly number[];
 }
 
 export interface EXRWriteOptions {
