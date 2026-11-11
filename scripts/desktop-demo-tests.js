@@ -11,6 +11,7 @@ import { decodePNG } from '../tests/support/png.js';
 import { installDemoLoadAudit } from './demo-load-audit.js';
 import { closeAll } from './support/shutdown.mjs';
 import { percentile } from './lib/percentile.mjs';
+import { desktopTierURL } from './support/desktop-tier.mjs';
 
 const demos = [
   { name: 'citadel', path: '/night-citadel/', range: ['azimuth', 'azimuth-value'] },
@@ -345,7 +346,9 @@ try {
     const result = {
       name: demo.name,
       path: demo.path,
-      url: new URL(demo.path, baseUrl).href,
+      // The checks below are the desktop full tier (DPR 1 backing, 4x MSAA). A fresh browser profile starts every
+      // page on the measured light tier (@margoengine/quality), so the tier is pinned.
+      url: desktopTierURL(demo.path, baseUrl),
       errors: [],
       networkErrors: [],
     };
