@@ -2129,6 +2129,8 @@ simply removing the depth predicate would not establish sharp-foreground
 occlusion. Compared Demers (2004), Hammon (2007) and Potmesil/Chakravarty (1981),
 cited in clean-room.md. No speculative shader or weaker edge bar was landed.
 
+Fixed 2026-11-11 (bug sweep L3b, KB1843): the gathers are now scatter as gather in two layers (Jimenez 2014; Kraus and Strengert 2007; clean-room.md D-10). The far gather also counts a far sample in front of the centre where its own disk reaches the centre, weighted by the centre's disk area over its own, laid over the behind layer by the coverage the weights add up to; a near centre counts as one tap's share of its own disk instead of full coverage, and its background is the visible background within its disk. Measured on the RTX A6000, 512 x 512, middle row, pixels more than 4 levels off the sharp picture: far card 11 inside, 0 outside before and 11 inside, 12 outside after; near card 10 inside, 11 outside after (it was 147 then 208, full inside, before). A sharp subject still leaks nothing: its disk is under a pixel. DOFLens shapes follow through the same covers test (polygon, aperture image, cat's eye, anamorphic). Regression: packages/dof/tests/gpu/lens-check.mjs (edge cases, fails before: far 11 in, 0 out), WebGL2 layer packages/dof/tests/gpu/compat-check.mjs.
+
 ## README examples
 
 ### README examples still need matching inputs and repairs

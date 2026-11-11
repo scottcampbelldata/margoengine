@@ -161,6 +161,9 @@ function apertureTaps(mask: Float32Array, n: number): Float32Array {
 }
 
 // Every occurrence of `from`, which must occur `count` times.
+// The covers test of the far gather's front samples, as the DOF shaders define it.
+const REACH = 'fn covers(o:vec2f,radius:f32,pixel:vec2i)->f32 {return select(0.0,1.0,length(o)<=radius);}';
+
 function editAll(source: string, from: string, to: string, count: number): string {
   if (source.split(from).length !== count + 1)
     throw new MargoError('unsupported', 'DOFLens needs the DOF shaders of its own version; update both together');
@@ -197,7 +200,7 @@ fn aperture(v:vec2f)->f32 {
   return mix(mix(cell(c),cell(c+vec2i(1,0)),f.x),mix(cell(c+vec2i(0,1)),cell(c+vec2i(1,1)),f.x),f.y);
 }
 fn spiral(i:u32,n:f32)->vec2f {`,
-    far = (code: string, sizes: number[]) =>
+    tapsFar = (code: string, sizes: number[]) =>
       editAll(
         sizes.reduce(
           (c, n) =>
@@ -212,6 +215,14 @@ fn spiral(i:u32,n:f32)->vec2f {`,
         '{farColor+=textureLoad(scene,farPixel,0).rgb;farWeight+=1.0;}',
         '{farColor+=textureLoad(scene,farPixel,0).rgb*farTap.z;farWeight+=farTap.z;}',
         sizes.length,
+      ),
+    // A far sample in front reaches the center where -offset / radius lies on the aperture, weighted as a near one.
+    far = (code: string, sizes: number[]) =>
+      editAll(
+        editAll(tapsFar(code, sizes), 'let farW=1.0;', 'let farW=farTap.z;', sizes.length),
+        REACH,
+        `${REACH.slice(0, -2)}*aperture(-o/radius)/${mean.toFixed(6)};}`,
+        1,
       );
   return {
     ...out,
@@ -241,7 +252,7 @@ function opticsShaders(out: DOFLensShaders, catEye: number, squeeze: number): DO
 fn eye(v:vec2f,pixel:vec2i)->f32 {return select(0.0,1.0,length(v-barrel(pixel))<=1.0);}
 fn lensArea(pixel:vec2i)->f32 {let d=min(length(barrel(pixel)),1.99);return (2.0*acos(d*0.5)-0.5*d*sqrt(4.0-d*d))/3.14159265;}
 fn spiral(i:u32,n:f32)->vec2f {`,
-    far = (code: string, sizes: number[]) =>
+    tapsFar = (code: string, sizes: number[]) =>
       editAll(
         sizes.reduce(
           (c, n) =>
@@ -261,7 +272,20 @@ fn spiral(i:u32,n:f32)->vec2f {`,
         '{farColor+=textureLoad(scene,farPixel,0).rgb;farWeight+=1.0;}',
         '{let w=eye(-farTap,pixel);farColor+=textureLoad(scene,farPixel,0).rgb*w;farWeight+=w;}',
         sizes.length,
-      );
+      ),
+    // A front far sample's disk is squeezed like the far taps, so its area ratio to the center's needs no squeeze term.
+    far = (code: string, sizes: number[]) =>
+      editAll(
+        editAll(
+          editAll(tapsFar(code, sizes), 'let farW=1.0;', 'let farW=eye(-farTap,pixel);', sizes.length),
+          'length(o)<=',
+          `length(o*vec2f(${a},1.0))<=`,
+          1,
+        ),
+        'radius:f32,pixel:vec2i)->f32 {return ',
+        'radius:f32,pixel:vec2i)->f32 {return eye(-o/radius,pixel)/lensArea(pixel)*',
+        1,
+      ).replace('radius*shape(atan2(o.y,o.x))', `radius*shape(atan2(o.y,o.x*${a}))`);
   let bokeh = far(out.bokehShader, [64, 32, 16]);
   bokeh = editAll(
     bokeh,
@@ -362,7 +386,9 @@ fn spiral(i:u32,n:f32)->vec2f {`,
       // The near gather's reach and its reach test follow the polygon: its taps lie closer, down to the inner circle.
       ['pow((nearMax+1.0)/p.lens.w,2.0)', `pow((nearMax+1.0)/(p.lens.w*${inner}),2.0)`],
       ['length(vec2f(nearOffset))<=radius', 'length(vec2f(nearOffset))<=radius*shape(f32(i)*2.39996323)'],
+      [REACH, REACH.replace('length(o)<=radius', 'length(o)<=radius*shape(atan2(o.y,o.x))')],
     ]);
+    out.coarseShader = edit(out.coarseShader, [[REACH, REACH.replace('length(o)<=radius', 'length(o)<=radius*shape(atan2(o.y,o.x))')]]);
     return opticsShaders(out, this.catEye, this.anamorphic);
   }
   /** Writes the tilt per clip unit into the free uniform slots 9 and 10. Called by `DOF` every frame. */

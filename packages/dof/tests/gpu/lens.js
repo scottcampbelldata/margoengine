@@ -9,7 +9,8 @@ import { TAA } from '../../../taa/dist/index.js';
 if (new URLSearchParams(location.search).get('mode') === 'compat')
   await (await import('../../../webgl2-compat/dist/index.js')).install({ force: true });
 const errors = [],
-  white = new PbrMaterial({ color: '#ffffff', emissive: [6, 6, 6], roughness: 1, metalness: 0 });
+  white = new PbrMaterial({ color: '#ffffff', emissive: [6, 6, 6], roughness: 1, metalness: 0 }),
+  card = new PbrMaterial({ color: '#ffffff', emissive: [0.5, 0.5, 0.5], roughness: 1, metalness: 0 });
 addEventListener('error', (e) => errors.push(e.message));
 addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
 
@@ -114,6 +115,25 @@ window.check = {
   async sharp() {
     await start([[0, 0, 7, 0.1]]);
     DOF.attach(engine, { focalDistance: 20, focalLength: 0.1, aperture: 0.5, maxRadius: 16, enabled: false });
+    await settle(4);
+  },
+  // KB1843: a grey card over the left half of the frame, its right edge on the middle column, on the empty background:
+  // far behind the focus (near false) or in front of it (near true); enabled false draws the sharp scene. A blurred edge
+  // must spread to both sides of the outline.
+  async edge(near, enabled = true) {
+    await start([]);
+    engine
+      .createMesh()
+      .setGeometry(box(40, 40, 0.01))
+      .setMaterial(card)
+      .setPosition([-20, 0, near ? 6 : -10]);
+    DOF.attach(engine, {
+      focalDistance: near ? 30 : 2,
+      focalLength: near ? 0.2 : 0.1,
+      aperture: 1,
+      maxRadius: 16,
+      enabled,
+    });
     await settle(4);
   },
   // More frames of the current case.

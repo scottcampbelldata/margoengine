@@ -36,19 +36,31 @@ ${groupMax}
 }`;
 
 // Spiral taps on the golden angle (Vogel 1979).
-// Far-field gather of n spiral taps over the center's own disk into farColor/farWeight; only background samples
-// count, so foreground stays in its own layer. A constant n lets the compiler fold the tap offsets.
-const far = (n: number) => `for(var i=0u;i<${n}u;i++){
+// Far-field gather of n spiral taps over the center's own disk, scatter as gather in two layers (Jimenez 2014; layers
+// as in Kraus & Strengert 2007). Samples at the center's depth or behind it average into farColor/farWeight. A far
+// sample in front of the center counts only where its own disk reaches the center (reach), weighted by the center's
+// disk area over its own (one tap stands for that share of the center's disk), and lies over the behind layer by the
+// coverage those weights add up to. So a blurred far edge spreads both ways over what lies behind it, half inside and
+// half outside, while a sharp subject (a disk under a pixel) never reaches its background. The near field keeps its own
+// layer. A constant n lets the compiler fold the tap offsets.
+const far = (n: number) => `var frontColor=vec3f(0);var frontWeight=0.0;var farTotal=farWeight;
+  for(var i=0u;i<${n}u;i++){
     let farPixel=clamp(pixel+vec2i(round(spiral(i,${n}.0)*center.x)),vec2i(0),limit);
-    let farCoC=textureLoad(coc,farPixel,0).xy;
+    let farCoC=textureLoad(coc,farPixel,0).xy;let farW=1.0;farTotal+=farW;
     if(farCoC.x>=0.0&&farCoC.y>=center.y-max(0.001,center.y*0.01)){farColor+=textureLoad(scene,farPixel,0).rgb;farWeight+=1.0;}
-  }`;
+    else if(farCoC.x>0.5){
+      let w=farW*covers(vec2f(farPixel-pixel),farCoC.x,pixel)*center.x*center.x/(farCoC.x*farCoC.x);
+      frontColor+=textureLoad(scene,farPixel,0).rgb*w;frontWeight+=w;
+    }
+  }
+  if(frontWeight>0.0){farColor=mix(farColor/farWeight,frontColor/frontWeight,min(frontWeight/farTotal,1.0));farWeight=1.0;}`;
 const sampling = `@group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var coc:texture_2d<f32>;
 fn spiral(i:u32,n:f32)->vec2f {
   let angle=f32(i)*2.39996323;
   return sqrt((f32(i)+0.5)/n)*vec2f(cos(angle),sin(angle));
-}`;
+}
+fn covers(o:vec2f,radius:f32,pixel:vec2i)->f32 {return select(0.0,1.0,length(o)<=radius);}`;
 
 // Wide far disks (radius > 3.19 px) are gathered once per 2x2 block, at its top-left pixel, into rgb + view depth
 // (0: not a wide far pixel).
@@ -69,8 +81,11 @@ ${sampling}
 // any interpolated block lies at another depth (silhouettes, where the gather changes fastest).
 // Near field: foreground pixels within maxRadius whose own disk reaches this pixel. Tap i lies sqrt((i+0.5)/64)*
 // maxRadius out and rounding moves it at most 0.71 px closer, so taps beyond the largest near radius of the
-// neighbouring tiles plus one pixel cannot pass the radius test and are skipped. The foreground center itself is
-// always counted, even for a disk smaller than the sampling lattice.
+// neighbouring tiles plus one pixel cannot pass the radius test and are skipped. The foreground center counts as one
+// tap's share of its own disk (64 taps cover the largest disk, so a disk under an eighth of it is covered by its own
+// pixel alone, smaller than the sampling lattice), not as full coverage: at a blurred near edge the taps from inside
+// cover about half the disk, and the background seen past the edge (partial occlusion, Kraus & Strengert 2007) is the
+// visible background within the center's own disk, gathered by the same taps.
 export const bokehShader = `${params}
 ${sampling}
 @group(0) @binding(3) var result:texture_storage_2d<rgba16float,write>;
@@ -91,7 +106,7 @@ fn disk(i:u32)->vec2f {return spiral(i,64.0);}
   let sharp=textureLoad(scene,pixel,0);
   if(p.frame.w==0.0){textureStore(result,pixel,sharp);return;}
   var farColor=sharp.rgb;var farWeight=1.0;
-  var nearColor=vec3f(0);var nearWeight=0.0;
+  var nearColor=vec3f(0);var nearWeight=0.0;var backColor=vec3f(0);var backWeight=0.0;
   let limit=vec2i(size)-1;
   if(center.x>3.19){
     let q=pixel/2;let f=vec2f(pixel%2)*0.5;let last=vec2i(textureDimensions(coarse))-1;var up=vec4f(0);
@@ -110,10 +125,15 @@ fn disk(i:u32)->vec2f {return spiral(i,64.0);}
     if(radius>0.5&&length(vec2f(nearOffset))<=radius&&nearCoC.y<=center.y+max(0.001,center.y*0.01)){
       let weight=p.lens.w*p.lens.w/max(radius*radius,1.0);
       nearColor+=textureLoad(scene,nearPixel,0).rgb*weight;nearWeight+=weight;
+    }else if(center.x< -0.5&&nearCoC.y>center.y+max(0.001,center.y*0.01)&&covers(vec2f(nearOffset),-center.x,pixel)>0.0){
+      backColor+=textureLoad(scene,nearPixel,0).rgb;backWeight+=1.0;
     }
   }
-  if(center.x< -0.5){nearColor+=sharp.rgb;nearWeight+=1.0;}
-  let coverage=select(clamp(nearWeight/64.0,0.0,1.0),1.0,center.x< -0.5);
+  if(center.x< -0.5){
+    let weight=p.lens.w*p.lens.w/(center.x*center.x);nearColor+=sharp.rgb*weight;nearWeight+=weight;
+    if(backWeight>0.0){farColor=backColor;farWeight=backWeight;}
+  }
+  let coverage=clamp(nearWeight/64.0,0.0,1.0);
   let color=mix(farColor/farWeight,nearColor/max(nearWeight,0.0001),coverage);
   textureStore(result,pixel,vec4f(color,sharp.a));
 }`;

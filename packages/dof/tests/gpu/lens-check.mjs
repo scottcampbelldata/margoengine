@@ -123,6 +123,34 @@ try {
   assert.ok(eyeCorner.radial <= plainCorner.radial - 8, 'narrower than the plain disk there');
   assert.ok(Math.abs(eyeMiddle.width - round.width) <= 2, 'and round at the frame centre');
 
+  // KB1843: a blurred edge spreads to both sides of its outline. The card covers the left half; along the middle row,
+  // count the pixels more than 4 levels off the sharp picture on each side of the outline (column 256). Before the
+  // two-layer gather a far card spread inward only (outside 0) and a near card outward only (inside 1 or 2).
+  const spread = async (near) => {
+    await page.evaluate((n) => window.check.edge(n, false), near);
+    const sharp = await shot();
+    await page.evaluate((n) => window.check.edge(n, true), near);
+    const blurred = await shot(),
+      y = sharp.height >> 1,
+      off = (x) => Math.abs(blurred.data[(y * sharp.width + x) * 4] - sharp.data[(y * sharp.width + x) * 4]) > 4;
+    let inside = 0,
+      outside = 0;
+    for (let x = 0; x < 256; x++) inside += off(x);
+    for (let x = 256; x < sharp.width; x++) outside += off(x);
+    return { inside, outside, card: sharp.data[(y * sharp.width + 100) * 4], sky: sharp.data[(y * sharp.width + 400) * 4] };
+  };
+  for (const near of [false, true]) {
+    const s = await spread(near),
+      what = near ? 'near' : 'far';
+    console.log(`${what} edge`, JSON.stringify(s));
+    assert.ok(s.card - s.sky > 150, `${what}: the card stands out from the background, ${s.card} against ${s.sky}`);
+    assert.ok(s.inside >= 6 && s.outside >= 6, `${what} blur spreads both ways: ${s.inside} in, ${s.outside} out`);
+    assert.ok(
+      Math.min(s.inside, s.outside) >= 0.6 * Math.max(s.inside, s.outside),
+      `${what} blur spreads about evenly: ${s.inside} in, ${s.outside} out`,
+    );
+  }
+
   // Temporal DOF: the half-resolution gather against the full one. Mean absolute difference over all channels of the
   // 512 x 512 frame; the box in focus (the middle 40 x 40) must be untouched, byte for byte.
   const diff = (a, b, x0 = 0, y0 = 0, x1 = a.width, y1 = a.height) => {
