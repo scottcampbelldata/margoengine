@@ -10,7 +10,7 @@ test('frame uniforms queue identical bytes only once, including alternating view
     plugin = new PointsPlugin();
   const camera = new Camera({ position: [0, 0, 8], target: [0, 0, 0] });
   camera.update(1, true);
-  const engine = { backend: 'webgpu', gpu: gpu.device };
+  const engine = { backend: 'webgpu', gpu: gpu.device, sceneOf() {} };
   gpu.record(() => plugin.setup(engine));
   plugin.add(new PointCloud({ positions: [0, 0, 0], material: { size: 4 } }));
   plugin.add(new SpriteBatch({ sprites: [{ position: [1, 0, 0] }] }));

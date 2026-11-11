@@ -6,7 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { computeShader } from './shaders.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
 import { OccluderList, type OccluderInput } from './occluders.js';
-import { viewSize } from '../../shared/view-rect.js';
+import { applyView, viewSize } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { unitLight } from '../../shared/unit-light.js';
 export { CulledMeshes } from './meshes.js';
@@ -637,6 +637,7 @@ export class CulledInstances implements EnginePlugin {
     this.color.storeOp = this.target.depthStoreOp = 'store';
     c.attach?.(this.color, this.target, true);
     const main = c.encoder.beginRenderPass(this.main);
+    applyView(main, c);
     let current: GPURenderPipeline | undefined;
     this.batches.forEach((batch, i) => {
       if (!batch.geometry.indices.length) return;

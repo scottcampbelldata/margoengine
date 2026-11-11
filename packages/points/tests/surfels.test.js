@@ -12,7 +12,7 @@ function rig({ samples = 1, options } = {}) {
     camera = new Camera({ position: [0, 0, 8], target: [0, 0, 0] }),
     view = gpu.device.createTexture({ size: [64, 64], format: 'rgba8unorm' }).createView();
   camera.update(1, true);
-  gpu.record(() => plugin.setup({ backend: 'webgpu', gpu: gpu.device }));
+  gpu.record(() => plugin.setup({ backend: 'webgpu', gpu: gpu.device, sceneOf() {} }));
   const run = passes(plugin),
     frame = () =>
       gpu.record(() =>

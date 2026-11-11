@@ -174,7 +174,7 @@ test('an offset view gets a view-sized Hi-Z drawn at the target origin; smaller 
   const begin = h.context.encoder.beginRenderPass;
   h.context.encoder.beginRenderPass = (descriptor) => {
     const pass = begin(descriptor);
-    return { ...pass, setViewport: (...v) => viewports.push(v) };
+    return { ...pass, setViewport: (...v) => viewports.push(v), setScissorRect() {} };
   };
   const frame = (viewport) => {
     h.context.view = { id: String(viewport), camera: h.context.camera, viewport, index: 1, count: 2 };
@@ -605,4 +605,32 @@ test('the plain class holds none of the parts entry: the root stays free of pick
   for (const name of ['pick', 'setParent', 'getWorldMatrix', 'addParts', 'removeParts', 'drawShadow'])
     assert.equal(parts[name], undefined, name);
   assert.equal(new CulledParts(batches()) instanceof CulledInstances, true);
+});
+
+test('the main pass of CulledInstances and CulledParts draws inside the view rectangle and scissor', () => {
+  for (const Class of [CulledInstances, CulledParts]) {
+    const h = harness(),
+      calls = [],
+      begin = h.context.encoder.beginRenderPass;
+    h.context.encoder.beginRenderPass = (descriptor) => {
+      const pass = begin(descriptor);
+      pass.setViewport = (...args) => calls.push(['viewport', ...args]);
+      pass.setScissorRect = (...args) => calls.push(['scissor', ...args]);
+      const draw = pass.drawIndexedIndirect;
+      pass.drawIndexedIndirect = (...args) => {
+        calls.push(['draw']);
+        return draw(...args);
+      };
+      return pass;
+    };
+    h.context.view = { id: 'a', viewport: [8, 4, 32, 16], scissor: [10, 4, 16, 16] };
+    const parts = new Class(batches());
+    h.engine.use(parts);
+    h.run();
+    const first = calls.findIndex(([kind]) => kind === 'draw');
+    assert.ok(first >= 0, 'the batches are drawn');
+    assert.deepEqual(calls.slice(0, first), [['viewport', 8, 4, 32, 16, 0, 1], ['scissor', 10, 4, 16, 16]]);
+    parts.dispose();
+    h.cleanup();
+  }
 });

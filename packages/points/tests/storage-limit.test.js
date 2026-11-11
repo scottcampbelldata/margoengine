@@ -12,7 +12,7 @@ const frame = (Plugin, cloud, limit) => {
   const gpu = mockGPU();
   gpu.device.limits.maxStorageBufferBindingSize = limit;
   const plugin = new Plugin(),
-    engine = { backend: 'webgpu', gpu: gpu.device },
+    engine = { backend: 'webgpu', gpu: gpu.device, sceneOf() {} },
     camera = new Camera({ position: [0, 0, 8], target: [0, 0, 0] });
   camera.update(1, true);
   gpu.record(() => plugin.setup(engine));

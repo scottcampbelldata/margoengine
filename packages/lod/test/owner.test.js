@@ -111,3 +111,33 @@ test('LODSystem disposal detaches it and its pass from its own scene, so it can 
     engine.dispose();
   }
 });
+
+for (const [label, make] of [
+  ['LevelStream', async () => new (await import('../dist/stream.js')).LevelStream()],
+  ['LODFade', async () => new (await import('../dist/fade.js')).LODFade(new LODSystem())],
+]) {
+  test(`${label}.dispose() leaves its scene and keeps a same-named replacement`, async () => {
+    const engine = new Engine({ width: 64, height: 64 }, await TransformStore.create(64), {
+      backend: 'webgpu',
+      gpu: mockGPU().device,
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    });
+    try {
+      const scene = engine.createScene('lod');
+      const plugin = await make();
+      scene.use(plugin);
+      assert.equal(engine.sceneOf(plugin), scene);
+      plugin.dispose();
+      assert.equal(engine.sceneOf(plugin), undefined, 'dispose must remove the plugin and its frame graph passes');
+      const replacement = { name: plugin.name, setup() {} };
+      scene.use(replacement);
+      plugin.dispose();
+      assert.equal(scene.plugins.get(plugin.name), replacement, 'a second dispose must not remove a replacement');
+    } finally {
+      engine.dispose();
+    }
+  });
+}

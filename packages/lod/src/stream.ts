@@ -245,9 +245,12 @@ export class LevelStream implements EnginePlugin {
   }
   /** Ends every fetch and frees every level. */
   dispose(): void {
+    const engine = this.engine;
     for (const level of this.levels) this.reset(level);
     this.levels.clear();
     this.engine = undefined;
+    // engine.removePlugin calls dispose again, which finds nothing left to free.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

@@ -327,8 +327,11 @@ export class SurfelPlugin implements EnginePlugin {
   }
   /** Releases every GPU resource. Clouds stay registered, so the plugin can be used again. */
   dispose(): void {
+    const engine = this.engine;
     this.releaseGpu();
     this.engine = undefined;
+    // engine.removePlugin calls dispose again, which finds nothing left to free.
+    (engine as unknown as EngineKernel | undefined)?.sceneOf(this)?.removePlugin(this.name);
   }
   [Symbol.dispose](): void {
     this.dispose();

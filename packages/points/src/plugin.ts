@@ -474,9 +474,12 @@ export class PointsPlugin implements EnginePlugin {
 
   /** Releases every GPU resource. Clouds and batches stay registered, so the plugin can be used again. */
   dispose(): void {
+    const engine = this.engine;
     this.transparency.released?.();
     this.releaseGpu();
     this.engine = undefined;
+    // engine.removePlugin calls dispose again, which finds nothing left to free.
+    (engine as unknown as EngineKernel | undefined)?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

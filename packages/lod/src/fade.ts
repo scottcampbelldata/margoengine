@@ -316,6 +316,7 @@ export class LODFade implements EnginePlugin {
     this.buffer = undefined;
   }
   dispose(): void {
+    const engine = this.engine;
     this.finish();
     this.detach?.();
     this.detach = undefined;
@@ -329,6 +330,8 @@ export class LODFade implements EnginePlugin {
     for (const ghost of this.ghosts) ghost.dispose();
     this.ghosts.length = 0;
     this.engine = undefined;
+    // engine.removePlugin calls dispose again, which finds nothing left to free.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

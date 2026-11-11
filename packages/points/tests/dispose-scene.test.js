@@ -79,3 +79,32 @@ test("OctreeCloud.dispose removes it from its own scene, not the active scene's 
     h.cleanup();
   }
 });
+
+import { PointsPlugin } from '../dist/index.js';
+import { SurfelPlugin } from '../dist/surfels.js';
+
+for (const [label, make] of [
+  ['PointsPlugin', () => new PointsPlugin()],
+  ['SurfelPlugin', () => new SurfelPlugin()],
+]) {
+  test(`${label}.dispose() leaves its scene and passes, and a second call keeps a same-name replacement`, async () => {
+    const h = optionalGPU(),
+      engine = await realEngine(h);
+    try {
+      const scene = engine.createScene('other'),
+        plugin = make();
+      h.engine.gpu.createPipelineLayout ??= (d) => d;
+      scene.use(plugin);
+      assert.equal(engine.sceneOf(plugin), scene);
+      plugin.dispose();
+      assert.equal(engine.sceneOf(plugin), undefined, 'a disposed plugin left its pass in the frame graph');
+      const replacement = { name: plugin.name, setup() {} };
+      scene.use(replacement);
+      plugin.dispose();
+      assert.equal(scene.plugins.get(plugin.name), replacement, 'a second dispose removed the replacement');
+    } finally {
+      engine.dispose();
+      h.cleanup();
+    }
+  });
+}
