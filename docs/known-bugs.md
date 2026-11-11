@@ -3342,8 +3342,8 @@ RMSE 6.388144511474295, max 254, 40,875 differing pixels of 262,144. Compatibili
 Repro: scripts/reference-rendering/run.mjs under the shared GPU lock (see whitepaper reproduction).
 
 Known Margo causes to isolate: gltf-pro/src/shader.ts clamps perceptual roughness to 0.045 even for the
-sample's authored zero-roughness column, and packages/shared/light-terms.js uses separable single-scatter
-Smith G, without height correlation or multiple-scattering compensation. Appendix B.3.6 describes why
+sample's authored zero-roughness column, and its single-scatter Smith G has no multiple-scattering compensation
+(it was separable until 2026-11-11 and is height-correlated since, KB5875a). Appendix B.3.6 describes why
 these model choices can lose energy. The Sample Viewer is treated strictly as a black box: its exact model
 is not inferred from source. These are known limitations of Margo's formulation, not a quantified attribution
 of this entire picture error. The residual including the thin model text and silhouettes is not yet isolated;
@@ -3363,7 +3363,7 @@ Entire Khronos ClearCoatTest, 27 primitives, no IBL, identical camera and sun, 5
 All-pixel RGB MAE 1.6809107462565105 (WebGPU), 1.6809145609537761 (compatibility WebGL2),
 maximum byte error 180. Frozen result: whitepaper/results/batch-160-clearcoat.json.
 Cause of the complete residual is not yet isolated. Known formulation differences to investigate:
-Margo clamps clearcoat roughness to .045 and uses separable single-scatter Smith; its coat direct
+Margo clamps clearcoat roughness to .045 and uses single-scatter Smith (height-correlated since 2026-11-11); its coat direct
 Fresnel uses VdotH, while the extension's nonnormative layering example uses NdotV.
 None of these has been proved to explain the full image error. Base-material, texture-filtering,
 normal-map and silhouette errors are included, not removed by masking. No reference-specific
@@ -6032,11 +6032,26 @@ Cause: packages/core/src/camera.ts `fitToBoundingBox` raises the radius to `2 ne
 away) and never checks `distance - radius >= near` (which a wide angle breaks). Fix to build: fit the true radius, then
 move out (or lower `near`) only when `distance - radius < near`.
 
-### Note: core direct light follows the 2021 glTF Appendix B
+### Fixed 2026-11-11: core direct light used the separable Smith G of the 2021 glTF Appendix B (KB5875a)
 
-The shader uses the separable Smith G of the 2021 revision of glTF 2.0 Appendix B; the current revision gives the
-height-correlated form (Heitz 2014). The clean-room record now says which revision (P46). Moving to the
-height-correlated form changes WebGL, gltf-pro and core pixels together and is Scott's call.
+Core's WGSL direct light, its WebGL2 twin (`@margoengine/webgl2-compat` preview) and gltf-pro (base shader, the
+physical shader's coat lobe and the extended materials' isotropic path) multiplied two separate G1 terms, which counts a
+microfacet hidden from both the light and the eye twice and darkens rough surfaces at grazing angles. They now use the
+height-correlated G2 = 1 / (1 + Lambda(v) + Lambda(l)) of Heitz 2014 (JCGT 3(2), eq. 99), the form the current glTF
+Appendix B.3.2 gives (`smithGCorrelated` in `packages/shared/light-terms.js`). G2 is never below G1 G1; on the tests'
+grid the largest gain is over 25 percent (rough, grazing); at normal incidence both are 1. Core + stage 24,812 B to
+24,808 B gzip (the expression is shorter). Scott's 2026-11-11 core ruling. Regression: packages/core/tests/smith.test.js,
+packages/gltf-pro/tests/smith.test.js, packages/webgl2-compat/test/smith.test.js (each fails on the separable form).
+The other PBR shaders (clustered, materials, terrain, lod, animation, post decals, voxel) still write the separable
+`smithG` (next entry).
+
+### Open: clustered, materials and the other PBR shaders still use the separable Smith G (2026-11-11)
+
+Repro: `packages/shared/light-terms.js` `smithG` (and `ggxNamed`), used by clustered/src/shader.ts, materials,
+terrain, lod imposters, animation VAT, post material decals and voxel render. A clustered light on a core or gltf-pro
+material uses the separable G while the sun uses the height-correlated one, so the two lights shade the same surface
+with different masking. Cause: KB5875a moved only core, its WebGL2 twin and gltf-pro (the approved core row). Fix to
+build: switch `smithG` to the height-correlated form and re-record each package's proofs.
 
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 

@@ -1,7 +1,7 @@
 // Direct lighting is the glTF 2.0 metal-rough BRDF (specification Appendix B): GGX distribution (Walter et al. 2007),
-// separable Smith masking, Schlick Fresnel and Lambert diffuse. The display curve is Khronos PBR Neutral (the Khronos
-// Group's published specification), then the exact sRGB encoding (IEC 61966-2-1); packages/shared/display.js holds
-// the same curve for every other package. The curve sits above the vertex function: packages replace everything from
+// height-correlated Smith masking-shadowing (Heitz 2014, JCGT 3(2); shared/light-terms.js smithGCorrelated), Schlick
+// Fresnel and Lambert diffuse. The display curve is Khronos PBR Neutral (the Khronos Group's published specification),
+// then the exact sRGB encoding (IEC 61966-2-1); packages/shared/display.js holds the same curve for every other package. The curve sits above the vertex function: packages replace everything from
 // "@vertex fn vertex(" up to "@fragment" with their own vertex stage. Tests read the shader as this file's first
 // backtick-quoted text, so comments above it use none.
 // Optional shader hooks depend on these WGSL names and line breaks.
@@ -23,7 +23,7 @@ let facing=front==(i.material.w>0.0);if(!C&&!facing&&i.material.z<0.5){discard;}
 let n=normalize(i.normal)*select(-1.0,1.0,facing);let v=normalize(frame.eye.xyz-i.position);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
 let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
 let a=i.material.x*i.material.x;let a2=a*a;let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
-let g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
+let g=2.0*nl*nv/max(nl*sqrt(a2+(1.0-a2)*nv*nv)+nv*sqrt(a2+(1.0-a2)*nl*nl),0.0001);
 let f0=mix(vec3f(0.04),i.color,i.material.y);let f=f0+(1.0-f0)*pow(1.0-vh,5.0);
 let direct=((1.0-f)*(1.0-i.material.y)*i.color/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;
 let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb;

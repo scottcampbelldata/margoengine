@@ -1,3 +1,14 @@
+### Section 5 evidence: height-correlated Smith in core's direct light (2026-11-11)
+
+Core's WGSL direct light, its WebGL2 twin and gltf-pro (base, coat lobe, extended isotropic path) use the
+height-correlated Smith-GGX G2 = 1 / (1 + Lambda(v) + Lambda(l)) (Heitz 2014, JCGT 3(2), eq. 99; glTF 2.0 Appendix
+B.3.2, current revision) in place of the separable G1 G1 (KB5875a). Evidence: `packages/core/tests/smith.test.js`,
+`packages/gltf-pro/tests/smith.test.js` and `packages/webgl2-compat/test/smith.test.js` evaluate each shader's own
+text against Heitz's Lambda over 150 (nl, nv, roughness) points (1e-12); G2 is never below G1 G1 and gains over 25
+percent rough and grazing. gltf-pro's naming proof fixture follows the same line (re-recorded). Missing: clustered,
+materials and the other PBR shaders still write the separable `smithG` (docs/known-bugs.md, open); no
+multiple-scattering compensation in direct light.
+
 ### Section 5 evidence: allocation-free changed-row uploads (2026-11-11)
 
 Core's `uploadRows` walks a batch's dirty-row words 16 bits at a time through a `Uint16Array` view, so no V8 tier boxes

@@ -7,9 +7,10 @@ import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const baseline = await readFile(new URL('../tests/fixtures/pbr-before-naming.wgsl', import.meta.url), 'utf8');
+// Re-recorded 2026-11-11: the fixture's Smith line follows the base shader to the height-correlated G2 (KB5875a).
 assert.equal(
   createHash('sha256').update(baseline).digest('hex'),
-  '55d97b19f64633a459972ca528268598c48f5a751df47f598152ee110c446c86',
+  '4235a246514687df8cf4900004610daca0f66abec3a9a0142c1db542f6a72a68',
 );
 const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5198 }),
   errors = [];

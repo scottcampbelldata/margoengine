@@ -39,6 +39,19 @@ export const ggxDFloat = 'a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0))';
 export const smithG = '2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001)';
 /** {@link smithG} with float literals. */
 export const smithGFloat = '2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001)';
+/**
+ * Height-correlated Smith-GGX masking-shadowing, G2 = 1 / (1 + Lambda(v) + Lambda(l)) with the GGX Lambda, written
+ * `2 nl nv / (nl sqrt(a2 + (1 - a2) nv^2) + nv sqrt(a2 + (1 - a2) nl^2))`: Heitz 2014, "Understanding the
+ * Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), eq. 99 and section 6; the visibility form
+ * G2 / (4 nl nv) of glTF 2.0 Appendix B.3.2 (current revision) and Karis 2013 ("Real Shading in Unreal Engine 4"). It
+ * never darkens below the separable {@link smithG} (Heitz 2014, section 6.2: the separable form counts a microfacet
+ * hidden from both directions twice). Core's direct light, its WebGL2 twin and gltf-pro use it; the guard only stops 0/0
+ * at nl = a2 = 0.
+ */
+export const smithGCorrelated = '2*nl*nv/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),0.0001)';
+/** {@link smithGCorrelated} with float literals (core's WGSL and GLSL text). */
+export const smithGCorrelatedFloat =
+  '2.0*nl*nv/max(nl*sqrt(a2+(1.0-a2)*nv*nv)+nv*sqrt(a2+(1.0-a2)*nl*nl),0.0001)';
 /** GGX distribution denominator `nh^2 (a2 - 1) + 1` (float literals) over the name `nh` (default 'nh'). */
 export const ggxDenominator = (nh = 'nh') => `${nh}*${nh}*(a2-1.0)+1.0`;
 /** {@link ggxD} and {@link smithG} over other names, for shaders whose locals are prefixed. */

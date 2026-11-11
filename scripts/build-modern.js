@@ -290,7 +290,9 @@ for (const name of packages) {
 // 2026-11-11, Scott's approved bug-sweep core rows: KB6434a (an out-of-memory uncaptured error is reported once and
 // rebuilds the device instead of failing every later frame): core 22,145 -> 22,211 B (+66 B). Strict ceiling one byte
 // above it.
-const CORE_ONLY_CEILING = 22_212;
+// 2026-11-11, KB5875a (height-correlated Smith in core's direct light, a shorter expression): core 22,211 -> 22,207 B
+// (-4 B). Strict ceiling one byte above it.
+const CORE_ONLY_CEILING = 22_208;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();

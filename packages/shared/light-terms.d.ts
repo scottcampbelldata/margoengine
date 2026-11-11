@@ -11,6 +11,10 @@ export const ggxDFloat: string;
 export const smithG: string;
 /** {@link smithG} with float literals. */
 export const smithGFloat: string;
+/** Height-correlated Smith-GGX G2 (Heitz 2014, eq. 99) over a2, nv and nl. */
+export const smithGCorrelated: string;
+/** {@link smithGCorrelated} with float literals. */
+export const smithGCorrelatedFloat: string;
 /** GGX distribution denominator (float literals) over the name nh (default 'nh'). */
 export function ggxDenominator(nh?: string): string;
 /** [ggxD, smithG] over other names. */

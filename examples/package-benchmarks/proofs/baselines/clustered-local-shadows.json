@@ -2,11 +2,11 @@
  "proof": "clustered-local-shadows",
  "ref": "65098f33f",
  "revision": "65098f33fe3ed7f87f1ee014bf0745bb4cbcd334",
- "capturedAt": "47b04230b8c6565cf284cea64f4d6f13c4c2102e",
+ "capturedAt": "1fadf69478704b6b197527bd882dbfc3adb075fd",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "1x": "743eaf88e5cb6bba2d4857840639896050dfc7a65280393ba3f57191380a4e23",
-  "4x": "2a563ea12c6581b9f56e77ebfedf6bd1a7282e9eff524b4c76a91faca3bc8c67"
+  "1x": "62568529a4d21e0b85c5a37fd798a4b83bf1f08431c06c2e8e4685fe71d9cbef",
+  "4x": "10051360917e551163c2e9ab9578fe3d366428ed56786ebdee246dae2efe4f50"
  }
 }

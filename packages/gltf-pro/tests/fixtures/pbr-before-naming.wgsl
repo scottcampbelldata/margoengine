@@ -64,7 +64,7 @@ fn ambient(s:Surface)->vec3f {
   let s=surface(i,front); let v=normalize(f.eye.xyz-i.position); let l=normalize(f.light.xyz); let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=s.roughness*s.roughness; let a2=a*a; let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
-  let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
+  let g=2*nl*nv/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),0.0001);
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
   let direct=((1-fresnel)*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
   var color=direct+ambient(s)+s.emissive;

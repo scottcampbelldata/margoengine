@@ -1753,7 +1753,7 @@ carry the same citation as a one-line comment in the code.
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| P1 | Core / WebGL / gltf-pro direct light: GGX D, separable Smith G, Schlick F, Lambert | core/src/shaders.ts, webgl/src/index.ts, gltf-pro/src/shader.ts | glTF 2.0 spec Appendix B (B.3.2-B.3.5); Walter 2007 eq. 33/34; Schlick 1994 |
+| P1 | Core / WebGL2 / gltf-pro direct light: GGX D, height-correlated Smith G2 (separable until 2026-11-11, KB5875a), Schlick F, Lambert | core/src/shaders.ts, webgl2-compat/src/preview.ts, gltf-pro/src/shader.ts, shared/light-terms.js `smithGCorrelated` | glTF 2.0 spec Appendix B (B.3.2-B.3.5, current revision); Walter 2007 eq. 33; Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), eq. 72 and 99, https://jcgt.org/published/0003/02/03/; Karis 2013, "Real Shading in Unreal Engine 4" (SIGGRAPH course notes, the visibility form); Schlick 1994 |
 | P46 | Core display curve: Khronos PBR Neutral (F90 0.04, Ks 0.76, Kd 0.15, f = x - x^2 / (4 F90) below 2 F90), then the sRGB encoding | core/src/shaders.ts | **Read in full (batch 132 audit, 2026-11-10):** Khronos PBR Neutral specification (KhronosGroup/ToneMapping, PBR_Neutral/README.md, specification text only); glTF 2.0 Appendix B in its 2021 revision (separable Smith G, `c_diff = lerp(baseColor, black, metallic)`), which the code follows; the current revision of that appendix uses the height-correlated Smith G instead, so P1 cites the 2021 text. sRGB transfer constants (0.0031308, 12.92, 1.055, 2.4) checked against CSS Color 4 sample code; IEC 61966-2-1 itself not read (paywalled) |
 | P42 | Default ambient strength | core/src/engine.ts | Margo-own: Margo design choice |
 

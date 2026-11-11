@@ -91,10 +91,19 @@ export function anisotropicV(NdotL, NdotV, BdotV, TdotV, TdotL, BdotL, at, ab) {
 /** Isotropic GGX D with alpha = roughness^2 (glTF 2.0 Appendix B). */
 export const isotropicD = (NdotH, alpha) =>
   (alpha * alpha) / (Math.PI * (NdotH * NdotH * (alpha * alpha - 1) + 1) ** 2);
-/** Separable Smith visibility as gltf-pro's base shader evaluates it: G1(v) G1(l) / (4 NdotL NdotV). */
+/** Separable Smith visibility G1(v) G1(l) / (4 NdotL NdotV), the 2021 glTF Appendix B form (no shader uses it now). */
 export const separableV = (NdotL, NdotV, alpha) => {
   const a2 = alpha * alpha;
   return 1 / ((NdotV + Math.sqrt(a2 + (1 - a2) * NdotV * NdotV)) * (NdotL + Math.sqrt(a2 + (1 - a2) * NdotL * NdotL)));
+};
+/**
+ * Height-correlated Smith visibility G2 / (4 NdotL NdotV) = 0.5 / (NdotL sqrt(a2 + (1 - a2) NdotV^2) + NdotV sqrt(a2 +
+ * (1 - a2) NdotL^2)), as gltf-pro's isotropic direct light evaluates it: Heitz 2014, JCGT 3(2), eq. 99; glTF 2.0
+ * Appendix B.3.2 (current revision).
+ */
+export const correlatedV = (NdotL, NdotV, alpha) => {
+  const a2 = alpha * alpha;
+  return 0.5 / (NdotL * Math.sqrt(a2 + (1 - a2) * NdotV * NdotV) + NdotV * Math.sqrt(a2 + (1 - a2) * NdotL * NdotL));
 };
 
 /**
@@ -129,7 +138,7 @@ export function direct(s, v, l) {
     spec =
       anisotropicD(NdotH, dot(t, h), dot(b, h), at, alpha) *
       anisotropicV(NdotL, NdotV, dot(b, v), dot(t, v), dot(t, l), dot(b, l), at, alpha);
-  } else spec = isotropicD(NdotH, alpha) * separableV(NdotL, NdotV, alpha);
+  } else spec = isotropicD(NdotH, alpha) * correlatedV(NdotL, NdotV, alpha);
   const dt = s.diffuseTransmission ?? { factor: 0, color: [0, 0, 0] },
     back = Math.max(-dot(s.n, l), 0);
   return [0, 1, 2].map(

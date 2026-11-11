@@ -2,7 +2,7 @@
  "proof": "post-stack",
  "ref": "a738d815b",
  "revision": "a738d815bb8878d1acecc1f2da6c79b06265f0c5",
- "capturedAt": "a738d815bb8878d1acecc1f2da6c79b06265f0c5",
+ "capturedAt": "db8e1eba44bbbcd5016f2b05bf87465132faa5fb",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
   "a738d815b descends from eaddd64": false,
@@ -11,15 +11,15 @@
   "creative PostProcessing 4x: 5b1fe66^ -> 3319317 identical calls": 1840
  },
  "outputs": {
-  "post Bloom 1x": "5954d5bbf687711ce472d8f7f11b05061d1ebcfb93dc798deebedc39bfc447eb",
-  "post Bloom 4x": "0572b5e6b4729ba95651d8906ac3e02b48b3cfbeacc21d0638b4fc950a8583a4",
-  "post SSAO 1x": "47ca23af3026ef37150d4d6da90af5cc7f22d40f5277e75eda0e43565572dc0f",
-  "post SSAO 4x": "54fbb876d73399300ed4e571a7733ecb1c5f6bc6d66229447662843dc7bf9b9e",
-  "dof DOF 1x": "664162f8ce2ce06e80da1fd2b788c85db07303c9d37dfb1cb06810c06b73d47d",
-  "dof DOF 4x": "0b684c451c590a07232ad3e40f2177e450bcc540fe0bf5607ed6ea717ffc9549",
-  "tonemap Tonemap 1x": "37a1bd97042983f5c3587fab10075c71958015b8625cd207abe789b79039e74c",
-  "tonemap Tonemap 4x": "67391b228f4017e096e277abf60a6314393cf769d1e1b38492ee5b95d761be29",
-  "DOF -> Tonemap 1x": "b5ce1256edd3e33e86f901bf74aa50060f251d766b2c26a3af545aaa265b31b5",
-  "DOF -> Tonemap 4x": "8ba23b5189af2fa4e5bb72590b423c9894669d712bad11928ffb69d7a4476c5a"
+  "post Bloom 1x": "4078f67a0d0a09ee150cf8e6c260c76db12c41d0ac85214780f836dedcd559be",
+  "post Bloom 4x": "d18a04968dd99fdbae2d82e673d5cb7e0a4d5d7580ea42080852f3b42e73de49",
+  "post SSAO 1x": "a8e69367f0457893088fd9b27d5d1c21a9208d413917535e2369df9ccfb4cd8a",
+  "post SSAO 4x": "4c428916cb6b61151121f81f65415b2fb55eb32f177584cb6633300e16447c9a",
+  "dof DOF 1x": "791fddd0463126e050e0546705deb53d20597d12d1a38438456341e648d9d6c8",
+  "dof DOF 4x": "e019a239f20e3c21f3052d0fa28bbc9093cc9308c3bf25ac5e7e2d2c8ccb577c",
+  "tonemap Tonemap 1x": "1c7c21740fdd04bdd39843694e14e2fe7f25dad89900a42dadee39fdb9dd995a",
+  "tonemap Tonemap 4x": "e49ade4701714870e59ae482d1f99a1118f960b0633af36e2ee14415e7535b6d",
+  "DOF -> Tonemap 1x": "f85c937ace782fdbf64b0215add35caf0965d50255109641d4644830d368cb56",
+  "DOF -> Tonemap 4x": "aa84c0568340bc983d12f57635015fdff57559a747cd3d8d9dbaccee5bee7fbf"
  }
 }

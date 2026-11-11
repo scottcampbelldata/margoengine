@@ -15,9 +15,12 @@ test('named base lighting keeps all prior resources and optional lighting splice
     '\r\n',
     '\n',
   );
+  // The fixture is the base shader as it was before the naming review, with one later change: its Smith line moved to
+  // the height-correlated G2 with the base shader on 2026-11-11 (KB5875a, Heitz 2014), so the naming proof still
+  // compares like with like. Before that the hash was 55d97b19f64633a459972ca528268598c48f5a751df47f598152ee110c446c86.
   assert.equal(
     createHash('sha256').update(before).digest('hex'),
-    '55d97b19f64633a459972ca528268598c48f5a751df47f598152ee110c446c86',
+    '4235a246514687df8cf4900004610daca0f66abec3a9a0142c1db542f6a72a68',
   );
   assert.match(pbrShader, /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f/);
   assert.match(pbrShader, /let direct=direct_light\(s,v,l\)/);

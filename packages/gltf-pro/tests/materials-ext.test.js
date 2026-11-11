@@ -20,6 +20,7 @@ import {
   isotropicD,
   iridescentFresnel,
   sensitivity,
+  correlatedV,
   separableV,
   vec,
 } from '../../../tests/support/khr-brdf.js';
@@ -256,7 +257,7 @@ test('CPU reference: anisotropic GGX reduces to isotropic GGX at strength 0 and 
     near(sum, 1, 0.01, `integral ${at}/${ab}`);
   }
   // Height-correlated visibility at strength 0 is the isotropic height-correlated Smith term 0.5 / (NL sqrt(NV^2 (1 - a^2) + a^2)
-  // + NV sqrt(NL^2 (1 - a^2) + a^2)); gltf-pro's isotropic path keeps its separable form, equal at normal incidence.
+  // + NV sqrt(NL^2 (1 - a^2) + a^2)), the form gltf-pro's isotropic path uses since 2026-11-11 (correlatedV).
   const v = vec.normalize([0.3, 0.5, 0.4]),
     l = vec.normalize([-0.2, 0.1, 0.7]),
     nv = vec.dot(n, v),
@@ -270,7 +271,10 @@ test('CPU reference: anisotropic GGX reduces to isotropic GGX at strength 0 and 
       1e-9,
       `V ${alpha}`,
     );
+    near(correlatedV(nl, nv, alpha), iso, 1e-12, `isotropic V ${alpha}`);
+    assert.ok(iso >= separableV(nl, nv, alpha), `height-correlated V is never below the separable one (${alpha})`);
   }
+  near(correlatedV(1, 1, 0.3), 0.25, 1e-12, 'height-correlated V at normal incidence');
   near(separableV(1, 1, 0.3), 0.25, 1e-12, 'separable V at normal incidence');
 });
 
