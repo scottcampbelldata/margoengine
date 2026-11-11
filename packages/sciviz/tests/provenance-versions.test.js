@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, readFile, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, copyFile, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 test('build version generation preserves an equivalent CRLF checkout without dirtying it', async () => {
   const root = resolve(`test-results/sciviz-provenance/versions-${process.pid}`);
+  // A reused process id must not find an earlier run's output: the first run would then keep its CRLF file.
+  await rm(root, { recursive: true, force: true });
   const scripts = resolve(root, 'sciviz/scripts'),
     source = resolve(root, 'sciviz/src');
   await mkdir(scripts, { recursive: true });
