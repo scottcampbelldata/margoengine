@@ -735,6 +735,7 @@ interface VolumeClassification {
     readonly gradientMax?: number;
     readonly step?: number;
     readonly density?: number;
+    readonly range?: readonly [number, number];
 }
 
 class VolumeLayer implements Drawable {

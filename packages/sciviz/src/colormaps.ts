@@ -456,14 +456,15 @@ export class Colormap {
 
   /**
    * `n` evenly spaced RGBA colours, 4 floats each (alpha 1): sRGB-encoded by default, or linear light with
-   * `linear: true` (what shaders that blend and light want).
+   * `linear: true` (what shaders that blend and light want). Entry k is the colour at k / (n - 1) for every kind,
+   * the placement the GPU lookup reads; a cyclic table's last entry repeats its first, so a wrapped read is seamless.
    */
   table(n = 256, options: { readonly linear?: boolean } = {}): Float32Array {
     if (!Number.isInteger(n) || n < 2)
       throw rangeError(`Colormap table size must be a whole number of at least 2, got ${n}`, 'sciviz');
     const out = new Float32Array(n * 4);
     for (let k = 0; k < n; k++) {
-      const rgb = this.sample(this.kind === 'cyclic' ? k / n : k / (n - 1));
+      const rgb = this.sample(k / (n - 1));
       for (let c = 0; c < 3; c++) out[k * 4 + c] = options.linear ? decodeSRGB(rgb[c]) : rgb[c];
       out[k * 4 + 3] = 1;
     }

@@ -84,6 +84,7 @@ export function preintegrateTransfer(tf: TransferFunction, options?: {
     readonly samples?: number;
     readonly step?: number;
     readonly density?: number;
+    readonly range?: readonly [number, number];
     readonly signal?: AbortSignal;
 }): Promise<VolumeClassification>;
 
@@ -264,6 +265,7 @@ interface VolumeClassification {
     readonly gradientMax?: number;
     readonly step?: number;
     readonly density?: number;
+    readonly range?: readonly [number, number];
 }
 
 class VolumeLayer implements Drawable {

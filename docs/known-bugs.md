@@ -583,12 +583,20 @@ so they wait for the fix phase. Line numbers are at the audit commit.
   4-row table.
 - **Jittered preintegration spans the wrong length.** `volume-quality-shader.ts` takes front at t + ds jitter and back
   at t + ds but applies opacity for the full ds; back should be front + ds.
-- **Preintegration uses the transfer function's range, not the layer's.** `transfer.ts` builds the table over
-  tf.state.range while the shader normalises by the layer range; `bindTransfer` uses layer.range.
 - **Multivolume culls back faces and ignores scene depth.** `multivolume.ts` always uses cullMode 'back' (nothing draws
   with the camera inside the box) and never clips rays against opaque geometry, unlike `volume.ts`.
-- **Cyclic tables are read half an entry off.** `colormaps.ts` places entries at k / 256 and `color-lookup.ts` reads
-  t 255, so the GPU shows sample(t 255 / 256).
+
+### Fixed 2026-11-11: sciviz preintegration range and cyclic table placement (batch 132 audit)
+
+- **Preintegration used the transfer function's range, not the layer's.** `preintegrateTransfer` built its table over
+  tf.state.range while the shader reads values normalised to the layer range. It now takes `range` (default the
+  function's range), records it on the table, and `VolumeLayer.setClassification` refuses a preintegrated table whose
+  recorded range differs from the layer's, naming the fix. Regression: packages/sciviz/tests/transfer.test.js
+  (range case) and packages/sciviz/tests/transfer-browser.mjs (refusal on both backends).
+- **Cyclic tables were read half an entry off.** `Colormap.table` placed cyclic entries at k / n while the GPU lookup
+  reads entry t (n - 1). Every kind now places entry k at k / (n - 1) (a cyclic table's last entry repeats its first,
+  so a wrapped read is seamless), and the portable figure format restores tables the same way. Regression:
+  packages/sciviz/tests/colormaps.test.js (cyclic lookup case).
 
 ### Open from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
 
@@ -5057,7 +5065,7 @@ packages/inspector/test/gizmo.test.js fails without it and proves both the owner
 cleanup and the default inspector's survival.
 
 
-Batch 171 job 6, small fix-phase follow-up under rule 22: clearing the optional demo UTC datetime input passes an invalid Date from its change handler to globe.setDate, which correctly rejects but leaves the event unhandled. Repro: clear Sun (UTC) in examples/sciviz-atmosphere.html. Cause: the demo does not validate the empty datetime value before calling the typed solar API. The default valid date, API input checks and complete globe feature pass.
+Fixed 2026-11-11 (batch 171 job 6 follow-up): clearing the demo's Sun (UTC) datetime input passed an invalid Date to globe.setDate, which rejects it, leaving the event unhandled. The demo now keeps the last valid time and says so in its status line. Regression: packages/sciviz/tests/atmosphere-browser.mjs (clears the input on both backends; no page error).
 
 Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
 

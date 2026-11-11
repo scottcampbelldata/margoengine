@@ -12,6 +12,10 @@ for(const compat of [false,true]){
   await page.waitForFunction(()=>document.querySelector('canvas')?.dataset.ready==='true'||document.querySelector('canvas')?.dataset.error);
   assert.equal(await page.locator('canvas').getAttribute('data-error'),null,await page.locator('#status').textContent());
   await page.locator('canvas').screenshot({path:`test-results/sciviz-atmosphere/${compat?'compat':'native'}.png`});
+  await page.evaluate(()=>{const input=document.querySelector('#time');input.value='';input.dispatchEvent(new Event('change'));});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0))));
+  assert.deepEqual(errors,[],'clearing the Sun (UTC) input keeps the last valid time without an unhandled error');
+  assert.match(await page.locator('#status').textContent(),/Pick a UTC date and time/);
   const result=await page.evaluate(async()=>{
    const {figure,globe}=await import('/examples/sciviz-atmosphere.ts');
    const {particles,scalar,points}=globalThis.atmosphereDemo;

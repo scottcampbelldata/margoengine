@@ -100,7 +100,17 @@ for (const compat of [false, true]) {
           { value: 1, rgba: [1, 0, 0, 0.04] },
         ],
       });
-      constant.setClassification(await preintegrateTransfer(one, { step: 0.5, resolution: 32, samples: 32 }));
+      // A preintegrated table built over another range than the layer's is refused, not drawn shifted (KB0507g).
+      const otherRange = await preintegrateTransfer(one, { range: [0, 2], resolution: 8, samples: 8 });
+      let rangeRefusal = '';
+      try {
+        constant.setClassification(otherRange);
+      } catch (error) {
+        rangeRefusal = error.message;
+      }
+      if (!/build it with preintegrateTransfer\(tf, \{ range: layer.range \}\)/.test(rangeRefusal))
+        throw new Error(`a preintegrated table over [0, 2] on a [0, 1] volume was not refused: ${rangeRefusal}`);
+      constant.setClassification(await preintegrateTransfer(one, { step: 0.5, resolution: 32, samples: 32, range: constant.range }));
       const pre = await pixels(fig);
       const temporary = bindTransfer(constant, tf, { resolution: 32 });
       const replaced = await pixels(fig);

@@ -27,7 +27,7 @@ const tf = new TransferFunction({ range: [0,1], gradientMax: 2, points: [
 ] });
 using binding = bindTransfer(volume, tf, { render: () => figure.engine.render() });
 const histogram = await transferHistogram(data, { dims: [2,2,2], range: [0,1] });
-const table = await preintegrateTransfer(tf, { resolution: 16, samples: 16 });
+const table = await preintegrateTransfer(tf, { resolution: 16, samples: 16, range: volume.range });
 console.log(histogram.valid, table);
 await figure.ready();
 figure.engine.render();
@@ -40,6 +40,9 @@ are reported, aggregated when necessary. `getClassification()` returns an owned
 snapshot. Preintegration defaults to resolution 128, 128 midpoint samples, step 1
 reference voxel and density 1; match step/density to the consumer. It integrates a
 linear scalar segment, not arbitrary within-segment gradients or changing density.
+The table spans `range` (default the function's range) and records it; pass the
+layer's `range`, because `setClassification` refuses a preintegrated table that
+spans another range (the shader reads values normalised to the layer range).
 
 ## Categorical and component fusion
 

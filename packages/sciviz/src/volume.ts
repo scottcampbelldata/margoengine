@@ -83,6 +83,11 @@ export interface VolumeClassification {
   readonly step?: number;
   /** Density baked into preintegration. Default 1. */
   readonly density?: number;
+  /**
+   * Scalar range the table's value axes span. A preintegrated table must span the layer's `range` (the shader reads
+   * it with values normalised to that range); one built over another range is refused. Default the layer's range.
+   */
+  readonly range?: readonly [number, number];
 }
 
 const classifyWGSL = /* wgsl */ `${colorLookupWGSL}
@@ -578,6 +583,11 @@ export class VolumeLayer implements Drawable {
       )
         throw rangeError(
           'Classification needs a positive gradientMax, step and density; correct the table metadata',
+          'sciviz',
+        );
+      if (kind === 'preintegrated' && value.range && (value.range[0] !== this.range[0] || value.range[1] !== this.range[1]))
+        throw rangeError(
+          `Preintegrated table spans [${value.range.join(', ')}] but the volume range is [${this.range.join(', ')}]; build it with preintegrateTransfer(tf, { range: layer.range })`,
           'sciviz',
         );
       this.#classification = { ...value, size: [...size], rgba: new Uint8Array(rgba) };

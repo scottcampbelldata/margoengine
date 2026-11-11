@@ -387,3 +387,19 @@ test('binding disposal and abort restore owned gradient and preintegrated classi
     }
   }
 });
+test('preintegration spans the range it is asked for and records it (KB0507g)', async () => {
+  const tf = new TransferFunction({
+    ...state,
+    points: [
+      { value: 0, rgba: [1, 0, 0, 0.5] },
+      { value: 1, rgba: [0, 0, 1, 0.5] },
+    ],
+  });
+  const table = await preintegrateTransfer(tf, { resolution: 3, samples: 16, range: [0, 2] });
+  assert.deepEqual(table.range, [0, 2]);
+  // Entry (1, 1) is the constant segment at value 1 of [0, 2]: pure blue. Over the function's own range it was 0.5.
+  const i = (1 * 3 + 1) * 4;
+  assert.deepEqual([table.rgba[i], table.rgba[i + 1], table.rgba[i + 2]], [0, 0, 255]);
+  assert.deepEqual((await preintegrateTransfer(tf, { resolution: 3, samples: 16 })).range, [0, 1]);
+  await assert.rejects(preintegrateTransfer(tf, { range: [1, 1] }));
+});

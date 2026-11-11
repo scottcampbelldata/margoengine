@@ -207,10 +207,13 @@ export async function preintegrateTransfer(
     /** Midpoint quadrature samples per segment. Default 128, 8..2048. */ readonly samples?: number;
     /** Segment length in reference voxels. Default 1. */ readonly step?: number;
     /** Optical density. Default 1. */ readonly density?: number;
+    /** Scalar range the table spans; pass the layer's `range`. Default the function's range. */
+    readonly range?: readonly [number, number];
     /** Cancels generation with the exact reason. */ readonly signal?: AbortSignal;
   } = {},
 ): Promise<VolumeClassification> {
   const s = tf.state,
+    range = options.range ?? s.range,
     n = options.resolution ?? 128,
     samples = options.samples ?? 128,
     step = options.step ?? 1,
@@ -223,10 +226,13 @@ export async function preintegrateTransfer(
     samples > 2048 ||
     !finite([step, density]) ||
     step <= 0 ||
-    density <= 0
+    density <= 0 ||
+    range.length !== 2 ||
+    !finite(range) ||
+    !(range[1] > range[0])
   )
     throw rangeError(
-      'Preintegration needs a 1D function, 8..2048 samples and positive step/density; correct the options',
+      'Preintegration needs a 1D function, 8..2048 samples, positive step/density and an increasing finite range; correct the options',
       'sciviz',
     );
   const rgba = new Uint8Array(n * n * 4);
@@ -236,7 +242,7 @@ export async function preintegrateTransfer(
       const out = [0, 0, 0, 0];
       for (let j = 0; j < samples; j++) {
         const t = (j + 0.5) / samples,
-          v = s.range[0] + ((x + (y - x) * t) / (n - 1)) * (s.range[1] - s.range[0]),
+          v = range[0] + ((x + (y - x) * t) / (n - 1)) * (range[1] - range[0]),
           c = evaluate(s, v, 0);
         const a = (1 - out[3]) * -Math.expm1((Math.log1p(-c[3]) * step * density) / samples);
         for (let k = 0; k < 3; k++) out[k] += a * c[k];
@@ -248,7 +254,7 @@ export async function preintegrateTransfer(
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
   options.signal?.throwIfAborted();
-  return { kind: 'preintegrated', size: [n, n], rgba, step, density };
+  return { kind: 'preintegrated', size: [n, n], rgba, step, density, range: [range[0], range[1]] };
 }
 
 /** Joint value/gradient histogram with physical units, x fastest. */

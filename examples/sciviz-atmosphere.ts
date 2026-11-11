@@ -27,7 +27,7 @@ try{
  const points=globe.points([-70,40,100000,-40,50,100000,-10,30,100000],[1,2,3],{radius:80000,range:[0,4]});
  let busy=false;
  element('next').addEventListener('click',()=>{if(busy)return;busy=true;void particles.advance(Math.min(7*day,particles.time+day/4),{step:600,signal}).then(()=>{element('status').textContent=`Wind data time ${new Date(Date.UTC(2024,0,1)+particles.time*1000).toISOString()}`;}).catch(fail).finally(()=>{busy=false;});});
- element<HTMLInputElement>('time').addEventListener('change',event=>{const value=(event.target as HTMLInputElement).value;globe.setDate(new Date(value+'Z'));});
+ element<HTMLInputElement>('time').addEventListener('change',event=>{const value=(event.target as HTMLInputElement).value,date=new Date(value+'Z');if(!value||Number.isNaN(date.getTime())){element('status').textContent='Pick a UTC date and time to place the Sun; the globe keeps the last valid time.';return;}globe.setDate(date);});
  element<HTMLInputElement>('scalar').addEventListener('change',event=>{scalar.visible=(event.target as HTMLInputElement).checked;});
  element<HTMLInputElement>('points').addEventListener('change',event=>{points.visible=(event.target as HTMLInputElement).checked;});
  await figure.ready();

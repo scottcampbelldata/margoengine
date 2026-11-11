@@ -620,6 +620,7 @@ export interface VolumeClassification {
     readonly gradientMax?: number;
     readonly step?: number;
     readonly density?: number;
+    readonly range?: readonly [number, number];
 }
 
 export class VolumeLayer implements Drawable {

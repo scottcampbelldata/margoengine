@@ -216,3 +216,19 @@ test('standard maps interpolate before float32 conversion, including reversed an
     }
   }
 });
+
+test('a cyclic table is read where it was written: the GPU lookup x = t (n - 1) returns sample(t) (KB0507i)', () => {
+  const phase = colormap('phase'),
+    n = 256,
+    table = phase.table(n);
+  // The encoded GPU lookup (color-lookup.ts) wraps t and reads entry x = t (n - 1), linear between entries.
+  const read = (t) => {
+    const x = (t - Math.floor(t)) * (n - 1),
+      i = Math.min(n - 2, Math.floor(x)),
+      f = x - i;
+    return [0, 1, 2].map((c) => table[i * 4 + c] * (1 - f) + table[(i + 1) * 4 + c] * f);
+  };
+  for (const k of [0, 1, 64, 128, 200, 254, 255])
+    phase.sample(k / (n - 1)).forEach((v, c) => assert.ok(Math.abs(read(k / (n - 1))[c] - v) < 1e-6, `entry ${k}`));
+  for (let c = 0; c < 3; c++) assert.ok(Math.abs(table[c] - table[(n - 1) * 4 + c]) < 1e-6, 'the wrapped ends meet');
+});

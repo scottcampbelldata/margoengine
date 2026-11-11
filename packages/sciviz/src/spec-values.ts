@@ -398,7 +398,7 @@ export class ValueIO {
       if (!(table instanceof Float32Array) || table.length !== 1024)
         throw typeError('Invalid colormap table; supply 256 RGBA samples', 'sciviz');
       const base = new Colormap(v.$colormap as string, v.kind as 'sequential', (t) => {
-        const x = Math.min(255, Math.max(0, t * (v.kind === 'cyclic' ? 256 : 255))),
+        const x = Math.min(255, Math.max(0, (v.kind === 'cyclic' ? t - Math.floor(t) : t) * 255)),
           i = Math.min(254, Math.floor(x)),
           f = x - i;
         return [0, 1, 2].map((c) => table[i * 4 + c] * (1 - f) + table[(i + 1) * 4 + c] * f) as [
