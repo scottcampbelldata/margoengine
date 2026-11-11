@@ -126,3 +126,45 @@ test('a readback that fails on a live device is still reported', async () => {
     engine.dispose();
   }
 });
+
+test('an environment disposed while it rebuilds releases the rebuild at dispose and reports nothing', async () => {
+  const first = device(),
+    renderer = { backend: 'webgpu', gpu: first, dispose() {} },
+    engine = new Engine({ width: 16, height: 16 }, await TransformStore.create(4), renderer, {}, null),
+    errors = [];
+  engine.onError = (error) => errors.push(error);
+  try {
+    const attaching = Environment.attach(engine, image, { size: 16 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    first.finish();
+    const environment = await attaching;
+    // Every buffer and texture the rebuild makes on the next device, and whether it is destroyed yet.
+    const second = device(),
+      live = new Set();
+    for (const name of ['createBuffer', 'createTexture']) {
+      const create = second[name];
+      second[name] = (descriptor) => {
+        const resource = create(descriptor),
+          destroy = resource.destroy;
+        live.add(resource);
+        resource.destroy = () => {
+          live.delete(resource);
+          destroy.call(resource);
+        };
+        return resource;
+      };
+    }
+    renderer.gpu = second;
+    environment.onDeviceRestored(engine);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.ok(live.size > 0, 'the rebuild holds GPU resources while its readback waits');
+    environment.dispose();
+    assert.equal(live.size, 0, 'dispose released every resource of the running rebuild');
+    second.finish();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.equal(live.size, 0);
+    assert.deepEqual(errors, [], 'the abandoned rebuild reached engine.onError');
+  } finally {
+    engine.dispose();
+  }
+});

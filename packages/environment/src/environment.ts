@@ -281,7 +281,10 @@ async function guarded(device: GPUDevice, encode: () => void): Promise<void> {
     );
 }
 
+const abandoned = () => new MargoError('disposed', 'Environment is disposed; create a new Environment');
+
 // `reuse`: process into these resources (same settings) instead of new ones; the BRDF LUT is kept.
+// `signal`: aborting it (the owner was disposed) releases everything the build holds at once, not when its GPU work ends.
 async function build(
   device: GPUDevice,
   source: EnvironmentSource,
@@ -289,8 +292,20 @@ async function build(
   rotation: number,
   intensity: number,
   reuse?: Resources,
+  signal?: AbortSignal,
 ): Promise<Resources> {
   const created: Array<GPUTexture | GPUBuffer> = [];
+  let lut: SharedLut | undefined, released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    for (const resource of created) resource.destroy();
+    if (lut && !reuse) dropLut(device, lut);
+  };
+  const live = () => {
+    if (signal?.aborted) throw abandoned();
+  };
+  signal?.addEventListener('abort', release, { once: true });
   const track = <T extends GPUTexture | GPUBuffer>(resource: T): T => {
     created.push(resource);
     return resource;
@@ -334,7 +349,6 @@ async function build(
   let cube!: GPUTexture,
     specular!: GPUTexture,
     brdf!: GPUBuffer,
-    lut: SharedLut | undefined,
     sh!: GPUBuffer,
     params!: GPUBuffer,
     sampler!: GPUSampler,
@@ -343,6 +357,7 @@ async function build(
   let radianceScale = 1;
   const temporary: GPUBuffer[] = [];
   try {
+    live();
     // Phase 1: upload and build the source cube with its mip chain.
     await guarded(device, () => {
       if (reuse) ({ sampler, cube, specular, brdf, lut, sh, params } = reuse);
@@ -471,6 +486,7 @@ async function build(
       device.queue.submit([encoder.finish()]);
     });
     // Phase 2: prefiltered specular, SH and the BRDF LUT.
+    live();
     await guarded(device, () => {
       const encoder = device.createCommandEncoder({ label: 'environment lighting' });
       cubeView = cube.createView({ dimension: 'cube' });
@@ -579,7 +595,9 @@ async function build(
       encoder.copyBufferToBuffer(sh, 0, readback, 0, 512);
       device.queue.submit([encoder.finish()]);
     });
+    live();
     await readback.mapAsync(GPUMapMode.READ);
+    live();
     const values = new Float32Array(readback.getMappedRange().slice(0));
     readback.unmap();
     readback.destroy();
@@ -625,14 +643,16 @@ async function build(
       radianceScale,
     };
   } catch (error) {
-    for (const resource of created) resource.destroy();
-    // The fill may be what failed, so nothing joins this LUT again; an environment already holding it keeps it.
-    if (lut && !reuse) {
+    // The fill may be what failed, so nothing joins this LUT again; an environment already holding it keeps it. An
+    // abandoned build submitted its fill, so the LUT stays shared.
+    if (lut && !reuse && !released) {
       const pool = sharedLuts.get(device);
       if (pool?.get(lut.key) === lut) pool.delete(lut.key);
-      dropLut(device, lut);
     }
-    throw error;
+    release();
+    throw signal?.aborted ? abandoned() : error;
+  } finally {
+    signal?.removeEventListener('abort', release);
   }
 }
 
@@ -663,6 +683,8 @@ export class Environment implements EnginePlugin {
   private source?: EnvironmentSource;
   private restoring?: { device: GPUDevice; promise: Promise<void> };
   private refreshing?: Promise<void>;
+  // Aborted by dispose: a rebuild or refresh still running releases its resources then, not when its GPU work ends.
+  private readonly lifetime = new AbortController();
   protected readonly listeners = new Set<(environment: Environment) => void>();
   private rotationValue: number;
   private intensityValue: number;
@@ -892,7 +914,15 @@ export class Environment implements EnginePlugin {
       );
     destroy(this.resources);
     this.resources = undefined;
-    const promise = build(device, this.source, this.settings, this.rotationValue, this.intensityValue).then(
+    const promise = build(
+      device,
+      this.source,
+      this.settings,
+      this.rotationValue,
+      this.intensityValue,
+      undefined,
+      this.lifetime.signal,
+    ).then(
       (resources) => {
         if (this.disposed || this.restoring?.promise !== promise) {
           destroy(resources);
@@ -905,6 +935,8 @@ export class Environment implements EnginePlugin {
         for (const listener of this.listeners) listener(this);
       },
       async (error) => {
+        // Disposed mid-rebuild: everything was released at dispose and nobody waits for this environment.
+        if (this.lifetime.signal.aborted) return;
         if (this.restoring?.promise === promise) this.restoring = undefined;
         // A device lost during the rebuild rejects its readback. On a lost device the queue's work counts as done at
         // the loss, so once it is, the lost promise has settled too.
@@ -944,6 +976,7 @@ export class Environment implements EnginePlugin {
         this.rotationValue,
         this.intensityValue,
         resources,
+        this.lifetime.signal,
       )
         .then(() => undefined)
         .finally(() => {
@@ -975,6 +1008,7 @@ export class Environment implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.lifetime.abort();
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     destroy(this.resources);
