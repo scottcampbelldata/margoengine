@@ -5025,7 +5025,7 @@ No open defect from the globe suite. Radial altitude, perspective/reference-elli
 Batch 251 job 1: no open defect found in reference expansion; missing registrations,
 cycles and bounded expansion reject during construction (subtrees.test.js).
 
-Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+Closed 2026-11-11 (KB4915, sweep L2): the cause was the capture read fixed by the batch 206 entry below (the rigged frame was read before the compatibility queue replayed its commands); on main 00ffed75f3, Edge 157, RTX A6000, `node scripts/modern-usdz-tests.js --compat` passed 3 of 3 runs and native WebGPU 1 of 1 with no GPU errors, and that three-pose check is its regression test. Original entry: Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
 
 Lane G current-main repro update (2026-11-10): the unchanged RiggedFigure portion,
 isolated from the demo and other cases, now returns moved true, repeats true and
