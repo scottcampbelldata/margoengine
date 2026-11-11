@@ -5723,6 +5723,7 @@ The camera rig is built with direct CPU trace and GPU overlay regressions. No op
 
 Fixed 2026-11-10: Outside batch 244. Current complete GPU plan passes browser registration and chain validation; original repairs: 326c67544, d7be06653, f235e21f0. Regression: tests/gpu-browser-registration.test.js and tests/modern-extension-suite.test.js.
 
+- Fixed 2026-11-11: package-lock.json went stale on main when 29b4a5cea added an optional `@margoengine/compute` peer to packages/audio without the lock (a fresh `npm install` rewrote the lock; relocked in 991322178c). The lock check lived only in a test that the fast gate does not run, so hygiene now calls `assertLockInSync` (scripts/support/lock-sync.mjs), which also compares optional peer flags and workspaces missing from the lock; regression: `tests/package-lock-sync.test.js`.
 - Fixed 2026-11-11: conflict markers in known-bugs.md and whitepaper/reproduce.md (seen on origin/main 42c1cbdac) were removed in 3f71b2d491, and 856e8f21da makes hygiene reject tracked conflict markers; regression: `tests/hygiene-conflict-markers.test.js`.
 Batch 212 analyser: repaired bus insertion deleting internal output taps and shared-document merge markers, both covered by regression tests. No open tested defect.
 ### Fixed 2026-11-11: Firefox worker matrix failed to spawn (UNKNOWN)

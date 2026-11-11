@@ -39,6 +39,7 @@ import { entries as errorHelp } from './errors/entries.js';
 import { plan as gpuPlan } from './gpu-package-tests.mjs';
 import { assertCitedResultsTracked } from './support/cited-results.mjs';
 import { assertNoConflictMarkers } from './support/conflict-markers.mjs';
+import { assertLockInSync } from './support/lock-sync.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
 import { countMissingHelp, countNoFix } from './support/throw-messages.js';
 import { isUmbrellaAlias } from './umbrella.mjs';
@@ -48,6 +49,8 @@ const root = resolve(import.meta.dirname, '..');
 // This safety check is fatal even while the scored gates remain in warn mode.
 assertNoConflictMarkers(root);
 assertValidTrackedManifests(root);
+// package-lock.json must match every workspace's package.json (scripts/support/lock-sync.mjs).
+assertLockInSync(root);
 assertCitedResultsTracked(root);
 // Every committed Wasm blueprint must match the crate sources it was built from (scripts/wasm-blueprints.mjs).
 assertWasmBlueprintsCurrent(root);
