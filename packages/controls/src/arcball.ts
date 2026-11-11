@@ -1,6 +1,6 @@
 import type { Camera, EngineKernel } from '@margoengine/core';
 import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
-import { EPS, madd, rotateAxis, type V3 } from './math.js';
+import { dollyFactor, EPS, finiteInput, madd, rotateAxis, type V3 } from './math.js';
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import { basis, intersectPlane, ray, type Basis } from './view.js';
 export { Controls };
@@ -264,6 +264,7 @@ export class ArcballControls extends Controls {
 
   /** Turns the camera about the world `axis` through the target by `angle` radians (right-handed). */
   rotate(axis: readonly number[], angle: number): void {
+    finiteInput('Arcball turn axis and angle', axis[0], axis[1], axis[2], angle);
     const length = Math.hypot(axis[0], axis[1], axis[2]);
     if (!length || !angle) return;
     // Compose with the pending turn: q = q(axis, angle) * q(spinAxis, spinAngle).
@@ -280,6 +281,7 @@ export class ArcballControls extends Controls {
   }
   /** Pans by a screen delta in CSS pixels; the scene follows the pointer. */
   pan(deltaX: number, deltaY: number): void {
+    finiteInput('Arcball pan delta', deltaX, deltaY);
     const b = this.frame(),
       perPixel = (2 * (b.ortho ?? b.distance * b.tanHalf)) / this.size()[1],
       sx = -deltaX * perPixel,
@@ -288,11 +290,13 @@ export class ArcballControls extends Controls {
   }
   /** Multiplies the pending distance (or orthographic size) scale by `factor`, about the view centre (below 1 moves closer). */
   dollyIn(factor: number): void {
+    dollyFactor(factor);
     this.cursor = null;
     this.logScale += Math.log(factor);
   }
   /** Divides the pending distance (or orthographic size) scale by `factor`, about the view centre. */
   dollyOut(factor: number): void {
+    dollyFactor(factor);
     this.cursor = null;
     this.logScale -= Math.log(factor);
   }
@@ -598,7 +602,8 @@ export class ArcballControls extends Controls {
       b = this.frame(),
       [width, height] = this.size(),
       point =
-        this.pick?.(at.x, at.y) ?? intersectPlane(ray(b, at.x, at.y, width, height), [...this.camera.target] as V3, b.forward);
+        this.pick?.(at.x, at.y) ??
+        intersectPlane(ray(b, at.x, at.y, width, height), [...this.camera.target] as V3, b.forward);
     if (!point) return;
     event.preventDefault();
     this.focus(point);

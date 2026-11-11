@@ -6,7 +6,7 @@ import {
   type EventTargetLike,
   type InputEventListener,
 } from './controls.js';
-import { EPS, type V3 } from './math.js';
+import { dollyFactor, EPS, finiteInput, type V3 } from './math.js';
 import { basis, intersectPlane, ray } from './view.js';
 import type { KeyAction, NavigationProfile } from './profiles.js';
 export { Controls };
@@ -296,14 +296,17 @@ export class OrbitControls extends Controls {
 
   /** Turns around the target; a positive angle moves the camera clockwise seen from above (azimuth decreases). */
   rotateLeft(angle: number): void {
+    finiteInput('Orbit turn angle', angle);
     this.turnAzimuth -= angle;
   }
   /** Tilts around the target; a positive angle raises the camera toward +Y (polar angle decreases). */
   rotateUp(angle: number): void {
+    finiteInput('Orbit tilt angle', angle);
     this.turnPolar -= angle;
   }
   /** Pans by a screen delta in CSS pixels; the scene follows the pointer. */
   pan(deltaX: number, deltaY: number): void {
+    finiteInput('Orbit pan delta', deltaX, deltaY);
     const b = basis(this.camera),
       half = b.ortho ?? b.distance * b.tanHalf,
       perPixel = (2 * half) / Math.max(1, this.element?.clientHeight ?? 1);
@@ -315,10 +318,12 @@ export class OrbitControls extends Controls {
   }
   /** Multiplies the pending distance scale by `factor` (below 1 moves closer). */
   dollyIn(factor: number): void {
+    dollyFactor(factor);
     this.dollyScale *= factor;
   }
   /** Divides the pending distance scale by `factor` (below 1 moves farther). */
   dollyOut(factor: number): void {
+    dollyFactor(factor);
     this.dollyScale /= factor;
   }
 
@@ -404,13 +409,7 @@ export class OrbitControls extends Controls {
       [qx, qy, qz] = [nx + dx * newDistance, ny + dy * newDistance, nz + dz * newDistance];
     }
 
-    if (
-      this.zoomToCursor &&
-      this.pointerAt &&
-      scale !== 1 &&
-      !fixed &&
-      distance > 0
-    ) {
+    if (this.zoomToCursor && this.pointerAt && scale !== 1 && !fixed && distance > 0) {
       const hit = this.cursorHit([nx, ny, nz], [nx + dx * distance, ny + dy * distance, nz + dz * distance]);
       if (hit) {
         // Scale the view about the hit point: same direction, new distance, the hit keeps its pixel.

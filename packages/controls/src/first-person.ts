@@ -6,7 +6,7 @@ import {
   type EventTargetLike,
   type InputEventListener,
 } from './controls.js';
-import { EPS, madd } from './math.js';
+import { EPS, finiteInput, madd } from './math.js';
 import { basis } from './view.js';
 import { moved, translate } from './steer.js';
 
@@ -97,7 +97,9 @@ export class FirstPersonControls extends Controls {
 
   /** Points the camera at a world position (three numbers or an array) and resynchronises latitude and longitude. */
   lookAt(x: number | readonly number[], y = 0, z = 0): this {
-    this.camera.target = typeof x === 'number' ? [x, y, z] : [x[0], x[1], x[2]];
+    const target: [number, number, number] = typeof x === 'number' ? [x, y, z] : [x[0], x[1], x[2]];
+    finiteInput('First-person look target', ...target);
+    this.camera.target = target;
     this.sync();
     return this;
   }
@@ -112,6 +114,7 @@ export class FirstPersonControls extends Controls {
 
   /** Walks and turns for `delta` seconds (default 1/60). Returns true when the camera moved. */
   update(delta = 1 / 60): boolean {
+    finiteInput('First-person update step', delta);
     const camera = this.camera,
       before = [...camera.position, ...camera.target],
       s = this.moveState,

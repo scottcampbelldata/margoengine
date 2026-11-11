@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14766002,
+  "total": 14767288,
   "history": [
     {
       "date": "2026-10-24",
@@ -8261,6 +8261,12 @@
       "commit": "3a1c72440",
       "reason": "navmesh/tiles +27 B: A* estimate scale keeps routes cheapest with off-mesh links cheaper than their length (rust port R1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "f259362f2",
+      "reason": "controls +102 B, controls/arcball +87 B: RangeError checks keep NaN script motion off the camera (rust port R5)",
+      "grew": 2
     }
   ],
   "items": {
@@ -8442,8 +8448,8 @@
     "@margoengine/compute/sparse": 7238,
     "@margoengine/compute/stream": 1324,
     "@margoengine/compute/subgroups": 2537,
-    "@margoengine/controls": 27708,
-    "@margoengine/controls/arcball": 8637,
+    "@margoengine/controls": 28645,
+    "@margoengine/controls/arcball": 8986,
     "@margoengine/controls/box-gizmo": 6842,
     "@margoengine/controls/collide": 7341,
     "@margoengine/controls/device-orientation": 3770,

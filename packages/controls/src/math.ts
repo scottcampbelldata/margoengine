@@ -6,6 +6,16 @@ export type V3 = [number, number, number];
 export type Q4 = [number, number, number, number];
 
 export const EPS = 1e-6;
+/** Throws a RangeError unless every value is finite, so one NaN from a script cannot reach the camera. */
+export function finiteInput(what: string, ...values: number[]): void {
+  for (const value of values)
+    if (!Number.isFinite(value)) throw new RangeError(`${what} must be finite; pass a finite number, not ${value}`);
+}
+/** Throws a RangeError unless a dolly factor is finite and above 0. */
+export function dollyFactor(factor: number): void {
+  if (!(factor > 0) || !Number.isFinite(factor))
+    throw new RangeError(`Dolly factor must be finite and above 0; pass a positive number, not ${factor}`);
+}
 export const madd = (a: readonly number[], b: readonly number[], s: number): V3 => [
   a[0] + b[0] * s,
   a[1] + b[1] * s,
