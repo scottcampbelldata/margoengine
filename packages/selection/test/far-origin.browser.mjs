@@ -27,7 +27,8 @@ const run = (world, floating, capture) =>
     async ({ world, floating, capture }) => {
       const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js'),
         { Picking } = await import('/packages/selection/dist/index.js'),
-        { FloatingOrigin } = await import('/packages/cameras/dist/origin.js');
+        { FloatingOrigin } = await import('/packages/cameras/dist/origin.js'),
+        { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
       const size = 64,
         canvas = document.createElement('canvas');
       canvas.style.cssText = `position:fixed;left:0;top:0;width:${size}px;height:${size}px`;
@@ -61,16 +62,12 @@ const run = (world, floating, capture) =>
         context.drawImage(engine.canvas, 0, 0);
         return context.getImageData(0, 0, size, size).data;
       };
-      // Pipelines compile off the frame: draw until two frames agree.
-      let lit = shot();
-      for (let i = 0; i < 40; i++) {
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+      // Pipelines compile off the frame: draw until two frames in a row started no pipeline and none is compiling.
+      await waitForPipelines(async () => {
+        shot();
         await engine.gpu.queue.onSubmittedWorkDone();
-        const next = shot(),
-          same = next.every((v, k) => v === lit[k]);
-        lit = next;
-        if (same && i > 2) break;
-      }
+      });
+      const lit = shot();
       mesh.visible = false;
       const empty = shot();
       mesh.visible = true;
