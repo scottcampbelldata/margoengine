@@ -70,7 +70,7 @@ export interface SpriteLayerOptions {
   atlas: SpriteAtlas | readonly SpriteAtlas[];
   /** World units to pixels; see {@link SpriteLayer.camera}. Default `{x: 0, y: 0, zoom: 1}`: world units are pixels. */
   camera?: SpriteCamera;
-  /** Rounds each image's corner to a whole pixel after the camera; see {@link SpriteLayer.snap}. Default true. */
+  /** Rounds each image's edges (a rotated one's corner) to whole pixels after the camera; see {@link SpriteLayer.snap}. Default true. */
   snap?: boolean;
   /** Among equal `z`, a sprite lower on the screen draws over a higher one; see {@link SpriteLayer.ySort}. Default false. */
   ySort?: boolean;
@@ -268,7 +268,7 @@ export class SpriteLayer implements EnginePlugin {
   readonly name: string;
   /** World units to pixels, read each frame. */
   camera: SpriteCamera;
-  /** Rounds each image's corner to a whole pixel after the camera, read each frame. Rotated images turn about the rounded place. */
+  /** Rounds each image's edges to whole pixels after the camera (a rotated image its corner), read each frame. Rotated images turn about the rounded place. */
   snap: boolean;
   /** Sorts equal `z` by `y`, read each frame. */
   ySort: boolean;

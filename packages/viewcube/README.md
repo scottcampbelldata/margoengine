@@ -61,7 +61,8 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   elevation the way OrbitControls moves. Top and bottom are exactly vertical: on the pole the cube sets `camera.up` to
   the screen up of the way it came (arrow keys turn it there) and puts the previous up back as soon as the camera
   leaves the pole, or on `dispose` (then 1e-6 rad off the pole, same image). An up it did not set is left alone, such as
-  a CameraProjection's vertical `up`. OrbitControls and CADCameraControls leave an exact pole at azimuth 0, so after a
+  a CameraProjection's vertical `up`, until a drag on the cube or its compass turns the heading on the pole: then the
+  cube turns the projection's `up` with it, so the image spins, and the projection keeps that up. OrbitControls and CADCameraControls leave an exact pole at azimuth 0, so after a
   top view reached from the side they start from the front.
 - **Drag to orbit.** Press on the cube and drag: the camera orbits its target at the same distance, with the
   azimuth and elevation OrbitControls uses, so the cube's surface follows the pointer (half the cube's width is one

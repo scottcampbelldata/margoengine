@@ -837,3 +837,27 @@ test('bidi numbers follow UAX #9: they attach to right-to-left text, keep Arabic
   assert.equal(cl('א 1,000.5 ב'), 'ב 1,000.5 א');
   assert.equal(cl('א $100'), '$100 א');
 });
+
+test('KB4990b: release drops one bitmap slot and frees its page once the page holds no other slot', () => {
+  const fakeTexture = { createView: () => ({}), destroy() {} };
+  const device = {
+    createTexture: () => fakeTexture,
+    createCommandEncoder: () => ({ copyTextureToTexture() {}, finish: () => ({}) }),
+    queue: { writeTexture() {}, submit() {} },
+    limits: { maxTextureDimension2D: 8192 },
+  };
+  const atlas = new GlyphAtlas(device, 'rgba8unorm', 32, 1),
+    bitmap = (i) => ({ cluster: `i${i}`, width: 15, height: 15, left: 0, top: 0, color: true, data: new Uint8Array(900) }),
+    a = bitmap(0),
+    b = bitmap(1);
+  atlas.place(a);
+  atlas.place(b);
+  assert.equal(atlas.release(a), true);
+  assert.equal(atlas.slots.has(a), false, 'the bitmap is no longer held');
+  assert.equal(atlas.packer.isPageEmpty(0), false, 'b still uses page 0');
+  assert.equal(atlas.release(b), true);
+  assert.equal(atlas.packer.isPageEmpty(0), true, 'the empty page is free for new bitmaps');
+  assert.equal(atlas.release(b), false);
+  const c = atlas.place(bitmap(2));
+  assert.deepEqual([c.page, c.x, c.y], [0, 0, 0]);
+});

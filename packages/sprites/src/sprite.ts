@@ -197,12 +197,26 @@ export function packSprites(
       rectY + rectH > atlasHeight
     )
       throw rangeError('Invalid sprite rect', 'sprite-options');
-    const offsetX = s.pivotX * width,
-      offsetY = s.pivotY * height;
-    put(snap ? snapToPixel(pixelX, offsetX) : pixelX);
-    put(snap ? snapToPixel(pixelY, offsetY) : pixelY);
-    put(width);
-    put(height);
+    if (snap && !s.rotation) {
+      // Both edges land on whole pixels, each rounded once from where it is: images that share an edge (the parts of
+      // a nine-slice) meet there with no gap, whatever their sizes. Rounded from float32, the precision the GPU gets,
+      // so two sums of the same edge that differ in the last double bit still agree.
+      const x0 = Math.round(Math.fround(pixelX - s.pivotX * width)),
+        y0 = Math.round(Math.fround(pixelY - s.pivotY * height)),
+        w = Math.round(Math.fround(pixelX - s.pivotX * width + width)) - x0,
+        h = Math.round(Math.fround(pixelY - s.pivotY * height + height)) - y0;
+      put(x0 + s.pivotX * w);
+      put(y0 + s.pivotY * h);
+      put(w);
+      put(h);
+    } else {
+      const offsetX = s.pivotX * width,
+        offsetY = s.pivotY * height;
+      put(snap ? snapToPixel(pixelX, offsetX) : pixelX);
+      put(snap ? snapToPixel(pixelY, offsetY) : pixelY);
+      put(width);
+      put(height);
+    }
     put(s.pivotX);
     put(s.pivotY);
     put(s.rotation);

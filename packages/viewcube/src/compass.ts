@@ -9,7 +9,14 @@ class CompassNavigation extends ViewCube {
   }
   static turn(cube: CompassNavigation, theta: number, phi: number, twist: number): void {
     // A manual compass drag retains distance and target even on a FitViewCube.
-    CompassNavigation.prototype.orbit.call(cube, theta, phi, 0, undefined, undefined, twist);
+    // A drag sets the heading, so on a pole it also turns a projection-owned up (ViewCube.pole).
+    const flag = cube as unknown as { spin: boolean };
+    flag.spin = true;
+    try {
+      CompassNavigation.prototype.orbit.call(cube, theta, phi, 0, undefined, undefined, twist);
+    } finally {
+      flag.spin = false;
+    }
   }
 }
 

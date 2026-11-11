@@ -149,3 +149,33 @@ test('compass drag is a turntable, retains user distance on a fit cube and suppr
   near(engine.camera.target, [0, 0, 0]);
   assert.equal(cube.animating, false);
 });
+test('KB5545b: a compass drag at Top turns the image under a CameraProjection, and the cube drag does too', () => {
+  for (const via of ['compass', 'cube']) {
+    const { engine, dom } = setup();
+    const projection = CameraProjection.attach(engine, { mode: 'orthographic' });
+    using cube = new ViewCube(engine, { duration: 0, projection });
+    using compass = new ViewCompass(cube);
+    cube.view('top', 0);
+    engine.frame();
+    const before = [...engine.camera.up],
+      heading = Math.atan2(before[0], before[2]);
+    const node =
+      via === 'compass' ? compass.element.querySelector('button') : cube.element.querySelector('[data-view]');
+    const pointer = (type, x) =>
+      node.dispatchEvent(
+        new dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: 0, button: 0, pointerId: 1 }),
+      );
+    pointer('pointerdown', 0);
+    pointer('pointermove', 40);
+    engine.frame();
+    const after = engine.camera.up;
+    assert.ok(Math.abs(direction(engine.camera)[1] - 1) < 1e-12, `${via}: still exactly on Top`);
+    const turned = Math.atan2(after[0], after[2]) - heading;
+    assert.ok(Math.abs(Math.sin(turned)) > 0.1, `${via}: the image turned (${turned} rad)`);
+    assert.ok(engine.camera.matrix.every(Number.isFinite));
+    // The heading the drag reached is the one the cube reports and the compass shows.
+    pointer('pointerup', 40);
+    engine.frame();
+    assert.ok(Math.abs(Math.atan2(engine.camera.up[0], engine.camera.up[2]) - heading - turned) < 1e-9);
+  }
+});

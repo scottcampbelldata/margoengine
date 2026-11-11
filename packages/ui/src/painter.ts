@@ -47,6 +47,8 @@ export interface GlyphPages {
   readonly size: number;
   readonly generation: number;
   place(glyph: GlyphBitmap): AtlasSlot;
+  /** Drops the slot of a bitmap that is no longer drawn (an image), so the atlas stops holding it. */
+  release?(glyph: GlyphBitmap): boolean;
 }
 
 /** Consecutive instances of one kind under one clip region, drawn with one call. */
@@ -302,6 +304,9 @@ export class UiBatch {
   glyphCount = 0;
   private sdf?: GlyphPages;
   private color?: GlyphPages;
+  /** Image bitmaps the last build drew; one the next build leaves out gives its colour atlas slot back. */
+  private images = new Set<GlyphBitmap>();
+  private drawn = new Set<GlyphBitmap>();
 
   /** Turn the draw list into rect and glyph instances and the runs that draw them. */
   build(list: Pick<DrawList, 'commands'>, sdf: GlyphPages, color: GlyphPages): void {
@@ -355,9 +360,13 @@ export class UiBatch {
     }
     this.rectCount = rectCount;
     this.glyphCount = glyphCount;
+    for (const bitmap of this.images) if (!this.drawn.has(bitmap)) color.release?.(bitmap);
+    [this.images, this.drawn] = [this.drawn, this.images];
+    this.drawn.clear();
   }
 
   private placeImage(command: ImageCommand, at: number): number {
+    this.drawn.add(command.bitmap);
     const slot = this.color!.place(command.bitmap),
       size = this.color!.size,
       source = command.source;

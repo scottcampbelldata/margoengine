@@ -567,7 +567,9 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
   that is not finite and above 0, and a `popClip` with no clip open throw a `RangeError` and leave the list as it was.
 - **Two instanced draws.** Rectangles are signed distance rounded boxes (crisp edges, outlines, soft shadows); glyphs are
   quads sampling the text package's atlases. Both read storage buffers by instance index, in the engine's own render pass
-  after post-processing, with premultiplied alpha blending and one scissor per clip region.
+  after post-processing, with premultiplied alpha blending and one scissor per clip region. Images share the colour
+  atlas; an image no longer drawn (removed, or its `texture` replaced) gives its slots back, so a page it leaves empty
+  is reused.
 - **Layout.** A small flexbox: base sizes, then free space by `grow` and a shortage by `shrink` (resolved as CSS Flexbox
   section 9.7 does: a child held by its min or max size is frozen and the rest goes to the others), then `justify` and
   `align`. A wrapping row first breaks its children into lines by their base sizes, then does the same per line. Stacks anchor their children; grids fill cells row by row.

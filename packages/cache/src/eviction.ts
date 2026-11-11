@@ -41,35 +41,61 @@ export function evictionIndex(): AssetCacheEviction {
       };
     },
     write(meta, data, entry, blob, limit, squeeze, done) {
+      this.writeAll!(meta, data, [{ entry, blob }], limit, squeeze, done);
+    },
+    // The totals are read once and written once per batch; each file reads only the entry it replaces and, when over
+    // the budget, the entries it evicts in last-use order.
+    writeAll(meta, data, items, limit, squeeze, done) {
       const total = meta.get(TOTAL),
-        files = meta.get(FILES),
-        old = meta.get(entry.url);
-      old.onsuccess = () => {
-        const replaced = isEntry(old.result) ? old.result.size : 0;
-        let others = count(total.result) - replaced,
-          stored = count(files.result) - (isEntry(old.result) ? 1 : 0),
-          evicted = 0;
-        const room = squeeze ? Math.min(limit, others) : limit,
-          cursor = meta.index(USED).openCursor();
-        cursor.onsuccess = () => {
-          const at = cursor.result;
-          if (at && others + entry.size > room) {
-            if (at.primaryKey !== entry.url && isEntry(at.value)) {
-              others -= at.value.size;
-              stored--;
-              evicted++;
-              data.delete(at.primaryKey);
-              at.delete();
-            }
-            at.continue();
-            return;
+        files = meta.get(FILES);
+      let others = 0,
+        stored = 0,
+        evicted = 0;
+      const next = (i: number): void => {
+        if (i === items.length) {
+          meta.put(others, TOTAL);
+          meta.put(stored, FILES);
+          return done(evicted);
+        }
+        const { entry, blob } = items[i],
+          old = meta.get(entry.url);
+        old.onsuccess = () => {
+          if (isEntry(old.result)) {
+            others -= old.result.size;
+            stored--;
           }
-          data.put(blob, entry.url);
-          meta.put(entry, entry.url);
-          meta.put(others + entry.size, TOTAL);
-          meta.put(stored + 1, FILES);
-          done(evicted);
+          const room = squeeze ? Math.min(limit, others) : limit,
+            store = () => {
+              data.put(blob, entry.url);
+              meta.put(entry, entry.url);
+              others += entry.size;
+              stored++;
+              next(i + 1);
+            };
+          // Within the budget nothing is evicted, so the last-use cursor is not opened.
+          if (others + entry.size <= room) return store();
+          const cursor = meta.index(USED).openCursor();
+          cursor.onsuccess = () => {
+            const at = cursor.result;
+            if (at && others + entry.size > room) {
+              if (at.primaryKey !== entry.url && isEntry(at.value)) {
+                others -= at.value.size;
+                stored--;
+                evicted++;
+                data.delete(at.primaryKey);
+                at.delete();
+              }
+              at.continue();
+              return;
+            }
+            store();
+          };
         };
+      };
+      files.onsuccess = () => {
+        others = count(total.result);
+        stored = count(files.result);
+        next(0);
       };
     },
     remove(meta, data, key) {

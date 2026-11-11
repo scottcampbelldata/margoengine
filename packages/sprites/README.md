@@ -52,7 +52,7 @@ coin.visible = false;
 | --- | --- | --- |
 | `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture`, or a list of same-size ones |
 | `camera` | `{x: 0, y: 0, zoom: 1}` | World point at the top-left and pixels per world unit, read each frame |
-| `snap` | true | Rounds each image's corner to a whole pixel after the camera, read each frame |
+| `snap` | true | Rounds each image's edges to whole pixels after the camera (an unrotated image both edges, so nine-slice parts meet with no gap; a rotated one its corner), read each frame |
 | `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
 | `target` | frame's colour | A texture, or a function returning one, to draw into instead |
 | `clear` | `[0, 0, 0, 0]` | With `target`: the clear colour, or false to draw over it |

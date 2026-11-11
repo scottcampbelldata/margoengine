@@ -39,6 +39,10 @@ interface AssetCacheEviction {
     readonly version: number;
     upgrade(meta: IDBObjectStore, oldVersion: number): void;
     write(meta: IDBObjectStore, data: IDBObjectStore, entry: AssetCacheEntry, blob: Blob | ArrayBuffer, limit: number, squeeze: boolean, done: (evicted: number) => void): void;
+    writeAll?(meta: IDBObjectStore, data: IDBObjectStore, files: readonly {
+        entry: AssetCacheEntry;
+        blob: Blob | ArrayBuffer;
+    }[], limit: number, squeeze: boolean, done: (evicted: number) => void): void;
     remove(meta: IDBObjectStore, data: IDBObjectStore, key: IDBValidKey): void;
     usage(meta: IDBObjectStore, done: (bytes: number, files: number) => void): void;
 }

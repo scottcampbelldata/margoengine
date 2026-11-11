@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15087169,
+  "total": 15091043,
   "history": [
     {
       "date": "2026-10-24",
@@ -8501,6 +8501,12 @@
       "commit": "9310112ebe",
       "reason": "KB3454: Hillaire multiple scattering table kept in log-sum-exp scaled sums so nearly closed atmospheres stay finite; sky/aerial 6713 to 6868 B gzip (hillaire +150, planet +154 within their budgets)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "40e8245886",
+      "reason": "cache batches miss writes (WebKit evictionReads), sprites snaps both edges (KB6013a), ui releases image atlas slots (KB4990b)",
+      "grew": 7
     }
   ],
   "items": {
@@ -8617,15 +8623,15 @@
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 11036,
-    "@margoengine/cache": 4263,
+    "@margoengine/cache": 4658,
     "@margoengine/cache/bundles": 1883,
-    "@margoengine/cache/decoded": 5509,
+    "@margoengine/cache/decoded": 5898,
     "@margoengine/cache/eviction": 793,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,
     "@margoengine/cache/ranges": 4902,
-    "@margoengine/cache/stream": 4650,
+    "@margoengine/cache/stream": 5047,
     "@margoengine/cache/vary": 821,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
@@ -9529,7 +9535,7 @@
     "@margoengine/sprites/aseprite": 4595,
     "@margoengine/sprites/atlas": 649,
     "@margoengine/sprites/billboard": 5389,
-    "@margoengine/sprites/blend": 8464,
+    "@margoengine/sprites/blend": 8763,
     "@margoengine/sprites/pick": 2189,
     "@margoengine/sprites/shader": 1222,
     "@margoengine/sprites/skeletal": 8208,
@@ -9642,7 +9648,7 @@
     "@margoengine/tween/scroll-pin": 2361,
     "@margoengine/tween/stagger": 1435,
     "@margoengine/tween/timeline": 3440,
-    "@margoengine/ui": 32842,
+    "@margoengine/ui": 33900,
     "@margoengine/ui/curved": 1692,
     "@margoengine/ui/editor": 4906,
     "@margoengine/ui/forms": 3743,
@@ -9651,8 +9657,8 @@
     "@margoengine/ui/input": 4606,
     "@margoengine/ui/keyboard": 1770,
     "@margoengine/ui/markup": 10820,
-    "@margoengine/ui/react": 33009,
-    "@margoengine/ui/world": 9836,
+    "@margoengine/ui/react": 34011,
+    "@margoengine/ui/world": 10170,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 12918,
     "@margoengine/usdz dist/workers/usdz.js": 144594,

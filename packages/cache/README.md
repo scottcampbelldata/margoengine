@@ -265,6 +265,9 @@ of files. For tens of thousands (map tiles), pass `eviction: evictionIndex()` fr
 an IndexedDB index on last use and a running byte and file total, kept in the same transaction as every write, so a
 write reads the totals and only the files it evicts.
 
+Misses that arrive while an earlier write is still queued (a burst of tiles) are stored together in one transaction,
+in arrival order, with the same result as separate writes; without the index that burst reads the metadata once.
+
 ```ts
 import {AssetCache} from 'margoengine/cache';
 import {evictionIndex} from 'margoengine/cache/eviction';
@@ -368,7 +371,10 @@ prefetch.cancel('level2'); // the player turned back: drop what waits, abort wha
   new when it arrives and `Expires` is counted from the local clock.
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
 - Eviction reads every entry's metadata (not the bytes) before each write unless `eviction: evictionIndex()` is set
-  (above): fine for thousands of files.
+  (above): fine for thousands of files. A burst of misses shares one write and one read.
+- Playwright WebKit on Windows answers each IndexedDB request on a timer tick of about 15 ms (a lone `setTimeout(0)`
+  takes as long there), so time there follows the number of requests: a miss costs one lookup request and one write
+  transaction, and a write within the budget opens no cursor.
 - Prefetcher and throttle: proved in Node with stand-in servers and a stand-in `requestIdleCallback`, and in Chromium
   by `npm run test:browser` (test/browser-prefetch.js). `throttle` paces how fast bodies are read, so the bytes already in the browser's buffers when the limit
   applies arrive at full speed.

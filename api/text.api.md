@@ -66,6 +66,7 @@ export class GlyphAtlas {
     touch(page: number): void;
     evictPage(page: number): boolean;
     evict(page?: number): boolean;
+    release(glyph: GlyphBitmap): boolean;
     place(glyph: GlyphBitmap): AtlasSlot;
     restore(device: GPUDevice): void;
     dispose(): void;
@@ -334,6 +335,8 @@ export function hitTest(layout: TextLayout, x: number, y: number): number;
 export function layoutText(text: string, options: LayoutOptions, measurer: TextMeasurer): TextLayout;
 
 export { parseColor } from "@margoengine/math";
+
+export function releaseSlot(slots: Map<GlyphBitmap, AtlasSlot>, packer: ShelfPacker, glyph: GlyphBitmap): number | undefined;
 
 export const sdfDistance: (value: number, params?: SdfParams) => number;
 

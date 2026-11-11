@@ -287,7 +287,9 @@ try {
   checkPrefetch(report.prefetchWorker);
   report.throttleWorker = await call('workerProof', 'throttle');
   checkThrottle(report.throttleWorker);
-  assert.equal(report.prefetchWindow.idleAPI, 'function');
+  // The window proof ran with the page's own requestIdleCallback where the browser has one (WebKit has none, so the
+  // Prefetcher's timer fallback ran there); a service worker never has one.
+  assert.equal(report.prefetchWindow.idleAPI, await page.evaluate(() => typeof requestIdleCallback));
   assert.equal(report.prefetchWorker.idleAPI, 'undefined');
   before = log.length;
   const serviceCold = await call('serviceWorkerRange', 'bytes=1000-2999');

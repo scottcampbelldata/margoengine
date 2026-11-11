@@ -274,7 +274,13 @@ window.cacheChecks = {
   /** `count` files of 10 bytes under a 20,000-byte budget, then `extra` more: the records the extra writes read. */
   async evictionReads(name, indexed, count, extra) {
     const cache = new AssetCache({ name, maxBytes: 20_000, ...(indexed && { eviction: evictionIndex() }) });
-    for (let i = 0; i < count; i++) await read(await cache.fetch(`/cache-files/tile/${i}`));
+    // Stored as a tile viewer stores them, 100 requests at a time: each burst of misses is one write.
+    for (let i = 0; i < count; i += 100)
+      await Promise.all(
+        Array.from({ length: Math.min(100, count - i) }, async (_, j) =>
+          read(await cache.fetch(`/cache-files/tile/${i + j}`)),
+        ),
+      );
     await cache.flush();
     const before = counts.reads;
     for (let i = count; i < count + extra; i++) {

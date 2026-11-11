@@ -110,6 +110,7 @@ class GlyphAtlas {
     touch(page: number): void;
     evictPage(page: number): boolean;
     evict(page?: number): boolean;
+    release(glyph: GlyphBitmap): boolean;
     place(glyph: GlyphBitmap): AtlasSlot;
     restore(device: GPUDevice): void;
     dispose(): void;

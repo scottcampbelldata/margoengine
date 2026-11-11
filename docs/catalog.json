@@ -1410,6 +1410,7 @@
       "hitTest",
       "layoutText",
       "parseColor",
+      "releaseSlot",
       "sdfDistance",
       "squaredDistanceTransform",
       "validateLayoutOptions"

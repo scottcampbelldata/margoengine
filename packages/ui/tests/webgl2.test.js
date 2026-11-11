@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Button, Label, List, Panel, UiRenderer } from '../dist/index.js';
+import { Image, ImageTexture } from '../dist/image.js';
 import { makeUi } from './helpers.js';
 
 // A WebGL2 context that records every call: constants read as numbers, objects as fresh tokens.
@@ -196,4 +197,34 @@ test('each glyph draw samples the SDF atlas on unit 0 and the colour atlas on un
   }
   assert.ok(checked > 0, 'a draw was checked');
   renderer.dispose();
+});
+
+test('KB4990b: replacing an image gives its colour atlas slot back, so replacements never fill the atlas', async () => {
+  const { ui, renderer, run } = setup(),
+    gl = fakeGl(),
+    texture = () => new ImageTexture(250, 250, new Uint8Array(250 * 250 * 4).fill(255)),
+    image = new Image({ texture: texture(), width: 100, height: 100, anchor: 'top-left' });
+  ui.add(image);
+  await drawn(run, renderer, gl);
+  // The places (x, y, page) a frame uploads image tiles to; glyph bitmaps of the font are 8 by 10.
+  const places = (from) =>
+    gl.calls
+      .slice(from)
+      .filter((c) => c[0] === 'texSubImage3D' && c[6] !== 8)
+      .map((c) => c.slice(3, 6).join(','))
+      .sort()
+      .join(' ');
+  const first = places(0);
+  assert.ok(first, 'the image was uploaded');
+  // 16 pages of 512 texels hold about 64 such images: 100 replacements fill them unless a replaced image is let go.
+  // Released, the old image's pages empty once the new one has moved on, so a few pages take turns (an image's tiles
+  // can straddle two pages).
+  const pages = new Set();
+  for (let i = 0; i < 100; i++) {
+    const from = gl.calls.length;
+    image.texture = texture();
+    run(gl);
+    for (const place of places(from).split(' ').filter(Boolean)) pages.add(place.split(',')[2]);
+  }
+  assert.ok(pages.size <= 3, `replacements reuse a few pages (${[...pages]})`);
 });

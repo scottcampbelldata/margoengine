@@ -249,6 +249,8 @@ export class ViewCube {
   /** The press being dragged: pointer, where it went down, the camera's angles then, radians per CSS pixel. */
   private grab?: { id: number; x: number; y: number; theta: number; phi: number };
   private dragged = false;
+  /** True while a drag (the cube's or a compass's) sets the heading: on a pole it turns a projection-owned up too. */
+  private spin = false;
   private readonly speed: number;
 
   /** Creates the ViewCube on `engine` (preferred over the constructor). */
@@ -614,6 +616,17 @@ export class ViewCube {
       if (this.upSet || !Math.hypot(up[0], up[2])) {
         n = [-k * Math.sin(theta), 0, -k * Math.cos(theta)];
         this.az = theta;
+      } else if (this.spin && (this.projection as { up?: unknown } | undefined)?.up === app) {
+        // A projection's vertical up (a CameraProjection's) is the screen up here, and camera.up cannot change it: a
+        // drag turns that up to the heading it reached, rolled as the view is, and the projection keeps it.
+        rotate(
+          ((this.projection as unknown as { up: number[] }).up = [0, 0, 0]),
+          this.world([-k * Math.sin(theta), 0, -k * Math.cos(theta)]),
+          direction,
+          -this.twist,
+        );
+        this.az = theta;
+        return;
       } else this.az = Math.atan2(-k * up[0], -k * up[2]);
     }
     if (n === up && !this.twist) {
@@ -740,7 +753,9 @@ export class ViewCube {
       Math.min(Math.PI, Math.max(0, g.phi - dy * this.speed)),
       Math.hypot(...c.position.map((x, i) => x - c.target[i])),
     );
+    this.spin = true;
     this.pole(theta);
+    this.spin = false;
     event.preventDefault();
   };
   private readonly onKey = (event: KeyboardEvent): void => {

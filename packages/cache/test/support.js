@@ -10,11 +10,12 @@
  * `refuseBlobs` makes a readwrite transaction that puts a Blob fail with UnknownError, as WebKit's ephemeral sessions do.
  * `refuseBlobs: 'webkit'` also models WebKit's stall (Playwright WebKit, 2026-11-11): when the refused Blob put is not
  * the first request of its transaction, that transaction never completes or aborts, and neither does any later one.
- * `counts.reads` counts the records handed out by get, getAll and cursors.
+ * `counts.reads` counts the records handed out by get, getAll and cursors; `counts.requests` counts every request,
+ * cursor steps included.
  */
 export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = false } = {}) {
   const databases = new Map(),
-    counts = { reads: 0 },
+    counts = { reads: 0, requests: 0 },
     later = (fn) => setTimeout(fn, 0);
   const copy = (value) => (value instanceof Blob ? value : structuredClone(value));
   const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -22,6 +23,7 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
     const { map, indexes } = target;
     const request = (run) => {
       tally.requests++;
+      counts.requests++;
       const r = {};
       queueMicrotask(() => {
         r.result = run();
@@ -80,7 +82,8 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
                 .filter(([, v]) => v !== null && typeof v === 'object' && v[path] !== undefined)
                 .sort((a, b) => order(a[1][path], b[1][path]) || order(a[0], b[0]));
             let i = 0;
-            const step = () =>
+            const step = () => {
+              counts.requests++;
               queueMicrotask(() => {
                 // Rows deleted since the cursor opened are skipped, as a live cursor would.
                 while (i < rows.length && !map.has(rows[i][0])) i++;
@@ -102,6 +105,7 @@ export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = 
                 }
                 r.onsuccess?.({ target: r });
               });
+            };
             step();
             return r;
           },

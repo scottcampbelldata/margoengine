@@ -1,4 +1,4 @@
-import { SDF_DEFAULTS, ShelfPacker, type AtlasSlot, type GlyphBitmap } from '@margoengine/text';
+import { SDF_DEFAULTS, ShelfPacker, releaseSlot, type AtlasSlot, type GlyphBitmap } from '@margoengine/text';
 import { fault, rangeError } from '../../shared/errors.js';
 import type { DrawList } from './draw.js';
 import { GLYPH_FLOATS, RECT_FLOATS, UiBatch, type GlyphPages, type PaintStats } from './painter.js';
@@ -130,6 +130,10 @@ class GlAtlas implements GlyphPages {
       this.allocate(Math.min(this.packer.maxPages, Math.max(slot.page + 1, this.layers * 2)));
     else this.upload(glyph, slot);
     return slot;
+  }
+  /** Drops an image's slot once it is no longer drawn; a page left with no slot is freed for new bitmaps. */
+  release(glyph: GlyphBitmap): boolean {
+    return releaseSlot(this.slots, this.packer, glyph) !== undefined;
   }
   private allocate(layers: number): void {
     const gl = this.gl,

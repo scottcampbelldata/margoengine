@@ -58,6 +58,18 @@ export interface AssetCacheEviction {
     squeeze: boolean,
     done: (evicted: number) => void,
   ): void;
+  /**
+   * Optional: `write` for several files in one readwrite transaction, in order, as separate writes would leave them;
+   * calls `done` once with the number evicted. AssetCache uses it for a burst of misses when present.
+   */
+  writeAll?(
+    meta: IDBObjectStore,
+    data: IDBObjectStore,
+    files: readonly { entry: AssetCacheEntry; blob: Blob | ArrayBuffer }[],
+    limit: number,
+    squeeze: boolean,
+    done: (evicted: number) => void,
+  ): void;
   /** In a readwrite transaction: removes one key from both stores. */
   remove(meta: IDBObjectStore, data: IDBObjectStore, key: IDBValidKey): void;
   /** In a readonly transaction: calls `done` with the stored bytes and files. */
@@ -100,6 +112,16 @@ export interface AssetCacheUsage {
 }
 
 /** A hit whose last-used time (and, after a 304, freshness) is still to be written. */
+interface Put {
+  entry: Entry;
+  blob: Blob;
+  records: [string, unknown][];
+}
+interface Stored {
+  entry: Entry;
+  blob: Blob | ArrayBuffer;
+  records: [string, unknown][];
+}
 interface Touch {
   entry: Entry;
   reason?: 'revalidated' | 'offline';
@@ -149,6 +171,10 @@ export class AssetCache {
   private touches?: Touch[];
   /** `writes` as the batch above left it; any later write replaces it and closes the batch. */
   private touchesTail?: Promise<unknown>;
+  /** New files queued as one write while it is still the last one and has not started (a burst of misses). */
+  private puts?: Put[];
+  /** `writes` as the batch above left it. */
+  private putsTail?: Promise<unknown>;
   private keys?: AssetCacheKeys;
   private maxAgeOnly: boolean;
   private eviction?: AssetCacheEviction;
@@ -324,9 +350,12 @@ export class AssetCache {
   private async lookup(url: string): Promise<[Entry, Blob] | undefined> {
     let entry: IDBRequest | undefined, data: IDBRequest | undefined;
     try {
+      // The bytes are asked for only once the record is found: a miss costs one request, not two.
       await this.tx('readonly', (meta, store) => {
-        entry = meta.get(url);
-        data = store.get(url);
+        const found = (entry = meta.get(url));
+        found.onsuccess = () => {
+          if (isEntry(found.result)) data = store.get(url);
+        };
       });
     } catch {
       this.stats.errors++;
@@ -429,7 +458,20 @@ export class AssetCache {
       final: response.url || url,
     };
     this.checked.add(entry.url);
-    if (target && entry.size <= this.maxBytes) this.queue(() => this.put(entry, blob, target.records));
+    if (target && entry.size <= this.maxBytes) {
+      // Misses stored back to back share one transaction, written in arrival order, as separate writes would leave them.
+      const put = { entry, blob, records: target.records ?? [] };
+      if (this.puts && this.writes === this.putsTail) this.puts.push(put);
+      else {
+        const puts = [put];
+        this.queue(() => {
+          if (this.puts === puts) this.puts = undefined;
+          return this.put(puts);
+        });
+        this.puts = puts;
+        this.putsTail = this.writes;
+      }
+    }
     return this.respond(entry, blob, range);
   }
 
@@ -475,84 +517,96 @@ export class AssetCache {
   /** True once this database refused a Blob: from then on the bytes are stored instead (see bytes.ts). */
   private bytes = false;
 
-  private async put(entry: Entry, blob: Blob, records: [string, unknown][] = []): Promise<void> {
+  private async put(puts: Put[]): Promise<void> {
+    const values = async () =>
+      Promise.all(puts.map(async (p) => ({ ...p, blob: this.bytes ? await p.blob.arrayBuffer() : p.blob })));
     try {
-      await this.store(entry, this.bytes ? await blob.arrayBuffer() : blob, records);
+      await this.store(await values());
     } catch (error) {
       if (this.bytes || !blobRefused(error)) throw error;
       this.bytes = true;
-      await this.store(entry, await blob.arrayBuffer(), records);
+      await this.store(await values());
     }
   }
 
-  private async store(entry: Entry, blob: Blob | ArrayBuffer, records: [string, unknown][]): Promise<void> {
-    const eviction = this.eviction;
-    if (eviction) {
-      const write = async (squeeze: boolean) => {
-        let evicted = 0;
-        if (
-          await this.tx('readwrite', (meta, data) => {
-            for (const [key, value] of records) meta.put(value, key);
-            eviction.write(meta, data, entry, blob, this.maxBytes, squeeze, (n) => {
-              evicted = n;
-            });
-          })
-        ) {
-          this.stats.stored++;
-          this.stats.evicted += evicted;
-        }
-      };
-      try {
-        return await write(false);
-      } catch (error) {
-        if ((error as Error)?.name !== 'QuotaExceededError') throw error;
-        return await write(true);
-      }
-    }
-    let all: IDBRequest | undefined;
-    await this.tx('readonly', (meta) => {
-      all = meta.getAll();
-    });
-    const others = ((all?.result ?? []) as unknown[])
-      .filter(isEntry)
-      .filter((e) => e.url !== entry.url)
-      .sort((a, b) => a.used - b.used);
-    const write = async (limit: number) => {
-      const evict: string[] = [];
-      for (
-        let total = others.reduce((sum, e) => sum + e.size, entry.size), i = 0;
-        total > limit && i < others.length;
-        i++
-      ) {
-        total -= others[i].size;
-        evict.push(others[i].url);
-      }
+  /**
+   * Writes the files in one readwrite transaction, evicting least recently used entries first. Over the browser's
+   * quota it tries once more, evicting as many bytes as the files need on top of the budget; a batch that still does
+   * not fit is written one file at a time, so one large file cannot keep the others out.
+   */
+  private async store(puts: Stored[]): Promise<void> {
+    const write = async (items: Stored[], squeeze: boolean) => {
+      let evicted = 0;
       if (
         await this.tx('readwrite', (meta, data) => {
-          for (const url of evict) {
-            meta.delete(url);
-            data.delete(url);
+          for (const { records } of items) for (const [key, value] of records) meta.put(value, key);
+          if (this.eviction?.writeAll)
+            return this.eviction.writeAll(meta, data, items, this.maxBytes, squeeze, (n) => {
+              evicted = n;
+            });
+          if (this.eviction) {
+            const eviction = this.eviction,
+              next = (i: number) => {
+                if (i < items.length)
+                  eviction.write(meta, data, items[i].entry, items[i].blob, this.maxBytes, squeeze, (n) => {
+                    evicted += n;
+                    next(i + 1);
+                  });
+              };
+            return next(0);
           }
-          data.put(blob, entry.url);
-          meta.put(entry, entry.url);
-          for (const [key, value] of records) meta.put(value, key);
+          // One read of the records for the whole batch; each file then evicts from the running state.
+          const all = meta.getAll();
+          all.onsuccess = () => {
+            const stored = ((all.result ?? []) as unknown[]).filter(isEntry),
+              live = new Map(stored.map((e) => [e.url, e])),
+              order = stored.sort((a, b) => a.used - b.used);
+            let total = stored.reduce((sum, e) => sum + e.size, 0),
+              at = 0;
+            for (const { entry, blob } of items) {
+              const old = live.get(entry.url);
+              if (old) {
+                total -= old.size;
+                live.delete(entry.url);
+              }
+              const limit = squeeze ? Math.min(this.maxBytes, total) : this.maxBytes;
+              while (total + entry.size > limit && at < order.length) {
+                const e = order[at++];
+                if (live.get(e.url) !== e) continue;
+                total -= e.size;
+                live.delete(e.url);
+                meta.delete(e.url);
+                data.delete(e.url);
+                evicted++;
+              }
+              data.put(blob, entry.url);
+              meta.put(entry, entry.url);
+              live.set(entry.url, entry);
+              total += entry.size;
+              let i = order.length;
+              while (i > at && order[i - 1].used > entry.used) i--;
+              order.splice(i, 0, entry);
+            }
+          };
         })
       ) {
-        this.stats.stored++;
-        this.stats.evicted += evict.length;
+        this.stats.stored += items.length;
+        this.stats.evicted += evicted;
       }
     };
-    // Over the browser's quota: evict as many bytes as the new file needs (on top of the budget) and try once more.
+    const fitted = async (items: Stored[]) => {
+      try {
+        await write(items, false);
+      } catch (error) {
+        if ((error as Error)?.name !== 'QuotaExceededError') throw error;
+        await write(items, true);
+      }
+    };
     try {
-      await write(this.maxBytes);
+      await fitted(puts);
     } catch (error) {
-      if ((error as Error)?.name !== 'QuotaExceededError') throw error;
-      await write(
-        Math.min(
-          this.maxBytes,
-          others.reduce((sum, e) => sum + e.size, 0),
-        ),
-      );
+      if ((error as Error)?.name !== 'QuotaExceededError' || puts.length === 1) throw error;
+      for (const item of puts) await fitted([item]).catch(() => this.stats.errors++);
     }
   }
 

@@ -41,6 +41,20 @@ export function glyphAtlases(
 }
 
 /**
+ * Removes `glyph`'s slot from `slots` and clears its page in `packer` when no other slot is left on it. Returns the
+ * freed page, -1 when the page still holds other slots, or undefined when the glyph had no slot. Shared by atlases
+ * that pack with a ShelfPacker (the WebGPU GlyphAtlas and the UI's WebGL2 atlas).
+ */
+export function releaseSlot(slots: Map<GlyphBitmap, AtlasSlot>, packer: ShelfPacker, glyph: GlyphBitmap): number | undefined {
+  const slot = slots.get(glyph);
+  if (!slot) return undefined;
+  slots.delete(glyph);
+  for (const other of slots.values()) if (other.page === slot.page) return -1;
+  packer.clearPage(slot.page);
+  return slot.page;
+}
+
+/**
  * A growable texture-array glyph atlas. Glyphs are shelf-packed on demand and uploaded one by one with
  * writeTexture. When the pages run out the array grows (doubling its layers, copying the old ones on the
  * GPU), so existing slots stay valid. CPU bitmaps are kept by the fonts, so a restored device re-uploads them.
@@ -156,6 +170,16 @@ export class GlyphAtlas {
     }
     if (candidate >= 0) return this.evictPage(candidate);
     return false;
+  }
+
+  /**
+   * Drops one bitmap's slot (an image no longer drawn), so the atlas stops holding it; a page left with no slot is freed
+   * for new bitmaps. Returns false when the bitmap had no slot.
+   */
+  release(glyph: GlyphBitmap): boolean {
+    const page = releaseSlot(this.slots, this.packer, glyph);
+    if (page !== undefined && page >= 0) this.pageLastUsed[page] = 0;
+    return page !== undefined;
   }
 
   /** Returns the glyph's slot, packing and uploading it first if needed. Throws when the atlas is full. */

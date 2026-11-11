@@ -546,13 +546,25 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 - **Regression:** `packages/cache/test/stale-touch.test.js` (four "refuses Blobs as WebKit does" cases); the fake
   IndexedDB's `refuseBlobs: 'webkit'` models the stall. Three of the four time out on the parent.
 
-### WebKit: cache `test:browser` evictionReads step over its limit (found 2026-11-11, open)
+### Fixed 2026-11-11: WebKit: cache `test:browser` evictionReads step over its limit
 
 - **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` (Windows, busy dev PC): plain
   `evictionReads` (2,030 fetches and writes) took 158.9 s and the indexed run passed the 180 s call limit; Chromium took
-  17.7 s and 8.8 s in the same session. Every step before it passes.
-- **Cause:** not found. Each of its 2,030 requests goes through the check's `context.route`, which on Playwright WebKit
-  is a round trip to the test process; a measurement of the route's share against the cache's own IndexedDB time is next.
+  17.7 s and 8.8 s in the same session.
+- **Cause:** not the check's `context.route` (the same with and without it). Measured in Playwright WebKit on Windows,
+  every IndexedDB request outstanding at once is answered on its own timer tick of about 15 ms (1 get 15 ms, 10 gets in
+  one transaction 152 ms, 40 gets 547 ms; a lone `setTimeout(0)` 15 ms; Chromium 0.1 ms), so time there follows the
+  number of requests. The cache made more than it needed: a miss read the bytes record it then found absent, the
+  default eviction used a read transaction and then a write transaction, the index opened its last-use cursor when
+  nothing had to go, and every miss of a burst was its own transaction that read the totals again (and, by default,
+  every record again: 2,000 misses read 2 million records).
+- **Fix:** a miss asks only for the record; the default eviction reads and writes in one transaction; the index opens
+  no cursor within the budget; misses queued behind a running write share one transaction (in arrival order, the same
+  stored result as separate writes), reading the records or the totals once (`AssetCacheEviction.writeAll`). WebKit
+  `evictionReads` now 70.1 s plain and 72.6 s indexed. Regression: packages/cache/test/write-requests.test.js
+  (requests per miss, and a 60-miss burst against separate writes).
+- Found with it and fixed: the check expected `requestIdleCallback` in every window; WebKit has none, so it now
+  expects what the page has (the Prefetcher's timer fallback runs there).
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
@@ -5104,7 +5116,7 @@ Fixed 2026-11-11 (batch 171 job 6 follow-up): clearing the demo's Sun (UTC) date
 
 Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
 
-Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles remain resident until atlas eviction/renderer disposal. Repro: create, draw and remove a sequence of new ImageTexture objects; the colour atlas retains their tile slots. Cause: image tiles share the glyph atlas lifetime. These build-phase quality gaps are queued in private finish-later, with residency limits documented.
+Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles stayed resident until atlas eviction/renderer disposal (fixed 2026-11-11, KB4990b: a build that no longer draws an image releases its colour atlas slots, and a page left empty is reused; 100 replacements of a 250 px image used 16 pages and then threw "Glyph atlas is full", now at most 3 pages; regression packages/ui/tests/webgl2.test.js and packages/text/tests/text.test.js KB4990b cases). These build-phase quality gaps are queued in private finish-later, with residency limits documented.
 
 
 Fixed in batch 262 scene editing: a non-callable Edit.discard previously entered
@@ -5654,7 +5666,7 @@ Fixed 2026-11-10: Batch 194 job 3 reobserved physical compatibility sampler plan
 - Voxel-net native Deno host: native WebSocket has no ping/pong observation hook. After clientTimeout without application input, the existing authoritative server can close an otherwise reachable idle client. Repro: join via serveVoxelDeno then stop client.update longer than clientTimeout. Cause: Deno handles control pongs internally and exposes only application message activity. Follow-up: native-provider liveness integration without inventing byte counters. Keep client.update running meanwhile.
 
 
-- Batch 198 compass: attach CameraProjection and ViewCompass, request Top, then drag a cardinal. Continuous spin at that exact pole retains projection.up instead of turning the image because ViewCube.pole deliberately preserves a projection-owned valid screen up. Ordinary turntable drags, all cardinal clicks and menu actions work. Small rule-22 finish item: integrate arbitrary pole heading with projection-owned screen up without changing quarter-roll semantics or ownership.
+Fixed 2026-11-11 (KB5545b): Batch 198 compass spin at the Top pole under a CameraProjection kept projection.up, so the image did not turn. A drag on the cube or its compass now turns the projection's vertical up to the heading it reached (rolled as the view is); clicks, named views and quarter rolls still leave it alone. Regression: packages/viewcube/test/compass.test.js (KB5545b case).
 ### Batch 235 job 3: captured-matrix and water feedback contract
 
 Environment now exposes the matrix of its last successful captured image rather than requiring consumers to read a mutable camera. captureOnly keeps capture active without drawing a second rectangle; water filters its draw from that capture to avoid self-feedback. Regression: environment/tests/mirror.test.js and water/test/reflector.browser.mjs prove snapshot identity, capture-only drawing, independent offscreen-object projection, exact unready fallback, SSR compilation and lifecycle.
@@ -6118,10 +6130,10 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
 
 ### Open: sprites findings not fixed in the audit
 
-- Nine-slice with squeezed or fractional borders leaves a one-pixel gap under `snap`: borders [4, 0, 4, 0] on an
-  8-wide rect drawn 7 wide at x 0 put the left part over [0, 3.5) and the right part, snapped on its own, over
-  [4, 7.5), so pixel 3 is empty and the right edge overshoots by half a pixel (slice.ts sliceParts with
-  sprite.ts snapToPixel). Worked out from the arithmetic; not rendered.
+- Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
+  because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
+  unrotated image once, from float32, so parts that share an edge meet there. Regression: packages/sprites/tests/slice.test.js
+  (KB6013a case).
 - Spine IK keys that leave out `bendPositive`, `compress` or `stretch` keep the setup values; the JSON export format
   page says "Assume false if omitted" for keys, but it shows a 3.8 export and the 4.x default was not confirmed from a
   specification, so this is left as it is (spine.ts applyAnimation constraint loop).
