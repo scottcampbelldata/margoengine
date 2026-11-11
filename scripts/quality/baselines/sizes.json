@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14769669,
+  "total": 14772350,
   "history": [
     {
       "date": "2026-10-24",
@@ -8294,8 +8294,8 @@
     },
     {
       "date": "2026-11-11",
-      "commit": "5815622acb",
-      "reason": "gltf-pro/asset +7 B: KHR_meshopt_compression fallback and both-names rejection (bug fix)",
+      "commit": "1d9d2297bb",
+      "reason": "gltf-pro/asset +7 B: KHR_meshopt_compression fallback and both-names rejection (bug fix 1d9d2297bb)",
       "grew": 1
     }
   ],
@@ -8581,7 +8581,7 @@
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/environment": 32597,
+    "@margoengine/environment": 33072,
     "@margoengine/environment dist/workers/exr-codecs.js": 1835,
     "@margoengine/environment/blend": 4687,
     "@margoengine/environment/cube-camera": 5882,
@@ -9359,9 +9359,9 @@
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 7593,
     "@margoengine/taa/upscale-velocity": 19045,
-    "@margoengine/terrain": 13718,
+    "@margoengine/terrain": 14424,
     "@margoengine/terrain/blend": 3676,
-    "@margoengine/terrain/deform": 5282,
+    "@margoengine/terrain/deform": 5488,
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/imagery": 6506,
@@ -9369,9 +9369,9 @@
     "@margoengine/terrain/overlays": 4061,
     "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/query": 3420,
-    "@margoengine/terrain/rvt": 6595,
+    "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,
-    "@margoengine/terrain/stream": 12843,
+    "@margoengine/terrain/stream": 13606,
     "@margoengine/text": 17967,
     "@margoengine/text/animate": 12416,
     "@margoengine/text/curve": 11401,
