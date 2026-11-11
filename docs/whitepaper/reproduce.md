@@ -1012,7 +1012,7 @@ remain necessary, while current work continues without waiting for a quiet machi
 
 `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=2 --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`
 after building packages. External `engine-bench/batch-168/node_modules/@babylonjs/core` is version 8.33.0.
-If absent, install with `npm install --prefix C:\Development\Projects\engine-bench\batch-168 @babylonjs/core@8.33.0`.
+If absent, install with `npm install --prefix ../engine-bench/batch-168 @babylonjs/core@8.33.0`.
 `MARGO_ENGINE_BENCH` overrides the engine-bench parent. The rival stays external. Oracle:
 `node --test packages/oit/test/oit-reference.test.js`. Seven alternating rounds, per-round minimum;
 busy-machine frame-plus-completion timings, not GPU-only timings. [Raw result](results/batch-168-oit.json).
@@ -1021,8 +1021,8 @@ busy-machine frame-plus-completion timings, not GPU-only timings. [Raw result](r
 ### Batch 168 sky (perf history 110)
 
 Create an external Python 3.12 venv:
-`py -3.12 -m venv C:\Development\Projects\engine-bench\batch-168\mitsuba-venv`, then
-`C:\Development\Projects\engine-bench\batch-168\mitsuba-venv\Scripts\python.exe -m pip install mitsuba==3.9.1`.
+`py -3.12 -m venv ../engine-bench/batch-168/mitsuba-venv`, then
+`../engine-bench/batch-168/mitsuba-venv/Scripts/python.exe -m pip install mitsuba==3.9.1`.
 After building packages run
 `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
 `MARGO_ENGINE_BENCH` overrides engine-bench; `MARGO_MITSUBA_PYTHON` overrides the interpreter.
@@ -1095,7 +1095,7 @@ After `npm run build:packages`, run `npm test --workspace @margoengine/pixel` fo
 ## Batch 160 metallic-roughness
 
 Build packages first. Set MARGO_ENGINE_BENCH to the outside engine-bench folder if it is not
-C:/Development/Projects/engine-bench. No third-party renderer source is read or imported into Margo.
+../engine-bench. No third-party renderer source is read or imported into Margo.
 
 ~~~sh
 node scripts/reference-rendering/fetch-assets.mjs
@@ -3886,7 +3886,7 @@ Batch 180 job 5: build packages, then node --test --test-timeout=60000 packages/
 
 Batch 181 density: after build:packages, run `node --test packages/sciviz/tests/density.test.js`, then `node scripts/gpu-lock.mjs run --owner=density-check --max=5 --wait-max=60 -- node packages/sciviz/tests/density-browser.mjs` and the same command with `density-scale-browser.mjs` and --max=6. Both browser suites run native and WebGL2 compatibility and write test-results/batch181-j4-density.json and batch181-j4-scale.json. Scale data is the retained SoA gzip 2MASS stars.bin (RA, Dec, J-Ks, Ks) tiled 20 times, and the retained quoted NYC TLC CSV tiled to exactly 10M rows, with its incomplete final tile retained. No timing assertions or benchmark is part of these commands. Demo: examples/sciviz-density.html, also ?backend=webgl2. The 20M/10M timed rival comparison stays in work-lists/speed-phase.md until Scott ends the build phase.
 
-Density pixel-only rival reproduction: install regl-scatterplot@1.16.0, @deck.gl/core@9.4.1 and @deck.gl/layers@9.4.1 outside the repository under C:/Development/Projects/engine-bench/batch-181-density (MARGO_DENSITY_RIVALS overrides it). Run `node scripts/sciviz-density-pixels.mjs --prepare` on the CPU to bundle their published APIs into that external folder, then `node scripts/gpu-lock.mjs run --owner=density-pixels --max=3 --wait-max=60 --gpu="Render external density pixels" -- node scripts/sciviz-density-pixels.mjs --prepared`. The script captures Margo through Figure.toPNG, compares actual pixel bytes and separately checks analytical opacity, and writes test-results/batch181-j4-rival-pixels.json/.png. It measures no time. Exact source coordinates, draw policies, versions and hardware are in results/batch181-density.json. Packages are executed as black boxes; source implementations are never consulted by the agent or copied into Margo.
+Density pixel-only rival reproduction: install regl-scatterplot@1.16.0, @deck.gl/core@9.4.1 and @deck.gl/layers@9.4.1 outside the repository under ../engine-bench/batch-181-density (MARGO_DENSITY_RIVALS overrides it). Run `node scripts/sciviz-density-pixels.mjs --prepare` on the CPU to bundle their published APIs into that external folder, then `node scripts/gpu-lock.mjs run --owner=density-pixels --max=3 --wait-max=60 --gpu="Render external density pixels" -- node scripts/sciviz-density-pixels.mjs --prepared`. The script captures Margo through Figure.toPNG, compares actual pixel bytes and separately checks analytical opacity, and writes test-results/batch181-j4-rival-pixels.json/.png. It measures no time. Exact source coordinates, draw policies, versions and hardware are in results/batch181-density.json. Packages are executed as black boxes; source implementations are never consulted by the agent or copied into Margo.
 
 Batch 274 job 5 ONNX: after build:packages, run node --test --test-timeout=120000 packages/compute/tests/onnx*.test.js and node packages/compute/tests/onnx-browser.mjs. Native kernel: cargo test --locked --manifest-path packages/compute/onnx-kernel/Cargo.toml. Browser ONNX is CPU Wasm and takes no GPU slot. The pinned references require no external runtime to reproduce; clean-room.md records the optional external reference regeneration, provenance and versions.
 Batch 179 notebook: follow docs/guides/sciviz-notebooks.md. Build sciviz and run node python/build-notebook.mjs; prepare the existing Python test venv with anywidget and pyarrow; execute python/tests/notebook-fixtures.py. Run notebook*.test.js with experimental module mocks and python/tests/test_notebook.py. Run packages/sciviz/tests/notebook-browser.mjs and python/tests/sciviz-jupyter-browser.mjs under the shared GPU lock with hard hold limits. Local artifacts are test-results/sciviz-notebook/{webgpu,webgl2}.json, the offline pages/screenshots and test-results/sciviz-jupyter/jupyterlab.png. No benchmark is run.
@@ -3938,7 +3938,7 @@ Run packages/exporters/scripts/basis-quality.mjs with the outside oracle path pr
 encoder/basis_encoder.cjs, encoder/basis_encoder.wasm,
 oracle-built/basis_transcoder.js and oracle-built/basis_transcoder.wasm, followed
 by an output JSON path. For the pinned lane artifacts the prefix is
-C:/Development/Projects/margoengine-lane-M-basis134- (suffixes encoder and
+../margoengine-lane-M-basis134- (suffixes encoder and
 oracle-built name sibling folders). These pinned prebuilt modules run only as opaque black boxes
 outside this repository. The script uses the full CC0 terrain Aerial Rocks 02
 fixtures, all eleven mips, equal RGB PSNR and Wang et al. 2004 valid 11x11 Gaussian

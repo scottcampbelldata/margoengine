@@ -1112,25 +1112,25 @@
   },
   "opaqueReferenceArtifacts": [
     {
-      "path": "C:\\Development\\Projects\\margoengine-lane-M-basis134-encoder\\basis_encoder.cjs",
+      "path": "../margoengine-lane-M-basis134-encoder/basis_encoder.cjs",
       "bytes": 112986,
       "sha256": "2c0aa2a648b6fc6006e116074a1dd075d6aaf1adb34d4bfd9818acd79e96537e",
       "usage": "opaque execution outside repository; no implementation inspected or copied"
     },
     {
-      "path": "C:\\Development\\Projects\\margoengine-lane-M-basis134-encoder\\basis_encoder.wasm",
+      "path": "../margoengine-lane-M-basis134-encoder/basis_encoder.wasm",
       "bytes": 1735264,
       "sha256": "dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a",
       "usage": "opaque execution outside repository; no implementation inspected or copied"
     },
     {
-      "path": "C:\\Development\\Projects\\margoengine-lane-M-basis134-oracle-built\\basis_transcoder.js",
+      "path": "../margoengine-lane-M-basis134-oracle-built/basis_transcoder.js",
       "bytes": 58516,
       "sha256": "fe39f181e00028df0d9e9213b481b74163d4054789b60b5cc36b15ac6ccea3be",
       "usage": "opaque execution outside repository; no implementation inspected or copied"
     },
     {
-      "path": "C:\\Development\\Projects\\margoengine-lane-M-basis134-oracle-built\\basis_transcoder.wasm",
+      "path": "../margoengine-lane-M-basis134-oracle-built/basis_transcoder.wasm",
       "bytes": 527333,
       "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a",
       "usage": "opaque execution outside repository; no implementation inspected or copied"
