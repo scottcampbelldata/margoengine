@@ -70,6 +70,8 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   // Hashes recorded from the build before directional and area shadows existed (the same scene), and recorded again
   // when areaIntegral gained its early returns and the owned edge-angle evaluation fixed backend cancellation.
   // The four shader-text hashes include that deliberate math change; binding and upload hashes stay unchanged.
+  // Core's mesh shader hash recorded again at edcb6debb7 (KB5875a, height-correlated Smith G2 in core's direct light,
+  // Scott's approved core change); the three clustered declaration hashes did not change.
   const h = harness(),
     lights = new Clustered({ grid: [2, 2, 2] });
   h.engine.use(lights);
@@ -88,7 +90,7 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   ]);
   h.frame();
   h.frame();
-  assert.equal(hash(h.context.shader), 'fee7cc19a437945ddb3d5402bcb99c0885f82d334736b06fad0397b9b5f7a320');
+  assert.equal(hash(h.context.shader), 'ad88a09b1c4d31f79c7d153c70fe4fdd2b42e353e5501c801528b8370924cae7');
   assert.equal(hash(lights.pbr(2).declarations), 'e7aa5546f7ed9e390393a4a95920eaa54746dcec293801ecb9f80aa5f520edb6');
   assert.equal(
     hash(lights['unshadowed'].pbr(2).declarations),
