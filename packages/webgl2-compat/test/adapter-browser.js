@@ -13,6 +13,9 @@ import { Tonemap } from '/packages/tonemap/dist/index.js';
 import { allowCompatibilityAdapters } from '/packages/webgl2-compat/dist/adapter.js';
 import { SceneTarget } from '/packages/shared/msaa.js';
 import { PointCloud, PointsPlugin } from '/packages/points/dist/index.js';
+import { Sky } from '/packages/sky/dist/index.js';
+import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
+import { Water } from '/packages/water/dist/index.js';
 
 const open = async (options) => {
   const canvas = document.createElement('canvas');
@@ -74,6 +77,13 @@ const edlScene = (engine) => {
   engine.use(plugin);
   plugin.add(new PointCloud({ positions: sheet(), material: { size: 6, color: '#ffc040', edl: true } }));
 };
+/** Sky fog over PostStack's 4x capture: per sample by sample_index at the full level, by masked draws at the level. */
+const fogScene = (engine, density = 0.2) => {
+  floorScene(engine);
+  const post = PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
+  engine.use(new Sky({ hours: 10, timeScale: 0, fog: { depth: () => post.depthTexture, start: 1, density } }));
+};
+const skyScene = (engine) => fogScene(engine, 0);
 /** The last of three frames of a scene seen from above, on a new engine. */
 const frames = async (build) => {
   const view = await open({ camera: { position: [0, 3, 4], target: [0, 0, 0] } });
@@ -131,7 +141,11 @@ const sampleCopy = async (device) => {
   target.copyDepth(encoder, copy.createView(), 4, 'depth32float');
   const layout = device.createBindGroupLayout({
       entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float', multisampled: true } },
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'unfilterable-float', multisampled: true },
+        },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     }),
@@ -195,6 +209,32 @@ export const PACKAGES = {
     scene(engine);
     PostStack.attach(engine, [new Bloom({ strength: 0.6 }), new Tonemap()]);
   },
+  // KB2272: these three read each sample of a 4x scene depth, by sample_index at the full level and by one masked draw
+  // per sample at the compatibility level, which has no sample_index. PostStack's capture makes the scene 4x.
+  'sky fog 4x'(engine) {
+    scene(engine);
+    const post = PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
+    engine.use(new Sky({ hours: 10, timeScale: 0, fog: { depth: () => post.depthTexture, start: 1, density: 0.05 } }));
+  },
+  'environment volumetric 4x'(engine) {
+    scene(engine);
+    PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
+    VolumetricFog.attach(engine, { density: 0.05 });
+  },
+  'water spray 4x'(engine) {
+    scene(engine);
+    PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
+    const terrain = engine.gpu.createTexture({
+      size: [16, 16],
+      format: 'r32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
+    Water.attach(engine, {
+      segments: 4,
+      spray: true,
+      terrain: { heightmap: () => terrain, origin: [-8, -8], size: [16, 16] },
+    });
+  },
 };
 
 window.check = {
@@ -211,7 +251,9 @@ window.check = {
     const floorFull = await frames(floorScene),
       shadowFull = await frames(shadowScene),
       postFull = await frames(postScene),
-      edlFull = await frames(edlScene);
+      edlFull = await frames(edlScene),
+      fogFull = await frames(fogScene),
+      skyFull = await frames(skyScene);
 
     const adapters = allowCompatibilityAdapters({ force: true }),
       compat = await open({}),
@@ -242,7 +284,13 @@ window.check = {
     const shadowLevel = await frames(shadowScene),
       postLevel = await frames(postScene),
       edlLevel = await frames(edlScene),
+      fogLevel = await frames(fogScene),
+      skyLevel = await frames(skyScene),
       levels = {
+        sky: compare(skyFull.bytes, skyLevel.bytes),
+        fog: compare(fogFull.bytes, fogLevel.bytes),
+        fogFullDrawn: compare(skyFull.bytes, fogFull.bytes),
+        fogDrawn: compare(skyLevel.bytes, fogLevel.bytes),
         shadowCast: compare(floorFull.bytes, shadowFull.bytes),
         shadow: compare(shadowFull.bytes, shadowLevel.bytes),
         post: compare(postFull.bytes, postLevel.bytes),
@@ -250,7 +298,15 @@ window.check = {
         edlLit: edlLevel.bytes.reduce((sum, value, i) => sum + +(i % 4 === 0 && value > 100), 0),
         samplesFull,
         samples,
-        errors: [...shadowLevel.errors, ...postLevel.errors, ...edlLevel.errors],
+        errors: [
+          ...shadowLevel.errors,
+          ...postLevel.errors,
+          ...edlLevel.errors,
+          ...fogFull.errors,
+          ...fogLevel.errors,
+          ...skyFull.errors,
+          ...skyLevel.errors,
+        ],
       };
 
     const packages = {};
@@ -271,7 +327,18 @@ window.check = {
       if (view) close(view);
     }
     adapters.dispose();
-    return { fullLimits, limits, levels, pixels: pixels.length, different, pick: pick === mesh, miss: miss === null, afterLoss, coreErrors, packages };
+    return {
+      fullLimits,
+      limits,
+      levels,
+      pixels: pixels.length,
+      different,
+      pick: pick === mesh,
+      miss: miss === null,
+      afterLoss,
+      coreErrors,
+      packages,
+    };
   },
 };
 window.ready = true;

@@ -232,6 +232,15 @@ export function sceneTarget(c) {
   const target = c[owner];
   return target?.color === c.color && target.depth === c.depth ? target : undefined;
 }
+/**
+ * The samples a per-sample pass draws one at a time on `device`, for a `count`-sample target: `[null]` where the
+ * fragment shader can take `@builtin(sample_index)` (one draw), and every sample index where it cannot. The WebGPU
+ * compatibility level has no `sample_index` (and no sample interpolation), so there a pass draws once per sample with
+ * that sample's index as a constant and the pipeline's `multisample.mask` writing that sample alone.
+ */
+export function perSample(device, count) {
+  return count > 1 && compatibilityLevel(device) ? Array.from({ length: count }, (_, i) => i) : [null];
+}
 export function resolveMSAA(c) {
   sceneTarget(c)?.resolve(c.encoder);
 }

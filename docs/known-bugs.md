@@ -2300,14 +2300,24 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
 
-### Three routes still break WebGPU compatibility-level rules
+### Fixed 2026-11-11: three routes broke WebGPU compatibility-level rules (KB2272); surfels at 4x still refuse
 
-- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, `FogPass` in `@margoengine/sky`, the volumetric pass in `@margoengine/environment` and the spray in `@margoengine/water` take `@builtin(sample_index)` at 4x, found by reading the code and not yet run there. `SurfelPlugin` at 4x refuses with `unsupported`. A page can use the WebGL2 layer instead.
-- **Repro:** `npm run build:packages`, add the package to `PACKAGES` in `packages/webgl2-compat/test/adapter-browser.js`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, and read `packages` in `test-results/compat-adapter.json`.
-- **Cause:** the level has no `sample_index` in a fragment shader and no multisampled float format: neither r32float nor rgba16float, so the surfel sums have nothing to add into at 4x.
-- **Needed to close:** the routes `Shadows`, `SceneTarget` and eye-dome lighting took: a masked draw per sample (`packages/shared/msaa.js` `copyDepth`, `packages/points/src/plugin.ts` `edlPipelines`). Surfels need sums in a format the level multisamples, or a single-sample pass with its own copy of the scene depth. Then add the names to the list `adapter-browser.mjs` asserts.
+- **Was:** with `allowCompatibilityAdapters`, `FogPass` in `@margoengine/sky`, the `VolumetricFog` composite in `@margoengine/environment` and the spray in `@margoengine/water` failed pipeline creation at 4x ("sample_index is not supported in compatibility mode").
+- **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.
+- **Still open, surfels:** `SurfelPlugin` at 4x refuses with `unsupported`: its sums need a multisampled float target to add into and the level multisamples neither `r32float` nor `rgba16float`. A 1x pass needs a sampleable copy of the scene depth, which core's own 4x attachments do not have. Next idea: two `rg11b10ufloat` sum targets where the adapter has `rg11b10ufloat-renderable` (6-bit mantissa sums, to be measured), front depth packed into `rgba8unorm` as eye-dome lighting packs it, resolve by masked draws per sample.
 
-- **Lane C source audit (2026-11-10):** sky/fog.ts, environment/volumetric.ts and water/spray.ts retain their multisampled sample_index branches. points/surfels.ts still explicitly refuses 4x compatibility-level float accumulation. These repairs remain open; a per-sample masked draw fixes only the three depth consumers, not the surfel accumulation format. No new runtime pass or closure is claimed.
+### Sky and other packages draw HDR as display colour over PostStack's rg11b10ufloat capture (found 2026-11-11, open)
+
+- **What:** at WebGPU's compatibility level, `PostStack` captures 4x in `rg11b10ufloat`. `@margoengine/sky` (base, aerial, Hillaire, shafts, volumetric clouds) decides linear HDR output by `format === 'rgba16float'`, so over that capture it encodes for display and then the stack tonemaps again: the sky draws up to 19 of 255 brighter than at the full level (11,842 of 12,288 bytes differ, RTX A6000). About 25 more sites in animation, creative, environment, gltf-pro, lod, scatter, splats, terrain, voxel, voxel-pathtracer and water test the same way.
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, read `levels.sky`.
+- **Cause:** no shared "linear target" test; each package names `rgba16float` (some also `rgba32float`).
+- **Needed:** one predicate in `packages/shared` (float formats are linear) used at every site, then compare `levels.sky` at 0 and assert the fogged frames equal.
+
+### Lone Bloom fails at 4x on WebGPU's compatibility level (found 2026-11-11, open)
+
+- **What:** `Bloom.attach(engine)` without `PostStack` creates a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"). `PostStack` picks `rg11b10ufloat` there; Bloom alone does not.
+- **Repro:** in `packages/webgl2-compat/test/adapter-browser.js` attach `Bloom` alone in a `PACKAGES` case.
+- **Needed:** the same capture-format choice as `PostStack` (`captureFormat` in `packages/post/src/stack.ts`), with a case in the adapter check.
 
 ### External PBR display passes
 

@@ -1746,7 +1746,10 @@ its map a second time as float for the blocker search (a depth texture takes no 
 copies 4x depth with one masked draw per sample (no `sample_index`), points' eye-dome lighting does the same and draws its depth in a second pass, as bytes in rgba8unorm (r32float does not multisample at the level, and it has no blend to match the colour target's), the frame equal to the full level's on the forced device, Bloom keeps each level in its own texture (no two
 views of one texture in a dispatch) and `PostStack` captures 4x in `rg11b10ufloat`. Evidence in the same check: Shadows
 0 bytes apart from the full level with a real shadow on the floor, four depth samples read back as written, the post
-frame within 2 of 255. Missing: fog, volumetrics, points, water spray and soft `VirtualShadows` (known-bugs.md).
+frame within 2 of 255. Sky fog, the VolumetricFog composite and water spray also draw once per sample with a constant
+sample index and a one-sample mask (`perSample` in `packages/shared/msaa.js`, 2026-11-11), proved by the adapter check's
+4x cases and its fogged frame. Missing: surfels at 4x, a lone Bloom at 4x, and the float-target test the sky and about
+25 other sites make by naming rgba16float, which misreads the rg11b10ufloat capture (known-bugs.md).
 
 `@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
 runs with no page. Stages alive at once share one `gpu`, because `installGPU` changes globals, and `engine.start()` needs

@@ -14,7 +14,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
-import { sceneTarget } from '../../shared/msaa.js';
+import { perSample, sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { clusterCell, decayTerms, legacyTerms } from '../../shared/light-terms.js';
@@ -24,7 +24,9 @@ import { alphaBlend, groupCode, overlayPass, type SurfaceTransparency } from '..
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
-const defaultGrid = [160, 90, 64] as const, white = [1, 1, 1], jitterBases = [2, 3, 5];
+const defaultGrid = [160, 90, 64] as const,
+  white = [1, 1, 1],
+  jitterBases = [2, 3, 5];
 
 /** What VolumetricFog reads from `Shadows` (@margoengine/shadows) or `Clustered` (@margoengine/clustered): their WGSL and bindings. */
 export interface VolumetricLightSource {
@@ -308,8 +310,8 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
   private lightGroup?: { entries: GPUBindGroupEntry[]; group: GPUBindGroup };
   private shadowGroup?: { entries: GPUBindGroupEntry[]; group: GPUBindGroup };
   private mediumGroup?: { entries: GPUBindGroupEntry[]; group: GPUBindGroup };
-  private readonly composites = new Map<string, GPURenderPipeline>();
-  private compositeGroup?: { pipeline: GPURenderPipeline; view: GPUTextureView; group: GPUBindGroup };
+  private readonly composites = new Map<string, GPURenderPipeline[]>();
+  private compositeGroup?: { pipelines: GPURenderPipeline[]; view: GPUTextureView; groups: GPUBindGroup[] };
   private depthViews = new WeakMap<GPUTexture, GPUTextureView>();
   private frameIndex = 0;
   private valid = false;
@@ -651,45 +653,58 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     // Composite over the scene target (per sample when the depth is multisampled).
     const samples = c.descriptor.multisample?.count ?? 1,
       compositeKey = c.format + ':' + samples + ':' + multisampled;
-    let pipeline = this.composites.get(compositeKey);
-    if (!pipeline) {
-      const code = multisampled
-        ? composite
-            .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
-            .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
-            .replace('vec2i(position.xy),0)', 'vec2i(position.xy),i32(sample))')
-        : composite;
-      const module = device.createShaderModule({ code }),
-        blend: GPUBlendComponent = { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' };
-      pipeline = device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [{ format: c.format, blend: { color: blend, alpha: blend } }],
-        },
-        multisample: { count: samples },
+    let pipelines = this.composites.get(compositeKey);
+    if (!pipelines) {
+      // One draw reading sample_index, or at the compatibility level, which has none, one masked draw per sample.
+      pipelines = (multisampled ? perSample(device, samples) : [null]).map((sample) => {
+        const code = !multisampled
+          ? composite
+          : sample !== null
+            ? composite
+                .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+                .replace('vec2i(position.xy),0)', `vec2i(position.xy),${sample})`)
+            : composite
+                .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+                .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
+                .replace('vec2i(position.xy),0)', 'vec2i(position.xy),i32(sample))');
+        const module = device.createShaderModule({ code }),
+          blend: GPUBlendComponent = { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' };
+        return device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            targets: [{ format: c.format, blend: { color: blend, alpha: blend } }],
+          },
+          multisample: sample === null ? { count: samples } : { count: samples, mask: 1 << sample },
+        });
       });
-      this.composites.set(compositeKey, pipeline);
+      this.composites.set(compositeKey, pipelines);
     }
-    if (this.compositeGroup?.pipeline !== pipeline || this.compositeGroup.view !== depth)
+    if (this.compositeGroup?.pipelines !== pipelines || this.compositeGroup.view !== depth) {
+      const volume = this.textures[2].createView();
       this.compositeGroup = {
-        pipeline,
+        pipelines,
         view: depth,
-        group: this.group(pipeline, 0, [
-          { binding: 0, resource: { buffer: this.uniform! } },
-          { binding: 1, resource: this.textures[2].createView() },
-          { binding: 2, resource: this.sampler! },
-          { binding: 3, resource: depth },
-        ]),
+        groups: pipelines.map((pipeline) =>
+          this.group(pipeline, 0, [
+            { binding: 0, resource: { buffer: this.uniform! } },
+            { binding: 1, resource: volume },
+            { binding: 2, resource: this.sampler! },
+            { binding: 3, resource: depth },
+          ]),
+        ),
       };
+    }
     this.attachment.view = c.color;
     const draw = c.encoder.beginRenderPass(this.pass);
-    draw.setPipeline(pipeline);
-    draw.setBindGroup(0, this.compositeGroup.group);
     applyView(draw, c);
-    draw.draw(3);
+    for (let i = 0; i < pipelines.length; i++) {
+      draw.setPipeline(pipelines[i]);
+      draw.setBindGroup(0, this.compositeGroup.groups[i]);
+      draw.draw(3);
+    }
     draw.end();
     this.previous.set(m);
     v.copyWithin(36, 32, 36);

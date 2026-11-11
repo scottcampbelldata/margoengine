@@ -4,6 +4,7 @@ import { overlayPass } from '../../shared/pass.js';
 import { waterFrame, type CoastalFlow } from './coastal.js';
 import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
+import { perSample } from '../../shared/msaa.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // random(): the xxHash32 avalanche finaliser (Y. Collet, xxHash specification): primes 2246822519 = 0x85EBCA77 and
@@ -98,8 +99,8 @@ export class Spray {
   private readonly presentation = overlayPass();
   private readonly color = this.presentation.colorAttachments[0];
   private readonly depth = this.presentation.depthStencilAttachment;
-  private render?: GPURenderPipeline;
-  private renderGroup?: GPUBindGroup;
+  private renders: GPURenderPipeline[] = [];
+  private renderGroups: GPUBindGroup[] = [];
   private format = '';
   private depthFormat = '';
   private sampled?: GPUTexture;
@@ -137,54 +138,72 @@ export class Spray {
   draw(c: Context, surface: GPUTexture, view: GPUTextureView, fog?: GPUBuffer): void {
     const key = c.format + ':' + surface.sampleCount + (fog ? ':fog' : '');
     if (this.format !== key || this.depthFormat !== surface.format) {
-      const source = fog ? foggedRender() : render;
-      const code =
-        surface.sampleCount === 4
-          ? source
-              .replace('surface:texture_depth_2d', 'surface:texture_depth_multisampled_2d')
-              .replace('fragment(i:Output)', 'fragment(i:Output,@builtin(sample_index) sample:u32)')
-              .replace('textureLoad(surface,vec2i(i.clip.xy),0)', 'textureLoad(surface,vec2i(i.clip.xy),i32(sample))')
-          : source;
-      const module = c.device.createShaderModule({ code });
-      this.render = c.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [
-            {
-              format: c.format,
-              blend: {
-                color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+      const source = fog ? foggedRender() : render,
+        count = surface.sampleCount;
+      // Per sample at 4x: one draw reading sample_index, or at the compatibility level, which has none, one masked
+      // draw per sample.
+      this.renders = perSample(c.device, count).map((sample) => {
+        const multisampled = source.replace('surface:texture_depth_2d', 'surface:texture_depth_multisampled_2d'),
+          code =
+            count === 1
+              ? source
+              : sample !== null
+                ? multisampled.replace(
+                    'textureLoad(surface,vec2i(i.clip.xy),0)',
+                    `textureLoad(surface,vec2i(i.clip.xy),${sample})`,
+                  )
+                : multisampled
+                    .replace('fragment(i:Output)', 'fragment(i:Output,@builtin(sample_index) sample:u32)')
+                    .replace(
+                      'textureLoad(surface,vec2i(i.clip.xy),0)',
+                      'textureLoad(surface,vec2i(i.clip.xy),i32(sample))',
+                    );
+        const module = c.device.createShaderModule({ code });
+        return c.device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            targets: [
+              {
+                format: c.format,
+                blend: {
+                  color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                },
               },
-            },
-          ],
-        },
-        depthStencil: { format: surface.format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
-        multisample: { count: surface.sampleCount },
+            ],
+          },
+          depthStencil: { format: surface.format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+          multisample: sample === null ? { count } : { count, mask: 1 << sample },
+        });
       });
       this.format = key;
       this.depthFormat = surface.format;
       this.sampled = undefined;
     }
     if (this.sampled !== surface || this.sampledFog !== fog) {
-      this.renderGroup = group(c.device, this.render!, [
-        { buffer: this.uniform },
-        { buffer: this.buffer },
-        surface.createView({ aspect: 'depth-only' }),
-        ...(fog ? [{ buffer: fog }] : []),
-      ]);
+      const view = surface.createView({ aspect: 'depth-only' });
+      this.renderGroups = this.renders.map((pipeline) =>
+        group(c.device, pipeline, [
+          { buffer: this.uniform },
+          { buffer: this.buffer },
+          view,
+          ...(fog ? [{ buffer: fog }] : []),
+        ]),
+      );
       this.sampled = surface;
       this.sampledFog = fog;
     }
     this.color.view = c.color;
     this.depth.view = view;
     const pass = c.encoder.beginRenderPass(this.presentation);
-    pass.setPipeline(this.render!);
-    pass.setBindGroup(0, this.renderGroup!);
-    pass.draw(6, 2048);
+    for (let i = 0; i < this.renders.length; i++) {
+      pass.setPipeline(this.renders[i]);
+      pass.setBindGroup(0, this.renderGroups[i]);
+      pass.draw(6, 2048);
+    }
     pass.end();
   }
   dispose(): void {

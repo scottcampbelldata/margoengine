@@ -7,7 +7,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 
 // Both feature levels here are native WebGPU, independent of the caller's forced WebGL2 run.
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/adapter.html', port: 'free', compat: false }),
+const context = await openBrowser({
+    startPath: '/packages/webgl2-compat/test/adapter.html',
+    port: 'free',
+    compat: false,
+  }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -42,8 +46,33 @@ try {
   console.log('levels', JSON.stringify({ edl: result.levels.edl, lit: result.levels.edlLit }));
   assert.ok(result.levels.edlLit > 0, 'points reach the frame');
   assert.equal(result.levels.edl.count, 0, 'the eye-dome lit frame is the same at both levels');
+  // Sky fog reads each of the four depth samples by a masked draw per sample (no sample_index at the level) and fogs the
+  // frame there as the sample_index draw does at the full level. The two frames are not compared byte for byte: the
+  // sky itself draws apart over PostStack's rg11b10ufloat capture at the level (docs/known-bugs.md, "rg11b10ufloat").
+  console.log(
+    'fog',
+    JSON.stringify({
+      sky: result.levels.sky,
+      fog: result.levels.fog,
+      full: result.levels.fogFullDrawn,
+      level: result.levels.fogDrawn,
+    }),
+  );
+  assert.ok(result.levels.fogFullDrawn.count > 6000, 'the fog changes the full-level frame');
+  assert.ok(result.levels.fogDrawn.count > 6000, 'the fog changes the frame at the level');
   // Each of these runs on the level.
-  for (const name of ['core alone', 'virtual shadows soft', 'materials createMesh', 'materials createInstancedMesh', 'shadows', 'culling', 'post bloom and tonemap'])
+  for (const name of [
+    'core alone',
+    'virtual shadows soft',
+    'materials createMesh',
+    'materials createInstancedMesh',
+    'shadows',
+    'culling',
+    'post bloom and tonemap',
+    'sky fog 4x',
+    'environment volumetric 4x',
+    'water spray 4x',
+  ])
     assert.match(result.packages[name], /^ok, [1-9]/, name);
   assert.deepEqual(pageErrors, []);
 } finally {

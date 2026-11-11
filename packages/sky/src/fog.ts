@@ -1,6 +1,6 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
-import { sceneTarget } from '../../shared/msaa.js';
+import { perSample, sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
@@ -46,8 +46,8 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
       attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' },
       descriptor: GPURenderPassDescriptor = { colorAttachments: [attachment] };
     let uniform: GPUBuffer | undefined,
-      pipeline: GPURenderPipeline | undefined,
-      bind: GPUBindGroup | undefined,
+      pipelines: GPURenderPipeline[] = [],
+      binds: GPUBindGroup[] = [],
       bound: GPUTextureView | GPUTexture | undefined,
       key = '';
     return {
@@ -73,44 +73,51 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
           next = c.format + ':' + samples + ':' + depthSamples;
         uniform ??= c.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         if (key !== next) {
-          const source =
-            depthSamples === 1
-              ? shader
-              : shader
-                  .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
-                  .replace('fogFragment(i:Vertex)', 'fogFragment(i:Vertex,@builtin(sample_index) sample:u32)')
-                  .replace('vec2i(i.position.xy),0', 'vec2i(i.position.xy),i32(sample)');
-          const module = c.device.createShaderModule({ code: source });
-          pipeline = c.device.createRenderPipeline({
-            layout: 'auto',
-            vertex: { module, entryPoint: 'vertex' },
-            fragment: {
-              module,
-              entryPoint: 'fogFragment',
-              targets: [
-                {
-                  format: c.format,
-                  blend: {
-                    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                    alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+          // Per sample over multisampled depth: one draw reading sample_index, or at the compatibility level, which has
+          // no sample_index, one masked draw per sample.
+          pipelines = (depthSamples === 1 ? [null] : perSample(c.device, samples)).map((sample) => {
+            const source =
+              depthSamples === 1
+                ? shader
+                : sample !== null
+                  ? shader
+                      .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+                      .replace('vec2i(i.position.xy),0', `vec2i(i.position.xy),${sample}`)
+                  : shader
+                      .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+                      .replace('fogFragment(i:Vertex)', 'fogFragment(i:Vertex,@builtin(sample_index) sample:u32)')
+                      .replace('vec2i(i.position.xy),0', 'vec2i(i.position.xy),i32(sample)');
+            const module = c.device.createShaderModule({ code: source });
+            return c.device.createRenderPipeline({
+              layout: 'auto',
+              vertex: { module, entryPoint: 'vertex' },
+              fragment: {
+                module,
+                entryPoint: 'fogFragment',
+                targets: [
+                  {
+                    format: c.format,
+                    blend: {
+                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                      alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+                    },
                   },
-                },
-              ],
-            },
-            multisample: c.descriptor.multisample,
+                ],
+              },
+              multisample: sample === null ? c.descriptor.multisample : { count: samples, mask: 1 << sample },
+            });
           });
           key = next;
           bound = undefined;
         }
         if (bound !== (live ?? depth)) {
-          bind = c.device.createBindGroup({
-            layout: pipeline!.getBindGroupLayout(0),
-            entries: [
-              ...entries,
-              { binding: 3, resource: live ?? depth.createView({ aspect: 'depth-only' }) },
-              { binding: 4, resource: { buffer: uniform } },
-            ],
-          });
+          const view = live ?? depth.createView({ aspect: 'depth-only' });
+          binds = pipelines.map((pipeline) =>
+            c.device.createBindGroup({
+              layout: pipeline.getBindGroupLayout(0),
+              entries: [...entries, { binding: 3, resource: view }, { binding: 4, resource: { buffer: uniform! } }],
+            }),
+          );
           bound = live ?? depth;
         }
         values[0] = fog.density ?? 0.01;
@@ -123,9 +130,11 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         attachment.view = c.color;
         const pass = c.encoder.beginRenderPass(descriptor);
         applyView(pass, c);
-        pass.setPipeline(pipeline!);
-        pass.setBindGroup(0, bind!);
-        pass.draw(3);
+        for (let i = 0; i < pipelines.length; i++) {
+          pass.setPipeline(pipelines[i]);
+          pass.setBindGroup(0, binds[i]);
+          pass.draw(3);
+        }
         pass.end();
       },
       release() {

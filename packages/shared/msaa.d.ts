@@ -17,6 +17,8 @@ export class SceneTarget {
   present(context: Context): void;
   dispose(): void;
 }
+/** `[null]` where a fragment shader can read `@builtin(sample_index)`, else each sample index (compatibility level). */
+export function perSample(device: GPUDevice, count: number): (number | null)[];
 export function sceneTarget(context: Context): SceneTarget | undefined;
 export function resolveMSAA(context: Context): void;
 
