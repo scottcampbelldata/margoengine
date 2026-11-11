@@ -1622,7 +1622,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
-| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `268bfc625` |
+| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `96136151cd` |
 | quality-presets | `96daac7` -> `01e5e35` | `6a958e532` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
@@ -1679,6 +1679,8 @@ rewrite; call counts, descriptors, bindings and every buffer write are unchanged
 7,734 calls as before).
 
 - **clustered-area-lights, clustered-light-hooks, clustered-local-shadows:** 10 of 241 calls per story (shader
+
+**water-ssr, advanced to `96136151cd` on 2026-11-11 (bug sweep L4, KB5736a):** against `da12bd07e`, 2 of the 1,606 calls of the terrain story differ, both the `createShaderModule` of the coast flow kernel (1,558 to 1,772 characters): `96136151cd` deliberately caps each pipe's speed at Froude 4 and half a cell per step, so a 10 m fall no longer reaches 240 m/s (regression `packages/water/test/rivers.test.js`). The other two stories, call counts, pipelines, bind groups, buffers and every buffer write are unchanged. Built at the parent `96136151cd^`, the terrain story still matched the `da12bd07e` golden, so no earlier commit moved the log. The golden was recaptured at the fix commit with capture.mjs.
   modules only): the light loop's falloff and cone are now `packages/shared/light-terms.js`'s `legacyTerms` (window
   `clamp(1 - (d/range)^4, 0, 1)^2` over `max(d^2, 2^-12)` instead of `0.01`; the same Hermite cone, written with a
   `ramp` local and a 1e-6 instead of 1e-5 guard; `adff4e06`).
