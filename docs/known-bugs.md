@@ -1,5 +1,14 @@
 # Known bugs and unverified features
 
+### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
+
+- **Repro:** an EXR whose `chromaticities` attribute names ACEScg (AP1) primaries and one pixel (1, 0, 0): `parseEXR`,
+  `/exr-tiled` and the `/exr-codecs` worker return (1, 0, 0), where linear sRGB is about (1.705, -0.130, -0.024).
+- **Cause:** `packages/environment/src/exr.ts` skips the `chromaticities` attribute (OpenEXR technical introduction,
+  "chromaticities" standard attribute), so every decode path treats the data as Rec.709.
+- **Fix to build:** read the attribute in the shared header parser and apply the RP 177 plus Bradford matrix `parseHDR`
+  uses for Radiance PRIMARIES (`packages/environment/src/hdr.ts` `toSRGB`) in each decode path, with an AP1 test.
+
 ### Lines without tiles pay for tiled capture (proofs lane, 2026-11-10, open)
 
 - **Repro:** `node examples/package-benchmarks/proofs/lines-perspective.proof.js 3e6479d7e^ 3e6479d7e`: a scene that

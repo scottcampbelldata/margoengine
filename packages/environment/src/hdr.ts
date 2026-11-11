@@ -15,6 +15,11 @@ export interface HDRImage extends FloatImage {
   exposure: number;
   /** Value of the GAMMA header line (1 when absent). Not applied to `data`. */
   gamma: number;
+  /**
+   * The COLORCORR header lines multiplied together per primary (`[1, 1, 1]` when absent): a colour balance the
+   * writer already applied to the pixels, as EXPOSURE is a brightness already applied. Not applied to `data`.
+   */
+  colorCorrection: [number, number, number];
   /** Floats per pixel in `data`: 4 (RGBA, the default) or 3 (RGB, `channels: 3`). */
   channels: 3 | 4;
   /** How the file was stored. */
@@ -35,6 +40,17 @@ export interface HDRDiagnostics {
   headerBytes: number;
   /** Bytes after the last scanline, ignored. */
   trailingBytes: number;
+  /**
+   * The PRIMARIES header (red, green, blue and white CIE xy chromaticities), `null` when the file has none or the line
+   * is not eight numbers. Files without a usable line (Photoshop writes eight zeros), and files naming the sRGB /
+   * Rec.709 (D65) or the Radiance standard primaries, decode unchanged as linear sRGB.
+   */
+  primaries: number[] | null;
+  /**
+   * True when the pixels were converted from other PRIMARIES to linear sRGB / Rec.709 (D65), white adapted with the
+   * Bradford transform. Colours outside the sRGB gamut then carry negative components; lighting reads them as 0.
+   */
+  primariesConverted: boolean;
 }
 
 /** Bounds `parseHDR` checks before it allocates the image. */
@@ -116,7 +132,9 @@ export function parseHDR(source: ArrayBuffer | ArrayBufferView, options: HDRPars
   if (!/^#\?(RADIANCE|RGBE)/.test(magic)) throw invalid('missing #?RADIANCE signature');
   let format = '',
     exposure = 1,
-    gamma = 1;
+    gamma = 1,
+    primaries: number[] | null = null;
+  const colorCorrection: [number, number, number] = [1, 1, 1];
   for (;;) {
     const line = readLine();
     if (line === '') break;
@@ -132,8 +150,16 @@ export function parseHDR(source: ArrayBuffer | ArrayBufferView, options: HDRPars
     } else if (key === 'GAMMA') {
       const v = Number(value);
       if (Number.isFinite(v) && v > 0) gamma = v;
+    } else if (key === 'COLORCORR') {
+      const v = value.split(/[ 	]+/).map(Number);
+      if (v.length === 3 && v.every((n) => Number.isFinite(n) && n > 0)) for (let i = 0; i < 3; i++) colorCorrection[i] *= v[i];
+    } else if (key === 'PRIMARIES') {
+      const v = value.split(/[ 	]+/).map(Number);
+      if (v.length === 8 && v.every(Number.isFinite)) primaries = v;
     }
   }
+  // A line that names no colour space (Photoshop writes eight zeros) decodes as a file without one.
+  const convert = primaries && toSRGB(primaries);
   if (format === '32-bit_rle_xyze')
     throw new MargoError(
       'unsupported',
@@ -202,6 +228,10 @@ export function parseHDR(source: ArrayBuffer | ArrayBufferView, options: HDRPars
         data[o + 1] = scanline[n * 4 + 1] * scale;
         data[o + 2] = scanline[n * 4 + 2] * scale;
       }
+      if (convert) {
+        const [r, g, b] = [data[o], data[o + 1], data[o + 2]];
+        for (let i = 0; i < 3; i++) data[o + i] = convert[i] * r + convert[i + 3] * g + convert[i + 6] * b;
+      }
       if (channels === 4) data[o + 3] = 1;
     }
   }
@@ -212,8 +242,62 @@ export function parseHDR(source: ArrayBuffer | ArrayBufferView, options: HDRPars
     scanlines: counts,
     headerBytes,
     trailingBytes: bytes.length - position,
+    primaries,
+    primariesConverted: !!convert,
   };
-  return { width, height, data, exposure, gamma, channels, diagnostics };
+  return { width, height, data, exposure, gamma, colorCorrection, channels, diagnostics };
+}
+
+// Column-major 3x3 helpers in float64.
+type M3 = number[];
+const mul = (a: M3, b: M3): M3 =>
+  Array.from({ length: 9 }, (_, k) => {
+    const c = (k / 3) | 0,
+      r = k % 3;
+    return a[r] * b[c * 3] + a[r + 3] * b[c * 3 + 1] + a[r + 6] * b[c * 3 + 2];
+  });
+const inverse = (m: M3): M3 | null => {
+  const [a, b, c, d, e, f, g, h, i] = m,
+    A = e * i - f * h,
+    B = f * g - d * i,
+    C = d * h - e * g,
+    det = a * A + b * B + c * C;
+  if (!(Math.abs(det) > 1e-12)) return null;
+  return [A, c * h - b * i, b * f - c * e, B, a * i - c * g, c * d - a * f, C, b * g - a * h, a * e - b * d].map(
+    (v) => v / det,
+  );
+};
+const xyz = (x: number, y: number) => [x / y, 1, (1 - x - y) / y];
+// RGB to XYZ from the primaries' and white's chromaticities (SMPTE RP 177-1993, section 3.3).
+const rgbToXYZ = (p: number[]): M3 | null => {
+  const P = [...xyz(p[0], p[1]), ...xyz(p[2], p[3]), ...xyz(p[4], p[5])],
+    inv = inverse(P);
+  if (!inv) return null;
+  const w = xyz(p[6], p[7]),
+    s = [0, 1, 2].map((r) => inv[r] * w[0] + inv[r + 3] * w[1] + inv[r + 6] * w[2]);
+  return P.map((v, k) => v * s[(k / 3) | 0]);
+};
+// sRGB / Rec.709 primaries with the D65 white (IEC 61966-2-1, ITU-R BT.709-6), and the Radiance standard primaries a
+// file without a PRIMARIES line is defined to use (Radiance picture format notes); both decode unchanged.
+const SRGB = [0.64, 0.33, 0.3, 0.6, 0.15, 0.06, 0.3127, 0.329],
+  RADIANCE = [0.64, 0.33, 0.29, 0.6, 0.15, 0.06, 0.333, 0.333];
+// Bradford cone response matrix (Lam 1985, as given by Susstrunk, Holm and Finlayson 2001), column-major.
+const BRADFORD = [0.8951, -0.7502, 0.0389, 0.2664, 1.7135, -0.0685, -0.1614, 0.0367, 1.0296];
+
+// The column-major matrix taking linear RGB in `p` to linear sRGB (D65), or null when no conversion is needed or the
+// primaries span no colour space.
+function toSRGB(p: number[]): M3 | null {
+  if ([SRGB, RADIANCE].some((q) => q.every((v, i) => Math.abs(v - p[i]) < 0.0015))) return null;
+  const source = rgbToXYZ(p),
+    target = inverse(rgbToXYZ(SRGB)!);
+  if (!source || !target) return null;
+  const cone = (w: number[]) => [0, 1, 2].map((r) => BRADFORD[r] * w[0] + BRADFORD[r + 3] * w[1] + BRADFORD[r + 6] * w[2]),
+    from = cone(xyz(p[6], p[7])),
+    to = cone(xyz(SRGB[6], SRGB[7])),
+    scale = [to[0] / from[0], 0, 0, 0, to[1] / from[1], 0, 0, 0, to[2] / from[2]],
+    adapt = mul(inverse(BRADFORD)!, mul(scale, BRADFORD)),
+    m = mul(target, mul(adapt, source));
+  return m.every(Number.isFinite) ? m : null;
 }
 
 // Decodes stored scanline `index` (`length` pixels) at `position` into `out` as RGBE bytes.

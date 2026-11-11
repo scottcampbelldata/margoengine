@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14770932,
+  "total": 14772087,
   "history": [
     {
       "date": "2026-10-24",
@@ -8285,6 +8285,12 @@
       "commit": "2d90bd4e1f",
       "reason": "terrain floatingOrigin (TerrainOptions.floatingOrigin, closes known-bugs U6): float64 ring and cache planning, layer wrap and tone rules, the origin shader edits and the anchor uniform. Measured gzip before -> after: terrain 13318 -> 14003, terrain/stream 12468 -> 13209 (bundles the root), terrain/rvt 6339 -> 6870, terrain/deform 5026 -> 5232. A separate /origin entry was ruled out in the plan: the ring snap and layer sampling live in the root prepare and shader, so the root would keep the same hooks and users would wrap their origin twice",
       "grew": 4
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "bd66d45232",
+      "reason": "environment: parseHDR converts Radiance PRIMARIES to linear sRGB (RP 177 matrix, Bradford white) and reports COLORCORR (Rust port R10); entry 31,647 to 32,108 B gzip, the price of correct colour from wide-gamut HDRs, no split possible in a synchronous parser",
+      "grew": 1
     }
   ],
   "items": {
@@ -8569,7 +8575,7 @@
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/environment": 31917,
+    "@margoengine/environment": 33072,
     "@margoengine/environment dist/workers/exr-codecs.js": 1835,
     "@margoengine/environment/blend": 4687,
     "@margoengine/environment/cube-camera": 5882,

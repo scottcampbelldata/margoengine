@@ -231,3 +231,45 @@ test("a generated corpus decodes bit-identically to Margo Voxel Studio's decoder
 });
 const CORPUS_DECODED = 544;
 const CORPUS_SHA256 = '75e5c1a7ea5aa793c0eac808f84bffb2e48fe6afea43b50808ccd71488e7424e';
+
+// Radiance picture format notes: PRIMARIES names the file's RGB chromaticities, COLORCORR a per-primary balance already
+// applied. ACEScg (AP1, ACES white) red in linear sRGB D65 is the first column of the Bradford-adapted AP1 to sRGB
+// matrix (1.70505, -0.13026, -0.02400; ACES TB-2014-004 primaries, Lindbloom's RGB working-space derivation).
+const AP1 = 'PRIMARIES= 0.713 0.293 0.165 0.830 0.128 0.044 0.32168 0.33767\n';
+const withHeader = (lines, body) => hdr('-Y 1 +X 2', body, `#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n${lines}\n`);
+test('PRIMARIES other than sRGB convert to linear sRGB; white stays white', () => {
+  const map = parseHDR(withHeader(AP1, [128, 0, 0, 129, 128, 128, 128, 129]));
+  const near = (actual, expected, tolerance) =>
+    expected.forEach((v, i) => assert.ok(Math.abs(actual[i] - v) <= tolerance, `${actual[i]} vs ${v}`));
+  near(map.data.slice(0, 3), [1.70505, -0.13026, -0.024], 2e-3);
+  near(map.data.slice(4, 7), [1, 1, 1], 1e-5);
+  assert.equal(map.diagnostics.primariesConverted, true);
+  assert.deepEqual(map.diagnostics.primaries, [0.713, 0.293, 0.165, 0.83, 0.128, 0.044, 0.32168, 0.33767]);
+});
+
+test('sRGB, Radiance standard and unusable PRIMARIES decode unchanged', () => {
+  for (const line of [
+    'PRIMARIES= 0.64 0.33 0.3 0.6 0.15 0.06 0.3127 0.329\n',
+    'PRIMARIES= 0.640 0.330 0.290 0.600 0.150 0.060 0.333 0.333\n',
+    // Photoshop's line, then a short line, a degenerate triangle and text: none names a colour space.
+    'PRIMARIES=0 0 0 0 0 0 0 0\n',
+    'PRIMARIES= 0.64 0.33\n',
+    'PRIMARIES= 0.3 0.3 0.3 0.3 0.3 0.3 0.3127 0.329\n',
+    'PRIMARIES= a b c d e f g h\n',
+    '',
+  ]) {
+    const map = parseHDR(withHeader(line, [128, 64, 32, 129, 32, 64, 128, 130]));
+    assert.deepEqual([...map.data], [1, 0.5, 0.25, 1, 0.5, 1, 2, 1], line);
+    assert.equal(map.diagnostics.primariesConverted, false);
+  }
+  const zeros = parseHDR(withHeader('PRIMARIES=0 0 0 0 0 0 0 0\n', [0, 0, 0, 0, 0, 0, 0, 0]));
+  assert.deepEqual(zeros.diagnostics.primaries, [0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(parseHDR(withHeader('PRIMARIES= 1 2\n', [0, 0, 0, 0, 0, 0, 0, 0])).diagnostics.primaries, null);
+});
+
+test('COLORCORR lines multiply per primary and are reported, not applied', () => {
+  const map = parseHDR(withHeader('COLORCORR= 1.2 1 0.8\nCOLORCORR= 0.5 2 1\n', [128, 0, 0, 129, 0, 0, 0, 0]));
+  assert.deepEqual(map.colorCorrection, [0.6, 2, 0.8]);
+  assert.deepEqual([...map.data.slice(0, 3)], [1, 0, 0]);
+  assert.deepEqual(parseHDR(withHeader('', [128, 0, 0, 129, 0, 0, 0, 0])).colorCorrection, [1, 1, 1]);
+});

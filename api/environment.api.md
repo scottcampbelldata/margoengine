@@ -279,11 +279,14 @@ export interface HDRDiagnostics {
     };
     headerBytes: number;
     trailingBytes: number;
+    primaries: number[] | null;
+    primariesConverted: boolean;
 }
 
 export interface HDRImage extends FloatImage {
     exposure: number;
     gamma: number;
+    colorCorrection: [number, number, number];
     channels: 3 | 4;
     diagnostics: HDRDiagnostics;
 }
