@@ -61,18 +61,20 @@ export function casterRuntime(source, engine, noun) {
 }
 
 /** The bind group of a displaced caster (shared/displacement.js): its feature uniform, map and sampler; else undefined.
- * `layout` is called only when there is a displacement. */
-export const displacementGroup = (device, layout, displacement) =>
-  displacement
-    ? device.createBindGroup({
-        layout: layout(),
-        entries: displacement.entries?.() ?? [
-          { binding: 0, resource: { buffer: displacement.buffer } },
-          { binding: 1, resource: displacement.view },
-          { binding: 2, resource: displacement.sampler },
-        ],
-      })
-    : undefined;
+ * `layout` is called only when there is a displacement. A node graph's displacement can read none of its bindings (a
+ * constant move). An automatic layout (`pipeline.getBindGroupLayout`) then has no such group, since a default pipeline
+ * layout stops at the highest group the shader uses (WebGPU 10.1.1), so no group is made: WebKit refuses that layout,
+ * where Chromium hands back an empty one. `explicit` says `layout` is a group of the caller's own pipeline layout, which
+ * needs a bind group even when it is empty. */
+export const displacementGroup = (device, layout, displacement, explicit = false) => {
+  if (!displacement) return undefined;
+  const entries = displacement.entries?.() ?? [
+    { binding: 0, resource: { buffer: displacement.buffer } },
+    { binding: 1, resource: displacement.view },
+    { binding: 2, resource: displacement.sampler },
+  ];
+  return entries.length || explicit ? device.createBindGroup({ layout: layout(), entries }) : undefined;
+};
 
 /**
  * WGSL of a material's opacity map (materials `alphaMap`, green channel, its own UV rows 0 and 1 of the feature uniform):

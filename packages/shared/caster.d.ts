@@ -63,11 +63,16 @@ export function casterPipeline(
 export function nodeRecords<N, K, R>(draws: Map<N, Map<K, R>>, node: N): Map<K, R>;
 /** The runtime object of a caster source; throws MargoError 'disposed' or 'attached'. */
 export function casterRuntime<S extends object, R>(source: S, engine: unknown, noun: string): R;
-/** The bind group of a displaced caster: its feature uniform, map and sampler; else undefined. */
+/**
+ * The bind group of a displaced caster: its feature uniform, map and sampler; else undefined. Also undefined when the
+ * displacement binds nothing and `layout` is an automatic layout's group (`explicit` false, the default), which a
+ * default pipeline layout does not hold.
+ */
 export function displacementGroup(
   device: GPUDevice,
   layout: () => GPUBindGroupLayout,
   displacement: CasterDisplacement | undefined,
+  explicit?: boolean,
 ): GPUBindGroup | undefined;
 /** WGSL of an opacity map at bindings `first` to `first` + 2 (default 4) of `group`, and `margoOpacityAt` of both UV sets. */
 export function opacityCode(group: number, first?: number): string;

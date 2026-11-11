@@ -22,6 +22,7 @@ import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorde
 import { Texture } from '../../materials/dist/index.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { instancedDepth } from '../../shared/instances.js';
+import { displacementGroup } from '../../shared/caster.js';
 
 const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
 const { shadowDepth } = await import('../../shadows/src/shader.ts');
@@ -111,6 +112,36 @@ test('the depth bind group holds what the depth shader reaches, not what only th
     kinds = cut.layout().entries.map((e) => Object.keys(e).find((k) => k !== 'binding' && k !== 'visibility'));
   assert.deepEqual(kinds.sort(), ['sampler', 'texture']);
   assert.equal(cut.cuts, true);
+});
+
+test('a constant move binds nothing, so an automatic layout gets no displacement group and an explicit one an empty group', () => {
+  // WebKit sweep: materials cutout-passes and inspector shaders. A constant positionNode reaches no binding, so TAA's
+  // velocity pipeline (layout 'auto') used group 0 only; getBindGroupLayout(1) was out of the default layout's range
+  // (WebGPU 10.1.1 makes groups up to the highest one used), WebKit made it invalid and createBindGroup failed.
+  const made = {
+      createBindGroupLayout: (d) => d,
+      createBuffer: (d) => ({ ...d, destroy() {} }),
+      queue: { writeBuffer() {} },
+    },
+    moved = new NodeMaterial({ positionNode: positionLocal.add(vec3(1.2, 0, 0)) }).caster(made);
+  assert.ok(moved, 'the move is a caster displacement');
+  assert.deepEqual(moved.entries(), []);
+  const groups = [],
+    device = { createBindGroup: (d) => (groups.push(d), d) };
+  let asked = 0;
+  const auto = () => {
+    asked++;
+    throw new Error('an automatic layout has no group the shader does not use');
+  };
+  assert.equal(displacementGroup(device, auto, moved), undefined);
+  assert.equal(asked, 0);
+  const own = moved.layout();
+  assert.deepEqual(own.entries, []);
+  assert.deepEqual(displacementGroup(device, () => own, moved, true), { layout: own, entries: [] });
+  // A move that reads a uniform still gets its group from the automatic layout.
+  const read = new NodeMaterial({ positionNode: positionLocal.mul(uniform(1)) }).caster(made);
+  assert.equal(displacementGroup(device, () => 'auto group 1', read).layout, 'auto group 1');
+  assert.equal(groups.length, 2);
 });
 
 test('a graph with nothing for a depth pass has no caster, so it stays a static plain caster', () => {

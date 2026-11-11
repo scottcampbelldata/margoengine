@@ -1239,7 +1239,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           key,
           displacement,
           opacity,
-          displaced: displacementGroup(this.device!, () => this.displacementLayout(displacement), displacement),
+          displaced: displacementGroup(this.device!, () => this.displacementLayout(displacement), displacement, true),
           sphere: new Float32Array([0, 0, 0, Number.NaN]),
           stale: true,
         };
