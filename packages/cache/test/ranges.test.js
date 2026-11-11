@@ -221,3 +221,29 @@ test('progressive glTF streaming loads through the cache, and again offline from
   assert.equal(network.log.length, before + 1, 'one failed revalidation, no other request');
   assert.ok(offline.stats.hits > 2 && offline.stats.misses === 0);
 });
+
+test('under a weak ETag, blocks of two versions are never combined in one answer', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const files = { '/weak.glb': { body: bytes(4000, 1), etag: 'W/"same"' } },
+    network = server(files),
+    cache = new RangeCache({ name: 'weak', block: B, fetch: network });
+  assert.deepEqual(await read(await get(cache, 'weak.glb', 'bytes=0-9')), files['/weak.glb'].body.slice(0, 10));
+  await cache.flush();
+  // Same size, same weak tag, new bytes: nothing tells the cache the first block is stale.
+  files['/weak.glb'] = { body: bytes(4000, 2), etag: 'W/"same"' };
+  assert.deepEqual(await read(await get(cache, 'weak.glb', 'bytes=1100-1109')), files['/weak.glb'].body.slice(1100, 1110));
+  await cache.flush();
+  const both = await read(await get(cache, 'weak.glb', 'bytes=0-1500'));
+  assert.deepEqual(both, files['/weak.glb'].body.slice(0, 1501), 'every byte of one answer comes from the same version');
+});
+
+test('under a strong ETag block requests carry If-Range with it', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const body = bytes(4000, 3),
+    network = server({ '/strong.glb': { body, etag: '"abc"' } }),
+    cache = new RangeCache({ name: 'strong', block: B, fetch: network });
+  await read(await get(cache, 'strong.glb', 'bytes=0-9'));
+  await cache.flush();
+  await read(await get(cache, 'strong.glb', 'bytes=1100-1109'));
+  assert.equal(network.log.at(-1).headers['if-range'], '"abc"');
+});

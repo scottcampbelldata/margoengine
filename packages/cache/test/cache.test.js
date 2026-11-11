@@ -244,3 +244,36 @@ test('@margoengine/loaders fetchBytes takes cache.fetch and loads offline from t
   assert.deepEqual(await fetchBytes(base + 'scan.ply', { fetch: offline.fetch }), bytes(20));
   assert.equal(offline.stats.offline, 1);
 });
+
+test('request cache modes: no-store skips the store, reload replaces the copy, no-cache revalidates a fresh copy', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const files = { '/m.glb': { body: bytes(500), etag: '"v1"', control: 'max-age=3600' } },
+    network = server(files);
+  const cache = new AssetCache({ name: 'modes', fetch: network });
+  const get = (init) => cache.fetch(base + 'm.glb', init);
+  // no-store: answered by the network and never stored.
+  assert.deepEqual(await read(await get({ cache: 'no-store' })), files['/m.glb'].body);
+  await cache.flush();
+  assert.equal(cache.stats.stored, 0);
+  // A normal fetch stores it; a second normal fetch is fresh and does not touch the network.
+  await read(await get());
+  await cache.flush();
+  await read(await get());
+  assert.equal(network.log.length, 2);
+  // no-cache: the fresh copy is revalidated with its ETag (304), then served.
+  const before = network.log.length;
+  assert.deepEqual(await read(await get({ cache: 'no-cache' })), files['/m.glb'].body);
+  assert.equal(network.log.length, before + 1);
+  assert.equal(network.log.at(-1).etag, '"v1"');
+  // A request Cache-Control: no-cache does the same.
+  await read(await get({ headers: { 'cache-control': 'no-cache' } }));
+  assert.equal(network.log.length, before + 2);
+  // reload: ignores the stored copy, fetches it whole (no conditional header) and stores the answer.
+  files['/m.glb'] = { body: bytes(500, 7), etag: '"v2"', control: 'max-age=3600' };
+  const reloaded = await read(await get({ cache: 'reload' }));
+  assert.deepEqual(reloaded, files['/m.glb'].body);
+  assert.equal(network.log.at(-1).etag, null);
+  await cache.flush();
+  assert.deepEqual(await read(await get()), files['/m.glb'].body, 'the reloaded copy is now the stored one');
+  assert.equal(network.log.length, before + 3);
+});

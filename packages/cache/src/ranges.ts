@@ -70,6 +70,9 @@ const key = (url: string, block: number) => `${url}\n${block}`;
 /** Thrown inside a fetch when the server's validators or size differ from the stored file's. */
 const CHANGED = Symbol('changed');
 
+/** True when the stored file has a strong ETag (not `W/`), the only validator its blocks may be combined under. */
+const strong = (file: Stored): boolean => !!file.etag && !file.etag.startsWith('W/');
+
 /**
  * Block cache for HTTP range requests, so files read in pieces (progressive glTF streaming, KTX2 streaming, LAS and
  * COPC point clouds) also load offline and from disk. Each file is kept as aligned blocks in IndexedDB; a request is
@@ -195,9 +198,13 @@ export class RangeCache {
     const [start, end] = range,
       first = Math.floor(start / this.block),
       last = Math.floor(end / this.block),
-      have = new Set(file.blocks),
-      missing: number[] = [];
+      have = new Set(file.blocks);
+    let missing: number[] = [];
     for (let i = first; i <= last; i++) if (!have.has(i)) missing.push(i);
+    // RFC 9111 section 3.4: stored parts combine only under one strong validator. Under a weak ETag or none, a miss
+    // fetches every block of this range again, and the write replaces the old blocks, so no answer mixes two versions.
+    if (missing.length && !strong(file))
+      missing = Array.from({ length: last - first + 1 }, (_, k) => first + k);
     let fetched = new Map<number, Blob>();
     if (missing.length) {
       const got = await this.download(request, file, missing);
@@ -298,6 +305,7 @@ export class RangeCache {
             hi = Math.min((b + 1) * this.block, file.size) - 1,
             headers = new Headers(request.headers);
           headers.set('range', `bytes=${lo}-${hi}`);
+          if (strong(file)) headers.set('if-range', file.etag!);
           const response = await this.network(new Request(request, { headers }));
           if (response.status === 206) {
             const range = contentRange(response.headers.get('content-range'));
@@ -469,7 +477,7 @@ export class RangeCache {
     });
     const records = ((all?.result ?? []) as unknown[]).filter(isStored),
       current = records.find((r) => r.url === file.url),
-      same = current && current.size === file.size && current.etag === file.etag && current.modified === file.modified,
+      same = strong(file) && current && current.size === file.size && current.etag === file.etag && current.modified === file.modified,
       blocks = [...new Set([...(same ? current.blocks : []), ...blobs.keys()])].sort((a, b) => a - b),
       next: Stored = {
         ...(same ? current : file),

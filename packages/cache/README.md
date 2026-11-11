@@ -187,6 +187,8 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
   whole file once in the background, so the next visit (or the offline one) has it. Cold, that costs the range bytes
   plus the whole file. To store only the ranges read, use `margoengine/cache/ranges` (above).
 
+Request cache modes are honoured by `AssetCache`: `cache: 'no-store'` goes to the network and is not stored, `'reload'` skips the stored copy and replaces it, and `'no-cache'` (or a request `Cache-Control: no-cache`) revalidates the stored copy before it is served. `RangeCache` combines stored blocks only under a strong ETag; under a weak one or none it fetches every block of a range again, so one answer never mixes two versions.
+
 ## Budget, quota and failures
 
 - `maxBytes` (default 512 MiB): before each write the least recently used files are evicted until the new one fits; a

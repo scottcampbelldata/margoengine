@@ -5968,11 +5968,12 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
 - Fixed, lane S (2026-11-10): AssetCache and RangeCache retain stored Cache-Control/Expires fields when omitted by a 304; provided fields replace them, and Date/Age are taken from the validating response. The common policy helper persists only the two lifetime fields, with matching-validator updates. Parent-failing regressions in packages/cache/test/freshness.test.js cover both caches; additional cases cover retained Expires, current Age and no-cache replacement/retention. Legacy metadata without saved policy remains conservatively revalidated until a response supplies that policy; offline bytes remain usable.
 - RangeCache response snapshot race (lane S, 2026-11-10, found during 304 policy retention): warm URL a with 100 bytes, ETag "a" and model/gltf-binary; hold a reader's conditional 304, then replace a from a second cache with 80 different bytes, ETag "new" and application/new before releasing the 304. The held response contains the new 80 bytes with the old ETag/type. Cause: answer holds old metadata across revalidation, but assemble reads blocks later by reused URL/block keys in another transaction. Metadata and the requested stored Blob handles need one consistent snapshot; validator-guarded freshness updates alone do not fix the response. The standalone delayed-response probe reproduces with fakeIndexedDB; no runtime change in the policy-retention job under lane rule 21.
-- RangeCache combines blocks under a weak ETag or no validator at all; RFC 9111 3.4 allows it only under one strong
-  validator. Same size, new bytes, same weak tag: one answer mixes two versions. Fix: combine only under a strong
-  validator and send `If-Range` with it on block requests.
-- Request cache modes (`cache: 'reload'`, `'no-store'`, `'no-cache'`, request `Cache-Control: no-cache`) are ignored;
-  the stored copy answers.
+- Fixed 2026-11-11: RangeCache combines stored blocks only under one strong ETag (RFC 9111 section 3.4) and sends
+  `If-Range` with it on block requests; under a weak ETag or none a miss fetches every block of the range again and the write
+  replaces the old blocks. Regression: packages/cache/test/ranges.test.js (weak ETag and If-Range tests).
+- Fixed 2026-11-11: AssetCache honours Request cache modes: `no-store` goes to the network and is not stored, `reload` skips
+  the stored copy and replaces it, `no-cache` (or request `Cache-Control: no-cache`) revalidates before serving.
+  Regression: packages/cache/test/cache.test.js (request cache modes test). RangeCache still ignores these modes.
 - Stale copies are served on any non-200 answer and on a timeout, also for `no-cache` and `must-revalidate` files
   (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play. Documented 2026-11-11 in
   `docs/limits.md` ("Stale copies on failure"); the cache README already states it.

@@ -247,9 +247,14 @@ export class AssetCache {
     // Fetch rejects at once on a signal that is already aborted, a stored answer included.
     request.signal.throwIfAborted();
     if (request.method !== 'GET' || !/^https?:/i.test(url)) return this.network(request);
+    // Request cache modes (Fetch): no-store skips the store both ways; reload asks the network and then replaces the
+    // stored copy; no-cache (also `Cache-Control: no-cache` on the request) revalidates the stored copy before using it.
+    if (request.cache === 'no-store') return this.network(request);
+    const reload = request.cache === 'reload',
+      revalidate = request.cache === 'no-cache' || /(?:^|,)\s*no-cache\b/i.test(request.headers.get('cache-control') ?? '');
     const key = this.keys ? await this.keys.lookup(request, url, (k) => this.read(k)) : url;
     if (key === undefined) return this.network(request);
-    const hit = await this.lookup(key);
+    const hit = reload ? undefined : await this.lookup(key);
     if (!hit) {
       if (range) {
         this.fill(request, key);
@@ -261,7 +266,7 @@ export class AssetCache {
       return this.keep(request, key, response, null, sent);
     }
     const [entry, blob] = hit,
-      fresh = entry.fresh > Date.now() || this.checked.has(key);
+      fresh = !revalidate && (entry.fresh > Date.now() || this.checked.has(key));
     request.signal.throwIfAborted();
     // RFC 9110 section 13.1.5: an If-Range that does not name the stored copy asks for the whole file.
     if (!ifRange(request.headers.get('if-range'), entry.etag, entry.modified)) range = null;
