@@ -4192,7 +4192,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | One timeline (`@margoengine/net/timeline`, 2026-11-07) | Enforced: 2 to 65,536 entries, times strictly rising; `add` refuses an older or repeated time. By method: a full ring drops its oldest entry, and `GameClient` keeps `history` snapshots, up to 4,096. An `AdaptiveDelay` passed to `GameClient` is reset when the client is made, so one instance serves one client; it counts snapshot ticks as server time, so it needs no ping. Stand-in: the client's view was proved on `LoopbackNetwork`. Not measured: no timed number. | One ring for four users removes the duplicates; each entry costs a search of O(log n). | The default view of `GameClient` is unchanged; a measured delay is opt-in. | Pass `new AdaptiveDelay()` as `interpolationDelay`; LIM-379 |
 | Any field interpolation (`@margoengine/net/fields`, 2026-11-07) | Enforced: 1 to 64 numbers a field, colour 3 or 4, 2 to 65,536 snapshots, `maxPrediction` 0 to 10 s. By method: a looping `time` takes the shorter way round, so a clip must advance by under half its period between snapshots to read as forward; a clip restarted without a change of its `clip` field reads as a scrub back; across a change of clip the time holds until the new snapshot's moment; `linear`, `angle`, `color` and `step` hold past the newest snapshot, and only `hermite` and `time` run on. Not measured: no timed number. | A snapshot holds no more than two samples of a clock, so the blend cannot tell a fast clip from a backward one. | A clip can seem to hold for one snapshot interval at a change. | Send a new `clip` number on every restart; LIM-377 |
 | Adaptive render delay (`@margoengine/net/delay`, 2026-11-07) | Enforced: `quantile` 0.5 to 1, `window` 16 to 65,536 arrivals, delay from `min` to `max` (default 0 to 1 s). By method: the delay covers a share of recent arrivals, so at the default 99% about one snapshot in a hundred lands late and the view holds or extrapolates; the first 8 arrivals keep `initial` as a floor; the smallest transit in the window stands for the link's fixed delay, so a clock drifting against the sender lifts the delay by the drift across the window; a change of delay shows as motion up to 25% slow or 5% fast, as a game has no silence to hide it in; a spike longer than a quarter of the window counts as a new route, and the link is measured afresh. Stand-in: proved on seeded simulated links, not a captured network trace. Not measured: no timed number. | Those are the published methods, with Moon's percentile over a far shorter window than its 10,000 packets, as a game link can change within seconds. | A late snapshot shows as a hold or a short extrapolation. A view that trails by more than `max` jumps forward. | `quantile`, `window`, `margin`, `min`, `max` and the two rates; LIM-373 |
-| WebGPU compatibility level (`@margoengine/webgl2-compat/adapter`, 2026-11-05, packages 2026-11-06) | Checked on a forced device (Chromium, RTX A6000, D3D12), not yet on a real OpenGL ES or Direct3D 11 class GPU. Runs: core (same pixels as the full level), pick, device restore, materials `createMesh` and `createInstancedMesh`, `Shadows` (same pixels as the full level, soft shadow on a floor), `VirtualShadows` with `'soft'`, `CulledInstances`, `PostStack` with `Bloom` and `Tonemap`, points with eye-dome lighting (same pixels as the full level). `SurfelPlugin` at 4x refuses with `unsupported`. | The level forbids `textureLoad` of depth texture types, `sample_index` and a plain sampler on a depth texture, two views of one texture in a dispatch, and multisampled `rgba16float` and `r32float`. The adapter rewrites depth textures that are only loaded to float types; `Shadows` and `VirtualShadows` bind their map twice, `SceneTarget` copies depth with a masked draw per sample, eye-dome lighting shades the same way and packs its depth into `rgba8unorm` in a second pass of the same draws, `Bloom` keeps each level in its own texture, and `PostStack` captures 4x in `rg11b10ufloat`. | Accepted difference: that capture has less precision and no alpha, measured at most 2 of 255 from the full level on the Bloom and Tonemap frame, 4,066 of 16,384 bytes differing. An adapter without `rg11b10ufloat-renderable` gets a validation error at a 4x capture. Fog, volumetrics, points, water spray and soft `VirtualShadows` are in [known-bugs.md](known-bugs.md). A real older GPU also has its own lower limits, which a forced run cannot show. | Install `@margoengine/webgl2-compat` instead on such a device: all of these run there. |
+| WebGPU compatibility level (`@margoengine/webgl2-compat/adapter`, 2026-11-05, packages 2026-11-06) | Checked on a forced device (Chromium, RTX A6000, D3D12), not yet on a real OpenGL ES or Direct3D 11 class GPU. Runs: core (same pixels as the full level), pick, device restore, materials `createMesh` and `createInstancedMesh`, `Shadows` (same pixels as the full level, soft shadow on a floor), `VirtualShadows` with `'soft'`, `CulledInstances`, `PostStack` with `Bloom` and `Tonemap`, points with eye-dome lighting (same pixels as the full level), and over a 4x `PostStack` capture sky fog, `VolumetricFog` and water spray (2026-11-11, KB2272). `SurfelPlugin` at 4x refuses with `unsupported`. | The level forbids `textureLoad` of depth texture types, `sample_index` and a plain sampler on a depth texture, two views of one texture in a dispatch, and multisampled `rgba16float` and `r32float`. The adapter rewrites depth textures that are only loaded to float types; `Shadows` and `VirtualShadows` bind their map twice, `SceneTarget` copies depth with a masked draw per sample, eye-dome lighting shades the same way and packs its depth into `rgba8unorm` in a second pass of the same draws, sky fog, the `VolumetricFog` composite and water spray draw once per sample with that sample's index as a constant and the pipeline mask writing that sample alone (`perSample` in `packages/shared/msaa.js`; four draws where the full level takes one), `Bloom` keeps each level in its own texture, and `PostStack` captures 4x in `rg11b10ufloat`. | Accepted difference: that capture has less precision and no alpha, measured at most 2 of 255 from the full level on the Bloom and Tonemap frame, 4,066 of 16,384 bytes differing. An adapter without `rg11b10ufloat-renderable` gets a validation error at a 4x capture. Surfels at 4x, a lone `Bloom` at 4x and the sky over the `rg11b10ufloat` capture are in [known-bugs.md](known-bugs.md). A real older GPU also has its own lower limits, which a forced run cannot show. | Install `@margoengine/webgl2-compat` instead on such a device: all of these run there. |
 | Rendering in a worker (`@margoengine/worker`, 2026-11-05) | Proved on Chromium with a real GPU: core, a control package, the stage class and the WebGL2 fallback run on a transferred canvas with no core change, and neither thread stops the other ([browser-check.mjs](../packages/worker/tests/browser-check.mjs)). Firefox and Safari have not been run. | A worker has no DOM: it cannot stop a browser default in time, and pointer lock stays on the page. | The page stops `wheel` and `contextmenu` defaults once the worker listens for them, and no other; input arrives one message later; `mount` needs a page. | `new Stage(engine)` in the worker; a page path behind `workerCanvasSupported()`. |
 | Picking on the WebGL2 preview (`@margoengine/webgl2-compat/pick`, 2026-11-06) | Proved in Chromium on real WebGL2: CSS pixels, depth, single and double-sided faces, hidden meshes, views, layers, a canvas left unchanged, `Picking` and `HoverHighlight` from `selection`, which answer with the mesh only and take one pick a point in `pickMany`, and React pointer handlers ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. Mesh ids up to 16,777,216, the largest whole number a 32-bit float holds. | Core's pick refuses every renderer but WebGPU's before any plugin hook, so the plugin covers `pick` and `render` on that one engine; core stays frozen. | Each pick blocks on one `readPixels` and refreshes the scene as a frame does. A plugin's `onPick` is not called, and `Picking` from `@margoengine/selection` still needs WebGPU. | `engine.pick` on WebGPU or the compatibility layer. |
 | Context restore on the WebGL2 preview (`@margoengine/webgl2-compat/restore`, 2026-11-06) | Proved in Chromium with `WEBGL_lose_context`: identical pixels after a loss, picks, geometry added during the loss, `onDeviceRestored` in each scene, and a reboot on a live context ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. `rebootDevice` waits 30,000 ms by default (`timeout`) for a lost context. | The browser decides whether a lost context returns, and the plugin must be attached before the loss, or the browser never gives it back. | Frames draw nothing during a loss. A timed-out wait reports `timeout`, and a later restore still recovers. An app that draws on demand draws again itself, from `onDeviceRestored`. | A new engine on a new canvas. |
@@ -4680,7 +4680,16 @@ nonbinary display-domain material blending remains a separate open defect. Busy-
 The default Preetham sky does not match Mitsuba 3.9.1 sunsky (Hosek-Wilkie): zenith-Y-normalized RGB
 MAE 1.439228 over 297 directions, max 70.681783. Per-case relative MAE is 0.199319 to 0.765628.
 Sun elevations 10/45/75 degrees, turbidity 2/3/6, ground albedo 0, sun disk off. This is a sampled
-angular-radiance comparison, not hemisphere integration or absolute physical-unit equivalence. Loss open.
+angular-radiance comparison, not hemisphere integration or absolute physical-unit equivalence.
+
+Accepted difference (KB3148c, 2026-11-11): the gap is the model. Margo's default is the 1999 Preetham fit, the
+same model as three.js `Sky` and Babylon's `SkyMaterial`; Mitsuba sunsky is the 2012 Hosek-Wilkie fit, which its
+authors and Zotti et al. 2007 show corrects Preetham's horizon brightening and high-turbidity behaviour. The paper
+Preetham model alone, without Margo's tuning, measures MAE 1.436382 on the same 297 directions; Margo's daylight-locus
+floor moves the grid by MAE 0.012108 (relative 1.74 % at most, `packages/sky/test/sunsky-reference.test.js`), and its
+clamps do not act on this grid. Hosek-Wilkie's coefficients are published only inside the authors' source code, so
+Margo cannot ship that model clean room without fitting its own coefficients; for a physically based sky use
+`model: 'bruneton'` or `HillaireSky`. Sources: A. J. Preetham, P. Shirley and B. Smits, "A Practical Analytic Model for Daylight", SIGGRAPH 1999, https://doi.org/10.1145/311535.311545; L. Hosek and A. Wilkie, "An Analytic Model for Full Spectral Sky-Dome Radiance", ACM TOG 31(4) 2012, https://cgg.mff.cuni.cz/projects/SkylightModelling/HosekWilkie_SkylightModel_SIGGRAPH2012_Preprint.pdf; G. Zotti, A. Wilkie and W. Purgathofer, "A Critical Review of the Preetham Skylight Model", WSCG 2007, https://www.cg.tuwien.ac.at/research/publications/2007/zotti-2007-wscg/zotti-2007-wscg-paper.pdf.
 
 ## Audio Doppler (batch 110)
 
@@ -8032,15 +8041,17 @@ limits are unchanged. Imported meshes are never decimated or truncated to meet t
 
 Measured default ceiling (2026-11-11, RTX A6000 dev PC): the defaults hold a 996,004-vertex mesh with every corner
 its own vertex (normals, one UV set, tangents; binary FBX with compressed arrays, 6.7 MiB): it converts, attaches with
-`parseFBX` and renders as one primitive in one draw, uploading its 81.7 MiB of GPU geometry once, on WebGPU and on
-the WebGL2 layer (`packages/fbx/test/large.test.js`, `test/default-scale-browser.mjs`). What bounds it: the
+`parseFBX` and renders on WebGPU and on the WebGL2 layer, uploading its GPU geometry once; the converted file holds
+one primitive, which gltf-pro draws as parts of at most 262,144 vertices (its default `maxPartVertices`), one draw
+each, covering every vertex and every triangle once (`packages/fbx/test/large.test.js`, `test/default-scale-browser.mjs`,
+`test/part-coverage.js`). What bounds it: the
 1,000,000 expanded-vertex cap (a second primitive starts past 999,997 vertices and repeats the corners of a polygon
 split across it). The memory caps sit just above it for this layout: the geometry build reserves 94 B per corner for
 a mesh of unique vertices with normals and one UV set (each term a typed array of exactly that size; it was about
 267 B, which stopped such a mesh at about 480,000 corners under the 128 MiB scene cap), decoded arrays are about 75 MiB
 of the 128 MiB array cap (an inflated array is counted while it lives, not added to the total after its typed copy is
 made), and an uncompressed file reaches the 64 MiB input cap first, at about 860,000 such vertices. WebGPU's default
-device limits do not bind: a primitive holds at most 1,000,000 vertices of 80 B (under the 128 MiB storage binding)
+device limits do not bind: a converted primitive holds at most 1,000,000 vertices and a drawn part 262,144 of 80 B (under the 128 MiB storage binding)
 and its index buffer is far under the 256 MiB buffer size. Past the default ceiling `largeFBX` raises every cap.
 
 Batch 205 large entry: 539 B min+gzip, new ceiling 795 B. FBX worker finished at 98,163 B, within its existing 100,703 B ceiling (before 97,769 B). Core plus stage is 24,209 B; 16,769 B was the separately reported particlesOnly build.
@@ -10510,13 +10521,29 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `packages/cache/test/blob-refused.test.js` (the fake IndexedDB gained `refuseBlobs`, WebKit's refusal); it fails on the parent.
   In Playwright WebKit the cold, decoded, streamRanges, rangeOf and eviction steps of `test:browser` now pass.
 
-### WebKit: cache `test:browser` staleTouch step does not finish (found 2026-11-11, open)
+### Fixed 2026-11-11: WebKit: cache `test:browser` staleTouch step did not finish
 
 - **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache`; every step before `staleTouch`
-  passes, then `staleTouch took over 180 s`. The warm copy is stored (`stats.stored` is 1), and the 20 s step limits
-  added to `packages/cache/test/stale-touch.js` do not fire, so the wait is in a call that has no step limit yet
-  (the warm fetch's body read, `flush` or `usage`). Chromium passes.
-- **Cause:** not found. Next: run `staleTouch` alone with a log line before every await to name the stuck call.
+  passed, then `staleTouch took over 180 s`. Chromium passed.
+- **Cause:** run alone with a log line per await and per transaction, the stuck call was the second cache's write of b,
+  whose transaction deletes the evicted a before it puts b's Blob. A probe in Playwright WebKit (Windows, 2026-11-11)
+  showed the rule: a refused Blob put that is the first request of its transaction aborts it with UnknownError, as the
+  cache expected; one that comes after any other request (a delete, a get, a put to the other store) leaves the
+  transaction for ever, with no complete, no abort, not even after `abort()`, and every later transaction on its stores
+  waits behind it. The warm cache had passed only because its first write put the Blob first.
+- **Fix:** AssetCache and RangeCache ask once at open with a transaction of their own that puts a 1-byte Blob first and
+  deletes it (`storesBlobs` in `packages/cache/src/bytes.ts`), and store bytes from the first write when it is refused.
+  The write's own fallback stays for any other refusal. In WebKit `staleTouch` now passes in 3.0 s.
+- **Regression:** `packages/cache/test/stale-touch.test.js` (four "refuses Blobs as WebKit does" cases); the fake
+  IndexedDB's `refuseBlobs: 'webkit'` models the stall. Three of the four time out on the parent.
+
+### WebKit: cache `test:browser` evictionReads step over its limit (found 2026-11-11, open)
+
+- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` (Windows, busy dev PC): plain
+  `evictionReads` (2,030 fetches and writes) took 158.9 s and the indexed run passed the 180 s call limit; Chromium took
+  17.7 s and 8.8 s in the same session. Every step before it passes.
+- **Cause:** not found. Each of its 2,030 requests goes through the check's `context.route`, which on Playwright WebKit
+  is a round trip to the test process; a measurement of the route's share against the cache's own IndexedDB time is next.
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
@@ -10608,8 +10635,11 @@ Found by reading the shaders against Max 1995 and the package's own docs; fixed 
 - **Dense attributes are not read.** `src/hdf5.ts` reads attribute messages (type 12) only; an object with more than 8
   attributes stores them in a fractal heap (attribute info message, type 21) and `attributes()` returns none or some.
   Repro needs a file written with h5py and 9 or more attributes on one object; no fixture has one yet.
-- **The implicit chunk index walks every chunk.** `src/hdf5.ts` loops over all chunks of a dataset with an implicit
-  index whatever the selection, with no abort check, so a large shape with chunk size 1 takes very long.
+- **Fixed 2026-11-11 (KB0535b): the implicit chunk index walked every chunk.** `src/hdf5.ts` looped over all chunks of
+  a dataset with an implicit index whatever the selection, with no abort check, so a large shape with chunk size 1 took
+  very long (2^40 x 4 in 1 x 4 chunks never finished). It now lists, per axis, only the chunks holding a selected value
+  (strides included) and checks the signal every 4096 chunks. Regression: packages/sciviz/tests/hdf5.test.js (implicit
+  index case, a file written by the test).
 
 ### Fixed 2026-11-10: blender parseMargoPBR leaked decoded images when the physical shader failed to load
 
@@ -11901,7 +11931,9 @@ Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinish
 
 ## Checks
 
-- check:readme-run: after an example hits its 20 s limit, closing the owned browser throws `browser host <pid> did not acknowledge the end: null` from scripts/lib/browser.mjs (2026-11-10, lane U). Repro: before the companion fix, `npm run check:readme-run -- --packages=worker` on unchanged main. The worker's own README block ran alone and timed out; the shutdown error then hid the per-example report. Cause in the browser host's end handshake after a hung page, not yet traced; owner of scripts/lib/browser.mjs.
+- Fixed 2026-11-11: suite dev servers watched files, and a rebuild reloaded a suite's page. check:owners sky on the WebGL2 layer failed once on a loaded machine with "Execution context was destroyed, most likely because of a navigation", passing on rerun (sweep0, 2026-11-11). `startDevServer` asks Vite for `watch: null`, but Vite's mergeConfig skips null values, so the root `vite.config.mjs`'s `watch: { ignored }` won and every suite's server ran a chokidar watcher over the files it had served. Rewriting a served module (a package's `npm test` rebuilds its dist, often beside the checks in one worktree) made Vite send the page a full reload, and the next `page.evaluate` failed. Measured: a page served by `openBrowser` reloaded within 3 s of its module being rewritten. Fix: the server's own first plugin sets `server.watch` to null in `configResolved`, so Vite starts its no-op watcher. Regression: `tests/dev-server-watch.test.js` (both cases fail on the parent).
+
+- Fixed 2026-11-11: check:readme-run: after an example hits its 20 s limit, closing the owned browser threw `browser host <pid> did not acknowledge the end: null` from scripts/lib/browser.mjs (2026-11-10, lane U). Repro: before the companion fix, `npm run check:readme-run -- --packages=worker` on unchanged main. Cause (traced 2026-11-11): the browser was closed twice, once by the example's deadline handler and once more for the shared browser at the end of the run (349243b3d3). The first bounded close released its host; the second asked the released host to end again, and a released host answers `null`. Fix: `withBoundedClose` closes a browser once, as Playwright's own `close()` does, and a second call shares the first one's outcome (since 242e8a7542 each example also owns its browser and one close). Regression: `tests/browser-teardown.test.js` ("closing a browser twice").
 
 ### SSAO's orthographic picture moves with the eye
 
@@ -12211,7 +12243,7 @@ Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cas
 - **Cause:** not found. Read so far: a foot the controller counts as standing leaves the floor. On Seed-san pushed left at 0.5 m/s no step starts, while the right foot crosses 0.11 m and rises 0.015 m, and the figure tilts 0.82 rad by frame 78. On RiggedFigure pushed forward at 1 m/s both feet stand 0.1 m off the floor at frame 18 with no swing running. `RagdollBalance.landing` gives these two no step at all, as it takes the hips' height for the leg's: `room` reads 0 where Knight's reads 0.253 m. That is wrong, but it is not what throws them: reach from the true hip to ankle line, and reach from the friction cone, both read no better (at 1 m/s RiggedFigure falls in 57 and 58 of 64 against 31, Seed-san in 61 and 59 against 49). Ending a swing on foot contact, as SIMBICON does, and leaving a foot in the air out of the stance legs read worse over all seven figures: 964 and 926 pushes failed of 2,688, against 854.
 - **Needed to close:** the controller owns this, so it stays after the solver change. Remeasure on Margo's solver, then find why a standing foot leaves the floor.
 
-### npm run verify hung once in its unit test step
+### Fixed 2026-11-11: npm run verify hung once in its unit test step
 
 - **What:** on 2026-11-06 one `npm run verify` run in a worktree passed every other step and then sat in the unit test step until its 1,500 s limit, where the same tree took 166 s minutes before and the next run passed in 380 s. Nothing named the test, because the step prints only when it ends.
 - **Repro:** none yet. Other lanes were running their own checks on the machine at the time.
@@ -12219,6 +12251,8 @@ Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cas
 - **Needed to close:** a run that prints that line, and a fix of the test it names. Every verify run since is a run of this watch.
 
 - **Lane C sweep (2026-11-10):** no demand repro is available. Full verify is reserved for local CI; this entry remains its per-test hang watch, and no lane verify was run.
+- **Named (local CI, 2026-11-11 03:00, `16-root-tests.log`):** `HUNG TEST: testsite-cache-isolation.test.js after its last test "a checkout reached through a Windows short path serves its pages" (something keeps the process alive): no event for 361 s`. That test ran its child with `spawnSync` and no limit, so a child that never exited held the runner's event loop. The child starts a suite dev server, and every suite dev server then ran a chokidar file watcher it had asked Vite not to start (below, "suite dev servers watched files"): file system watches are what kept an earlier child of this file alive (the failed-start case).
+- **Fix:** suite dev servers start no watcher (`scripts/browser.js`), and the child now has the same 60 s bound as its sibling and prints `process.getActiveResourcesInfo()` if it is still open 20 s after its close, so any recurrence fails in the test, naming what stays open. Regressions: `tests/dev-server-watch.test.js` (no FSWatcher), `tests/vite-cache-isolation.test.js`. One occurrence in 10 local CI runs kept (2026-11-10 01:00 to 2026-11-11 03:00).
 
 ### Apple M6 sweep, 2026-11-05 (Chrome 157 and Playwright WebKit; Safari not run)
 
@@ -12268,14 +12302,24 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
 
-### Three routes still break WebGPU compatibility-level rules
+### Fixed 2026-11-11: three routes broke WebGPU compatibility-level rules (KB2272); surfels at 4x still refuse
 
-- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, `FogPass` in `@margoengine/sky`, the volumetric pass in `@margoengine/environment` and the spray in `@margoengine/water` take `@builtin(sample_index)` at 4x, found by reading the code and not yet run there. `SurfelPlugin` at 4x refuses with `unsupported`. A page can use the WebGL2 layer instead.
-- **Repro:** `npm run build:packages`, add the package to `PACKAGES` in `packages/webgl2-compat/test/adapter-browser.js`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, and read `packages` in `test-results/compat-adapter.json`.
-- **Cause:** the level has no `sample_index` in a fragment shader and no multisampled float format: neither r32float nor rgba16float, so the surfel sums have nothing to add into at 4x.
-- **Needed to close:** the routes `Shadows`, `SceneTarget` and eye-dome lighting took: a masked draw per sample (`packages/shared/msaa.js` `copyDepth`, `packages/points/src/plugin.ts` `edlPipelines`). Surfels need sums in a format the level multisamples, or a single-sample pass with its own copy of the scene depth. Then add the names to the list `adapter-browser.mjs` asserts.
+- **Was:** with `allowCompatibilityAdapters`, `FogPass` in `@margoengine/sky`, the `VolumetricFog` composite in `@margoengine/environment` and the spray in `@margoengine/water` failed pipeline creation at 4x ("sample_index is not supported in compatibility mode").
+- **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.
+- **Still open, surfels:** `SurfelPlugin` at 4x refuses with `unsupported`: its sums need a multisampled float target to add into and the level multisamples neither `r32float` nor `rgba16float`. A 1x pass needs a sampleable copy of the scene depth, which core's own 4x attachments do not have. Next idea: two `rg11b10ufloat` sum targets where the adapter has `rg11b10ufloat-renderable` (6-bit mantissa sums, to be measured), front depth packed into `rgba8unorm` as eye-dome lighting packs it, resolve by masked draws per sample.
 
-- **Lane C source audit (2026-11-10):** sky/fog.ts, environment/volumetric.ts and water/spray.ts retain their multisampled sample_index branches. points/surfels.ts still explicitly refuses 4x compatibility-level float accumulation. These repairs remain open; a per-sample masked draw fixes only the three depth consumers, not the surfel accumulation format. No new runtime pass or closure is claimed.
+### Sky and other packages draw HDR as display colour over PostStack's rg11b10ufloat capture (found 2026-11-11, open)
+
+- **What:** at WebGPU's compatibility level, `PostStack` captures 4x in `rg11b10ufloat`. `@margoengine/sky` (base, aerial, Hillaire, shafts, volumetric clouds) decides linear HDR output by `format === 'rgba16float'`, so over that capture it encodes for display and then the stack tonemaps again: the sky draws up to 19 of 255 brighter than at the full level (11,842 of 12,288 bytes differ, RTX A6000). About 25 more sites in animation, creative, environment, gltf-pro, lod, scatter, splats, terrain, voxel, voxel-pathtracer and water test the same way.
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, read `levels.sky`.
+- **Cause:** no shared "linear target" test; each package names `rgba16float` (some also `rgba32float`).
+- **Needed:** one predicate in `packages/shared` (float formats are linear) used at every site, then compare `levels.sky` at 0 and assert the fogged frames equal.
+
+### Lone Bloom fails at 4x on WebGPU's compatibility level (found 2026-11-11, open)
+
+- **What:** `Bloom.attach(engine)` without `PostStack` creates a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"). `PostStack` picks `rg11b10ufloat` there; Bloom alone does not.
+- **Repro:** in `packages/webgl2-compat/test/adapter-browser.js` attach `Bloom` alone in a `PACKAGES` case.
+- **Needed:** the same capture-format choice as `PostStack` (`captureFormat` in `packages/post/src/stack.ts`), with a case in the adapter check.
 
 ### External PBR display passes
 
@@ -13189,17 +13233,11 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   copies retain the canvas before presentation expiry. Neither cause is closed.
 
 
-- **Default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`, perf history 110):
-  297 directions across sun elevations 10/45/75 degrees and turbidity 2/3/6. Normalize each sky by its own
-  zenith Y. RGB MAE 1.439228, max 70.681783, per-case relative MAE 0.199319 to 0.765628 against Mitsuba
-  3.9.1 scalar_rgb Hosek-Wilkie sunsky with disk off and albedo 0. Cause: the default model is Preetham,
-  with Margo horizon/turbidity clamps and daylight-locus chromaticity adjustment, not the newer fitted
-  sunsky model. Absolute units are also not interchangeable. Repro under the shared GPU lock:
-  `node packages/sky/scripts/rival-bench.mjs`. The normalized model loss remains open.
-
-  Lane G repeated only the original 297-direction value comparison against
-  the retained Mitsuba values, without timing: MAE 1.4392275140102735 and
-  max 70.6817830576387. The formulation difference remains.
+- **Accepted 2026-11-11 (KB3148c): default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`,
+  perf history 110): MAE 1.439228 over 297 directions against Mitsuba 3.9.1 sunsky (Hosek-Wilkie). The paper Preetham
+  model alone measures MAE 1.436382; Margo's tuning moves the grid by MAE 0.012108
+  (`packages/sky/test/sunsky-reference.test.js`). A model difference, recorded as an accepted difference in
+  docs/limits.md ("Batch 168 sky radiance reference"); not a defect.
 
 ### Audio Doppler (batch 110)
 
@@ -13516,12 +13554,28 @@ The previously open non-default-scene disposal defect was fixed separately in 18
 
 GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=iridescence, each with and without --compat, reproduce the complete-scene measured budgets. Full residual causes are not isolated. Anisotropy retains all strength/roughness rows and labels. Iridescence retains all 346 primitives in its three-dimensional material/film-IOR/thickness grid; this direct-light camera contains overlapping spheres and sparse highlights, with no IBL. Margo uses its shared anisotropic GGX and thin-film implementation; the figures alone do not attribute the loss to a particular formula. Silhouette, tone-map and filtering differences remain included, and no small shader fix is claimed without an isolating regression.
 
-Lane G current-main repro: anisotropy native absolute/square 819210/29848296
-exceed 819207/29848293, with RGB 132 to 133 at archived pixel (152,408);
-compatibility passes. Iridescence native absolute 454342 exceeds 454341,
-with five changed components against its archived picture. Compatibility
-iridescence has 64210 foreground pixels against 64280. Frozen budgets remain
-unchanged and these are not the sciviz/dispersion ANGLE exemption.
+Bisected 2026-11-11 (RTX A6000, Edge, native WebGPU; each step built with build:packages and run once through the GPU
+lock with only the failing case). Four batch 160 cases fail on main; every budget was reproduced exactly at the
+commit that froze it, so the browser and driver did not move them. No commit found is a renderer defect, so nothing
+was reverted and no budget changed; whether to keep these results is Scott's ruling.
+- da12bd07e1 (core uploads the light direction normalized once on the CPU in float64): iridescence 454,341 to
+  454,342, anisotropy 819,207 to 819,210, clearcoat 1,321,922 to 1,321,923 absolute (the Lane G figures above). One
+  float32 rounding of the direction moves a few pixels one code.
+- 65098f33fe (area-filter mips; BLEND base colour maps weighted by alpha): iridescence to 613,669 (budget 454,341),
+  anisotropy to 819,417. The IridescenceMetallicSpheres guides texture is 2048 x 2048 BLEND: 3,975,856 texels are
+  alpha 0 with white RGB, 114,010 are opaque black lines. A plain average greys the lines down the chain by mixing in
+  invisible white; the weighted chain keeps them black, which is what a premultiplied box filter of the displayed
+  texture gives. All 2,558 changed pixels got darker, towards the filtered texture and away from the Sample Viewer,
+  whose minified lines show the plain average. Anisotropy: 179 label pixels (OPAQUE, plain chain) one or two codes
+  brighter, exact texel loads in place of one hardware bilinear fetch.
+- 401c2e032b (native glass composited in linear light): transmission absolute error falls from 1,763,456 to
+  1,590,805 on main, but foreground coverage is 67,046 against 67,050. Margo now draws black where the Sample Viewer
+  is black (15 pixels behind the red glass that used to read up to 222,89,53 are 0), and 11 new nonblack pixels
+  appear, so the union shrinks by 4.
+Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
+scripts/reference-rendering/run.mjs --case=<iridescence|anisotropy|clearcoat|transmission>` at the commit and its
+parent after `npm run build:packages`. Frozen budgets remain unchanged and these are not the sciviz/dispersion ANGLE
+exemption.
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 
@@ -15082,6 +15136,8 @@ Fixed 2026-11-10: GPU package-runner owner collision (version guard). Unrelated 
 Dependent audio GPU validation is incomplete for the version-guard landing: the shared GPU monitor reclaimed lane-T-version-guard at 2026-11-10T02:28:06.439Z after 211623 ms without GPU activity, while audio/scripts/test-browser.js awaited its browser evaluations before writing audio-browser.json. The suite produced no report and did not reach its own 10 min limit. Root cause of the uncompleted audio evaluation is unconfirmed; monitor evidence is in the local GPU idle record and test-results/version-guard-resume/gpu-lane-T.log. No timeout or idle threshold was raised.
 
 Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
+
+Audio follow-up (sweep L6, 2026-11-11, still open): not reproduced; the whole suite takes 9 to 10 s on the dev PC. The reclaimed run was the audio step of a serial `scripts/gpu-package-tests.mjs` run (local GPU idle record, 02:28:06Z, 211,623 ms idle), and the Windows System log holds no driver reset (4101, nvlddmkm 153) between 02:15 and 02:30Z, so a GPU reset did not cause it. Every page call of `packages/audio/scripts/test-browser.js` now has a 60 s limit that names its step and prints the state and clock of every real AudioContext the page made, so the next stall fails in about a minute and names the call (a real-time `resume()` that never settles, an `Engine.create`, or a media element that never plays).
 - Fixed while recording the VRM asset: appended WebXR generic-hand provenance is now part of the notices generator asset table, preserving the original licence and hashes. The existing supply-chain consistency test covers both records.
 
 - Fixed 2026-11-11 (4e703eb6e6): `addVRM` in packages/rigging/src/vrm.ts registered and removed its plugin through the active scene rather than the model scene. Dispose now removes it from its own scene (`engine.sceneOf(plugin)`); regression: the "dispose removes the face plugin from its own scene" test in `packages/rigging/tests/face.test.js`.
@@ -15137,7 +15193,7 @@ Batch 172 landing also restores the exact approved version-guard ceilings from t
 The same baseline merge lost water 20817 B (batch-225), XR 9158 B (version-guard) and lazy compute/readback 31756 B (snorm-storage). Restore those exact retained approvals. Existing quality assertions reproduce all three failures on a fresh build and pass after the data repair; no source algorithm, test or tolerance changes.
 
 The final dependent umbrella test also found the already-landed exporters/materials entry absent from the generated umbrella map. Regenerate with scripts/umbrella.mjs, preserving the sciviz pipeline facade; tests/umbrella.test.js exercises both current generation and binding identity. No exporter source changes.
-- Outside batch 263: video/record can resolve a header-only WebM when stopped before Chromium encodes its first frame. Repro: record a native WebGPU canvas at 30 fps, render 12 requestAnimationFrame ticks, then stop; observed 110-byte video/webm;codecs=vp8, decoder rejects DEMUXER_ERROR_COULD_NOT_OPEN. Cause: recordCanvas validates only nonzero Blob size, which also accepts container headers. A 1.2-second recording decodes correctly on WebGPU and preview WebGL2. Fix phase should add first-encoded-frame readiness or structural stream validation in video/record with a short-recording regression.
+- Fixed 2026-11-11 (sweep L6): `recordCanvas` checks that the file holds an encoded frame before it resolves (a SimpleBlock or BlockGroup inside a WebM Cluster, read by an EBML walk of the first MiB; an `mdat` box with a payload in MP4, read box header by box header) and otherwise rejects with code `state`. Regression: packages/video/test/record.test.js ("a recording with no encoded frame rejects"), failing on the parent. Was: outside batch 263: video/record can resolve a header-only WebM when stopped before Chromium encodes its first frame. Repro: record a native WebGPU canvas at 30 fps, render 12 requestAnimationFrame ticks, then stop; observed 110-byte video/webm;codecs=vp8, decoder rejects DEMUXER_ERROR_COULD_NOT_OPEN. Cause: recordCanvas validates only nonzero Blob size, which also accepts container headers. A 1.2-second recording decodes correctly on WebGPU and preview WebGL2. Fix phase should add first-encoded-frame readiness or structural stream validation in video/record with a short-recording regression.
 ### Animation scene ownership repaired
 
 Animation plugins now detach by registered identity, preserving same-name plugins
@@ -15669,7 +15725,7 @@ No unresolved defect found in the implemented dataset contract. Exact curved-cel
 
 Fixed during batch 176 job 1: the existing formats GPU leaf wrote test-results/sciviz-fixes/formats-gpu.json without creating its parent directory, so a fresh worktree failed after all GPU assertions passed. The leaf now creates its own output directory; its normal run is the fresh-worktree regression. No browser lifecycle or shutdown code changed.
 
-Build-phase follow-up outside batch 176 job 1: legacy parseVTKXML mislabels mixed PolyData triangleCells. Repro: one Vert, one Line, one polygon on point IDs 0/1/2 and one strip on 3/4/5 yields indices [3,4,5,0,1,2] and triangleCells [2,3], but VTK cell order requires [3,2]. Cause: its eager parser visits Strips before Polys. The new datasets adapter uses the correct vertices/lines/polygons/strips order. Repair the older eager API in the fix phase under rule 21.
+Fixed 2026-11-11 (bug sweep L2, KB5650a): legacy parseVTKXML mislabelled mixed PolyData triangleCells; it now reads Verts, Lines, Polys, then Strips, VTK's cell order. Regression: packages/loaders/tests/vtk-xml.test.js. Original entry: Repro: one Vert, one Line, one polygon on point IDs 0/1/2 and one strip on 3/4/5 yields indices [3,4,5,0,1,2] and triangleCells [2,3], but VTK cell order requires [3,2]. Cause: its eager parser visits Strips before Polys. The new datasets adapter uses the correct vertices/lines/polygons/strips order. Repair the older eager API in the fix phase under rule 21.
 ### Fixed: batch 217 API summary umbrella row
 
 The lane rebase helper counted only @margoengine rows when rebuilding the shared API summary, omitting margoengine kits from its header. The next full api:update regenerates the header and table from emitted declarations, and api:check requires exact agreement. No public implementation changed; future shared-doc merges include the umbrella row before the normal generated check.
@@ -15725,11 +15781,11 @@ Batch 177 job 4: no open correctness defect in the checked chart presentation pa
 
 
 API conventions lane (2026-11-10): unchanged materials dispersion compatibility reproduces the tracked 4x live-reset error 0.000244140625 against 0; native passes 278 checks/254 captures. The changed optional Fur.attach entry is never imported by this fixture, whose materials root is unchanged. Retain the existing fix-phase item under rules 21/22 without a tolerance or renderer change.
-- Fix-phase follow-up in existing scalar/curvilinear marches: constant classifier opacity 1 with a reference distance much larger than the traversed physical thickness remains partly transparent because their fractional-step correction first caps alpha below 1. Repro for curvilinear: unit constant cube, opacity()=>1, referenceStep=1000, no shading; expected opaque red. The new tetrahedral entry keeps exact alpha 1 and tests this endpoint; the pre-existing paths are outside job 173.6 and wait for the fix phase.
+- Fixed 2026-11-11 (KB5700a): opacity 1 in the scalar, bricked, multi-volume, quality and curvilinear marches stayed partly transparent when the per-step length was a tiny fraction of the reference (curvilinear referenceStep 1000, or density 1e-4), because the opacity correction capped alpha first (log of max(1 - a, 1e-6), or a clamp to 0.999999). Opacity 1 is infinite extinction, so each march now takes alpha exactly 1 for any positive step (density 0 stays clear); GPU picking does the same, so `opacityThreshold: 1` finds an opacity-1 voxel. Regressions: packages/sciviz/tests/volume-physics-browser.mjs case 8, curvilinear-browser.mjs `opaque`, bricks-browser.js, pick-gpu-browser.mjs.
 - Fix-phase follow-up in existing curvilinear physical metrics: scale a unit cube and referenceStep together by 1e20 or 1e-20, with matching figure limits. Its raw physical length(d*span) squares can overflow/underflow float32 before opacity correction. The tetrahedral entry normalizes extents/reference together and covers both scales; port that bounded metric to the other owning optional paths in the fix phase.
 
 
-- Batch 174 multivariate brush history: after two axis brushes, SelectionStore.undo restores row highlights but the controller retains its last local range map; a later axis gesture can reapply an undone other-axis range. Cause: selection history snapshots row-key brushes, not controller predicate metadata. Repro: period brush, radius brush, undo, then change period. Rendered undo itself is correct; predicate/control restoration is owed in the fix phase.
+- Fixed 2026-11-11 (KB5700c, batch 174 multivariate brush history): after two axis brushes and SelectionStore.undo the controller kept its last range map, so the next axis gesture reapplied the undone range. SelectionStore brushes now carry an optional `predicate` kept through undo, redo, toJSON and fromJSON; parallel coordinates and scatter matrices store their ranges there and rebuild them on every store change. Regressions: packages/sciviz/tests/link.test.js (predicate history), parcoords-browser.mjs (period, radius, undo, then period).
 Batch 180 gate finding, existing glyph capture: node packages/sciviz/tests/glyph-browser.mjs once failed the unchanged >20 lit-pixel assertion for the thin line glyph on WebGL2 after shape replacement. Native had 151 pixels; subsequent unchanged assertions on both backends had exactly 151 and identical hashes. Cause is not isolated: the captured shape-transition frame lost expected thin-tube coverage; this is a value/capture nondeterminism, not a timing-only budget miss. No test threshold changed. Preserve the diagnostic and investigate readiness/resize/capture ordering in the glyph owner during the fix phase.
 Batch 180 job 2: no open correctness defect in the requested vector-geography contract. Future near-plane ribbons and runtime style mutation are documented quality follow-ups. The fallback and newly rebased engineering/pointcloud browser scripts gained the same repository-root bootstrap as other sciviz browser scripts; existing browser-root.test.js caught the missing registrations.
 Fixed upstream: batch 183 navmesh package-directory bundle probes. e295cc68a anchors both pipeline inputs with fileURLToPath(new URL('../src/pipeline.ts', import.meta.url)); 3296cce94 creates their repository-anchored output directory and 6ede7aa75 removes duplicate imports. Rechecked 2026-11-10: all 121 unchanged navmesh CPU tests pass from packages/navmesh, including border and SIMD probes. No navigation algorithm or assertion changed in this sweep.
@@ -15760,7 +15816,7 @@ A Rivers source with radius 0 (the default) or below half a cell, off a cell cen
 
 Fixed 2026-11-10: review 3 P1 PixelFollow extreme finite deltas (cde120852). Smoothing preserves stationary zero-lerp axes without evaluating 1**Infinity and retains tiny positive factors through log1p/expm1. Current-main reproduction: all eight packages/pixel/tests/follow.test.js cases pass, including zero/unit/tiny lerps, Number.MIN_VALUE, Number.MAX_VALUE/60 and Number.MAX_VALUE. Accepted input ranges and integer camera positions are unchanged.
 
-- ChartPolish visibility on selection-bound marks: bind a scatter/line layer, attach polishFigure, then setVisible(layer, false); the binding still draws. Cause: format.ts mutates the hidden source visible flag rather than SelectionBinding.visible. Ordinary Figure picking/brushing already follows the linked-draw identity on main. Outside batch 174 query scope; fix phase.
+- Fixed 2026-11-11 (KB5736b): ChartPolish visibility on selection-bound marks: bind a scatter/line layer, attach polishFigure, then setVisible(layer, false); the binding still drew, because format.ts set the hidden source's visible flag rather than SelectionBinding.visible. ChartPolish now shows and hides whatever draws the layer (its binding or density replacement), and a binding starts with its source's visibility and hands it back on dispose (binding a hidden layer used to show it). Regression: packages/sciviz/tests/chart-polish-browser.mjs (bound line case).
 
 - Existing atmosphere exact-capture defect after main merge: run SPEC_DEMOS=atmosphere SPEC_BACKENDS=webgl2 with packages/sciviz/tests/spec-demos-browser.mjs under the GPU lock. In batch174/j4-land-gpu.log, three blue-channel bytes differ by 1 (offsets 1360474, 1360478, 1365274); sameSourceDiff is also 3 for the unchanged source figure, and camera/limits match. The failure originates in repeated atmosphere compatibility drawing, rather than date/log window restoration; the particular nondeterministic draw operation is not isolated. Record for fix phase under rule 21; exact assertion is unchanged.
 Batch 178 job 4: no open correctness defect in the requested colour/legend contract. Surface NaN heights still form holes because they have no geometric position; diagnostic CVD simulation makes no universal distinguishability promise. The PDF equal-stop gap and finite-first volume MIP state are covered by regression tests in the same job.
@@ -15800,7 +15856,7 @@ Fixed 2026-11-10: review 3 SV4 transfer-binding reentrant abort. The abort liste
 Batch 176 job 4: no open defect found in the supported Cartesian cell-centred AMR contract. Format extensions, block-edge reconstruction and explicit sample/index budgets are documented in limits.md; refinements remain on the private finish-later list.
 
 Fixed 2026-11-10: Batch 176 inspection. GPU planner registrations and command ordering are repaired on main (30c8a02db). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
-- Batch 174 annotation keyboard focus: on a running figure, focus an editable SVG handle and let the next engine frame run; focus returns to the document because Annotations.render replaces every SVG child with innerHTML on each frame. Pointer dragging still uses capture on the stable SVG root. Preserve/reconcile the focused handle across frame paints in the fix phase; current keyboard regression covers stopped figures.
+- Fixed 2026-11-11 (KB5765c, batch 174 annotation keyboard focus): Annotations.render rebuilt every SVG child on each engine frame, so a focused handle lost focus. Render now skips the rebuild when the markup is unchanged and, when it does change, focuses the same handle of the same record. Regression: packages/sciviz/tests/annotate-browser.mjs (unchanged frames keep the element; a moved handle is refocused).
 
 
 - Batch 120 path audit: public npm create margo@latest still reaches the prerelease placeholder until Scott authorizes publication; cause is intentionally pending registry release. The actual create/install/build/frame path is proven against the private packed registry.
@@ -15866,7 +15922,7 @@ Conservative accumulator limits and f32 rescale error bounds are documented in
 docs/compute-quant.md; independent float-reference cases cover CPU and both GPU backends.
 
 Batch 175 job 5: no open defect found in the built graph-gpu paths. The straight-edge zero-subdivision u32 underflow is fixed in the owning optional shader and covered by the invisible-first-edge GPU regression; figure dimensionality, both force references, bundling boundaries, labels and device routes are checked. Float32 precision, concentrated-leaf costs, FDEB quadratic pair work and explicit label snapshot refresh remain documented limits.
-Batch 180 job 4: no open correctness defect found in the implemented climate/projection paths. CF coverage and interpolation domains are explicit in docs/limits.md. Outside this job: openCloudZarr rejects valid rank-zero scalar arrays (shape/chunks []); repro public IPSL tas height/.zarray at the climate source URL, cause dimension-count validation requires nonempty shape. The offline data curation reads those uncompressed scalar coordinate bytes directly; CF reads the resulting NetCDF scalar without this restriction. Rule 21 leaves broader Cloud Zarr scalar support to its owner.
+Batch 180 job 4: no open correctness defect found in the implemented climate/projection paths. CF coverage and interpolation domains are explicit in docs/limits.md. Outside this job: openCloudZarr rejected valid rank-zero scalar arrays (shape/chunks []); repro public IPSL tas height/.zarray at the climate source URL, cause dimension-count validation required a nonempty shape. Fixed 2026-11-11 (KB5822b): the cloud Zarr store accepts empty chunk shapes for rank-zero v2 and v3 arrays (key "0" or "c"); volume formats keep requiring three dimensions. Regression: packages/sciviz/tests/omezarr.test.js (rank-zero case). The offline data curation reads those uncompressed scalar coordinate bytes directly; CF reads the resulting NetCDF scalar without this restriction. Rule 21 leaves broader Cloud Zarr scalar support to its owner.
 Batch 180 job 4 GPU observation (2026-11-10): the existing atmosphere spec demo reproduced the recorded ANGLE D3D11 nondeterminism under the shared queue: 50 bytes differed, including 50 between two unchanged source captures (test-results/batch180-job4-gpu-all.log). No CF/projection scene failed. The unchanged atmosphere/surface/volume/points spec assertions are exact on the documented ANGLE Vulkan backend (test-results/batch180-job4-gpu-remaining.log). D3D11 remains the existing release blocker above; this is not a repaired driver claim or a widened pixel bound.
 
 - Batch 175 job 4 landing gate: the unchanged geo-lod exact restoration assertion observed one-level differences, 1 native channel and 46 WebGL2 channels. This matches the documented ANGLE D3D11/NVIDIA resolve defect above and Scott's 2026-11-10 landing exception. The test and assertion remain unchanged. Evidence: test-results/b175-j4-package-gpu.log and b175-j4-geo-probe-direct.log; /series passes both backends.
@@ -15993,7 +16049,7 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
 - Fixed, lane S (2026-11-10): AssetCache and RangeCache retain stored Cache-Control/Expires fields when omitted by a 304; provided fields replace them, and Date/Age are taken from the validating response. The common policy helper persists only the two lifetime fields, with matching-validator updates. Parent-failing regressions in packages/cache/test/freshness.test.js cover both caches; additional cases cover retained Expires, current Age and no-cache replacement/retention. Legacy metadata without saved policy remains conservatively revalidated until a response supplies that policy; offline bytes remain usable.
-- RangeCache response snapshot race (lane S, 2026-11-10, found during 304 policy retention): warm URL a with 100 bytes, ETag "a" and model/gltf-binary; hold a reader's conditional 304, then replace a from a second cache with 80 different bytes, ETag "new" and application/new before releasing the 304. The held response contains the new 80 bytes with the old ETag/type. Cause: answer holds old metadata across revalidation, but assemble reads blocks later by reused URL/block keys in another transaction. Metadata and the requested stored Blob handles need one consistent snapshot; validator-guarded freshness updates alone do not fix the response. The standalone delayed-response probe reproduces with fakeIndexedDB; no runtime change in the policy-retention job under lane rule 21.
+- Fixed 2026-11-11: RangeCache response snapshot race (lane S, 2026-11-10, found during 304 policy retention): warm URL a with 100 bytes, ETag "a" and model/gltf-binary; hold a reader's conditional 304, then replace a from a second cache with 80 different bytes, ETag "new" and application/new before releasing the 304. The held response contained the new 80 bytes with the old ETag/type, because assemble read the blocks in a transaction of their own, after the record. Assemble now reads the record and the blocks in one transaction; when the record no longer has the validators and size the answer was planned with, the request is answered again from the new record (RFC 9111 section 3.4), so the held response is the new 80 bytes with ETag "new" and application/new. Regression: packages/cache/test/ranges.test.js ("a file replaced while a revalidation is held"), failing on the parent.
 - Fixed 2026-11-11: RangeCache combines stored blocks only under one strong ETag (RFC 9111 section 3.4) and sends
   `If-Range` with it on block requests; under a weak ETag or none a miss fetches every block of the range again and the write
   replaces the old blocks. Regression: packages/cache/test/ranges.test.js (weak ETag and If-Range tests).
@@ -16459,15 +16515,16 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-faul
 
 Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-fault-sweep.mjs` (and with `MARGO_COMPAT=1`), RTX A6000, Edge 157. Each of the 40 (native) or 42 (WebGL2 layer) allocations a restore makes fails once in turn. Every failure is reported and a clean restore after it gives the same buffers, textures and picture. But a failed allocation of core (10 native, 8 layer), `@margoengine/shadows` (5) or `@margoengine/culling` (13 native, reported at the next frame) stops the engine: the out-of-memory error reaches core's `uncapturederror` listener, and every frame throws the coded `gpu-lost` fault (`engine.start()` stops its loop) until the next device restore. `@margoengine/environment` scopes its allocations, rejects its restore and the frames go on. Cause: those allocations run outside an `out-of-memory` error scope, and WebGPU only reports the failure later, after frames have used the object. Fix needed: scope the allocations of each package's setup and restore, skip the package's passes until the scope resolves, and on failure release, report a coded error and retry at the next restore, with `scripts/restore-fault-sweep.mjs` asserting that the frame after any one failure renders.
 
-### sciviz views: ResizeObserver callback renders and resizes the canvases it observes (WebKit, 2026-11-11)
+### Fixed 2026-11-11 (KB6438a): sciviz views ResizeObserver callback rendered and resized the canvases it observes (WebKit)
 
 - **What:** `sciviz test:browser:views` in Playwright WebKit fails on some runs with the page error "ResizeObserver loop
   completed with undelivered notifications." (3 of 3 runs at 90f7f7dd0, 1 of 2 at 8ac516006); it passes in Chromium.
 - **Repro:** `MARGO_BROWSER=webkit npm run test:browser:views --workspace @margoengine/sciviz`.
 - **Cause:** the observer in `packages/sciviz/src/views.ts` (the `#resize` callback of the three-slice view) fits the
-  slices and calls `figure.render()`, which can change the size of the canvases it observes in the same frame. Not yet
-  fixed; the fix is to schedule the re-render from the callback with `requestAnimationFrame` and add a test that counts
-  observer errors.
+  slices and called `figure.render()`, which can change the size of the canvases it observes in the same frame.
+- **Fix:** the callback schedules one refit and redraw on the next animation frame (deliveries before it share it;
+  dispose cancels it). Regression: packages/sciviz/tests/views-browser.mjs counts renders inside the delivery (must be
+  0) and after it (WebKit rerun owed on a machine with Playwright WebKit).
 
 ## Batch 132b audit: materials (fixed, 2026-11-11, lane N)
 
