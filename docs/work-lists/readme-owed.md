@@ -1087,7 +1087,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 
 - @margoengine/sciviz (batch 180 job 1): document geo-lod, selection/cache/fades, terrain stream and quantized height adapters, cancellation, errors, provider attribution and real AWS demo; margoengine generated geo-lod alias. DONE (sciviz-readme-phase)
-- @margoengine/sciviz (batch 181 job 1): document createFallbackFigure from /fallback, page-wide explicit WebGL2 installation, full-tier requirements, same-case CPU isosurfaces, ownership/cancellation/restore and ?backend=webgl2 for the three real-data demos; examples deferred. DONE (sciviz-readme-phase)
+- @margoengine/sciviz (batch 181 job 1): document createFallbackFigure from /fallback, page-wide explicit WebGL2 installation, full-tier requirements, same-case CPU isosurfaces, ownership/cancellation/restore and ?backend=webgl2 for the three real-data demos; the createFallbackFigure example now runs as written ("WebGL2 without WebGPU"; the native sciviz/webgl2 section was removed with the driver, KB1405). DONE (sciviz-readme-phase, KB1405 sweep)
 
 - @margoengine/ui (review 2): describe Select popup ownership when closing and reopening within one turn, including disposal of the current popup.
 
@@ -1212,7 +1212,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 - @margoengine/sciviz (batch 177 job 5): document /stream append/patch, original data/channels, rollover, cancellation/disposal, async WebSocket/SSE/polling sources, sliding/smooth date windows, Figure.updateData identity and transient allocations, and integration with /format. README examples owed. DONE (sciviz-readme-phase)
 - margoengine (batch 177 job 5): document the optional sciviz/stream alias in README phase.
 
-- @margoengine/sciviz (lane L fix): createFallbackFigure now takes the layer as `compat: await import('@margoengine/webgl2-compat')`; README prose updated, example deferred. DONE (sciviz-readme-phase)
+- @margoengine/sciviz (lane L fix): createFallbackFigure now takes the layer as `compat: await import('@margoengine/webgl2-compat')`; README prose and runnable example in place (KB1405 sweep). DONE (sciviz-readme-phase)
 
 | @margoengine/environment | exr-tiled: run the `parseTiledEXR` example (levels: all) under check:readme-run; fixture `/texture-mips.exr` still to provide. | Batch 51 job 2 |
 | @margoengine/inspector | shaders: ShaderEditor.attach with a WgslMaterial mesh, recompileShader result and diagnostics, undo | batch-107 job 2 DONE (inspector-readme-phase) |
