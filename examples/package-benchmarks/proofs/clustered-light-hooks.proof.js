@@ -14,7 +14,7 @@ import { Engine, TransformStore } from '../../../packages/core/dist/extension.js
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('6c20076d', 'b4700864', '65098f33f');
+const { ref, pin } = refs('6c20076d', 'b4700864', '29d79d377');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin);
 const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
   { DirectionalLights } = await entryAt('clustered', 'src/directional.ts', pin),
