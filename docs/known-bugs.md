@@ -21,26 +21,18 @@
 - **Fix to build:** decide in loaders whether to follow the new core cap (and keep the point-cloud default at 166,666
   points so frame cost does not change), or keep 1,000,000 as the loaders' own limit and say so in the message.
 
-### WebGL2 layer: an imported external texture outlives the Video that imported it (found by check:owners, 2026-11-10, open)
+### SSR and SSGI keep a clear-colour buffer after disposal (found by check:owners, 2026-11-11, open)
 
-- **Repro:** `MARGO_COMPAT=1 node scripts/check-owner-lifetime-browser.mjs --packages=video` with
-  `packages/video/test/owner-lifetime.fixture.js` on disk: all 11 cases fail 'no leaked GPU buffers, textures or query
-  sets'; the same fixture passes on native WebGPU.
-- **Cause:** `packages/webgl2-compat/src/device/device.ts` `importExternalTexture` keeps one texture per source in
-  `externals` and destroys it only when the size changes, so after `Video.dispose()` (and after its VideoFrame is
-  closed) the texture stays until the source object is collected. WebGPU expires an external texture at the end of
-  the task, or when its VideoFrame closes.
-- **Fix to build:** expire the layer's external texture as WebGPU does (a closed VideoFrame, the end of the task)
-  while reusing the texture storage for the next frame of the same size, so steady frames still allocate nothing;
-  then gate the video fixture.
-
-### SSR and SSGI are missing from the post owner-lifetime fixture (found by check:owners, 2026-11-10, open)
-
-- **Repro:** `packages/post/test/owner-lifetime.fixture.js` is not on `main`; it exists only in the unlanded owners work
-  (commit `e871e72960`) and its comment lists SSR and SSGI as not covered.
-- **Cause:** the clear-colour buffer leak that blocked them is fixed (evicted buffers are destroyed after submitted
-  work), but the fixture is not landed, so `SSR.attach` and `SSGI.attach` cannot be added yet.
-- **Fix to build:** when the owners fixture lands, add `SSR.attach` and `SSGI.attach` to it and delete this entry.
+- **Repro:** add `ssr: ['SSR'], ssgi: ['SSGI']` to the `entries` of `packages/post/test/owner-lifetime.fixture.js` and run
+  `node scripts/check-owner-lifetime.mjs --packages=post`: all 22 `SSR.attach` and `SSGI.attach` cases fail 'no leaked
+  GPU buffers, textures or query sets'.
+- **Cause:** `packages/shared/clear-color.js` keeps one 16 byte uniform buffer per colour in a per-device cache of 64
+  (core's eviction fix, aaace8b22f, bounds it). SSR and SSGI clear with a colour of their own, so the first clear makes
+  that buffer under the plugin, and it stays in the cache after the plugin is disposed, until 64 newer colours evict it
+  or the device goes.
+- **Fix to build:** count the users of each cached colour and destroy its buffer when the last user is disposed (or
+  give SSR and SSGI their clear values through a buffer they own), then add both to the post fixture. Core change:
+  needs Scott's yes unless it is zero bytes.
 
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 

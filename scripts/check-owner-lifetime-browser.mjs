@@ -20,7 +20,10 @@ try {
       const { exerciseLifetime, lifecycleCases } = await import('/tests/support/owner-lifetime.js');
       const { browserLifetimeAdapter } = await import('/tests/support/owner-lifetime-browser.js');
       const results = [], failures = [];
-      const entries = await fixtures();
+      // Entries load by plain URL, as the package's own cross-entry imports do. The fixture's own import() of a
+      // variable gets Vite's ?import query, a second module instance that breaks class and brand checks.
+      const base = new URL('/' + path, location.href);
+      const entries = await fixtures((entry) => import(new URL(entry, base).href));
       for (const fixture of entries) for (const target of ['default', 'secondary']) for (const mode of lifecycleCases) {
         if (target === 'default' && mode === 'scene') continue;
         try { results.push({ package: name, ...await exerciseLifetime(fixture, browserLifetimeAdapter, { target, mode }) }); }

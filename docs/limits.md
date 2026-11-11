@@ -29,20 +29,17 @@
 ### Owner/lifetime check (check:owners) limits
 
 - Only packages with a `test(s)/owner-lifetime.fixture.js` are checked; every other selected package is printed as
-  pending (89 of 102 on 2026-11-10, many with no engine plugin at all, such as math or input). Core and the physics
+  pending (81 of 102 on 2026-11-11, many with no engine plugin at all, such as math or input). Core and the physics
   packages (on hold) are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`.
-- The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`. It
-  lacks `createPipelineLayout`, `queue.writeTexture`, device limits, the `GPU*` enum globals, `OffscreenCanvas` and a
-  document, so the fixtures that need them add those
-  themselves; glyphs are not rasterised. The GPU leaf runs the same fixtures on a real device, native and WebGL2.
-- Written but not gated yet, because they pass the CPU model only: the culling, environment, post, shadows, sky,
-  splats, text, ui and video fixtures. Their Node shims (stub shaders, fake buffers, a document stand-in) break on a
-  real device, and video's WebGL2 case finds the external-texture retention in docs/known-bugs.md; they are gated once
-  each passes native WebGPU and the WebGL2 layer. The bugs those fixtures found are fixed with their own tests.
+- The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,
+  completed in `tests/support/owner-lifetime-node.js` (pipeline layouts, error scopes, texture writes, limits, the
+  `GPUShaderStage` and `GPUTextureUsage` globals, a canvas context and core's standard lit shader lines). Fixtures never
+  shim a device, so the GPU leaf runs the same fixtures with real resources on a real device, native and WebGL2. Glyphs
+  are not rasterised in the CPU model.
 - Not covered yet: stage feature entries (they take a Stage, not the engine the harness gives), terrain, `LabelRenderer`
   and `LabelGL` (DOM), `TransmissionLayers` and the `BatchedMesh`, `Fur` and node-material entries of materials, SSR and
-  SSGI (shared clear-colour cache, docs/known-bugs.md), and SceneFade, which disposes itself on device restore by
-  design, so the attached device-loss case cannot hold for it.
+  SSGI (a clear-colour buffer stays in the shared per-device cache, docs/known-bugs.md), and SceneFade, which disposes
+  itself on device restore by design, so the attached device-loss case cannot hold for it.
 - Work after an async factory settles (a stream that keeps loading) runs with no owner and is checked only through
   the plugin hooks it runs in.
 
