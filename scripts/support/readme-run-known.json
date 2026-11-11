@@ -1,12 +1,5 @@
 {
   "cutscene/readme-render-to-video-4f9104": "sample: EncodingError: Unable to decode audio data",
-  "exporters/readme-render-to-file-80cd28": "example: TypeError: Cannot read properties of undefined (reading '1')",
-  "exporters/readme-unity-asset-and-support-bundles-a4fd05": "example: MargoError: Unity import profile requires the explicit Margo Mesh Studio source profile; use general GLB for other generators; change the scene or choose anothe",
-  "fbx/readme-margoengine-fbx-4c9214": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
-  "fbx/readme-nurbs-curves-and-lines-4d004a": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
-  "fbx/readme-scale-inheritance-b099af": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
-  "fbx/readme-skinning-modes-and-in-between-sh-84ddc1": "sample: MargoError: FBX request failed: HTTP 404; check the URL and that the server serves it",
-  "input/readme-chords-contexts-rebinding-and-pr-5e2c1c": "example: TimeoutError: signal timed out",
   "mesh-edit/readme-import-to-editable-meshes-and-fl-03d481": "sample: TypeError: glTF accessor undefined does not exist; pass an index into accessors",
   "ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55": "sample: RangeError: Unknown animator clip \"GetUpFromBack\"; use a clip name from animation.clips",
   "rigging/readme-corrective-shapes-margoengine-ri-ff3e5c": "sample: RangeError: Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation",

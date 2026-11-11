@@ -1240,7 +1240,10 @@ const jpg = await encodeJPEG(shot, 0.9);                 // browser encoder, qua
 
 // Transparent background: attach TransparentCanvas (@margoengine/environment) first.
 const sprite = capture(engine, {width: 256, height: 256, background: '#203040', backgroundAlpha: 0.5});
-const topView = capture(engine, {view: engine.views![1]}); // one engine.views entry: its camera, scene and layers, at its rectangle's size
+const topCamera = new Camera({position: [0, 12, 0], target: [0, 0, 0]});
+topCamera.up = [0, 0, -1];                               // straight down needs another screen-up
+engine.views = [{camera: engine.camera, viewport: [0, 0, 0.5, 1]}, {camera: topCamera, viewport: [0.5, 0, 0.5, 1]}];
+const topView = capture(engine, {view: engine.views[1]}); // one engine.views entry: its camera, scene and layers, at its rectangle's size
 
 // Movie as numbered files: walk_000.png, walk_001.png ...
 const frame = (i: number) => (timeline.seek(i / 30), capture(engine, {width: 640, height: 360}));
@@ -1455,7 +1458,7 @@ const glb = exportGLB({nodes: [{name: 'Ranger', extras: {id: 'ranger'}, geometry
   uvs: new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]),
   indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
 }, material: {baseColorTexture: {image: atlas, mimeType: 'image/png', magFilter: 'nearest', minFilter: 'nearest',
-  mipmaps: false, wrapS: 'clamp', wrapT: 'clamp'}}}]});
+  mipmaps: false, wrapS: 'clamp', wrapT: 'clamp'}}}]}, {generator: 'Margo Mesh Studio'}); // the Unity profile reads Margo Mesh Studio files only
 
 const support = await createUnityImportSupportPackage();
 const asset = await createUnityImportBundle(glb, {

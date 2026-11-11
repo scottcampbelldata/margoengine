@@ -25,11 +25,11 @@ const timer = setInterval(() => {
   client.update(1 / 60, { keys: Keys.forward | Keys.jump, yaw: 0, pitch: 0 });
   for (const other of client.samplePlayers().values()) console.log(other.snapshot.position);
 }, 1000 / 60);
-process.once('SIGINT', async () => {
-  clearInterval(timer);
-  client.close();
-  await server.close();
-});
+// Play for a moment, then stop. A real server stays up and closes in a `process.once('SIGINT', ...)` handler.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+clearInterval(timer);
+client.close();
+await server.close();
 ```
 
 ## How it works
@@ -109,6 +109,8 @@ const server = new VoxelServer({
   store,
 });
 await server.listen(8787, '0.0.0.0');
+// A real server stays up; closing it here saves every edited chunk and lets this example end.
+await server.close();
 ```
 
 ## Names and snapshots
@@ -183,7 +185,7 @@ for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves'])
 const server = new VoxelServer({ blocks });
 await server.listen(8787, '0.0.0.0');
 const greeted = new Set<number>();
-setInterval(() => {
+const greeter = setInterval(() => {
   for (const player of server.players)
     if (player.spawned && !greeted.has(player.id)) {
       greeted.add(player.id);
@@ -195,6 +197,12 @@ setInterval(() => {
 // Client: the first message is text, the others are the count.
 const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
 client.onApp = (data) => console.log(data.length > 1 ? new TextDecoder().decode(data) : `${data[0]} players`);
+
+// Stop after a moment so the example ends.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+clearInterval(greeter);
+client.close();
+await server.close();
 ```
 
 ## A dead network
@@ -305,9 +313,16 @@ pig.state = 1; // say, "hurt": clients get it with the next tick
 const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
 const view = new VoxelEntityView(client);
 view.onEnter = (e) => console.log(`entity ${e.id} of kind ${e.kind} came into view`);
-setInterval(() => {
+const timer = setInterval(() => {
   for (const e of view.sample().values()) console.log(e.kind, e.snapshot.position);
 }, 1000);
+
+// Stop after a moment so the example ends.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+clearInterval(timer);
+client.close();
+entities.dispose();
+await server.close();
 ```
 
 - **Server.** `spawn({kind, position, yaw?, state?, body?, brain?})` returns the entity; write its `position`, `yaw`
@@ -346,17 +361,24 @@ const map = new ShardMap({
   assign: (rx) => (rx >= 0 ? 0 : 1),
 });
 const secret = 'change me: the same 16+ characters on every shard';
+const servers: VoxelServer[] = [];
 for (const index of [0, 1]) {
   const shard = new VoxelShard({ map, index, secret });
   const server = new VoxelServer(shard.options({ blocks }));
   shard.attach(server);
   await server.listen(8811 + index);
+  servers.push(server);
 }
 
 // Client: follows the player from shard to shard. Set handlers on it, not on follower.client (that changes).
 const follower = connectShards(map, new VoxelWorld({ blocks }), { name: 'Ada' });
 follower.onHandoff = (url) => console.log(`now on ${url}`);
 follower.onApp = (data) => console.log(`your app message, ${data.length} bytes`);
+
+// Stop after a moment so the example ends.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+follower.close();
+for (const server of servers) await server.close();
 ```
 
 - **Server.** `new VoxelShard({map, index, secret, margin?, ticketLife?, grace?})`, then `shard.options(yours)` for
@@ -406,6 +428,7 @@ if ('WebTransport' in globalThis) {
   });
   client.onClose = ({ code }) => console.log(`closed ${code}`);
 }
+await server.close(); // a real server keeps ticking; closed here so the example ends
 ```
 
 - **Server.** `server.start()`, `acceptVoxelNetWebTransport(server, session, {request?, address?})`, or
@@ -467,6 +490,11 @@ client.onSpawn = () => {
   talk.say('hello there');
   talk.move(1, 8);
 };
+
+// Stop after a moment so the example ends.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+client.close();
+await server.close();
 ```
 
 - **Server.** `VoxelChat`: `system(text, player?)`, `onLine(player, text, to)`, `stats` (`said`, `dropped`: over the
@@ -512,6 +540,11 @@ rewind.onShot = (shooter, hit) => {
 // Client: on a click, shoot where the camera looks (here straight ahead along -z).
 const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
 globalThis.addEventListener?.('pointerdown', () => sendShot(client, [0, 0, -1]));
+
+// Stop after a moment so the example ends.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+client.close();
+await server.close();
 ```
 
 - **Server.** `shoot(shooter, { viewTick, direction }, maxDistance?)` checks a shot from your own code and returns
@@ -587,7 +620,9 @@ const db = new DatabaseSync('world.db');
 db.exec('PRAGMA journal_mode = WAL'); // readers do not wait on the writer
 const server = new VoxelServer({ blocks, store: new SqlChunkStore(db) });
 await server.listen(8787, '0.0.0.0');
-// Later: await server.close() saves every edited chunk still in memory, then close the database.
+// A real server stays up. Closing it saves every edited chunk still in memory; then close the database.
+await server.close();
+db.close();
 ```
 
 On Postgres (`npm install pg`), pass a pool shared with the rest of your game:

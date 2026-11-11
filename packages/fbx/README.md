@@ -11,7 +11,7 @@ import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadFBX(engine, '/assets/character.fbx');
 const animation = Animation.attach(model);
-animation.play('Walking');
+animation.play(0); // the first clip; a name from animation.clips, such as 'Walking', picks one
 ```
 
 `convertFBX(bytes, options)` returns a GLB `ArrayBuffer`. `parseFBX(engine, bytes, options)` returns a `PBRModel`. `loadFBX(engine, stringOrURL, options)` fetches an HTTP(S) asset and resolves texture paths against the final response URL. Options remain `{resourcePath?: string; signal?: AbortSignal}`. Explicit resource paths must use HTTP(S).
@@ -53,9 +53,11 @@ Every inherit type imports, under any ancestor scale, animated or not. Type 1 is
 
 ```ts
 import {loadFBX} from 'margoengine/fbx';
+import {animationLayers} from 'margoengine/fbx/layers';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const rig = await loadFBX(engine, '/assets/maya-rig.fbx');
+// This Maya file animates with cubic curves, which the base reader refuses (see Animation layers below).
+const rig = await loadFBX(engine, '/assets/maya-rig.fbx', {extensions: [animationLayers]});
 ```
 
 Proof: a real Maya rig that mixes types 1 and 2 under uneven animated scale matches all eight frames Maya wrote to the OBJ's six decimals (`test/inherit.test.js`). Type 0 under a shear is by hand-worked result only (stand-in): no real file with it was found.
@@ -112,12 +114,13 @@ Proof: real files from 3ds Max and Maya give each parameter its own number, and 
 `nurbsCurves` from `margoengine/fbx/curves` keeps the file's NURBS curves and lines. Each sits on its node as `extras.fbxCurve`, in the node's space, and `fbxCurves` hands them back as splines from `@margoengine/geometry/nurbs` for paths, tubes and anything else that takes a curve.
 
 ```ts
-import {loadFBX} from 'margoengine/fbx';
+import {convertFBX} from 'margoengine/fbx';
 import {fbxCurves, nurbsCurves} from 'margoengine/fbx/curves';
-import {Engine} from 'margoengine/core';
-const engine = await Engine.create(document.querySelector('canvas')!);
-const model = await loadFBX(engine, '/assets/route.fbx', {extensions: [nurbsCurves]});
-for (const {name, record, curve} of fbxCurves(model.extras())) console.log(name, record.form, curve.getPoint(0.5));
+// A file of curves alone has no mesh for loadFBX, so convert it and read the nodes of the GLB it makes.
+const glb = new Uint8Array(await convertFBX(await (await fetch('/assets/route.fbx')).arrayBuffer(), {extensions: [nurbsCurves]}));
+const json = new TextDecoder().decode(glb.subarray(20, 20 + new DataView(glb.buffer).getUint32(12, true)));
+const nodes = (JSON.parse(json).nodes as {name?: string; extras?: Record<string, unknown>}[]).map((node) => ({name: node.name, extras: node.extras ?? {}}));
+for (const {name, record, curve} of fbxCurves(nodes)) console.log(name, record.form, curve.getPoint(0.5));
 ```
 
 The record holds `form` (`Open`, `Closed`, `Periodic`, or `Line` for a polyline), `degree`, `points` (flat xyz, a periodic curve's wrapped ones included), `weights` (one per point, so a rational curve keeps its pull), `knots` and `polyline`. `polyline` is the curve in straight pieces, eight per knot span, ready to draw. The GLB has no line of its own: the curve travels in the node's `extras`, so a viewer that does not read them shows an empty node. `spline(record)` makes one spline from one record.
@@ -133,9 +136,11 @@ Proof: a real 3ds Max spline passes through every point of the line Max converte
 ```ts
 import {loadFBX} from 'margoengine/fbx';
 import {deformers} from 'margoengine/fbx/deformers';
+import {animationLayers} from 'margoengine/fbx/layers';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const model = await loadFBX(engine, '/assets/hero.fbx', {extensions: [deformers]});
+// This file also animates with cubic curves, so it needs animationLayers beside deformers.
+const model = await loadFBX(engine, '/assets/hero.fbx', {extensions: [deformers, animationLayers]});
 console.log(model.extras().filter((node) => node.extras.fbxSkinning).length);
 ```
 

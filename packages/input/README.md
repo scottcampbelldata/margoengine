@@ -27,7 +27,9 @@ const input = new Input(
 );
 input.setContext('game', false); // a menu opened: jump reads 0 and releases; confirm keeps working
 const prompt = bindingLabel(input.actions.save[0]); // "Ctrl+S"; gamepad buttons use 'xbox' | 'playstation' | 'generic' names
-const binding = await input.captureBinding({signal: AbortSignal.timeout(10_000)}); // "press a key to rebind"
+const pressed = input.captureBinding({signal: AbortSignal.timeout(10_000)}); // "press a key to rebind"
+window.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyJ'})); // stands in for the player's key press
+const binding = await pressed;
 input.rebind('jump', [binding]);
 localStorage.setItem('bindings', JSON.stringify(input.exportBindings()));
 input.importBindings(localStorage.getItem('bindings')!); // unknown actions are ignored; invalid data changes nothing
