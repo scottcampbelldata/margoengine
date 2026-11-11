@@ -165,11 +165,11 @@ export class AnimatedText {
   readonly texts: Text[] = [];
 
   private _layout?: TextLayout;
+  /** The font, its revision and the layout fields the current glyph origins were laid out with. */
+  private built: unknown[] = [];
   private readonly tempMat = identity();
-  private readonly blockOptions: AnimatedTextOptions;
 
   constructor(options: AnimatedTextOptions = {}) {
-    this.blockOptions = { ...options };
     const {
       text = '',
       font,
@@ -272,7 +272,7 @@ export class AnimatedText {
     if (shadowBlur !== undefined) this.shadowBlur = shadowBlur;
     if (billboard !== undefined) this.billboard = billboard;
     if (onTop !== undefined) this.onTop = onTop;
-    return this;
+    return this.apply();
   }
 
   /** Sets the block's local position, Euler rotation and scale. */
@@ -334,6 +334,13 @@ export class AnimatedText {
   typewriter(progressOrOptions: number | TypewriterOptions): this {
     const opts: TypewriterOptions =
       typeof progressOrOptions === 'number' ? { progress: progressOrOptions } : progressOrOptions;
+    for (const [key, value] of [
+      ['progress', opts.progress],
+      ['count', opts.count],
+      ['popScale', opts.popScale],
+    ] as const)
+      if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value)))
+        throw new RangeError(`typewriter ${key} must be a finite number`);
     const total = this.glyphs.length;
     if (!total) return this;
 
@@ -486,15 +493,27 @@ export class AnimatedText {
     return this;
   }
 
-  /** Recomputes layout and builds per-glyph Text instances. */
-  private rebuild(): void {
-    if (this.attachedRenderer) {
-      for (const t of this.texts) this.attachedRenderer.remove(t);
-    }
-    for (const t of this.texts) t.dispose();
-    this.texts.length = 0;
-    this.glyphs.length = 0;
+  /** The values a layout depends on, compared with Object.is to find a stale layout (as Text does). */
+  private layoutState(): unknown[] {
+    return [
+      this.font,
+      this.font.revision,
+      this.fontSize,
+      this.lineHeight,
+      this.letterSpacing,
+      this.ligatures,
+      this.maxWidth,
+      this.textAlign,
+      this.anchorX,
+      this.anchorY,
+      this.direction,
+      this.whiteSpace,
+      this.overflowWrap,
+    ];
+  }
 
+  private measure(): TextLayout {
+    const state = this.layoutState();
     const layout = layoutText(
       this._text,
       {
@@ -512,6 +531,43 @@ export class AnimatedText {
       },
       this.font,
     );
+    this.built = state;
+    return layout;
+  }
+
+  /**
+   * Lays the text out again after the font loaded (its revision moved), the font changed or a layout field changed.
+   * When the drawn clusters are the same, only the glyph origins move and every glyph keeps its animation state;
+   * otherwise the glyphs are rebuilt.
+   */
+  private relayout(): void {
+    const layout = this.measure(),
+      drawn = layout.glyphs.filter((g) => !g.whitespace);
+    if (drawn.length !== this.glyphs.length || drawn.some((g, i) => g.cluster !== this.glyphs[i].cluster)) {
+      this.rebuild(layout);
+      return;
+    }
+    this._layout = layout;
+    drawn.forEach((g, i) => {
+      const origin = this.glyphs[i].origin as [number, number, number];
+      origin[0] = g.x;
+      origin[1] = g.y;
+      const t = this.texts[i];
+      t.font = this.font;
+      t.fontSize = this.fontSize;
+    });
+  }
+
+  /** Recomputes layout and builds per-glyph Text instances. */
+  private rebuild(measured?: TextLayout): void {
+    if (this.attachedRenderer) {
+      for (const t of this.texts) this.attachedRenderer.remove(t);
+    }
+    for (const t of this.texts) t.dispose();
+    this.texts.length = 0;
+    this.glyphs.length = 0;
+
+    const layout = measured ?? this.measure();
     this._layout = layout;
 
     let glyphIndex = 0;
@@ -524,16 +580,7 @@ export class AnimatedText {
         anchorX: 'left',
         anchorY: 'baseline',
         mesh: this.target,
-        billboard: this.billboard,
-        onTop: this.onTop,
       });
-      textBlock.outlineWidth = this.outlineWidth;
-      textBlock.outlineOpacity = this.outlineOpacity;
-      textBlock.shadowOpacity = this.shadowOpacity;
-      textBlock.shadowBlur = this.shadowBlur;
-      textBlock.shadowOffset.set(this.shadowOffset);
-      textBlock.outlineColor.set(this.outlineColor);
-      textBlock.shadowColor.set(this.shadowColor);
 
       const origin: [number, number, number] = [g.x, g.y, 0];
       const item: AnimatedGlyph = {
@@ -570,10 +617,13 @@ export class AnimatedText {
   }
 
   /**
-   * Applies all glyph offsets, scales, rotations, colors, opacities and visibility to the underlying Text instances.
-   * Called automatically after animation methods.
+   * Applies all glyph offsets, scales, rotations, colors, opacities and visibility, and the block's outline, shadow,
+   * billboard and onTop styles, to the underlying Text instances. Called automatically after animation methods and
+   * setStyle. Lays the glyphs out again first when the font loaded or changed or a layout field changed.
    */
   apply(): this {
+    if (!this.glyphs.length) return this;
+    if (this.layoutState().some((value, i) => !Object.is(value, this.built[i]))) this.relayout();
     const total = this.glyphs.length;
     if (!total) return this;
     const layout = this._layout!;
@@ -590,6 +640,15 @@ export class AnimatedText {
       const g = this.glyphs[i];
       const t = g.text;
 
+      t.outlineWidth = this.outlineWidth;
+      t.outlineOpacity = this.outlineOpacity;
+      t.shadowOpacity = this.shadowOpacity;
+      t.shadowBlur = this.shadowBlur;
+      t.shadowOffset.set(this.shadowOffset);
+      t.outlineColor.set(this.outlineColor);
+      t.shadowColor.set(this.shadowColor);
+      t.billboard = this.billboard;
+      t.onTop = this.onTop;
       if (!this.visible || !g.visible || g.opacity <= 0) {
         t.visible = false;
         continue;

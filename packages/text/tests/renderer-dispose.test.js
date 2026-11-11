@@ -26,3 +26,21 @@ test('disposing a TextRenderer directly also removes it from its engine, so the 
     adapter.close();
   }
 });
+
+// Batch 132b: VectorTextRenderer.dispose kept its engine registration, unlike TextRenderer.
+test('disposing a VectorTextRenderer directly also removes it from its engine', async () => {
+  const { VectorTextRenderer } = await import('../dist/vector.js');
+  const adapter = await nodeLifetimeAdapter(), host = await adapter.create(), { engine } = host;
+  engine.gpu.createPipelineLayout ??= () => ({});
+  try {
+    const renderer = VectorTextRenderer.attach(engine);
+    assert.equal(engine.plugins.has(renderer.name), true);
+    renderer.dispose();
+    assert.equal(engine.sceneOf(renderer), undefined);
+    assert.equal(engine.plugins.has(renderer.name), false);
+    renderer.dispose();
+  } finally {
+    engine.dispose();
+    adapter.close();
+  }
+});

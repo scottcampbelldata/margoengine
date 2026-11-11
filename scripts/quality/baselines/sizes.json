@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15149175,
+  "total": 15149585,
   "history": [
     {
       "date": "2026-10-24",
@@ -8633,6 +8633,12 @@
       "commit": "e2c426c6c1",
       "reason": "KB0477: ImageBitmap copies on the WebGL2 layer run on the GPU (alpha-state detection, crop, flip, f32 alpha conversion); 112716 B from 111889 B full, 81105 B from 80737 B base; the path is the layer's only correct bitmap copy, and a separate lazy entry would add a dynamic import and a chunk for every textured scene",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "63a7b1234",
+      "reason": "batch 132b text second pass",
+      "grew": 1
     }
   ],
   "items": {
@@ -9715,7 +9721,7 @@
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 13606,
     "@margoengine/text": 17967,
-    "@margoengine/text/animate": 12416,
+    "@margoengine/text/animate": 12826,
     "@margoengine/text/curve": 11401,
     "@margoengine/text/extrude": 15305,
     "@margoengine/text/fit": 11271,

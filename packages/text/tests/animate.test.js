@@ -281,3 +281,40 @@ test('AnimatedText validates input arguments and numbers', () => {
   assert.throws(() => anim.fade('not a number'), RangeError);
   assert.throws(() => anim.colorWave(0, { colors: [[1, 0, 0]] }), RangeError);
 });
+
+// Batch 132b: the glyph origins follow the font once it loads, and block styles reach glyphs that already exist.
+test('AnimatedText lays out again when the font loads or a layout field changes, keeping glyph state', () => {
+  let width = 0.5;
+  const font = Object.assign(Object.create(Font.prototype), {
+    ...mockFont,
+    advance: (cluster) => width * cluster.length,
+  });
+  const anim = new AnimatedText({ text: 'AB', font, fontSize: 1 });
+  anim.glyphs[1].offset[1] = 0.25;
+  close(anim.glyphs[1].origin[0], 0.5, 'fallback advance');
+  // The font finished loading: new advances and a new revision, as Font.load does.
+  width = 0.75;
+  font.revision++;
+  anim.apply();
+  close(anim.glyphs[1].origin[0], 0.75, 'loaded advance moves the second glyph');
+  close(anim.glyphs[1].offset[1], 0.25, 'animation state is kept');
+  anim.fontSize = 2;
+  anim.apply();
+  close(anim.glyphs[1].origin[0], 1.5, 'fontSize change lays out again');
+  assert.equal(anim.texts[1].fontSize, 2);
+});
+
+test('AnimatedText setStyle reaches existing glyphs, and typewriter refuses non-finite input', () => {
+  const anim = new AnimatedText({ text: 'AB', font: mockFont });
+  anim.setStyle({ outlineWidth: 0.1, shadowOpacity: 0.5, shadowColor: [1, 0, 0], billboard: true, onTop: true });
+  for (const t of anim.texts) {
+    close(t.outlineWidth, 0.1, 'outlineWidth');
+    close(t.shadowOpacity, 0.5, 'shadowOpacity');
+    assert.deepEqual([...t.shadowColor], [1, 0, 0]);
+    assert.equal(t.billboard, true);
+    assert.equal(t.onTop, true);
+  }
+  assert.throws(() => anim.typewriter(NaN), RangeError);
+  assert.throws(() => anim.typewriter({ count: Number.NaN }), RangeError);
+  assert.throws(() => anim.typewriter({ progress: 0.5, popScale: Infinity }), RangeError);
+});

@@ -476,7 +476,6 @@ export class TextRenderer implements EnginePlugin {
       (text.onTop ? this.topTexts : this.depthTexts).push([text, r]);
       this.stats.texts++;
       this.stats.glyphs += r.count;
-      void layout;
     }
     if (!this.depthTexts.length && !this.topTexts.length) return;
     this.writeFrame(context, linearTarget);

@@ -309,7 +309,15 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
   }
   ends.push(text.length);
 
-  const raw: Array<{ items: Item[]; start: number; end: number; rtl: boolean; last: boolean; width: number }> = [];
+  const raw: Array<{
+    items: Item[];
+    levels: number[];
+    start: number;
+    end: number;
+    rtl: boolean;
+    last: boolean;
+    width: number;
+  }> = [];
   for (let p = 0; p < paragraphs.length; p++) {
     const items = paragraphs[p],
       n = items.length;
@@ -320,6 +328,12 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
           rtl = item.bidi === 'R';
           break;
         }
+    // UAX #9 resolves levels over the whole paragraph (W, N and I rules see across line breaks); section 3.4 then
+    // reorders each line. L1: a tab (segment separator) and the whitespace before it take the paragraph level.
+    const levels = resolveLevels(items, rtl ? 1 : 0);
+    for (let i = 0; i < n; i++)
+      if (items[i].cluster === '\t')
+        for (let k = i; k >= 0 && (k === i || items[k].space); k--) levels[k] = rtl ? 1 : 0;
     // Logical pen positions: pos[i] is where cluster i starts if nothing wraps.
     for (let i = 0; i + 1 < n; i++) {
       const a = items[i],
@@ -358,6 +372,7 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
       const lineItems = items.slice(start, end);
       raw.push({
         items: lineItems,
+        levels: levels.slice(start, visible),
         start: lineItems.length ? lineItems[0].index : end < n ? items[end].index : paragraphEnd,
         end: end < n ? items[end].index : paragraphEnd,
         rtl,
@@ -380,7 +395,7 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
     const visible = line.items.slice(0, visibleCount),
       trailing = line.items.slice(visibleCount);
     const base = line.rtl ? 1 : 0,
-      levels = resolveLevels(visible, base);
+      levels = line.levels;
     const order = reorder(levels);
     const visual = order.map((i) => ({ item: visible[i], level: levels[i] }));
     const xs: number[] = [];
@@ -553,7 +568,7 @@ const isStrong = (item: Item): boolean => {
 };
 
 /**
- * Simplified Unicode bidi (UAX #9 revision 52) for one line without explicit embeddings or isolates: weak types W2 to
+ * Simplified Unicode bidi (UAX #9 revision 52) for one paragraph without explicit embeddings or isolates: weak types W2 to
  * W7 (numbers after Arabic letters become Arabic numbers, separators between numbers and terminators next to them join
  * the number, European numbers after L text become L), bracket pairs (N0, simplified), neutrals (N1, numbers acting as
  * R; N2) and implicit levels (I1, I2: numbers always rise above the paragraph level).

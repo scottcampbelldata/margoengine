@@ -838,6 +838,21 @@ test('bidi numbers follow UAX #9: they attach to right-to-left text, keep Arabic
   assert.equal(cl('א $100'), '$100 א');
 });
 
+// UAX #9 section 3.4: levels are resolved over the paragraph and only reordering is per line (batch 132b).
+test('bidi levels are resolved across wrapped lines, and a tab takes the paragraph level (UAX #9 3.4, L1)', () => {
+  const lines = (l) =>
+    l.lines.map((line) =>
+      l.glyphs
+        .slice(line.firstGlyph, line.firstGlyph + line.glyphCount)
+        .map((g) => g.cluster)
+        .join(''),
+    );
+  // W7 looks back across the wrap: the number follows Hebrew, stays EN and joins the right-to-left run (N1).
+  assert.deepEqual(lines(layout('x אב 12 גד', { maxWidth: 2.5 })), ['x בא ', 'דג 12']);
+  // L1: a tab and the whitespace before it sit at the paragraph level, so the Hebrew either side is not one run.
+  assert.equal(layout('א \tב', { direction: 'ltr' }).glyphs.map((g) => g.cluster).join(''), 'א \tב');
+});
+
 test('KB4990b: release drops one bitmap slot and frees its page once the page holds no other slot', () => {
   const fakeTexture = { createView: () => ({}), destroy() {} };
   const device = {

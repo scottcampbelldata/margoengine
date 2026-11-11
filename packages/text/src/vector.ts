@@ -593,10 +593,12 @@ export class VectorTextRenderer implements EnginePlugin {
     this.frameBuffer = this.frameGroup = this.module = this.layouts = this.device = undefined;
   }
 
-  /** Releases every GPU resource. Texts stay registered, so the plugin can be used again. */
+  /** Releases every GPU resource and leaves the engine, as `TextRenderer.dispose` does. Texts stay registered. */
   dispose(): void {
+    const engine = this.engine;
     this.releaseGpu();
     this.engine = undefined;
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
