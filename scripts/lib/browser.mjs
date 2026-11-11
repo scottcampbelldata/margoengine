@@ -1,7 +1,8 @@
 import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
 import { spawn } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { win32 } from 'node:path';
 import { createInterface } from 'node:readline';
 import { closeAll, endTree, traceShutdown, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
 import { HOST_LOG, HOST_PATH, REAP_MS } from '../support/browser-host.mjs';
@@ -158,11 +159,14 @@ export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, pla
   const browser = resolveBrowser({ name, env, platform, argv }),
     reason = unsupportedReason(browser, 'chromium');
   if (reason) return skipSuite(reason);
+  // A Windows channel starts from its version folder, as launchBrowser starts it (channelExecutable, KB-C34i).
+  const executablePath =
+    browser.executablePath ?? options.executablePath ?? (browser.channel ? channelExecutable(browser, browser.channel) : undefined);
   return {
     ...options,
     args: launchArgs(browser, args, { webgpu }),
     ...(browser.channel ? { channel: browser.channel } : {}),
-    ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
+    ...(executablePath ? { executablePath } : {}),
   };
 }
 
@@ -431,14 +435,116 @@ export function chromiumExecutable(launcher, options) {
   return firefoxExecutable(launcher, options);
 }
 
+/** Where a channel's Windows install keeps its top-level executable, under each of the install roots below. */
+const CHANNEL_INSTALLS = Object.freeze({
+  msedge: ['Microsoft', 'Edge', 'Application', 'msedge.exe'],
+  chrome: ['Google', 'Chrome', 'Application', 'chrome.exe'],
+});
+/** The install roots a channel is looked for in, in this order (a per-user install first, as Playwright does). */
+const INSTALL_ROOTS = ['LOCALAPPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)'];
+const VERSION_FOLDER = /^\d+\.\d+\.\d+\.\d+$/;
+
 /**
- * The launch settings' `executablePath` for Playwright's own Chromium: the caller's or BROWSER_EXECUTABLE (already in
- * `browser.executablePath`) first; else, when headed with no channel, the real path of Playwright's install.
+ * The file version ("157.0.4341.46") in a Windows executable's version resource, or undefined. The resource is a
+ * VS_VERSIONINFO block: the UTF-16 key "VS_VERSION_INFO" at offset 6, then, 4-byte aligned at offset 40, the
+ * VS_FIXEDFILEINFO whose signature is 0xFEEF04BD and whose next words hold the version (Microsoft Learn,
+ * "VS_VERSIONINFO structure" and "VS_FIXEDFILEINFO structure"). The same key text can occur elsewhere in the file, so
+ * every match is checked for the signature where the structure puts it.
  */
-export function chromiumExecutablePath(browser, channel, options = {}, { launcher, realpath } = {}) {
+export function peFileVersion(bytes) {
+  const key = Buffer.from('VS_VERSION_INFO\0', 'utf16le');
+  for (let at = bytes.indexOf(key); at >= 6; at = bytes.indexOf(key, at + 1)) {
+    const fixed = at - 6 + 40;
+    if (fixed + 16 > bytes.length || bytes.readUInt32LE(fixed) !== 0xfeef04bd) continue;
+    const high = bytes.readUInt32LE(fixed + 8),
+      low = bytes.readUInt32LE(fixed + 12);
+    return `${high >>> 16}.${high & 0xffff}.${low >>> 16}.${low & 0xffff}`;
+  }
+  return undefined;
+}
+
+const nodeFiles = {
+  exists: existsSync,
+  list: (path) => {
+    try {
+      return readdirSync(path);
+    } catch {
+      return [];
+    }
+  },
+  read: (path) => {
+    try {
+      return readFileSync(path);
+    } catch {
+      return undefined;
+    }
+  },
+};
+
+const compareVersions = (a, b) => {
+  const x = a.split('.').map(Number),
+    y = b.split('.').map(Number);
+  for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return 0;
+};
+
+/**
+ * The executable inside the installed version folder of a Chromium-family install whose top-level executable is
+ * `topLevel` (`...\Edge\Application\msedge.exe`), or `topLevel` when the install has no version folder holding one
+ * (Chrome keeps only a stub at the top level: its version folders hold no chrome.exe, so it starts as before).
+ *
+ * Why (KB-C34i): an auto-update installs the new version beside the old one with a pending `new_msedge.exe`, then
+ * renames that over the top-level msedge.exe while the old version still runs. A browser started from the top-level
+ * file during that swap ended during launch or lost every new renderer and its GPU process; started from its version
+ * folder it kept working (6 of 6). The installed version is the top-level executable's own file version: the version
+ * folder of a pending `new_<exe>` update, and the VisualElements manifest (rewritten at install, before the swap), are
+ * not it. When the top-level version cannot be read or has no folder, the newest folder that is not the pending
+ * update's is used.
+ */
+export function installedVersionExecutable(topLevel, { files = nodeFiles } = {}) {
+  const dir = topLevel.replace(/[\\/][^\\/]+$/, ''),
+    exe = topLevel.slice(dir.length + 1);
+  const pendingBytes = files.read(win32.join(dir, `new_${exe}`)),
+    pending = pendingBytes && peFileVersion(pendingBytes);
+  const folders = files
+    .list(dir)
+    .filter((name) => VERSION_FOLDER.test(name) && files.exists(win32.join(dir, name, exe)))
+    .sort(compareVersions);
+  if (!folders.length) return topLevel;
+  const topBytes = files.read(topLevel),
+    installed = topBytes && peFileVersion(topBytes);
+  if (installed && folders.includes(installed)) return win32.join(dir, installed, exe);
+  const settled = folders.filter((name) => name !== pending);
+  return win32.join(dir, (settled.length ? settled : folders).at(-1), exe);
+}
+
+/**
+ * The executable a Windows channel (msedge, chrome) starts from: its install's version folder (see
+ * installedVersionExecutable), found under the first install root that holds the channel, or undefined (another
+ * platform, an unknown channel, or not installed: Playwright's own channel lookup then starts it, or reports it missing).
+ */
+export function channelExecutable(browser, channel, { files = nodeFiles } = {}) {
+  const parts = CHANNEL_INSTALLS[channel];
+  if (!parts || browser.platform !== 'win32') return undefined;
+  for (const root of INSTALL_ROOTS) {
+    const base = browser.env?.[root];
+    if (!base) continue;
+    const topLevel = win32.join(base, ...parts);
+    if (files.exists(topLevel)) return installedVersionExecutable(topLevel, { files });
+  }
+  return undefined;
+}
+
+/**
+ * The launch settings' `executablePath`: the caller's or BROWSER_EXECUTABLE (already in `browser.executablePath`)
+ * first; else a Windows channel's version-folder executable (channelExecutable); else, when headed with no channel,
+ * the real path of Playwright's install.
+ */
+export function chromiumExecutablePath(browser, channel, options = {}, { launcher, realpath, files } = {}) {
   if (options.executablePath) return options.executablePath;
   if (browser.executablePath) return browser.executablePath;
-  if (channel || options.headless !== false) return undefined;
+  if (channel) return channelExecutable(browser, channel, { files });
+  if (options.headless !== false) return undefined;
   return chromiumExecutable(launcher, { realpath });
 }
 

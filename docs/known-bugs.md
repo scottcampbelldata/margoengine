@@ -470,6 +470,27 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
   headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
 
+### Fixed 2026-11-11: an Edge auto-update swapped the browser under a starting GPU suite (KB-C34i)
+
+- **Repro:** shadows `test:gpu` (`scale-browser.mjs`) at 17:29:02 on 2026-11-11: `engine.create` threw "WebGPU adapter
+  unavailable", then the suite waited 120 s for `window.ready`. EdgeUpdate had installed 157.0.4341.46 beside the
+  running 157.0.4341.42 with a pending `new_msedge.exe`; its rename over `Application\msedge.exe` landed 1.6 s before the
+  page error, inside the launch. Forced on a copied Edge install: swapping the top-level file 30 to 160 ms after launch
+  ended the browser during launch, 200 to 1500 ms after made every new renderer crash, and a GPU process restart after
+  the swap ended the browser; the same three with Edge started from `Application\<version>\msedge.exe` kept working
+  (6 of 6, adapter present). Ruled out: a driver reset, memory, a stale adapter LUID, a probe/page race (0 null adapters
+  in 140 fresh launches and 30 real suite sessions under 3 full GPU slots).
+- **Cause:** `launchBrowser` started Edge through Playwright's `msedge` channel, which runs the top-level file the
+  updater replaces in place. A second defect let it cost 120 s: `openBrowser` accepted a probe with no WebGPU adapter
+  (`softwareAdapterReason` returns null for one), and a wait on `window.ready` ignored the page's startup error.
+- **Fix:** `scripts/lib/browser.mjs` starts a Windows channel from the folder of the installed version (the top-level
+  file's own file version, never a pending `new_msedge.exe`), falling back to the top-level file only when no version
+  folder holds the executable (Chrome's case). `openBrowser` fails at once with code `no-webgpu-adapter`, and a wait on
+  `window.ready` fails at once with code `page-startup-error` on an uncaught error or crash before the page is ready.
+  Regression: tests/browser-channel-install.test.js (fake install: top-level exe, two version folders, pending
+  new_msedge.exe), tests/browser-startup.test.js (null adapter), tests/page-startup.test.js. The forced swap needs a
+  copy of the whole Edge install (about 600 MB) and a timed rename, so it stays a manual check, not a GPU test.
+
 ### Fixed 2026-11-11: SSR and SSGI kept a clear-colour buffer after disposal
 
 - **Repro:** SSR or SSGI in a partial view (a viewport smaller than the canvas), then dispose it: the 16 byte uniform

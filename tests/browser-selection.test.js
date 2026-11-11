@@ -395,7 +395,8 @@ test('Chromium: headless, Edge, Chrome, an explicit executable and a missing ins
   // Headless Playwright Chromium keeps its own headless shell (no executablePath), set or unset.
   assert.equal(chromiumExecutablePath(chromium, undefined, {}, { launcher, realpath: same }), undefined);
   assert.equal(chromiumExecutablePath(chromium, undefined, { headless: true }, { launcher, realpath: same }), undefined);
-  // A channel (Edge, Chrome) starts through its own install.
+  // A channel (Edge, Chrome) with no install under the env's roots starts through Playwright's own channel lookup
+  // (an install that is found starts from its version folder: tests/browser-channel-install.test.js).
   assert.equal(chromiumExecutablePath(pick(), 'msedge', { headless: false }, { launcher, realpath: same }), undefined);
   assert.equal(chromiumExecutablePath(pick({ MARGO_BROWSER: 'chrome' }), 'chrome', { headless: false }, { launcher, realpath: same }), undefined);
   // An executable the caller or BROWSER_EXECUTABLE names wins.

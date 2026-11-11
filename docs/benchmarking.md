@@ -291,6 +291,19 @@ and headed (a window opens) for any step that needs WebGPU: headless Firefox ans
 Chromium-only step (`page.pdf`) prints `skipped: needs a Chromium browser, not firefox` and exits 0; a skip line is never
 a pass, so read the log. WebKit on Windows has no WebGPU, so a WebGPU suite there fails with "WebGPU unavailable".
 
+**Edge starts from its version folder on Windows, so an auto-update cannot swap it mid-launch.** Edge keeps a top-level
+`Application\msedge.exe` and one folder per installed version (`Application\157.0.4341.46\msedge.exe`). An update
+installs the new version beside the running one with a pending `new_msedge.exe`, then renames that over the top-level
+file. A suite that started Edge from the top-level file during that rename lost the browser during launch or its GPU
+process, and the page got no WebGPU adapter (docs/known-bugs.md, KB-C34i). `scripts/lib/browser.mjs` therefore starts
+`edge` (and `chrome`, by the same rule) from the folder of the version the top-level file is, read from its version
+resource, never the pending update's; the channel name stays `msedge` in records. With no version folder that holds the
+executable it starts the top-level file as before: Chrome's version folders hold no `chrome.exe`, so Chrome starts as
+before. `BROWSER_EXECUTABLE` still wins. A GPU check that does start without a WebGPU adapter fails at once with code
+`no-webgpu-adapter` (`openBrowser` in `scripts/browser.js`), and a wait on `window.ready` ends at once with code
+`page-startup-error` when the page throws before it is ready (`scripts/support/page-startup.js`), instead of waiting
+out its timeout.
+
 **Firefox and headed Chromium will not start from a packaged app on Windows (`spawn UNKNOWN`).** A process of an MSIX-packaged app (the
 Claude desktop app, for one) sees `%LOCALAPPDATA%` through the package's file-system redirection: Playwright's browsers
 land in the package's private `LocalCache` folder, and `%LOCALAPPDATA%\ms-playwright` opens there for that process only.

@@ -12,6 +12,7 @@ import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { holdStaleDocumentGpu } from './support/stale-document.js';
 import { compatIgnoredLine, compatRun, compatShim } from './support/compat-shim.js';
 import { closeAll, traceShutdown } from './support/shutdown.mjs';
+import { watchStartupErrors } from './support/page-startup.js';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
@@ -468,6 +469,20 @@ export function delayWorkerMessages(ms) {
   };
 }
 
+/** Error code of an openBrowser whose hardware probe got no WebGPU adapter in a Chromium browser. */
+export const NO_WEBGPU_ADAPTER = 'no-webgpu-adapter';
+
+/**
+ * The reason a GPU check must not start because the browser gave the probe no WebGPU adapter, or null. Chromium only
+ * (headless Firefox has none by design); a caller with `softwareAdapterOk` (it tests the harness, not the GPU) runs on
+ * whatever it gets. Before KB-C34i a null adapter passed, and the suite then waited out its ready timeout (120 s) for a
+ * page whose engine.create had already thrown "WebGPU adapter unavailable".
+ */
+export function noAdapterReason(engine, hardware, { softwareAdapterOk = false } = {}) {
+  if (engine !== 'chromium' || softwareAdapterOk || hardware?.webgpu) return null;
+  return `${NO_WEBGPU_ADAPTER}: the browser gave no WebGPU adapter (requestAdapter answered null, or navigator.gpu is missing; WebGL renderer ${JSON.stringify(hardware?.webglRenderer ?? null)}; ${hardware?.userAgent ?? 'no user agent'}). The GPU process failed to start or was lost: look for a GPU driver reset (Windows event 4101) or a browser update swapping its files during the launch (docs/known-bugs.md, KB-C34i)`;
+}
+
 export async function openBrowser({
   browserName = 'chromium',
   channel,
@@ -532,6 +547,8 @@ export async function openBrowser({
     // A device the driver takes away (a GPU reset) fails the next wait at once, naming the loss (support/device-loss.js).
     await page.addInitScript(deviceLossGuard);
     const deviceLoss = watchDeviceLoss(page);
+    // After the device-loss wrapper: a wait on window.ready also ends at once on an uncaught startup error (KB-C34i).
+    const startup = watchStartupErrors(page);
     if (pipelineDelayMs > 0) await page.addInitScript(delayPipelines, pipelineDelayMs);
     if (mathErrorScale > 0) await page.addInitScript(perturbBuiltinMath, mathErrorScale);
     if (reassociate) await page.addInitScript(reassociateMath);
@@ -598,6 +615,10 @@ export async function openBrowser({
         await server.waitForRequestsIdle();
       }
     }
+    const missing = noAdapterReason(browserName === 'chromium' ? resolveBrowser({ name: channel }).engine : browserName, hardware, {
+      softwareAdapterOk,
+    });
+    if (missing) throw Object.assign(new Error(missing), { code: NO_WEBGPU_ADAPTER });
     if (browserName === 'chromium' && !softwareAdapterOk) {
       // A real-GPU check never runs on SwiftShader by accident (MARGO_SOFTWARE_GPU=1 or an explicit
       // --use-webgpu-adapter=swiftshader in BROWSER_ARGS asks for it).
@@ -639,6 +660,7 @@ export async function openBrowser({
       hardware,
       wgsl,
       deviceLoss,
+      startup,
       async close() {
         // Compilation info arrives asynchronously: wait for every report (wgsl-guard keeps them) before reading them.
         // Bounded: a report that never arrives fails the close naming its module, after the browser and server close.

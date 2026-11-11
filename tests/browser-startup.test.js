@@ -17,12 +17,9 @@ mock.module('../scripts/support/driver-resets.mjs', {
 });
 const { openBrowser } = await import('../scripts/browser.js');
 
-function fixture(failures) {
+function fixture(failures, { webgpu = { vendor: process.env.GPU_VENDOR?.toLowerCase() ?? 'test', fallback: false } } = {}) {
   const result = { probes: 0, waits: 0, browserCloses: 0, serverCloses: 0, reload: null, initScripts: [] };
-  const hardware = {
-    webglRenderer: process.env.GPU_VENDOR ?? 'test',
-    webgpu: { vendor: process.env.GPU_VENDOR?.toLowerCase() ?? 'test', fallback: false },
-  };
+  const hardware = { webglRenderer: process.env.GPU_VENDOR ?? 'test', webgpu, userAgent: 'test agent' };
   const socket = {
     on(event, callback) {
       if (event === 'framereceived') result.reload = callback;
@@ -174,4 +171,23 @@ test('a MARGO_BROWSER=webkit run names webkit as its browser, not chromium', asy
     if (previous === undefined) delete process.env.MARGO_BROWSER;
     else process.env.MARGO_BROWSER = previous;
   }
+});
+
+// KB-C34i (2026-11-11): the probe got no WebGPU adapter (an Edge update swapped the browser's files during the launch),
+// openBrowser passed it, and the suite waited 120 s for a page whose engine.create had already thrown. Now it fails at once.
+test('a probe with no WebGPU adapter fails openBrowser at once with its code, and closes the browser and server', async () => {
+  const state = fixture([], { webgpu: null });
+  await assert.rejects(openBrowser(), (error) => {
+    assert.equal(error.code, 'no-webgpu-adapter');
+    assert.match(error.message, /no WebGPU adapter.*KB-C34i/);
+    return true;
+  });
+  assert.equal(state.probes, 1);
+  assert.equal(state.browserCloses, 1);
+  assert.equal(state.serverCloses, 1);
+  // A harness test that runs on whatever adapter the machine has keeps running without one.
+  fixture([], { webgpu: null });
+  const session = await openBrowser({ softwareAdapterOk: true });
+  assert.equal(session.hardware.webgpu, null);
+  await session.close();
 });
