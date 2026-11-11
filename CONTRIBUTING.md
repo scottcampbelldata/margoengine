@@ -64,6 +64,30 @@ CI runs the same commands on every push and pull request.
   and attach through `@margoengine/core/extension`.
 - Browser features need a check that runs in a real browser. The `modern:test:*` and `check:*` scripts show how.
 
+### Testing GPU failure paths
+
+`tests/support/gpu-faults.js` makes one device fail the n-th `createBuffer`, `createTexture` or `mapAsync` call the
+way a real device fails: an allocation raises a `GPUOutOfMemoryError` (or a `GPUValidationError` with
+`error: 'validation'`) in the innermost matching error scope, or an `uncapturederror` event without one, and returns
+a destroyed resource; `createBuffer` with `mappedAtCreation` throws a `RangeError`; `mapAsync` rejects with an
+`OperationError`. Calls count from installation, 1-based, and only that device is patched. It has no imports, so a
+browser test page can load it as well as Node. Use it to check that a failure is reported, that resources and counters
+are as they were before the failing call, and that the next frame or retry works:
+
+```js
+import { injectGPUFaults } from '../../../tests/support/gpu-faults.js';
+
+using faults = injectGPUFaults(device, { createBuffer: 2, mapAsync: [1] });
+device.pushErrorScope('out-of-memory');
+const buffers = [device.createBuffer({ size: 64, usage: GPUBufferUsage.COPY_DST })];
+buffers.push(device.createBuffer({ size: 64, usage: GPUBufferUsage.COPY_DST })); // fails
+console.log((await device.popErrorScope())?.name, faults.injected); // GPUOutOfMemoryError, [{ method, call: 2, ... }]
+```
+
+Leaving the `using` block (or `faults.restore()`) puts the device back. `tests/gpu-faults.test.js` runs the helper on
+a mock device. Packages whose allocation, readback or device-restore paths should be tested with it next: culling,
+lod, shadows and environment (device restore), and stats, selection, inspector, headless, bvh and sciviz (readback).
+
 ## Reporting bugs
 
 Open an issue with the browser and version, the GPU if you know it, what you expected, and the smallest snippet or
