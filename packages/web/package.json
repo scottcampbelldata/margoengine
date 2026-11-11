@@ -1719,6 +1719,10 @@
       "types": "./dist/text/curve.d.ts",
       "import": "./dist/text/curve.js"
     },
+    "./text/vector": {
+      "types": "./dist/text/vector.d.ts",
+      "import": "./dist/text/vector.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

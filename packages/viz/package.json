@@ -2083,6 +2083,10 @@
       "types": "./dist/text/curve.d.ts",
       "import": "./dist/text/curve.js"
     },
+    "./text/vector": {
+      "types": "./dist/text/vector.d.ts",
+      "import": "./dist/text/vector.js"
+    },
     "./tiles/properties": {
       "types": "./dist/tiles/properties.d.ts",
       "import": "./dist/tiles/properties.js"

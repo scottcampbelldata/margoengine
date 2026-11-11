@@ -576,3 +576,16 @@ in this pass, so it stays on this list for the quiet phase.
 ### Particle liquid scale cases (lague plan 1, 2026-11-10)
 
 `node scripts/gpu-lock.mjs run --owner=<you> --max=10 -- node packages/water/test/liquid-scale.browser.mjs` (and with MARGO_COMPAT=1): a 2 x 0.5 x 2 m pool on a jittered lattice over a box floor, engine default MSAA, timestamp-query natively. Work per frame (asserted): 6 render passes, 6 draws, 320 uniform bytes, no bind group. Target: 60+ fps; the liquid under 4 ms GPU at the default (32,768 particles, 1280 x 720) on the RTX A6000 and the mid laptop iGPU (Radeon 680M); the limit (4,194,304 at 1920 x 1080) under 16.7 ms on the A6000. Busy-machine diagnostic 2026-11-10, A6000 native GPU time: default 1.05 ms, medium (262,144 at 1920 x 1080) 1.70 ms, limit 8.06 ms; steady wall per frame including the readback wait 5.9, 5.5 and 11.3 ms (5.9 ms with no liquid). WebGL2 layer (no timestamps): wall 18.2, 20.4 and 26.7 ms against 11.9 ms with no liquid, so the liquid adds about 6, 9 and 15 ms of wall time there; time it on the quiet machine. Not measured on the iGPU yet.
+
+### Vector text at scale (lague plan 2, 2026-11-10)
+
+`node scripts/gpu-lock.mjs run --owner=<you> -- node packages/text/scripts/test-vector-browser.js`, native and `MARGO_COMPAT=1`
+(scale check in packages/text/tests/vector-browser.js). Case: 100,000 Source Sans 3 glyphs on screen in 100 `Text` blocks of
+1,000 glyphs on the 256 x 256 test canvas; the timed run adds a 1280 x 720 canvas. Work counts (asserted): first frame 100 draws,
+201 buffer writes, 4,816,112 bytes, 100 bind groups; steady frame 100 draws (one per block), 1 buffer write of 112 bytes,
+0 bind groups; 17,840 bytes of bands for the glyphs used. Per pixel the shader tests 18.2 (48 px) to 29.2 (4 px) curve rows
+for Latin and up to 41.9 for CJK at 6 px, measured by the CPU mirror (packages/text/tests/vector.test.js budget table).
+Targets: 60 fps (16.7 ms) on the RTX A6000 natively and on the WebGL2 layer; mid laptop iGPU (Radeon 680M) 60 fps natively
+and on the WebGL2 layer at 1280 x 720. Not timed yet (build phase). Candidates if a target misses, each with identical
+coverage: a tighter hull test before the extra rays, bands sorted in both directions so rays can start from the nearer side,
+and skipping the second axis where the first has no crossing near the pixel.

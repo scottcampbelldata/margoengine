@@ -224,12 +224,81 @@ extent. Malformed font ranges and subdivision limits throw `MargoError` with `co
 Depth 0 produces two planar caps; positive depth produces a solid. `toGeometry(Geometry)` takes the core constructor
 explicitly; with no constructor it returns the attribute data.
 
+## Vector text: `VectorTextRenderer`
+
+`@margoengine/text/vector` draws `Text` straight from the font's curves on the GPU, with no atlas and no distance field. Every pixel works out how much of it the glyph covers from the outline itself, so text stays sharp from 4 px to a full-screen headline, under any rotation or zoom, and thin strokes survive at small sizes where SDF text fades. It reads TrueType (`glyf`) and PostScript (`CFF ` and `CFF2`) OpenType binaries, variable fonts included, and takes the same `Text` blocks, layout, anchors, billboards, mesh attachment and shadows as `TextRenderer`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Text, TextRenderer, Font} from 'margoengine/text';
+import {VectorFont, VectorTextRenderer} from 'margoengine/text/vector';
+const canvas = document.querySelector('canvas')!;
+
+const engine = await Engine.create(canvas);
+const bytes = await (await fetch('/fonts/Inter.ttf')).arrayBuffer();
+
+let font: Font;
+let text: TextRenderer | VectorTextRenderer;
+try {
+  // Exact curve coverage; the font is parsed from the file, so no web font has to load first.
+  font = new VectorFont(bytes, {family: 'Inter'});
+  text = VectorTextRenderer.attach(engine);
+} catch {
+  // Fallback for a file the parser does not read (WOFF, WOFF2, bitmap-only fonts): SDF text drawn by the browser.
+  font = new Font({family: 'Inter, sans-serif'});
+  text = TextRenderer.attach(engine);
+}
+
+text.add(new Text({text: 'Small text keeps its stems', font, fontSize: 0.1, anchorX: 'center', position: [0, 0, 0]}));
+text.add(new Text({text: 'Hamburgefonts', font, fontSize: 0.5, color: '#ffd84a', shadowOpacity: 0.5, shadowBlur: 0.02, position: [0, 1, 0]}));
+
+// Steady frames write 112 bytes and draw once per block.
+if (text instanceof VectorTextRenderer) console.log(text.stats);
+```
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `name` | `'text:vector'` | Plugin name, unique per engine. Both renderers can be attached at once. |
+| `order` | `22` | Frame graph slot, the same as `TextRenderer`. |
+| `dilation` | `0` | Outline growth in screen pixels, 0 to 1, for darker small text. Layout is unchanged. |
+| `rays` | `'auto'` | Rays per axis per pixel: `1`, `3` or `5`. `'auto'` casts 5 under 7.5 px per em and 3 above. |
+
+`VectorFont(bytes, {family?, variations?})` measures advances from `hmtx` and ascent and descent from `hhea`. It also registers the bytes as a `FontFace`; once that face has loaded, kerning is measured through it (a variable instance gets none). `vectorGlyph(id)` and `store` expose the packed bands, and `vectorCoverage(store, glyph, x, y, pixelsPerEm)` is a CPU mirror of the shader for tests and hit maps.
+
+**How it works.**
+
+- **Curves.** Each glyph's outline becomes quadratic Bezier curves in em units. Lines become flat quadratics, and each CFF cubic is split into uniform pieces until the midpoint error bound (sqrt(3)/36 of the third difference over n cubed) is under 1/4096 em.
+- **Bands.** The glyph box is cut into up to 32 horizontal and 32 vertical bands, doubled from about one band per four curves until no band holds more than 64 curves. Each band lists the curves that cross it, sorted by their far end along the ray so the shader can stop early. Curve points are stored as 16-bit fractions of the glyph box, one `vec4u` per curve per band, in one growable buffer per font.
+- **Coverage.** The fragment shader casts rays along x and y through the pixel. For each curve it picks which of the quadratic's two roots count from the signs of the three control points (a lookup in the 16-bit constant 0x2E74), solves them in a numerically stable form and turns each crossing into a signed distance in pixels. Coverage along a ray is the exact inside length of a one-pixel window under nonzero winding, so overlapping contours, common in CJK fonts, count once. The two axes are blended by how close each one's nearest crossing is. Extra rays per axis are cast only where a curve reaches into the pixel, so most pixels cost one ray per axis.
+- **Pixel size.** The screen size of an em comes from the derivatives of the em coordinates, so perspective, rotation and billboards need no special case. Quads are padded by one pixel through the perspective divide.
+- **One draw per block.** Shadow and fill are layers of one instanced draw, as in `TextRenderer`, with the same blending, depth and sorting rules. A steady frame writes one 112-byte frame uniform and creates no bind groups.
+
+**Measured (2026-11-10, RTX A6000, native WebGPU and the WebGL2 compatibility layer).** Mean coverage error over the text's pixel box against a 16 x 16 supersampled reference of the same outlines:
+
+| Font | 4 px | 6 px | 8 px | 12 px | 48 px | 400 px |
+| --- | --- | --- | --- | --- | --- | --- |
+| Source Sans 3 (Latin) | 0.0064 | 0.0060 | 0.0069 | 0.0051 | 0.0012 | 0.0003 |
+| Noto Sans SC (CJK) | 0.0100 | 0.0075 | 0.0111 | 0.0092 | 0.0020 | 0.0002 |
+
+Rotated 17 degrees: 0.0029. Zoomed 40 times: 0.0001. The largest single-pixel error in any case is 0.139. The bar is a mean under 1/64 and a maximum under 0.25 on both backends. Counting only pixels with ink the means are higher (CJK at 4 px 0.018, Latin at 8 px 0.0165). A 0.49 px stem at 6 px keeps 0.49 px of ink in every row, with a worst row error of 0.062 against the reference, where `TextRenderer`'s SDF gives the same rows a worst error of 0.341 (at 4 px: 0.060 against 0.557). SDF and MSDF text, which the other web text libraries use, share that loss: a field sampled at 48 px cannot hold features smaller than its texels. 100,000 glyphs draw in 100 calls; the first frame uploads 4.8 MB and later frames write 112 bytes.
+
+**Clean-room record.** Built from these papers alone, without reading any implementation of them:
+
+- Eric Lengyel, "GPU-Centered Font Rendering Directly from Glyph Outlines", Journal of Computer Graphics Techniques 6(2), 2017, https://jcgt.org/published/0006/02/02/ : root classification, bands and per-axis coverage. The lookup constant, the stable root form, the window coverage under nonzero winding, the adaptive rays, the axis blend and the dilation formula were derived here.
+- Charles Loop and Jim Blinn, "Resolution Independent Curve Rendering using Programmable Graphics Hardware", SIGGRAPH 2005: the implicit view of a quadratic, used for the inside test. Its per-glyph triangulation was ruled out.
+- Will Dobbie, "GPU text rendering with vector textures", 2016: grid cells holding curve lists, which confirmed the band layout.
+- Mark Kilgard and Jeff Bolz, "GPU-accelerated Path Rendering", SIGGRAPH Asia 2012, and Diego Nehab and Hugues Hoppe, "Random-access rendering of general vector graphics", SIGGRAPH Asia 2008: ruled out as heavier for text (stencil-and-cover passes, lattice clipping).
+- Patents, checked 2026-11-10. US 10,373,352 B1 (Lengyel, the root-counting method) was dedicated to the public domain effective 2026-03-17: https://terathon.com/blog/decade-slug.html and https://patents.google.com/patent/US10373352B1/en. US 7,564,459 B2 (Loop and Blinn) expired on 2026-03-25: https://patents.google.com/patent/US7564459B2/en. US 7,239,319 B2 (rendering outline fonts) lapsed in 2019: https://patents.google.com/patent/US7239319B2/en.
+
+**Limits.** No outlines yet: `outlineWidth` is ignored, with one warning. Shaping is per code point, so there are no ligatures or contextual forms and no `GSUB` or `GPOS`; kerning comes only through the loaded `FontFace`. No colour fonts (COLR, emoji). WOFF and WOFF2 files must be unpacked to plain OpenType first, and bitmap-only fonts are not read. Curve points are 16-bit fractions of the glyph box and the shader works in 32-bit floats. Caps are listed in [docs/limits.md](../../docs/limits.md).
+
 ## Limits
 
 - Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
 - Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. Shaped runs size dynamically without clipping, and letter spacing applies between clusters within shaped runs.
-- Outlines plus shadow blur are limited by the field range to about 0.14 em together. Very small text (under about 6 px) loses thin strokes, as with any SDF text.
+- Outlines plus shadow blur are limited by the field range to about 0.14 em together. SDF text under about 6 px loses thin strokes; `@margoengine/text/vector` keeps them (a 0.49 px stem at 6 px keeps 0.49 px of ink, worst row error 0.062 against 0.341 for SDF; see Vector text).
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
+- Exact vector text from the font's curves is available via `@margoengine/text/vector` (its own limits are in Vector text above).
 - Extruded 3D glyph geometry is available via `@margoengine/text/extrude` (reads TrueType and PostScript OpenType font binaries directly).
 - A FontFace that is still loading delays its text; text drawn with a CSS web font before it loads uses the fallback, so call `await font.load(sample)` first.
 - Atlas eviction: once `maxPages` is reached, pages no longer referenced by any active visible `Text` block are evicted and reused. If all pages contain active glyphs, `place` throws.

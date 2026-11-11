@@ -4897,3 +4897,14 @@ size 2048) is exact to 6e-8 at hop size/4 and size/2; a hop of 3/4 of the size i
 32 iterations at 87.5 percent overlap (16.8 dB without momentum; 18 to 19 dB at 75 percent overlap); the GPU path agrees with
 the CPU path to 1.75e-7 of the peak on WebGPU and the WebGL2 layer. Proof: `packages/audio/tests/spectrogram.test.js` and
 `packages/audio/tests/spectrogram-browser.mjs`. No speed claim.
+
+### Exact vector text at small sizes
+
+`@margoengine/text/vector` draws text from the font's curves. Claims, measured on an RTX A6000 with native WebGPU and the
+WebGL2 layer on 2026-11-10: the mean coverage error over the text box against a 16 x 16 supersampled reference of the same
+outlines is 0.0060 to 0.0111 from 4 to 12 px (Source Sans 3 and a Noto Sans SC subset), 0.0020 or less at 48 and 400 px,
+0.0029 rotated 17 degrees and 0.0001 zoomed 40 times; a 0.49 px stem at 6 px keeps 0.49 px of ink with a worst row error of
+0.062, where Margo's SDF `TextRenderer` has 0.341 (0.060 against 0.557 at 4 px). Rival SDF libraries were not run; the SDF
+comparison is with Margo's own renderer. A steady frame of 100,000 glyphs in 100 blocks writes 112 bytes in one write.
+Proof: `packages/text/tests/vector.test.js` and `node packages/text/scripts/test-vector-browser.js` (native and
+`MARGO_COMPAT=1`). No speed claim; the timing case is deferred to the speed phase.

@@ -28,6 +28,7 @@ await build({
         msdf: resolve(root, 'src/msdf.ts'),
         animate: resolve(root, 'src/animate.ts'),
         extrude: resolve(root, 'src/extrude.ts'),
+        vector: resolve(root, 'src/vector.ts'),
       },
       formats: ['es'],
     },

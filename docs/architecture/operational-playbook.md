@@ -10,6 +10,18 @@ seven until the route was kept once loaded (docs/known-bugs.md, fixed 2026-11-11
 The soak names each live texture by format and size when counts differ. Standalone, run by hand in a shared GPU slot; no check
 runs it yet. Missing: gltf-pro models in the scene, other GPUs.
 
+### Section 5 evidence: exact vector glyph coverage (lague plan 2, 2026-11-10)
+
+`@margoengine/text/vector` computes glyph coverage per pixel from quadratic outlines (Lengyel, JCGT 6(2) 2017,
+https://jcgt.org/published/0006/02/02/): roots along x and y rays chosen by control-point signs (constant 0x2E74), stable
+root forms, exact nonzero window coverage for up to 4 crossings per ray, adaptive extra rays where a curve hull reaches the
+pixel, and pixels per em from screen-space derivatives. Evidence: a TypeScript mirror of the shader equals an independent
+winding test on 500 points x 200 glyphs (TrueType, CFF, CJK); cubic splits stay under 1/4096 em on every Source Sans 3 CFF
+cubic (worst 2.41e-4 em); on the RTX A6000, native WebGPU and the WebGL2 layer, the mean coverage error against a 16 x 16
+supersampled reference is under 1/64 from 4 to 400 px, rotated and zoomed (worst pixel 0.139), and the GPU matches the mirror
+to a mean of about 0.001. Proof: `packages/text/tests/vector.test.js` and `packages/text/scripts/test-vector-browser.js`.
+Missing: frame times (speed phase) and a run on a laptop iGPU.
+
 ### Section 5 evidence: alpha-tested mip coverage (2026-11-10)
 
 `packages/shared/alpha-mips.js` builds the mips of `MASK` base colour maps (gltf-pro, gltf/textured) on the GPU: an
