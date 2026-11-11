@@ -144,11 +144,13 @@ async function bundleEntry(entry, externals) {
   };
 }
 
+/** The core + stage measurement bundles core in and keeps every other package external (strings and RegExps). */
+export const coreStageExternal = external.filter(
+  (name) => typeof name !== 'string' || !name.startsWith('@margoengine/core'),
+);
+
 export async function measureCoreStage() {
-  const measured = await bundleEntry(
-    'packages/stage/dist/index.js',
-    external.filter((name) => typeof name !== 'string' || !name.startsWith('@margoengine/core')),
-  );
+  const measured = await bundleEntry('packages/stage/dist/index.js', coreStageExternal);
   checkCoreBudget(measured.gzip);
   return measured;
 }

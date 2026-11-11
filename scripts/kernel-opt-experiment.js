@@ -6,10 +6,12 @@ import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync, gunzipSync } from 'node:zlib';
+import { gzipSync, inflateRawSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { build } from 'vite';
-import { compactOutput, external } from './measure-size.js';
+import { compactOutput, coreStageExternal } from './measure-size.js';
+import { deflateKernel } from './build-core-kernel.mjs';
+import { readBlueprint } from './lib/kernel-blueprint.mjs';
 import { median } from './lib/percentile.mjs';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -57,8 +59,8 @@ const report = {
   benchmarks: [],
 };
 const wasmSource = await readFile(join(repository, 'packages/core/src/wasm.ts'), 'utf8');
-const shippingCompressed = Buffer.from(/wasmBase64(?::\s*string)?\s*=\s*'([^']+)'/.exec(wasmSource)[1], 'base64');
-const shipping = gunzipSync(shippingCompressed);
+// Core ships the kernel as a raw-deflate blueprint (scripts/build-core-kernel.mjs); variants use the same settings.
+const { compressed: shippingCompressed, wasm: shipping } = readBlueprint(wasmSource);
 
 async function stageSize(compressed) {
   const wasmModule = resolve(repository, 'packages/core/dist/wasm.js').replaceAll('\\', '/');
@@ -82,7 +84,8 @@ async function stageSize(compressed) {
       target: 'es2022',
       lib: { entry: join(repository, 'packages/stage/dist/index.js'), formats: ['es'] },
       rollupOptions: {
-        external: external.filter((name) => !name.startsWith('@margoengine/core')),
+        // The same externals as `npm run measure:size`, so the shipping row matches the gated figure.
+        external: coreStageExternal,
         output: compactOutput,
       },
     },
@@ -144,9 +147,9 @@ for (const [name, optimization] of [
     optimizedPath,
   ]);
   const bytes = await readFile(optimizedPath),
-    compressed = gzipSync(bytes, { level: 5, memLevel: 6, windowBits: 12 });
+    compressed = deflateKernel(bytes);
   assert.ok(WebAssembly.validate(bytes));
-  assert.deepEqual(gunzipSync(compressed), bytes);
+  assert.deepEqual(inflateRawSync(compressed), bytes);
   const nativeTests = run(cargo, ['test', '--offline', '--manifest-path', join(project, 'Cargo.toml'), '--release'], {
     ...env,
     RUSTFLAGS: '',
