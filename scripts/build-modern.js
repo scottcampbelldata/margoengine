@@ -279,7 +279,9 @@ for (const name of packages) {
 // 2026-11-10: Scott approved these core bug fixes (camera validate-before-publish, outward-rounded bounds, restore
 // budget) under the same rulings; they took core 21,828 -> 22,031 B (+203 B with the rebuilt kernel
 // Wasm), shrunk from the 22,041 B draft. Strict ceiling one byte above it. The 7b core shrink pass wins it back.
-const CORE_ONLY_CEILING = 22_032;
+// 2026-11-10, Scott's approved core scale change 1 (requestDevice asks for the adapter's buffer limits): core 22,031 ->
+// 22,059 B (+28 B). Strict ceiling one byte above it.
+const CORE_ONLY_CEILING = 22_060;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();

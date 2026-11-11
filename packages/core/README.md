@@ -78,6 +78,10 @@ meshes share it. If that throws, for example `GPU buffer limit` from a geometry 
 changed: the error reaches you, the mesh keeps the geometry it had and keeps drawing it, every other mesh draws as before,
 and calling again once there is room works. `engine.createMesh()` does the same when the transform store cannot grow.
 
+Core asks the adapter for its own `maxBufferSize` and `maxStorageBufferBindingSize` (at creation and on every device
+restore), not WebGPU's 256 MiB and 128 MiB defaults, so a desktop GPU's larger buffers are there for big meshes and
+instance counts. Read `engine.gpu.limits` for what this device allows.
+
 Growing keeps the old buffers until the new ones exist, so for that moment a batch holds both. A `Renderer` passed as
 `fallback` must do the same: `add` on a geometry it already holds replaces the storage, new first, and a throw keeps the
 old one. WebGPU reports a real out-of-memory later, as a device error on the next frame, not as a throw from this call.

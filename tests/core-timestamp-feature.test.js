@@ -185,17 +185,31 @@ test('Engine.renderTarget names what a pipeline must match, after a device resto
   }
 });
 
-test('renderer preserves the adapter texture-array capability for optional packages', async (t) => {
-  for (const maxTextureArrayLayers of [256, 2048]) {
+test("renderer asks for the adapter's texture-array and buffer limits, at creation and on device restore", async (t) => {
+  // WebGPU's defaults (an adapter that offers no more) and a desktop adapter with larger buffers: before, core asked
+  // only for maxTextureArrayLayers, so every device kept 256 MiB buffers and 128 MiB storage bindings.
+  const defaults = { maxTextureArrayLayers: 256, maxBufferSize: 268435456, maxStorageBufferBindingSize: 134217728 },
+    large = { maxTextureArrayLayers: 2048, maxBufferSize: 4294967296, maxStorageBufferBindingSize: 4294967292 };
+  for (const limits of [defaults, large]) {
     const h = harness(t, []);
-    h.adapter.limits.maxTextureArrayLayers = maxTextureArrayLayers;
+    Object.assign(h.adapter.limits, limits);
     const renderer = await GPURenderer.create(h.canvas);
     try {
-      assert.deepEqual(h.limitsRequests[0], { maxTextureArrayLayers });
+      assert.deepEqual(h.limitsRequests[0], limits);
     } finally {
       renderer.dispose();
       h.restore();
     }
+  }
+  const h = harness(t, []);
+  Object.assign(h.adapter.limits, large);
+  const engine = await EngineKernel.create(h.canvas, { capacity: 1, backend: 'webgpu' });
+  try {
+    await engine.rebootDevice();
+    assert.deepEqual(h.limitsRequests, [large, large]);
+  } finally {
+    engine.dispose();
+    h.restore();
   }
 });
 

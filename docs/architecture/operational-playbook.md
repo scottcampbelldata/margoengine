@@ -1646,6 +1646,8 @@ depth stays right with no sorting. Core meshes read the value from a buffer by m
 attached; models read a lighting effect's uniform. WebGPU only, instant on WebGL2. Evidence: `packages/lod/test/fade-check.mjs`.
 Missing: a measured cost.
 
+**Device limits and large scenes (2026-11-10, Scott's approved core exception).** `GPURenderer.create` asks `requestDevice` for the adapter's `maxTextureArrayLayers`, `maxBufferSize` and `maxStorageBufferBindingSize`, at creation and on every restore (a restore runs `create` again), so a desktop adapter's larger buffers reach core and every package that reads `device.limits`; an adapter that offers only WebGPU's defaults gets the same device as before. Evidence: `tests/core-timestamp-feature.test.js` (stub adapters with default and larger limits, and a restore) and `packages/core/tests/scale.browser.mjs` (the real device's limits equal its adapter's, natively and on the WebGL2 layer). Work per steady frame is unchanged (a 300-mesh scene: same draws, bind groups, buffer writes and bytes). Missing: adapters other than the RTX A6000 and the layer on it.
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |

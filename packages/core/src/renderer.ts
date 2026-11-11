@@ -334,9 +334,15 @@ export class GPURenderer implements Renderer {
           startup,
         ));
     if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable', 'webgpu');
-    const device = await settle(
+    const limits = adapter.limits,
+      device = await settle(
       adapter.requestDevice({
-        requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },
+        // The adapter's own buffer limits, not WebGPU's 256 MiB / 128 MiB defaults: large meshes and instance counts.
+        requiredLimits: {
+          maxTextureArrayLayers: limits?.maxTextureArrayLayers,
+          maxBufferSize: limits?.maxBufferSize,
+          maxStorageBufferBindingSize: limits?.maxStorageBufferBindingSize,
+        },
         requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
           adapter.features.has(feature),
         ),
