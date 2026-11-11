@@ -10,7 +10,12 @@ const curve = new Spline([[0,0,0], [5,1,5], [10,0,10]]);
 const point = new Float64Array(3);
 curve.atDistance(curve.length / 2, point);
 curve.tangent(0.5, point);
+const sample = curve.at(0.5); // Always a typed array, including when output is omitted.
+console.log(sample[0]);
 ```
+
+`Spline` and `CubicSpline` can be passed directly to `PathControls` from
+`@margoengine/controls/presentation`; their sample methods always return an array.
 
 Bezier curves require 3n+1 points and are open. Hermite requires one tangent per point; Catmull-Rom and Hermite can be closed. at uses t in 0..1; atDistance uses world units. Returned default output is reused, so provide an output buffer to retain multiple results. After editing points, call updateArcLengths. Arc lengths are numerical approximations controlled by divisions. Tangents use finite differences that wrap across a closed seam; the two endpoint tangents are identical. Closed-loop frames join their reference normals after twist correction, so mesh placement and deformation use the same endpoint frame.
 

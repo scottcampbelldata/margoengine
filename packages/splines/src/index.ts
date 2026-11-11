@@ -93,7 +93,7 @@ export class Spline {
     this.arcLengths = new Float64Array(divisions + 1);
     this.updateArcLengths();
   }
-  at(t: number, output: Float64Array | Float32Array = this.output): typeof output {
+  at(t: number, output: Float64Array | Float32Array = this.output): Float64Array | Float32Array {
     if (!Number.isFinite(t) || t < 0 || t > 1 || output.length !== 3)
       throw new RangeError('Curve parameter must be 0..1 and output length 3');
     const points = this.points,
@@ -169,7 +169,7 @@ export class Spline {
     }
     return output;
   }
-  tangent(t: number, output: Float64Array | Float32Array = this.output): typeof output {
+  tangent(t: number, output: Float64Array | Float32Array = this.output): Float64Array | Float32Array {
     if (output.length !== 3 || !Number.isFinite(t) || t < 0 || t > 1)
       throw new RangeError('Invalid tangent parameter; pass t from 0 to 1 and an output array of 3 elements.');
     const at = this.closed && t === 1 ? 0 : t,
@@ -201,7 +201,7 @@ export class Spline {
       this.previous.set(this.next);
     }
   }
-  atDistance(distance: number, output: Float64Array | Float32Array = this.output): typeof output {
+  atDistance(distance: number, output: Float64Array | Float32Array = this.output): Float64Array | Float32Array {
     if (!Number.isFinite(distance) || distance < 0 || distance > this.length)
       throw new RangeError('Distance must be from 0 to the spline length; pass a finite distance within the length.');
     if (!this.length) return this.at(0, output);

@@ -20,7 +20,7 @@ export class CubicSpline extends Spline {
     if (this.closed && [0, 1, 2].some((a) => this.points[a] !== this.points[this.points.length - 3 + a]))
       throw new RangeError('Closed cubic endpoints differ; repeat the first point at the end.');
   }
-  override tangent(t: number, output: Float64Array | Float32Array = new Float64Array(3)): typeof output {
+  override tangent(t: number, output: Float64Array | Float32Array = new Float64Array(3)): Float64Array | Float32Array {
     if (output.length !== 3) throw new RangeError('Invalid output; pass an array of length three.');
     const d = splineDerivative(this, t),
       length = Math.hypot(...d);

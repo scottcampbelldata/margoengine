@@ -37,6 +37,19 @@ API. [Titles, links, adapter and scope](whitepaper/batch-170-react.md). No exter
 Compared Adenot and Choi's W3C *Web Audio API 1.1* (2026 draft), TC39's *ECMAScript Language Specification*
 (living draft) and Smus's *Web Audio API* (2013). Fixed stored-vector reads retain audio clock and automation order.
 [Full titles, authors, dates, links and tests](whitepaper/batch-170-audio.md). No external implementation was read.
+### Spline declared sample returns (2026-11-10)
+
+Compared the TypeScript team, *Handbook: Functions* (2026 online edition),
+https://www.typescriptlang.org/docs/handbook/functions , *More on Functions*
+(2026 online edition), https://www.typescriptlang.org/docs/handbook/2/functions.html ,
+and *TypeScript 2.0 Release Notes* (2016),
+https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-0.html .
+Defaulted parameters become optional in declarations; optional parameters include
+undefined under strict null checking. Explicit return types retain the existing
+runtime guarantee instead of querying that optional declaration parameter.
+The regression compiles a separate consumer of built declarations, including
+CubicSpline's override and PathControls structural compatibility. Runtime code
+and optional import boundaries are unchanged. No external source code was read.
 
 ### Batch 170 controls work counts (2026-11-10)
 
