@@ -4,6 +4,9 @@
 // - limits: the device core makes has its adapter's maxBufferSize and maxStorageBufferBindingSize, not WebGPU's
 //   256 MiB / 128 MiB defaults (before 2026-11-10 core asked only for maxTextureArrayLayers).
 // - vertices: a 1,212,201-vertex plane (over the old 1,000,000 cap) that fills the view covers every pixel.
+// - instances: 1,200,000 boxes of one geometry (its instance buffer grows to 2,097,152 rows, 201 MB, past one 128 MiB
+//   storage binding) draw with no validation error or device loss, the same pixels as the field split over two
+//   geometries of 600,000 (each buffer under one binding).
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +36,8 @@ const server = await createServer({
         s.middlewares.use('/core-scale', (_request, response) => {
           response.setHeader('Content-Type', 'text/html');
           response.end(
-            '<!doctype html><body style="margin:0"><canvas style="display:block;width:64px;height:64px"></canvas>',
+            '<!doctype html><body style="margin:0"><canvas style="display:block;width:64px;height:64px"></canvas>' +
+              '<canvas id="b" style="display:block;width:64px;height:64px"></canvas>',
           );
         });
       },
@@ -89,9 +93,46 @@ const cases = {
     await window.frame(true);
     return { vertices: geometry.vertices.length / 6, triangles: indices.length / 3, errors };
   },
+  async instances() {
+    const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js');
+    const count = 1_200_000,
+      side = Math.ceil(Math.sqrt(count)),
+      camera = { fov: 50, near: 0.1, far: 4000, position: [0, 300, 900], target: [0, 0, 0] },
+      material = new PbrMaterial({ color: '#4dd966', roughness: 0.5 }),
+      one = box(0.6, 0.6, 0.6),
+      halves = [box(0.6, 0.6, 0.6), box(0.6, 0.6, 0.6)],
+      canvases = document.querySelectorAll('canvas'),
+      errors = [],
+      engines = [];
+    for (const [k, canvas] of [...canvases].entries()) {
+      const engine = await Engine.create(canvas, { exactSize: [256, 256], camera });
+      engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+      engine.onError = (e) => errors.push(e.message);
+      for (let n = 0; n < count; n++)
+        engine
+          .createMesh()
+          .setGeometry(k ? halves[n & 1] : one)
+          .setMaterial(material)
+          .setPosition([(n % side) - side / 2, 0, Math.floor(n / side) - side / 2]);
+      engines.push(engine);
+    }
+    for (let i = 0; i < 3; i++)
+      for (const engine of engines) {
+        engine.render({ culling: false });
+        await engine.gpu.queue.onSubmittedWorkDone();
+      }
+    for (const canvas of canvases) canvas.style.width = canvas.style.height = '256px';
+    const buffers = engines.map((e, k) => (k ? halves : [one]).map((g) => e.geometryBuffers(g)?.instance.size ?? 0));
+    return {
+      errors,
+      buffers,
+      binding: engines[0].gpu.limits.maxStorageBufferBindingSize,
+      drawn: engines.map((e) => e.stats.visible),
+    };
+  },
 };
 
-const shot = async (page) => decodePNG(await page.locator('canvas').screenshot());
+const shot = async (page, selector = 'canvas') => decodePNG(await page.locator(selector).first().screenshot());
 const checks = {
   limits({ device, adapter }) {
     assert.deepEqual(device, adapter, 'the device has its adapter limits');
@@ -109,6 +150,22 @@ const checks = {
         same++;
     result.uncovered = same;
     assert.equal(same, 0, 'every pixel shows the plane');
+  },
+  async instances(result, page) {
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(result.drawn, [1_200_000, 1_200_000]);
+    assert.ok(result.buffers[0][0] > 134217728, `one geometry's instance buffer passes one default binding`);
+    const [a, b] = [await shot(page, 'canvas:first-of-type'), await shot(page, '#b')];
+    let differing = 0,
+      field = 0;
+    for (let k = 0; k < a.data.length; k += 4) {
+      if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;
+      if (a.data[k + 1] > a.data[k] + 40) field++;
+    }
+    result.differing = differing;
+    result.field = field;
+    assert.equal(differing, 0, 'one geometry and two halves draw the same pixels');
+    assert.ok(field > a.data.length / 4 / 4, 'the field covers the view');
   },
 };
 

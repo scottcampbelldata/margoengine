@@ -1650,6 +1650,8 @@ Missing: a measured cost.
 
 `Geometry` takes up to 11,184,810 vertices (it was 1,000,000), the most 24-byte interleaved vertices one buffer of the default 256 MiB `maxBufferSize` holds; the index buffer keeps its upload-time check against the device's `maxBufferSize`. Evidence: `packages/core/tests/vertex-cap.test.js` (the cap, one past it, and 1,000,001, which failed before) and the `vertices` case of `scale.browser.mjs` (a 1,212,201-vertex plane covers every pixel natively and on the WebGL2 layer). Missing: frame time at the cap (speed phase).
 
+Core's instance buffer (96 B a row, doubling with the meshes of one geometry) is bound by core only through `setVertexBuffer`, for draws and picks, so `maxStorageBufferBindingSize` never applies to it inside core; only `maxBufferSize` does, checked when the buffer is made. The `instances` case of `scale.browser.mjs` draws 1,200,000 boxes of one geometry (2,097,152 rows, 201 MB) with the same pixels as two geometries of 600,000, with no validation error, natively and on the WebGL2 layer, on the code before and after 2026-11-10. The storage-binding limit is a contract for packages that bind `geometryBuffers(g).instance` themselves: bind the rows in use with `offset` and `size` (`CulledMeshes`, c106034b1); `FrontToBack` in `@margoengine/culling` (through `InstanceSorter`) still binds the whole buffer (docs/known-bugs.md).
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |
