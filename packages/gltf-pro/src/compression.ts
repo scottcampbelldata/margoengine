@@ -2,6 +2,10 @@ import { margoError } from '../../shared/errors.js';
 import type { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
 import { type GLTFAsset, decoderSource, entry, integer } from './asset.js';
 import { decoded } from './draco-state.js';
+import { PRIMITIVE_VERTICES } from './parts.js';
+// Draco primitives load as parts like any other (parts.ts): up to 2^24 vertices and three indices a vertex's worth of
+// triangles (16,777,216 triangles), inside the load's decoded budget.
+const DRACO_INDICES = 3 * PRIMITIVE_VERTICES;
 
 /**
  * Options for loading compressed glTF: an AbortSignal and optional reusable Draco, meshopt and KTX2 decoders the caller owns.
@@ -47,7 +51,12 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
           attributeWidths: Record<string, number> = {};
         const position = entry(asset.doc.accessors, p.attributes?.POSITION, 'Draco POSITION');
         const vertexCount = integer(position.count, 'Draco vertex count', 3);
-        if (position.type !== 'VEC3' || vertexCount > 1_000_000)
+        if (vertexCount > PRIMITIVE_VERTICES)
+          throw margoError(
+            'unsupported',
+            `glTF primitive has more than ${PRIMITIVE_VERTICES} vertices, the most one primitive may hold; split the mesh into several primitives`,
+          );
+        if (position.type !== 'VEC3')
           throw new RangeError(
             'Invalid glTF Draco POSITION size; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
           );
@@ -72,7 +81,7 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
               'Invalid glTF Draco indices; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
             );
           const count = integer(indexDef.count, 'Draco index count', 1);
-          if (count > 1_000_000 || count % 3)
+          if (count > DRACO_INDICES || count % 3)
             throw new RangeError(
               'Invalid glTF Draco index count; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
             );
@@ -89,7 +98,7 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
           );
         const maxIndices = indexDef
           ? indexDef.count
-          : Math.min(1_000_000, Math.floor((asset.remainingDecodedBytes - bytes) / 4));
+          : Math.min(DRACO_INDICES, Math.floor((asset.remainingDecodedBytes - bytes) / 4));
         if (maxIndices < 3)
           throw new RangeError(
             'Decoded glTF exceeds index byte budget; load a smaller model, or reduce its textures and meshes',
@@ -114,10 +123,10 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
         const count = integer(result.vertexCount, 'Draco vertex count', 3),
           indices = result.indices;
         if (
-          count > 1_000_000 ||
+          count > PRIMITIVE_VERTICES ||
           !(indices instanceof Uint16Array || indices instanceof Uint32Array) ||
           !indices.length ||
-          indices.length > 1_000_000 ||
+          indices.length > DRACO_INDICES ||
           indices.length % 3 ||
           indices.some((i) => i >= count) ||
           (indexDef && indices.length !== indexDef.count)

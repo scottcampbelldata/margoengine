@@ -1,6 +1,15 @@
 # Known bugs and unverified features
 
 
+### A 10M-triangle Draco scan decodes past @margoengine/decoders' 256 MiB output cap (found 2026-11-11, open)
+
+- **Repro:** a Draco glTF primitive of 5,000,000 vertices (position, normal, uv) and 10,000,000 triangles decodes to
+  about 280 MB; gltf-pro passes its 2 GiB decoded budget, but `validatedDracoLimits` in `packages/decoders/src/protocol.ts`
+  caps `maxDecodedBytes` at 256 MiB and the native crate's workspace at 256 MiB, so the decode is refused.
+- **Cause:** the decoders' ceiling predates parts; gltf-pro took at most 1,000,000 Draco vertices until 2026-11-11.
+- **Fix to build:** raise the decoders' output and workspace ceilings to what wasm32 memory allows for one decode
+  (measured), with a test at 10M triangles; gltf-pro already passes the right limits.
+
 ### gltf-pro extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
 
 - **Repro:** `MARGO_COMPAT=1 node packages/gltf-pro/scripts/test-extensions-browser.js` on the dev PC while 30 package

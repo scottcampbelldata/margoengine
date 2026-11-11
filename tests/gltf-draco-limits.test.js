@@ -97,7 +97,8 @@ test('declared Draco counts and widths reach the decoder and exact boundaries re
           calls++;
           assert.equal(options.limits.maxVertices, 24);
           assert.equal(options.limits.maxIndices, 36);
-          assert.equal(options.limits.maxDecodedBytes, 256 * 1024 * 1024);
+          // The load's decoded budget, 4x the 512 MiB default (@margoengine/decoders caps a decode at 256 MiB itself).
+          assert.equal(options.limits.maxDecodedBytes, 4 * 512 * 1024 * 1024);
           assert.deepEqual(options.limits.attributeWidths, { POSITION: 3, NORMAL: 3 });
           return decodeDraco(module, data, options);
         },
@@ -122,7 +123,8 @@ test('non-indexed Draco topology receives a bounded index limit', async () => {
     const model = await parseGLTFAsync(engine, doc, [source], [], {
       draco: {
         async decode(data, options) {
-          assert.equal(options.limits.maxIndices, 1_000_000);
+          // Three indices a vertex at the 2^24-vertex primitive limit (was 1,000,000, under one part of a scan).
+          assert.equal(options.limits.maxIndices, 3 * 16_777_216);
           return decodeDraco(module, data, options);
         },
       },
@@ -135,7 +137,7 @@ test('non-indexed Draco topology receives a bounded index limit', async () => {
 
 // Bug: the per-primitive decoded-byte check used the default budget (4x 64 MiB) instead of the load's own
 // `maxDownloadBytes`, so a raised budget still refused a Draco primitive declaring more than 256 MiB of attributes.
-test('a Draco primitive over 256 MiB declared decodes within a raised maxDownloadBytes, and is refused within 64 MiB', async () => {
+test('a Draco primitive over 256 MiB declared decodes within the default and a raised maxDownloadBytes, and is refused within 64 MiB', async () => {
   const doc = JSON.parse(await fixture('Box.gltf')),
     source = await fixture('Box.bin'),
     primitive = doc.meshes[0].primitives[0],
@@ -153,12 +155,45 @@ test('a Draco primitive over 256 MiB declared decodes within a raised maxDownloa
       },
     };
   for (const [maxDownloadBytes, expected] of [
+    // The default budget is 512 MiB (2 GiB decoded): a scan's Draco primitive decodes with no options.
+    [undefined, /reached the decoder/],
     [128 * 1024 * 1024, /reached the decoder/],
     [64 * 1024 * 1024, /Decoded glTF exceeds byte budget/],
   ]) {
     const { engine } = await scene();
     try {
       await assert.rejects(parseGLTFAsync(engine, structuredClone(doc), [source], [], { draco, maxDownloadBytes }), expected);
+    } finally {
+      engine.dispose();
+    }
+  }
+});
+
+// Draco primitives were capped at 1,000,000 vertices and indices while plain ones load up to 2^24 vertices as parts:
+// a compressed scan was refused where its uncompressed copy loaded.
+test('a Draco primitive past 1,000,000 vertices and indices reaches the decoder; past 2^24 vertices it is unsupported', async () => {
+  const reached = new Error('reached the decoder');
+  for (const [vertices, expected] of [
+    [1_000_001, reached],
+    [16_777_216, reached],
+    [16_777_217, { name: 'MargoError', code: 'unsupported', message: /more than 16777216 vertices/ }],
+  ]) {
+    const doc = JSON.parse(await fixture('Box.gltf')),
+      source = await fixture('Box.bin'),
+      primitive = doc.meshes[0].primitives[0];
+    for (const id of Object.values(primitive.attributes)) doc.accessors[id].count = vertices;
+    doc.accessors[primitive.indices].count = 3_000_003;
+    let limits;
+    const draco = {
+        async decode(_data, options) {
+          limits = options.limits;
+          throw reached;
+        },
+      },
+      { engine } = await scene();
+    try {
+      await assert.rejects(parseGLTFAsync(engine, doc, [source], [], { draco }), expected);
+      if (expected === reached) assert.deepEqual([limits.maxVertices, limits.maxIndices], [vertices, 3_000_003]);
     } finally {
       engine.dispose();
     }

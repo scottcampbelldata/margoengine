@@ -278,8 +278,9 @@ In a multi-view frame, a model draws only the nodes in the view's layers, and ea
 even when one command encoder records several views or probe faces. Buffers released mid-draw (a callback that
 disposes the model) stay valid until the frame is submitted.
 
-The loader passes declared vertex/index counts, accessor widths and the remaining
-256 MiB decoded-data budget into Draco. The default decoder rejects oversized
+The loader passes declared vertex/index counts (up to 16,777,216 vertices a primitive, loaded as parts like any
+other), accessor widths and the remaining decoded-data budget (4x `maxDownloadBytes`, whose default is 512 MiB) into
+Draco; `@margoengine/decoders` outputs at most 256 MiB per decode. The default decoder rejects oversized
 actual geometry before allocating output arrays, including topology without an
 index accessor. It still needs to decode internal Wasm geometry before reading
 those counts. Custom `draco.decode` hooks should honor the supplied `limits`;

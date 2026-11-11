@@ -11,7 +11,8 @@ export async function gltfRoute(target: URL, signal: AbortSignal) {
   if (!['http:', 'https:'].includes(target.protocol)) throw typeError('glTF URL must use HTTP(S)', 'arguments');
   const get = globalThis.fetch,
     response = await get(target, { signal }),
-    bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'glTF download' });
+    // gltf-pro's default download budget: a file the advanced loader takes is not refused here first.
+    bytes = await readResponse(response, { maxBytes: 512 * 1024 * 1024, signal, label: 'glTF download' });
   // A pointer from a clone without Git LFS would otherwise fail below as invalid JSON.
   rejectLFSPointer(bytes, target.href);
   const doc = parseJSON<GLTFDocument>(
@@ -66,6 +67,8 @@ export async function gltfRoute(target: URL, signal: AbortSignal) {
       else if (key !== 'extras') pending.push(child);
     }
   }
+  // The light loader reads at most 64 MiB.
+  if (bytes.length > 1 << 26) feature ||= 'files over 64 MiB';
   feature = animation || doc.extensionsRequired?.[0] || feature;
   // Replay the bounded root response once, preserving its redirect URL. External resources use the original fetch.
   let root = true;

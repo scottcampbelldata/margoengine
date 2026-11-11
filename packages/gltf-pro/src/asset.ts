@@ -5,7 +5,7 @@ import { readResponse } from '../../shared/loading.js';
 import type { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import type { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
 import { checkCount, countLimit } from '../../shared/limits.js';
-import { partLimit, PART_VERTICES } from './parts.js';
+import { partLimit, PART_VERTICES, PRIMITIVE_VERTICES } from './parts.js';
 import type { PBRInstances } from './instancing.js';
 import type { Engine } from '@margoengine/core/extension';
 import type { Splats } from '@margoengine/splats';
@@ -77,7 +77,11 @@ export const asyncCompression = (doc: GLTFDocument): boolean =>
   asyncGeometry(doc) ||
   !!doc.textures?.some((texture) => texture?.extensions?.KHR_texture_basisu) ||
   !!doc.images?.some((image) => image?.mimeType === 'image/ktx2');
-export const assetLimit = 64 * 1024 * 1024;
+/**
+ * Default `maxDownloadBytes`: 512 MiB, so a 10M-triangle scan (about 300 MB raw) loads with no options; decoded data may
+ * use 4x (2 GiB), which a 40 MB Draco scan needs (about 800 MB decoded).
+ */
+export const assetLimit = 512 * 1024 * 1024;
 /** A byte budget derived from `maxDownloadBytes` was exceeded: the error names the option to raise. */
 export const overBudget = (message: string, bytes: number): RangeError =>
   new RangeError(`${message} (${bytes} bytes; raise the maxDownloadBytes option)`);
@@ -683,7 +687,7 @@ export class GLTFAsset {
               attributes,
               indices:
                 result.indices ??
-                (Number.isSafeInteger(vertexCount) && vertexCount >= 3 && vertexCount <= 1_000_000
+                (Number.isSafeInteger(vertexCount) && vertexCount >= 3 && vertexCount <= PRIMITIVE_VERTICES
                   ? Uint32Array.from({ length: vertexCount }, (_, i) => i)
                   : undefined),
             };

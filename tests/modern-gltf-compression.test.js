@@ -467,8 +467,9 @@ test('meshopt EXPONENTIAL filtering matches reference bytes and rejects malforme
     byteStride: 4,
     filter: 'NONE',
   });
+  // 300 MiB decoded against a 64 MiB load (256 MiB decoded); the 512 MiB default allows 2 GiB.
   assert.throws(
-    () => new GLTFAsset(oversized, [data]).view(0),
+    () => new GLTFAsset(oversized, [data], undefined, {}, 64 * 1024 * 1024).view(0),
     /byte budget/,
     'reject a valid declared decoded layout before allocation',
   );

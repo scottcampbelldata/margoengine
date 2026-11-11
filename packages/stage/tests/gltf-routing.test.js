@@ -106,3 +106,30 @@ test('a glTF URL that returns a Git LFS pointer throws a coded error naming git 
     globalThis.fetch = previous;
   }
 });
+
+// The route read at most 64 MiB, so a file only gltf-pro can load (its budget is 512 MiB) failed as a download error
+// before any loader was chosen; a plain one over 64 MiB went to the light loader, which reads at most 64 MiB.
+test('a GLB over 64 MiB is read whole and routed to gltf-pro, naming its size when gltf-pro is missing', async () => {
+  const json = new TextEncoder().encode(JSON.stringify({ ...triangle(), buffers: [{ byteLength: 36 }] }).padEnd(1000)),
+    bin = 65 * 1024 * 1024,
+    glb = new Uint8Array(28 + json.length + bin),
+    view = new DataView(glb.buffer);
+  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, glb.length, true);
+  view.setUint32(12, json.length, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  glb.set(json, 20);
+  view.setUint32(20 + json.length, bin, true);
+  view.setUint32(24 + json.length, 0x004e4942, true);
+  const previous = globalThis.fetch;
+  globalThis.fetch = async () => new Response(glb);
+  try {
+    await assert.rejects(
+      addGLTF({ engine: {}, signal: new AbortController().signal }, 'https://test.invalid/scan.glb'),
+      { name: 'MargoError', code: 'state', message: /files over 64 MiB.*@margoengine\/gltf-pro/ },
+    );
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
