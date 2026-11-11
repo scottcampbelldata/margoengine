@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14904353,
+  "total": 14905074,
   "history": [
     {
       "date": "2026-10-24",
@@ -8333,6 +8333,12 @@
       "commit": "cae2c43cce",
       "reason": "Lines pay only for tiles they import: the tile row, capture shader step and Frame rebuild moved from the lines root into lines/tiles. lines/tiles 409 -> 1357 B gzip; lines root 20484 -> 20286 B, lines/batch 6606 -> 6386 B, lines/pick 6465 -> 6281 B. The bytes are the feature itself, which every lines user carried before; a split would put the rebuild back in the root.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "2040cc95f2",
+      "reason": "lightmap/refracted 9015 B budget to 9452 B measured, budget 9736 B (+437 B measured): Smith microsurface random walk and anisotropic GGX for rough glass; it is the refracted entry's own feature, a separate entry would duplicate the bake loop",
+      "grew": 1
     }
   ],
   "items": {
@@ -8822,7 +8828,7 @@
     "@margoengine/lightmap/imported": 1535,
     "@margoengine/lightmap/mesh": 3272,
     "@margoengine/lightmap/probes": 3273,
-    "@margoengine/lightmap/refracted": 9015,
+    "@margoengine/lightmap/refracted": 9736,
     "@margoengine/lines": 20524,
     "@margoengine/lines/batch": 6642,
     "@margoengine/lines/debug": 9966,

@@ -198,15 +198,37 @@ are opaque.
 
 Rough glass, dispersion and bounce light after glass are options of the same call:
 
-- a volume's `roughness` (0 to 1) bends each photon about a GGX microfacet normal sampled from the visible normals
-  (Heitz 2018), and Smith masking of the way out goes to `diagnostics.masked`, so very rough glass passes less light;
+- a volume's `roughness` (0 to 1, or `[u, v]` for anisotropic glass along `roughnessDirection`, default +X) runs each
+  photon through a Smith microsurface random walk (Heitz et al. 2016): it reflects and refracts on sampled GGX visible
+  normals until it leaves the surface, so no light is lost to masking (`diagnostics.masked` stays zero) and the
+  microsurface events count toward `maxEvents`;
 - a volume's `dispersion` (20 / Abbe number, as on the transmission material) gives each photon a stratified wavelength
   from 380 to 780 nm, a Cauchy index fitted to `ior` and the Abbe number, and the linear sRGB of that wavelength, so a
   prism splits white light into a rainbow while a flat spectrum still adds up to the light's colour;
 - `bounces` (0 to 4) lets a receiver send light that came through glass on, diffusely and times its quad albedo
   (`diagnostics.reflected` and `bounced`).
 
-`smithG1`, `sampleVisibleNormal`, `cauchy` and `wavelengthRgb` are exported for checks and custom tracers.
+`smithG1`, `sampleVisibleNormal`, `smithLambda`, `smithNormal`, `scatterRough`, `cauchy` and `wavelengthRgb` are
+exported for checks and custom tracers.
+
+```js
+import { bakeRefractedLightmap } from '@margoengine/lightmap/refracted';
+
+const floor = { positions: Float32Array.from([-5, 0, -5, -5, 0, 5, 5, 0, 5, 5, 0, -5]) };
+const slab = {
+  positions: Float32Array.from([-2, 1, -2, 2, 1, -2, 2, 1, 2, -2, 1, 2, -2, 2, -2, -2, 2, 2, 2, 2, 2, 2, 2, -2]),
+  indices: Uint32Array.from([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 3, 5, 0, 5, 4, 1, 7, 6, 1, 6, 2, 0, 4, 7, 0, 7, 1, 3, 2, 6, 3, 6, 5]),
+  ior: 1.5,
+  roughness: [0.7, 0.1], // brushed glass: rough along X, nearly smooth along Z
+  roughnessDirection: [1, 0, 0],
+};
+const result = await bakeRefractedLightmap(floor, {
+  glassVolumes: [slab],
+  emitters: [{ type: 'directional', direction: [0, 1, 0], aperture: { corner: [-0.5, 3, -0.5], edgeU: [1, 0, 0], edgeV: [0, 0, 1] } }],
+  photons: 4096,
+});
+console.log(result.diagnostics.masked); // [0, 0, 0]
+```
 
 ## Denoising: `@margoengine/lightmap/denoise`
 

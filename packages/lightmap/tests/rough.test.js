@@ -138,7 +138,7 @@ test('roughness 0 and no dispersion reproduce the smooth bake exactly', async ()
   assert.equal(smooth.diagnostics.bounced, 0);
 });
 
-test('rough glass spreads the beam, loses only masked power and accounts for every watt', async () => {
+test('rough glass spreads the beam, loses no power to masking and accounts for every watt', async () => {
   const slab = { ...box(), ior: 1.5 },
     smooth = await bake(floor(), opts([slab])),
     rough = await bake(floor(), opts([{ ...slab, roughness: 0.5 }])),
@@ -150,8 +150,9 @@ test('rough glass spreads the beam, loses only masked power and accounts for eve
   assert.ok(spread(smooth).outside < 1e-12);
   assert.ok(spread(rough).outside > 0.15, `rough outside ${spread(rough).outside}`);
   assert.ok(spread(rougher).outside > spread(rough).outside);
-  assert.ok(rough.diagnostics.masked[0] > 0 && rough.diagnostics.masked[0] < 0.2);
-  assert.ok(rougher.diagnostics.masked[0] > rough.diagnostics.masked[0]);
+  // Masked light continues its microsurface random walk (Heitz et al. 2016), so none is lost to masking.
+  assert.deepEqual(rough.diagnostics.masked, [0, 0, 0]);
+  assert.deepEqual(rougher.diagnostics.masked, [0, 0, 0]);
   close(spread(rough).x, 0, 0.05);
   assert.equal(rough.diagnostics.photons, 8192);
 });

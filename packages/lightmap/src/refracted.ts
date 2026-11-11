@@ -14,9 +14,17 @@ import { finiteVector } from '@margoengine/math/validate';
 import { bake, checkpoint, fillGutters, inRange, quadIndices, unit } from './bake.js';
 import type { Lightmap, LightmapOptions, LightmapQuads } from './index.js';
 import { beer, clip, convexPlanes, fresnel, type Medium, mediumOf, type Plane, rectOf } from './optics.js';
-import { cauchy, sampleVisibleNormal, smithG1, visible, wavelengthRgb } from './rough.js';
+import { cauchy, scatterRough, visible, wavelengthRgb } from './rough.js';
 
-export { cauchy, sampleVisibleNormal, smithG1, wavelengthRgb } from './rough.js';
+export {
+  cauchy,
+  sampleVisibleNormal,
+  scatterRough,
+  smithG1,
+  smithLambda,
+  smithNormal,
+  wavelengthRgb,
+} from './rough.js';
 
 /**
  * A closed convex glass boundary as indexed triangles, outward wound with exactly shared edges. Volumes must be
@@ -29,11 +37,12 @@ export interface RefractedGlassVolume
   positions: Float32Array;
   indices: Uint32Array;
   /**
-   * Surface roughness, 0 (ideal, default) to 1; GGX alpha is its square. Each boundary event samples a visible
-   * microfacet normal for Fresnel and Snell, and Smith masking of the outgoing direction removes the share that would
-   * scatter again on the microsurface (`diagnostics.masked`).
+   * Surface roughness, 0 (ideal, default) to 1, or [U, V] for anisotropic GGX; alpha is roughness squared.
+   * A Smith microsurface random walk continues masked light until escape or the shared maxEvents limit.
    */
-  roughness?: number;
+  roughness?: number | readonly [number, number];
+  /** World-space U direction, projected onto each boundary; default +X, with a perpendicular fallback at its poles. */
+  roughnessDirection?: Vec3;
 }
 
 /**
@@ -69,7 +78,7 @@ export interface RefractedLightmapOptions
   emitters: readonly RefractedEmitter[];
   /** Photons shared by the emitters, at least one each, at most 1,048,576. Default 65,536. */
   photons?: number;
-  /** Most reflections and refractions per photon, 1 to 32; the rest of its power counts as truncated. Default 8. */
+  /** Most reflections and refractions per photon, including microsurface events, 1 to 32. Remaining power is truncated. Default 8. */
   maxEvents?: number;
   /** Also deposit light that reaches a receiver without touching glass. Default false (caustics only). */
   includeDirect?: boolean;
@@ -102,7 +111,7 @@ export interface RefractedDiagnostics {
   unrefracted: V3;
   /** Hit a receiver's back face, which is opaque. */
   blocked: V3;
-  /** Lost to Smith masking at rough glass (light the microsurface would scatter again). */
+  /** Retained for compatibility; always zero. Masked light continues on the microsurface. */
   masked: V3;
   photons: number;
   /** Receiver ray casts and glass boundary tests the photons made. */
@@ -127,7 +136,8 @@ export interface RefractedLightmap {
 
 interface Volume extends Medium {
   /** GGX alpha; 0 for ideal glass. */
-  alpha: number;
+  alpha: readonly [number, number];
+  roughnessDirection: V3;
   /** The index at a wavelength in nm, when the volume disperses. */
   dispersive?: (nanometres: number) => number;
   planes: Plane[];
@@ -182,11 +192,17 @@ function volumesOf(input: readonly RefractedGlassVolume[]) {
         [0, 1, 2].map((k) => corner(value.indices[t * 3 + k])),
       ),
       vertices = [...new Map(triangles.flat().map((p) => [`${p}`, p])).values()],
-      roughness = inRange(value.roughness ?? 0, 0, 1, `${label} glass roughness`, false),
+      roughness = value.roughness ?? 0,
+      pair = typeof roughness === 'number' ? [roughness, roughness] : roughness,
       medium = mediumOf(value);
+    if (!Array.isArray(pair) || pair.length !== 2)
+      throw new TypeError(`${label} glass roughness must be a number or [U, V] pair`);
+    const alpha = pair.map((r) => inRange(r, 0, 1, `${label} glass roughness`, false) ** 2) as [number, number],
+      roughnessDirection = unit(value.roughnessDirection ?? [1, 0, 0], `${label} roughnessDirection`);
     return {
       ...medium,
-      alpha: roughness * roughness,
+      alpha,
+      roughnessDirection,
       ...(medium.dispersion > 0 ? { dispersive: cauchy(medium.ior, 20 / medium.dispersion) } : {}),
       planes: convexPlanes(triangles, `${label} glass volume`),
       vertices,
@@ -338,7 +354,7 @@ function cosineAbout(normal: V3, u1: number, u2: number): V3 {
  * Bakes caustics: photons from `emitters` refract and reflect through convex glass (Fresnel picks reflection or
  * transmission, total internal reflection, Beer absorption on each bent path, nested media use their neighbours'
  * IORs) and deposit their flux at the first diffuse front face they reach after touching glass. A volume's
- * `roughness` makes it rough glass (GGX visible normals with Smith masking); its `dispersion` (20 / Abbe number) gives
+ * `roughness` makes it rough glass (anisotropic GGX with Smith multiple scattering); its `dispersion` (20 / Abbe number) gives
  * each photon a stratified wavelength from 380 to 780 nm, a Cauchy index there and the linear sRGB of that
  * wavelength, normalized per emitter so the packets add up to its power. With `bounces`, receivers reflect the
  * deposited light on, diffusely and weighted by their albedo.
@@ -500,14 +516,34 @@ export async function bakeRefractedLightmap(
           to = iorOf(entering ? volume : outer),
           // The macro normal on the photon's side; a rough boundary bends about a sampled microfacet normal instead.
           macro = scale(volumes[volume].planes[plane].normal, entering ? 1 : -1),
-          alpha = volumes[volume].alpha,
-          normal = alpha > 0 ? sampleVisibleNormal(scale(direction, -1), macro, alpha, random(), random()) : macro,
-          cosine = Math.max(0, Math.min(1, -dot(direction, normal))),
-          reflectance = fresnel(cosine, from, to);
+          alpha = volumes[volume].alpha;
         origin = add(origin, scale(direction, distance));
         lastVolume = volume;
         lastPlane = plane;
         skipQuad = -1;
+        if (alpha[0] > 0 || alpha[1] > 0) {
+          const axis = volumes[volume].roughnessDirection,
+            projected = sub(axis, scale(macro, dot(axis, macro))),
+            tangent =
+              length(projected) > 1e-12
+                ? normalize(projected)
+                : normalize(Math.abs(macro[0]) < 0.9 ? cross(macro, [1, 0, 0]) : cross(macro, [0, 1, 0])),
+            result = scatterRough(direction, macro, tangent, alpha, from, to, maxEvents - events, random);
+          events += result.events;
+          diagnostics.reflections += result.reflections;
+          diagnostics.refractions += result.refractions;
+          diagnostics.totalInternalReflections += result.totalInternalReflections;
+          if (result.truncated) {
+            put(diagnostics.truncated, power);
+            break;
+          }
+          direction = result.direction;
+          if (result.transmitted) inside = entering ? volume : outer;
+          continue;
+        }
+        const normal = macro,
+          cosine = Math.max(0, Math.min(1, -dot(direction, normal))),
+          reflectance = fresnel(cosine, from, to);
         events++;
         const reflect = reflectance >= 1 || random() < reflectance;
         if (reflect) {
@@ -518,16 +554,6 @@ export async function bakeRefractedLightmap(
           const ratio = from / to,
             ct = Math.sqrt(Math.max(0, 1 - ratio * ratio * (1 - cosine * cosine)));
           direction = normalize(add(scale(direction, ratio), scale(normal, ratio * cosine - ct)));
-        }
-        if (alpha > 0) {
-          // Smith masking of the way out, against the macro surface on the side the photon leaves by.
-          const out = dot(direction, macro) * (reflect ? 1 : -1),
-            kept = smithG1(out, alpha);
-          for (let c = 0; c < 3; c++) {
-            diagnostics.masked[c] += power[c] * (1 - kept);
-            power[c] *= kept;
-          }
-          if (!(kept > 0)) break;
         }
         if (!reflect) {
           inside = entering ? volume : outer;

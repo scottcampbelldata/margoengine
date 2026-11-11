@@ -42,7 +42,8 @@ export type RefractedEmitter = (BakeLight & {
 export interface RefractedGlassVolume extends Pick<TransmissionOptions, 'ior' | 'dispersion'>, Pick<VolumeOptions, 'attenuationColor' | 'attenuationDistance'> {
     positions: Float32Array;
     indices: Uint32Array;
-    roughness?: number;
+    roughness?: number | readonly [number, number];
+    roughnessDirection?: Vec3;
 }
 
 export interface RefractedLightmap {
@@ -68,7 +69,29 @@ export function cauchy(ior: number, abbe: number): (nanometres: number) => numbe
 
 export function sampleVisibleNormal(view: V3, normal: V3, alpha: number, u1: number, u2: number): V3;
 
+export function scatterRough(incident: V3, macro: V3, tangent: V3, alpha: readonly [number, number], from: number, to: number, limit: number, random: () => number): {
+    readonly truncated: true;
+    readonly events: number;
+    readonly reflections: number;
+    readonly refractions: number;
+    readonly totalInternalReflections: number;
+    readonly direction?: undefined;
+    readonly transmitted?: undefined;
+} | {
+    readonly truncated: false;
+    readonly direction: V3;
+    readonly transmitted: boolean;
+    readonly events: number;
+    readonly reflections: number;
+    readonly refractions: number;
+    readonly totalInternalReflections: number;
+};
+
 export function smithG1(cosine: number, alpha: number): number;
+
+export function smithLambda(direction: V3, alpha: readonly [number, number]): number;
+
+export function smithNormal(view: V3, alpha: readonly [number, number], u: number, v: number): V3;
 
 export function wavelengthRgb(nm: number): V3;
 

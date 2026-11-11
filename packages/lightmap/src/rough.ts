@@ -5,6 +5,95 @@
 // IEC 61966-2-1.
 import type { MutableVec3 as V3 } from '@margoengine/math';
 import { cross, dot, normalize } from '@margoengine/math/vec3';
+import { fresnel } from './optics.js';
+
+/** Smith signed Lambda, including rays below the horizon (Heitz et al. 2016, Appendix B). */
+export function smithLambda(direction: V3, alpha: readonly [number, number]): number {
+  const [x, y, z] = direction,
+    a2 = (alpha[0] * x) ** 2 + (alpha[1] * y) ** 2,
+    projected = Math.hypot(z, alpha[0] * x, alpha[1] * y);
+  return z > 0 ? a2 / (2 * z * (projected + z)) : (projected - z) / (2 * z);
+}
+
+/** Log of the next height CDF; undefined means escape. Uniform heights cancel from the final BSDF. */
+export function smithHeight(logHeight: number, direction: V3, alpha: readonly [number, number], u: number) {
+  if (direction[2] === 0) return logHeight;
+  const lambda = smithLambda(direction, alpha);
+  if (lambda === 0) return undefined;
+  const next = logHeight - Math.log1p(-u) / lambda;
+  return next >= 0 ? undefined : next;
+}
+
+/** Full-sphere anisotropic GGX VNDF from the spherical-cap geometry of Dupuy and Benyoub 2023, section 3. */
+export function smithNormal(view: V3, alpha: readonly [number, number], u: number, v: number): V3 {
+  const w = normalize([alpha[0] * view[0], alpha[1] * view[1], view[2]]),
+    cap = w[2] < 0 ? (w[0] ** 2 + w[1] ** 2) / (1 - w[2]) : 1 + w[2],
+    z = cap * u,
+    r = Math.sqrt(Math.max(0, cap * (1 - u) * (2 - cap * (1 - u)))),
+    phi = 2 * Math.PI * v;
+  return normalize([alpha[0] * (w[0] + r * Math.cos(phi)), alpha[1] * (w[1] + r * Math.sin(phi)), z]);
+}
+
+/** Photon (power) transport, not radiance transport: dielectric events have unit weight, no eta-squared factor. */
+export function scatterRough(
+  incident: V3,
+  macro: V3,
+  tangent: V3,
+  alpha: readonly [number, number],
+  from: number,
+  to: number,
+  limit: number,
+  random: () => number,
+) {
+  const b = cross(macro, tangent),
+    open = () => Math.max(Number.EPSILON / 2, Math.min(1 - Number.EPSILON / 2, random()));
+  let direction: V3 = [dot(incident, tangent), dot(incident, b), dot(incident, macro)],
+    logHeight = 0,
+    side = 1,
+    events = 0,
+    reflections = 0,
+    refractions = 0,
+    totalInternalReflections = 0;
+  while (true) {
+    const local: V3 = [direction[0], direction[1], side * direction[2]],
+      next = smithHeight(logHeight, local, alpha, open());
+    if (next === undefined) break;
+    if (events === limit)
+      return { truncated: true, events, reflections, refractions, totalInternalReflections } as const;
+    logHeight = next;
+    const m = smithNormal([-local[0], -local[1], -local[2]], alpha, open(), open()),
+      normal: V3 = [m[0], m[1], side * m[2]],
+      cosine = Math.max(0, Math.min(1, -dot(direction, normal))),
+      n1 = side > 0 ? from : to,
+      n2 = side > 0 ? to : from,
+      f = fresnel(cosine, n1, n2);
+    events++;
+    if (f >= 1 || random() < f) {
+      direction = normalize(direction.map((d, k) => d + 2 * cosine * normal[k]) as V3);
+      reflections++;
+      if (f >= 1) totalInternalReflections++;
+    } else {
+      if (n1 !== n2) {
+        const ratio = n1 / n2,
+          ct = Math.sqrt(Math.max(0, 1 - ratio ** 2 * (1 - cosine ** 2)));
+        direction = normalize(direction.map((d, k) => ratio * d + (ratio * cosine - ct) * normal[k]) as V3);
+      }
+      side = -side;
+      // Symmetric heights: C1(-h) = 1 - C1(h). Keep tiny tails without cancellation or underflow.
+      logHeight = Math.log(-Math.expm1(logHeight));
+      refractions++;
+    }
+  }
+  return {
+    truncated: false,
+    direction: direction.map((_, k) => tangent[k] * direction[0] + b[k] * direction[1] + macro[k] * direction[2]) as V3,
+    transmitted: side < 0,
+    events,
+    reflections,
+    refractions,
+    totalInternalReflections,
+  } as const;
+}
 
 /** Smith masking G1 of an isotropic GGX surface with `alpha` for a direction at `cosine` to the macro normal. */
 export function smithG1(cosine: number, alpha: number): number {

@@ -3609,9 +3609,12 @@ quantizes each component to 1/255 of 2. No GPU shader applies it yet: `direction
 
 ## Lightmap rough glass, dispersion and bounce caustics (batch 54)
 
-`bakeRefractedLightmap` (`@margoengine/lightmap/refracted`) rough glass is single-scattering: light the microsurface would
-scatter again is dropped into `diagnostics.masked` (about 9% of a normal beam through a 1-unit slab at roughness 0.5,
-53% at roughness 0.9), so very rough glass is too dark. Roughness is isotropic and per volume. Dispersion uses Cauchy's
+`bakeRefractedLightmap` (`@margoengine/lightmap/refracted`) rough glass follows a Smith microsurface random walk (Heitz et al. 2016), so masked light scatters again instead of
+being dropped; `diagnostics.masked` is kept for compatibility and is always zero. Microsurface events share the
+`maxEvents` limit (1 to 32), and a photon still on the microsurface at that limit counts as truncated. Roughness is
+per volume, isotropic or an anisotropic `[u, v]` pair whose U axis is `roughnessDirection` projected onto each
+boundary (a perpendicular axis replaces it where the projection vanishes). The walk uses a uniform height
+distribution, which cancels from the result, and unit-weight dielectric events (photon power, not radiance). Dispersion uses Cauchy's
 two-term fit (no Sellmeier), wavelengths 380 to 780 nm with out-of-gamut colours clipped, and the event Fresnel at one
 wavelength per photon. Bounces (at most 4) are diffuse and use the quad's albedo only (no `surface` callback, no
 textures); receivers stay opaque.
