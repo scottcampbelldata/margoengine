@@ -2531,6 +2531,9 @@ Follow-up (KBnew-skyfog-ldr, L4, 2026-11-11): the three 4x cases KB2272 added to
 so the tier check met the documented refusal it did not list. Sky, VolumetricFog and spray have no fault there.
 `tier-packages-browser.mjs` now lists the three 4x scenes as LDR refusals and still checks their message; they
 render at half-float. Regression: that check (failed on 16fbe3c86c, passes now). Docs: webgl2-compat README.
+Same again (bug sweep L3a, 2026-11-11): the surfels case 34f9772d2a added ("points surfels 4x") takes the same
+capture, so `test:gpu:tiers` failed at "points surfels 4x ldr: the package accepts this tier" once both were on main.
+It is listed with the others as an LDR refusal, message still checked. Regression: that check. Docs: webgl2-compat README.
 
 - **Was:** with `allowCompatibilityAdapters`, `FogPass` in `@margoengine/sky`, the `VolumetricFog` composite in `@margoengine/environment` and the spray in `@margoengine/water` failed pipeline creation at 4x ("sample_index is not supported in compatibility mode").
 - **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.

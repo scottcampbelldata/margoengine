@@ -295,7 +295,7 @@ allocation; both pass half-float (SSAO maximum channel difference 1). Standalone
 FXAA is identical on both lower tiers. Standalone TAA and TAAUpscale refuse LDR too (`TAA history`): their 8-bit
 history put 90.4 and 92.1 percent of pixels more than 2 levels off, against at most 0.024 percent at half-float.
 These twelve scenes are the proven scope.
-The three 4x MSAA scenes (sky fog, VolumetricFog, water spray) take their 4x scene from PostStack's capture, the
+The four 4x MSAA scenes (sky fog, VolumetricFog, water spray, point surfels) take their 4x scene from PostStack's capture, the
 only 4x route, so on LDR they refuse with PostStack's coded `unsupported`; at half-float they render.
 
 Tracked follow-up **T273-COVERAGE**: remaining post effects and standalone Tonemap,

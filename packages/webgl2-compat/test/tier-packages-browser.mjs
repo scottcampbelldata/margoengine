@@ -48,6 +48,7 @@ try {
     'sky fog 4x',
     'environment volumetric 4x',
     'water spray 4x',
+    'points surfels 4x',
   ];
   for (const name of names) {
     const full = await context.page.evaluate((name) => window.check.capture('full', name), name);
