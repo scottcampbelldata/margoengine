@@ -13,8 +13,7 @@ export async function captureGPU(
   const device = engine.gpu!,
     context = canvas.getContext('webgpu') as unknown as GPUCanvasContext,
     configuration = context.getConfiguration()!;
-  const { width, height } = canvas,
-    format = configuration.format;
+  const format = configuration.format;
   // Capture commands are encoded during the canvas texture's lifetime. Copying to
   // an owned buffer before awaiting avoids stale and automatically expired images.
   if (!((configuration.usage ?? 0x10) & 0x01)) {
@@ -23,11 +22,15 @@ export async function captureGPU(
     await device.queue.onSubmittedWorkDone();
     context.configure({ ...configuration, usage: (configuration.usage ?? 0x10) | 0x01 });
   }
-  const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
+  // render() may resize the canvas (the engine sizes its drawing buffer from the CSS box on every frame) and a resize
+  // replaces the canvas texture, so the copy takes its size from the texture render() drew into, not from the canvas
+  // as it was before the frame.
+  render();
+  const texture = context.getCurrentTexture(),
+    { width, height } = texture,
+    bytesPerRow = Math.ceil((width * 4) / 256) * 256;
   const buffer = device.createBuffer({ size: bytesPerRow * height, usage: 0x01 | 0x08 });
   try {
-    render();
-    const texture = context.getCurrentTexture();
     const encoder = device.createCommandEncoder();
     encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow, rowsPerImage: height }, [width, height]);
     device.queue.submit([encoder.finish()]);
