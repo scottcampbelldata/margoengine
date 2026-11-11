@@ -114,6 +114,7 @@ type ServerMessage =
 
 type VoxelAuthenticate = (req: IncomingMessage, hello: {
     name: string;
+    resume?: boolean;
 } | undefined) => boolean | string | Promise<boolean | string>;
 
 interface VoxelEditStore {
@@ -262,6 +263,7 @@ interface VoxelServerConnection {
     cork(): void;
     uncork(): void;
     ping(): void;
+    readonly livenessByRuntime?: boolean;
     readonly datagrams?: boolean;
 }
 

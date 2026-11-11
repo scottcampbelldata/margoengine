@@ -25,6 +25,7 @@ export interface ConnectWebSocketOptions extends WebSocketOptions {
 
 export type VoxelAuthenticate = (req: IncomingMessage, hello: {
     name: string;
+    resume?: boolean;
 } | undefined) => boolean | string | Promise<boolean | string>;
 
 export interface VoxelEditStore {
@@ -82,6 +83,7 @@ export interface VoxelServerConnection {
     cork(): void;
     uncork(): void;
     ping(): void;
+    readonly livenessByRuntime?: boolean;
     readonly datagrams?: boolean;
 }
 
