@@ -27,7 +27,8 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:scale": "npm run build && cd ../.. && node packages/points/tests/scale-check.mjs"
   },
   "sideEffects": false,
   "exports": {

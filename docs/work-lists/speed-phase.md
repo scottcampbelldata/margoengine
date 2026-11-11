@@ -521,6 +521,12 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   on the RTX A6000 natively and on the WebGL2 layer; mid laptop iGPU 30 fps natively at 3,000,000. Busy-machine
   diagnostic 2026-11-10: native 15.2 ms and 7.8 ms wall; WebGL2 layer 401.6 ms and 123.6 ms, a speed bug (likely the
   sort's compute passes on the emulated compute tier) to diagnose before release.
+- Points at the binding bound: 11,184,810 byte-coloured points and 8,388,608 float-coloured points in a 640 x 400 view
+  (`node packages/points/tests/scale-check.mjs`, native and `MARGO_COMPAT=1`). Work per frame: the default
+  `pointBudget` draws 1,000,000; the all-drawn cases draw every point. Target: 60 fps on the RTX A6000 natively and on
+  the WebGL2 layer at every case; mid laptop iGPU 60 fps at the default budget. Busy-machine diagnostic 2026-11-10:
+  native 5.7, 16.1 and 13.0 ms wall; WebGL2 layer 16.1, 20.3 and 15.5 ms (the all-drawn 11.2 million case misses
+  16.7 ms on the WebGL2 layer: rerun on the quiet machine).
 ### Water caustics at scale (lague plan 5, 2026-11-10)
 
 `node packages/water/test/caustics-scale.browser.mjs`, native and `MARGO_COMPAT=1`. Cases: default (Water 128 segments, map
