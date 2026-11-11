@@ -36,7 +36,10 @@ export interface SafeCheck {
   good: number;
   /** Bad copies: 0, 1 or 2. */
   bad: number;
-  /** The newest good copy's generation, 0 when there is none. */
+  /**
+   * The newest good copy's generation, 0 when there is none. Exact: a generation above 2^53 - 1, which only a copy
+   * written elsewhere can hold, makes `check` throw rather than round it.
+   */
   generation: number;
 }
 
@@ -52,9 +55,14 @@ const MAGIC = 0x4d534146, // 'MSAF'
   VERSION = 1,
   HEADER = 20,
   TRAILER = 4,
-  COPIES = ['~a', '~b'] as const;
+  COPIES = ['~a', '~b'] as const,
+  /** The largest generation the 64-bit field holds; one more would wrap to 0 and lose the save to the older copy. */
+  LAST = 2n ** 64n - 1n;
 
-type Copy = { name: string; generation: bigint; payload: Uint8Array } | { name: string; bad: string } | { name: string };
+type Copy =
+  | { name: string; generation: bigint; payload: Uint8Array }
+  | { name: string; bad: string }
+  | { name: string };
 
 const isGood = (copy: Copy): copy is Extract<Copy, { payload: Uint8Array }> => 'payload' in copy;
 const isBad = (copy: Copy): copy is Extract<Copy, { bad: string }> => 'bad' in copy;
@@ -81,7 +89,8 @@ function unframe(bytes: Uint8Array): { generation: bigint; payload: Uint8Array }
   if (view.getUint32(0) !== MAGIC) return 'it is not a checked copy';
   if (view.getUint32(8) !== end - HEADER) return 'its length is wrong';
   if (view.getUint32(end, true) !== crc32(bytes.subarray(0, end))) return 'its checksum does not match';
-  if (view.getUint8(4) !== VERSION) return `it has format version ${view.getUint8(4)}; this build reads version ${VERSION}`;
+  if (view.getUint8(4) !== VERSION)
+    return `it has format version ${view.getUint8(4)}; this build reads version ${VERSION}`;
   return { generation: view.getBigUint64(12), payload: bytes.subarray(HEADER, end) };
 }
 
@@ -159,8 +168,13 @@ export function safeStorage(storage: SaveStorage, options: SafeStorageOptions = 
         throw new TypeError('Save bytes must be a Uint8Array; encode the document with encodeSave');
       return turn(key, async () => {
         const copies = await scan(key, call),
-          [newest] = good(copies),
-          target = copies.find((copy) => copy !== newest)!.name,
+          [newest] = good(copies);
+        if (newest?.generation === LAST)
+          throw new MargoError(
+            'failed',
+            `Save '${key}' is at the last generation, 2^64 - 1, so another write would wrap to 0 and lose it; delete the key and save again`,
+          );
+        const target = copies.find((copy) => copy !== newest)!.name,
           framed = frame(bytes, (newest?.generation ?? 0n) + 1n);
         await storage.write(target, framed, call);
         if (verify) {
@@ -199,12 +213,18 @@ export function safeStorage(storage: SaveStorage, options: SafeStorageOptions = 
       checkKey(key);
       return turn(key, async () => {
         const copies = await scan(key, call),
-          found = good(copies);
+          found = good(copies),
+          generation = found[0]?.generation ?? 0n;
+        if (generation > BigInt(Number.MAX_SAFE_INTEGER))
+          throw new MargoError(
+            'failed',
+            `Save '${key}' has generation ${generation}, above 2^53 - 1, which a number cannot hold exactly; read() still loads it`,
+          );
         return {
           ok: found.length > 0,
           good: found.length,
           bad: copies.filter(isBad).length,
-          generation: Number(found[0]?.generation ?? 0n),
+          generation: Number(generation),
         };
       });
     },

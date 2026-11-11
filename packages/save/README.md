@@ -267,7 +267,8 @@ cannot be read shows in `list()` with `damaged: true`, and `save` or `delete` re
 `safeStorage` from `@margoengine/save/safe` wraps any storage so a failed or torn write never loses the last good save,
 and damage is found on read. Each key keeps two copies, `key~a` and `key~b`, each with a generation and a CRC-32. A write
 only ever goes over the copy that is not the newest good one, and is read back to check it. A read gives the newest good
-copy.
+copy. Generations are 64-bit: a write at the last one, 2^64 - 1, rejects with MargoError `'failed'` before any copy
+changes, and `check` rejects a generation above 2^53 - 1 that a number cannot hold exactly (`read` still loads it).
 
 ```ts
 import { loadGame, memoryStorage, saveGame, type SaveDocument } from 'margoengine/save';
