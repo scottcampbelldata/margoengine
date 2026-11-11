@@ -1,5 +1,6 @@
-// Browser side of scale-check.mjs: one cloud at the per-cloud limit of 3,000,000 splats (no SH), and one at the most
-// degree-3 SH splats a default 128 MiB storage binding holds (699,050), drawn and sorted every frame.
+// Browser side of scale-check.mjs: one cloud at the per-cloud limit of 3,000,000 splats (no SH), one at the most
+// degree-3 SH splats a default 128 MiB storage binding holds (699,050) and one of the published truck's size
+// (1,692,538 of degree 3), drawn and sorted every frame.
 import { Engine } from '../../../core/dist/index.js';
 import { Splats } from '../../dist/index.js';
 import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';

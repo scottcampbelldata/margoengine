@@ -463,6 +463,49 @@ test('createBindGroup refuses a storage binding over maxStorageBufferBindingSize
   device.destroy();
 });
 
+// Bug (bug sweep L3, red on main since 1e5d2f94d3): a 3,000,000-splat cloud's projection group binds 360,000,016 bytes
+// of storage, each binding within maxStorageBufferBindingSize, and the layer refused it because its shared data texture
+// stopped at 2,048 texels wide (2,048 x 8,192 rows, 256 MiB). WebGPU sets no total per bind group; the texture now
+// grows wider instead, up to maxTextureDimension2D on both sides.
+test('a bind group whose storage bindings pass 2,048 x maxTextureDimension2D rows gets a wider data texture', async () => {
+  const storage = [];
+  const gl = new Proxy(fakeContext({ limits: { MAX_TEXTURE_SIZE: 8192 } }), {
+    get: (context, key) =>
+      key === 'texStorage2D' ? (...args) => storage.push(args.slice(3)) : key in context ? context[key] : () => ({}),
+  });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  assert.equal(device.limits.maxTextureDimension2D, 8192);
+  const size = 120_000_000,
+    layout = device.createBindGroupLayout({
+      entries: [0, 1, 2].map((binding) => ({ binding, visibility: 4, buffer: { type: 'read-only-storage' } })),
+    });
+  device.pushErrorScope('validation');
+  const group = device.createBindGroup({
+    layout,
+    entries: [0, 1, 2].map((binding) => ({
+      binding,
+      resource: { buffer: device.createBuffer({ size, usage: 0x80 | 0x8 }) },
+    })),
+  });
+  assert.equal(await device.popErrorScope(), null);
+  assert.equal(group.invalid, null);
+  const data = group.storageTexture();
+  // 22,500,000 rows: 2,048 wide would be 10,987 high, past 8,192; 4,096 wide is 5,494 high.
+  assert.equal(data.shift, 12);
+  assert.deepEqual(storage.at(-1), [4096, 5494]);
+  assert.deepEqual([...data.rows], [[0, 0], [1, 7_500_000], [2, 15_000_000]]);
+  // Past maxTextureDimension2D squared rows (1 GiB here) a group still cannot be held.
+  const big = device.createBuffer({ size: 128 * 1024 * 1024, usage: 0x80 | 0x8 }),
+    nine = device.createBindGroupLayout({
+      entries: Array.from({ length: 9 }, (_, binding) => ({ binding, visibility: 4, buffer: { type: 'read-only-storage' } })),
+    });
+  device.pushErrorScope('validation');
+  device.createBindGroup({ layout: nine, entries: Array.from({ length: 9 }, (_, binding) => ({ binding, resource: { buffer: big } })) });
+  assert.match((await device.popErrorScope())?.message ?? '', /storage bindings total 1207959552 bytes, over the 1073741824 bytes/);
+  device.destroy();
+});
+
 // Explicit installation on a native WebGPU browser must explain why the renderer did not change.
 test('install keeps native WebGPU with a coded warning and forcing installs the full layer', async () => {
   const { installCompat, uninstallCompat } = await import('../dist/device.js');

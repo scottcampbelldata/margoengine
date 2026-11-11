@@ -1837,7 +1837,11 @@ Mapping details:
   flips back.
 - Bind-group entries map to uniform blocks and texture units per pipeline.
 - Storage-buffer render reads use RGBA32UI data textures with 16-byte texels and clamped accesses. Bindings in one
-  group share a texture, reducing texture-unit pressure.
+  group share a texture, reducing texture-unit pressure. The texture is 2,048 texels wide, or wider when that would
+  pass maxTextureDimension2D in height (`rowShift`, 2026-11-11), so a group holds up to maxTextureDimension2D squared
+  rows (1 GiB at 8,192); before that a group past 256 MiB in total was refused, a WebGPU rule the layer had added.
+  Evidence: `device.test.js` (a 360 MB group on an 8,192 context gets a 4,096 x 5,494 texture) and the 3,000,000-splat
+  case of `packages/splats/test/gpu/scale-check.mjs` with MARGO_COMPAT=1.
 - Base vertex and base instance use uniforms because measured WebGL2 targets lacked the extension.
 - Without indexed draw-buffer state, outputs with matching blend state are grouped; depth/stencil-writing cases that
   cannot be preserved are refused.

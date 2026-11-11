@@ -221,7 +221,7 @@ export class CompatBuffer {
     const gl = this.device.gl,
       texels = Math.max(1, Math.ceil(this.size / 16));
     if (!this.data) {
-      const shift = Math.min(11, Math.ceil(Math.log2(texels))),
+      const shift = rowShift(texels, this.device.limits.maxTextureDimension2D),
         w = 1 << shift,
         h = Math.ceil(texels / w);
       const texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
@@ -342,6 +342,15 @@ export interface TextureStorage {
   /** Base and max level last set on the GL texture. */
   levels: string;
 }
+
+/**
+ * log2 of the width of a data texture holding `rows` 16-byte rows: 2,048 texels, narrower for fewer rows, and wider
+ * only when 2,048 would make it taller than `most` (the device's maxTextureDimension2D). Shaders read row r at
+ * (r & (width - 1), r >> shift), so any width works (`rows` is 1 or more, at most `most` squared); before 2026-11-11 the width stopped at 2,048 and a bind group
+ * whose storage bindings passed 2,048 x 8,192 rows (256 MiB, a 3,000,000-splat cloud's 360 MB) was refused.
+ */
+const rowShift = (rows: number, most: number) =>
+  Math.max(Math.min(11, Math.ceil(Math.log2(rows))), Math.ceil(Math.log2(rows / most)));
 
 /**
  * Copies `count` 16-byte rows of a GL buffer, from byte `from`, into the RGBA32UI texture bound at TEXTURE_2D on the
@@ -989,7 +998,7 @@ export class CompatBindGroup {
         this.invalid = `${where}: the storage binding is ${bound.size} bytes, over this device's maxStorageBufferBindingSize of ${device.limits.maxStorageBufferBindingSize}`;
       if (this.invalid) break;
     }
-    // The group's storage bindings share one texture 2,048 texels wide and at most MAX_TEXTURE_SIZE high (storageTexture).
+    // The group's storage bindings share one texture at most maxTextureDimension2D wide and high (storageTexture).
     if (!this.invalid) {
       let rows = 0;
       for (const l of this.layout.entries) {
@@ -1002,7 +1011,7 @@ export class CompatBindGroup {
         )
           rows += Math.max(1, Math.ceil(bound.size / 16));
       }
-      const most = 2048 * device.limits.maxTextureDimension2D;
+      const most = device.limits.maxTextureDimension2D * device.limits.maxTextureDimension2D;
       if (rows > most)
         this.invalid = `createBindGroup${this.label ? ` '${this.label}'` : ''}: its storage bindings total ${rows * 16} bytes, over the ${most * 16} bytes one WebGL2 data texture holds on this context; split them across bind groups`;
     }
@@ -1027,7 +1036,7 @@ export class CompatBindGroup {
       }
       if (!total) return null;
       // Bind groups have no destroy(): the texture goes once the group is collected (GLObjects.own).
-      const shift = Math.min(11, Math.ceil(Math.log2(total))),
+      const shift = rowShift(total, this.device.limits.maxTextureDimension2D),
         texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
