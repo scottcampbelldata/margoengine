@@ -29,6 +29,9 @@ import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
 const rounds = +arg('rounds', 6),
   median = (values) => nearestMedian(values);
+// Round 0 is a discarded warm-up, so one measured round needs --rounds=2.
+if (!Number.isInteger(rounds) || rounds < 2)
+  throw new RangeError(`--rounds must be an integer of at least 2 (round 0 is a discarded warm-up), got ${arg('rounds', 6)}`);
 mkdirSync('test-results', { recursive: true });
 writeFileSync('test-results/workers-big.glb', bigGLB({ segments: 400, meshes: 4 })); // 4 x 160,801 vertices, 960,000 indices each (accessors are capped at 1M elements)
 writeFileSync('test-results/workers-grid.fbx', binary(grid(400), { compress: true }));
