@@ -15,6 +15,7 @@ import {
   readmeScratch,
   standIns,
   tally,
+  unclosedFences,
   writeExamples,
 } from '../scripts/support/readme-types.mjs';
 import { PARALLEL } from '../scripts/verify.mjs';
@@ -154,4 +155,16 @@ test('a package test keeps its example scratch folder under test-results', (t) =
   t.after(() => rmSync(folder, { recursive: true, force: true }));
   mkdirSync(folder, { recursive: true });
   assert.equal(relative(folder, readmeScratch(folder)).split(sep)[0], 'test-results');
+});
+
+// The environment README closed a code block with "``` A compute pass ..." and the exporters README with "``` Quick
+// Look ...": a viewer keeps such a block open and shows the rest of the document as code, while the examples reader
+// closes on any three backticks, so check:readmes passed. It now fails on that line.
+test('a closing code fence with text after it is reported, and a clean fence is not', () => {
+  const clean = ['```js', 'a();', '```', 'Prose.', '  ```ts', '  b();', '  ```', '````md', '```js', '````'].join('\n');
+  assert.deepEqual(unclosedFences(clean), []);
+  const broken = ['Intro.', '```js', 'a();', '``` More prose.', '```', ''].join('\r\n');
+  assert.deepEqual(unclosedFences(broken), ['line 4: ``` More prose.']);
+  for (const { name, folder } of workspacePackages())
+    for (const { document, markdown } of packageMarkdown(folder)) assert.deepEqual(unclosedFences(markdown), [], `${name} ${document}`);
 });

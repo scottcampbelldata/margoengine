@@ -106,7 +106,9 @@ const image = { dims: [3, 2, 1] as [number, number, number], bounds: [0, 2, 0, 1
 const fast = await thresholdGrid(image, [2, Infinity], { association: 'cell', array: 'velocity' });
 const leftward = await thresholdGrid(image, [-Infinity, 0], { association: 'cell', array: 'velocity', component: 1 });
 console.log(Array.from(fast.sourceCells!), Array.from(leftward.sourceCells!)); // [0] [1]
-``` `extractSubset` uses
+```
+
+`extractSubset` uses
 inclusive logical ranges and positive strides, default full extent/unit strides;
 strided cell tuples come from the lower source cell, not an average. `imageGrid`
 materializes regular/curvilinear images with at least two active dimensions.

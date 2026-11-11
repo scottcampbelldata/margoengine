@@ -86,6 +86,28 @@ export function exampleIds(name, document, entries) {
 }
 
 /**
+ * The code fences of a Markdown text that do not close: a closing fence is the fence and nothing after it, so a line like
+ * "``` More prose." leaves the block open and a viewer shows the rest of the document as code (the environment and
+ * exporters READMEs had one each). The examples above still type-checked, as their reader closes on any three
+ * backticks. Returns `line <n>: <text>` for each such line.
+ */
+export function unclosedFences(markdown) {
+  const found = [];
+  let open = null;
+  for (const [index, line] of markdown.split(/\r?\n/).entries()) {
+    const fence = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!fence) continue;
+    if (!open) open = fence[1];
+    else if (fence[1][0] === open[0] && fence[1].length >= open.length) {
+      // Reported once; the scan then treats it as closed, so one slip is not repeated at every later fence.
+      if (fence[2].trim()) found.push(`line ${index + 1}: ${line.trim().slice(0, 80)}`);
+      open = null;
+    }
+  }
+  return found;
+}
+
+/**
  * The stand-ins of a Markdown text: every `declare` of a value in its examples, as trimmed lines. Such a line satisfies
  * the compiler but holds nothing at run time, so the example it serves does not run as pasted.
  */

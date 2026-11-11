@@ -6,7 +6,7 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compareKnown, compile, packageMarkdown, parseErrors, standIns, tally, writeExamples } from './support/readme-types.mjs';
+import { compareKnown, compile, packageMarkdown, parseErrors, standIns, tally, unclosedFences, writeExamples } from './support/readme-types.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   knownFile = join(root, 'scripts/support/readme-types-known.json');
@@ -35,7 +35,11 @@ function main() {
   const declared = packages.flatMap(({ name, folder }) =>
     packageMarkdown(folder).flatMap(({ markdown }) => standIns(markdown).map((line) => `${name}: ${line}`)),
   );
+  const unclosed = packages.flatMap(({ name, folder }) =>
+    packageMarkdown(folder).flatMap(({ document, markdown }) => unclosedFences(markdown).map((line) => `${name} ${document} ${line}`)),
+  );
   for (const line of declared) console.error(`Runs as pasted, so give it a real value: ${line}`);
+  for (const line of unclosed) console.error(`Text after a closing code fence leaves the block open; move it to the next line: ${line}`);
   for (const { line } of fresh) console.error(line);
   for (const { name, key, count: left } of gone)
     console.error(`${name}: fixed ${left} time(s), still on the known list: ${key}`);
@@ -44,7 +48,7 @@ function main() {
     `${count} examples of ${packages.length} packages: ${fresh.length} new errors, ` +
       `${errors.length - fresh.length} known (docs/known-bugs.md)`,
   );
-  if (fresh.length || gone.length || declared.length) process.exitCode = 1;
+  if (fresh.length || gone.length || declared.length || unclosed.length) process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

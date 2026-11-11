@@ -1001,7 +1001,9 @@ const usdz = exportUSDZ({
   ],
 });
 // usdz holds scene.usda and textures/albedo.png.
-``` Quick Look on a Mac draws the textured kit as intended, apart from `normalScale`, which it ignores; no iPhone or iPad has opened it yet. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+```
+
+Quick Look on a Mac draws the textured kit as intended, apart from `normalScale`, which it ignores; no iPhone or iPad has opened it yet. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
 ### Animated USDZ (`@margoengine/exporters/usdz-anim`)
 
