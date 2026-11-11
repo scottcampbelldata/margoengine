@@ -22,11 +22,11 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/compute` | sum of 1,048,576 values, then read the scalar | 0.900 ms | TensorFlow.js 4.22.0 WebGPU, 3.000 ms | win |
 | `@margoengine/sciviz` | volume-64, 256 x 256, frame plus the pixel read | 1.500 ms | VTK.js 38.0.5, 1.300 ms | loss |
 | `@margoengine/splats` | truck 7k prefix, 699,050 degree-3 splats, one still frame | 10.765 ms | GaussianSplats3D 0.4.7, 4.500 ms | loss |
-| `@margoengine/splats` | same frame against the published photo `000001` | PSNR 12.226 dB, MAE 52.272 | GaussianSplats3D 0.4.7, PSNR 9.994 dB, MAE 60.646 | picture error |
+| `@margoengine/splats` | truck 7k, full 1,692,538-splat cloud against the published photo `000001` (camera-to-world, entry 115) | PSNR 20.882 dB, MAE 13.037 | GaussianSplats3D 0.4.7 at the old world-to-camera pose, PSNR 9.994 dB (rerun at the right pose owed, speed phase) | picture |
 | `@margoengine/tiles` | quadtree, 5,461 tiles, screen-space error 16, selected set | 1,120 tiles, checksum 121586381 | 3DTilesRendererJS 0.4.21, same 1,120 tiles, same checksum | equal |
 | `@margoengine/tiles` | same view, one settled `update` | 0.300 ms | 3DTilesRendererJS 0.4.21, 2.300 ms | win |
 | `@margoengine/points` | 10,000,000 points, one settled frame | 9.000 ms | potree-core 2.0.17, 5.400 ms | loss |
-| `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels | MAE 0.069543, relative 0.211475 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error |
+| `@margoengine/lightmap` | Cornell box, irradiance per texel, 881 texels, one indirect bounce both sides | MAE 0.024863, relative 0.087125 | Cycles, Blender 5.3.0 Beta, 128 samples | picture error (ray noise; 8 seeds: 0.012063) |
 | `@margoengine/oit` | five panes, 1280 x 720, frame plus completion | 2.000 ms | Babylon.js 8.33.0 dual depth peeling, 7.100 ms | win, busy machine |
 | `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss |
 | `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | accepted difference (different model; Margo tuning share MAE 0.012108) |
@@ -96,7 +96,8 @@ the most whose SH buffer fits the WebGPU minimum storage binding of 134,217,728 
 dataset's `000001` JPEG, 979 x 546, and the render is that size. `cameras.json` names 1957 x 1091; the vertical
 field of view uses that height and `fy` (50.513 degrees), and the principal point is taken as the image centre.
 COLMAP's frame (x right, y down, z forward) was tried as world-to-camera and as camera-to-world. World-to-camera
-is closer (PSNR 12.226 dB, MAE 52.272) than camera-to-world (10.672 dB, MAE 59.713). The rival is shown that same
+was closer (PSNR 12.226 dB, MAE 52.272) than camera-to-world (10.672 dB, MAE 59.713) only because of a projection
+bug (KB2604f, fixed 2026-11-11, entry 115): after the fix camera-to-world is the match, 20.882 dB on the full cloud. The rival is shown that same
 world-to-camera pose (PSNR 9.994 dB, MAE 60.646). Neither is a match to the photograph. The clock is one update
 and one render plus GPU completion, not the pixel read. Two warmups, then 7 paired rounds, still camera,
 per-round minimum. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470). The
@@ -133,14 +134,17 @@ The lightmap row is the published Cornell box, scaled by 0.01, with every face s
 (`p2 = p1 + p3 - p0`). The short block top moves from (240, 165, 272) to (242, 165, 274). The floor, the back wall,
 the left wall and the tall block top are snapped too. The published floor and ceiling holes are omitted, and the
 rectangle light sits one published unit below the ceiling. Radiometry is physical irradiance. Reflectance is the
-published table averaged in three bands against the published emission, not a CIE match. Margo takes one radiosity
-bounce (`bounces` 1, 16 rays) and 16 samples on the area light. Cycles bakes diffuse direct plus indirect with the
-surface color left out, 128 samples, and `diffuse_bounces` 2 (a setting of 1 left the ceiling black). A direct-only
+published table averaged in three bands against the published emission, not a CIE match. Margo takes one path
+bounce (`bounces` 1, `bounceMode` 'path', 32 paths) and 16 samples on the area light. Cycles bakes diffuse direct
+plus indirect with the surface color left out, 128 samples, and `diffuse_bounces` 1: Cycles counts indirect bounces
+as Margo does. Until 2026-11-11 the bake used 2, from a time faces were baked alone and the ceiling came out black at
+1; with every face present it is lit at 1, and the two-bounce reference made Margo look 0.069543 off (KB2604h). A direct-only
 calibration (unit square light, height 2, 0.25 m receiver) fixes the scale using independent
 128 by 128 midpoint quadrature: multiply the Cycles pixels by 9.873209. All 15 faces remain present as
-occluders and bounce surfaces during every bake; the lifecycle regression detects an isolated-face bake. Mean irradiance is 0.305736 (Margo) and 0.328848 (Cycles). Mean absolute error
-is 0.069543, which is 0.211475 of the Cycles mean. The largest texel miss is 0.900128. The 8-bit step is 0.016984.
-The picture error stays open. The snaps and the direct integral are `packages/lightmap/tests/cornell-box.test.js`.
+occluders and bounce surfaces during every bake; the lifecycle regression detects an isolated-face bake and a
+bounce count that differs from Margo's. Mean irradiance is 0.288177 (Margo) and 0.285376 (Cycles). Mean absolute
+error is 0.024863, which is 0.087125 of the Cycles mean. The largest texel miss is 0.284111. The 8-bit step is
+0.016813. The rest is Margo's ray noise: averaging 8 seeds gives 0.012063. The snaps and the direct integral are `packages/lightmap/tests/cornell-box.test.js`.
 Rerun: `node packages/lightmap/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/lightmap`.
 
 

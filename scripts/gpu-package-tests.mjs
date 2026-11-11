@@ -169,6 +169,8 @@ const TOOLS = {
     'paired timing against TensorFlow.js WebGPU, installed outside the repository; run directly under the GPU lock',
   'packages/sciviz/scripts/rival-bench.mjs':
     'paired volume timing against VTK.js, installed outside the repository; run directly under the GPU lock',
+  'packages/splats/scripts/truck-photo.mjs':
+    'external Truck photograph comparison (data outside the repository), run directly under the GPU lock',
   'packages/splats/scripts/rival-bench.mjs':
     'paired timing against GaussianSplats3D, installed outside the repository; run directly under the GPU lock',
   'packages/loaders/scripts/real-files-render.mjs':

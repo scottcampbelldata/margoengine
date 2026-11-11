@@ -888,6 +888,28 @@ window.check.antialias = async () => {
   const on = await opacities();
   return { off, on, flag: cloud.antialias };
 };
+// A splat beside the camera, far outside the view (x / depth 30): the EWA Jacobian is linearised at a point clamped to
+// 1.3 times the half-view tangent (the 3DGS asset convention), so it stays off screen; unclamped it covered the frame.
+window.check.beside = async () => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:128px;height:128px;display:block';
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    preserveDrawingBuffer: true,
+    camera: { position: [0, 0, 3], target: [0, 0, 0], near: 0.05, far: 100 },
+  });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  engine.scene.background = '#000000';
+  Splats.attach(engine, {
+    positions: new Float32Array([3, 0, 2.9]),
+    covariances: new Float32Array([0.01, 0, 0, 0.01, 0, 0.01]),
+    colors: new Float32Array([1, 0, 0, 0.95]),
+  });
+  await waitForPipelines(draw);
+  return canvas.toDataURL('image/png');
+};
 window.check.progressive = async () => {
   engine?.dispose();
   canvas?.remove();

@@ -2722,11 +2722,16 @@ Measured but not fixed. Their history, sources and rerun commands are in
   The rival's shared-memory GPU sort drew no calls, so the number is its CPU sort. Repro:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
   Cause not yet found. Publishing the number does not close it.
-- **Truck 7k prefix does not match the published photograph** (`@margoengine/splats`, perf history entry 103):
-  world-to-camera PSNR 12.226 dB (MAE 52.272), camera-to-world 10.672 dB (MAE 59.713), against `000001`. The rival
-  at the same world-to-camera pose is 9.994 dB (MAE 60.646). The principal point is the image centre. The model is
-  the 7,000-iteration prefix, not the paper's 30,000-iteration cloud, and it is not the paper's dataset-average
-  PSNR. Cause not yet found. Publishing the number does not close it.
+- **Fixed (KB2604f, 2026-11-11): Truck 7k did not match the published photograph** (`@margoengine/splats`, perf
+  history entries 103 and 115): it scored 12.226 dB. Cause: the projection linearised the EWA Jacobian at each
+  splat's true view direction; a splat beside the camera (x / depth far past the view) got an ellipse thousands of
+  pixels long that covered the frame, so the camera-to-world pose (the right one) drew a grey blur and lost to the
+  wrong world-to-camera pose. The prefix was not the cause (full cloud 12.262 dB before the fix). Fix: the
+  linearisation point is clamped to 1.3 times the half-view tangent, the convention the captures were trained with
+  (shader.ts `projectSplat`, shared by picking). Full 1,692,538-splat cloud, camera-to-world: PSNR 20.882 dB
+  (MAE 13.037); the 699,050 prefix 12.814 dB. Regression: `packages/splats/test/gpu/check.mjs` case "beside" (a
+  splat at x / depth 30 lit 16,384 of 16,384 pixels, now 0). Measure: `node scripts/gpu-lock.mjs run
+  --owner=<you> --gpu=splats-truck-photo -- node packages/splats/scripts/truck-photo.mjs`. Sources: Kerbl, Kopanas, Leimkuehler and Drettakis 2023, "3D Gaussian Splatting for Real-Time Radiance Field Rendering", ACM TOG 42(4), https://doi.org/10.1145/3592433; Zwicker, Pfister, van Baar and Gross 2001, "EWA Volume Splatting", IEEE Visualization, https://doi.org/10.1109/VISUAL.2001.964490; Ye and Kanazawa 2023, "Mathematical Supplement for the gsplat Library", https://arxiv.org/abs/2312.02121.
 - **10 million points are slower than potree-core 2.0.17** (`@margoengine/points`, perf history entry 105):
   9.000 ms against 5.400 ms, one settled frame of a single 10,000,000 point leaf, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600).
@@ -2734,22 +2739,14 @@ Measured but not fixed. Their history, sources and rerun commands are in
   `readPixels`, because `fenceSync` returned `WAIT_FAILED`. Repro:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
   Cause not yet found. Publishing the number does not close it.
-- **Cornell box irradiance does not match a Cycles bake** (`@margoengine/lightmap`, perf history entry 108):
-  mean absolute error 0.069543 per channel over 881 texels, 0.211475 of the Cycles mean (0.328848). Margo's mean
-  is 0.305736. The largest miss is 0.900128. The 8-bit step is 0.016984. Blender 5.3.0 Beta, Cycles, 128 samples,
-  `diffuse_bounces` 2. Margo uses physical irradiance, one per-quad radiosity bounce and 16 area samples. The
-  short block top is snapped from (240, 165, 272) to (242, 165, 274). Repro:
-  `node packages/lightmap/scripts/rival-bench.mjs` after the lightmap build. Cycles runs outside the repository.
-  Cause: Margo gathers only 16 cosine rays from each texel using a single mean outgoing radiance per quad,
-  whereas Cycles integrates spatially varying transport. Area sampling and 8-bit irradiance quantization also
-  contribute; their individual shares of the error are not isolated. Publishing the number does not close it.
-  Batch 187 fixes a separate cause: area shadow rays and diffuse gathers culled opaque back faces, allowing light
-  through the tops of the blocks onto floor texels inside them. Both sides now block visibility; only front hits
-  supply outgoing radiance. With the unchanged frozen 881-texel reference, physical path mode, seed 1, 16 area
-  samples, one bounce and 32 bounce rays, MAE is 0.048730 (relative 0.148184), maximum 0.353979. This is still an
-  open accuracy difference, not parity: finite ray counts, cached texel-centre direct illumination, RGBA8 output
-  and the reference's diffuse-event convention remain to be isolated in the fix phase. No reference was replaced.
-
+- **Fixed (KB2604h, 2026-11-11): Cornell box irradiance did not match a Cycles bake** (`@margoengine/lightmap`,
+  perf history entries 108 and 116): MAE 0.069543 (0.048730 after batch 187). Cause: the Cycles reference baked
+  `diffuse_bounces` 2 against Margo's 1 indirect bounce (a +1 left from when faces were baked alone and the ceiling
+  came out black at 1). With every face present Cycles at 1 lights the ceiling and matches Margo at 1. Fix:
+  `packages/lightmap/scripts/cornell-cycles.py` bakes Margo's count, the bench refuses a reference with another
+  count and uses path bounces (32 paths). Result: MAE 0.024863 (relative 0.087125); 8 seeds 0.012063, under the
+  8-bit step 0.016813, so the rest is ray noise. Regression: `packages/lightmap/tests/cornell-cycles-lifecycle.py`
+  (run by `cornell-box.test.js`), which failed on the old script (`diffuse_bounces` 2).
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node
   scripts/physics2d-kernel-browsers.mjs` (the Box2D build is in reproduce.md). Cause, measured: the broad phase was

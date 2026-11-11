@@ -14,7 +14,9 @@ export const TEXELS_PER_UNIT = 2;
 export const PADDING = 1;
 export const AREA_SAMPLES = 16;
 export const BOUNCES = 1;
-export const BOUNCE_RAYS = 16;
+export const BOUNCE_RAYS = 32;
+/** Path bounces read the exact texel each ray reaches, as Cycles does; 'quad' reads a quad's mean light. */
+export const BOUNCE_MODE = 'path';
 export const SEED = 1;
 /** Published units the area light is lowered, so it sits under the ceiling quad. */
 export const LIGHT_DROP = 1;

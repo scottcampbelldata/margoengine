@@ -144,8 +144,8 @@ def main():
     receivers = [(quad, *add_quad(quad['name'], quad['corners'], quad['albedo'])) for quad in spec['quads']]
     quads = []
     for quad, obj, node in receivers:
-        # Margo's bounce count is the extra radiosity pass. Cycles needs one more diffuse
-        # event than that or a face the light does not see stays black (measured on the ceiling).
+        # Cycles' diffuse_bounces counts indirect bounces as Margo's `bounces` does: at 1 the ceiling,
+        # which the light does not see, is lit, and the bake matches Margo at 1 bounce (KB2604h).
         pixels, _total = bake_quad(
             scene,
             obj,
@@ -153,14 +153,14 @@ def main():
             quad['chart']['width'],
             quad['chart']['height'],
             spec['samples'],
-            spec['bounces'] + 1,
+            spec['bounces'],
         )
         quads.append({'name': quad['name'], 'width': quad['chart']['width'], 'height': quad['chart']['height'], 'pixels': pixels})
     result = {
         'blender': bpy.app.version_string,
         'samples': spec['samples'],
         'bounces': spec['bounces'],
-        'diffuse_bounces': spec['bounces'] + 1,
+        'diffuse_bounces': spec['bounces'],
         'calibration_light': stored,
         'cornell_light': cornell_light,
         'calibration': calibration,

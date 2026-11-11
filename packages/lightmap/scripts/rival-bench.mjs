@@ -18,6 +18,7 @@ import {
   AREA_SAMPLES,
   calibrationIrradiance,
   BOUNCES,
+  BOUNCE_MODE,
   BOUNCE_RAYS,
   cornellScene,
   CYCLES_SAMPLES,
@@ -42,6 +43,7 @@ const bakeOptions = (light, bounces) => ({
   areaSamples: AREA_SAMPLES,
   bounces,
   bounceRays: BOUNCE_RAYS,
+  bounceMode: BOUNCE_MODE,
   areaLights: [light],
 });
 
@@ -138,6 +140,9 @@ const cornell = await bakeGlobalLightmap(
 );
 await cyclesDone;
 const cycles = JSON.parse(await readFile(cyclesPath, 'utf8'));
+// The reference must count indirect bounces as Margo does (KB2604h: a two-bounce reference against one bounce).
+if (cycles.diffuse_bounces !== BOUNCES)
+  throw new Error(`cycles.json has ${cycles.diffuse_bounces} diffuse bounces, Margo bakes ${BOUNCES}; rerun the Cycles bake`);
 // Independent solid-angle quadrature, never a fit to the Margo bake under test.
 const margoCal = calibrationIrradiance(scene.calibration);
 const cyclesCal = mean(cycles.calibration);

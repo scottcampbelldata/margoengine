@@ -429,6 +429,15 @@ try {
     assert.ok(Math.abs(s[2] / s[0] - 100) < 0.1, `and grows with the world variance: ${s}`);
     assert.ok(ratio[2] > 0.95, `a large splat keeps its opacity: ${ratio[2]}`);
   }
+  // A splat beside the camera (x / depth 30, far outside the view) draws nothing (KB2604f: without the clamped
+  // linearisation point its ellipse covered the frame and the Truck capture rendered as a grey blur).
+  {
+    const img = await decodePNG(Buffer.from((await page.evaluate(() => window.check.beside())).split(',')[1], 'base64'));
+    let lit = 0;
+    for (let i = 0; i < img.data.length; i += 4) if (img.data[i] > 2) lit++;
+    report.beside = { lit };
+    assert.equal(lit, 0, `a splat beside the camera stays off screen: ${lit} pixels lit`);
+  }
   // ./animate: a two-frame sequence at 30% of the way mixes centres, covariances and colours; a skin with joint 0
   // moving 1 along x and joint 1 turning 90 degrees about z poses each splat by its blended matrix, A S A^T.
   {

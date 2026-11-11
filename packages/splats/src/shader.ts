@@ -13,6 +13,9 @@ struct Ellipse {center:vec4f,axes:vec4f}`;
 // undilated one and a sub-pixel splat fades instead of growing: the 2D Mip filter of Yu et al. 2024, "Mip-Splatting:
 // Alias-free 3D Gaussian Splatting" (CVPR), eq. 10 (eq. 9 is its 3D smoothing filter), with the 0.3 px^2 low-pass the
 // files were trained with. Neither paper states 0.3: Yu et al. eq. 5 writes the dilation with a scalar s.
+// The Jacobian is linearised at the view direction clamped to 1.3 times the half-view tangent per axis, as captures
+// are trained (Kerbl et al. 2023; Ye and Kanazawa 2023, arXiv 2312.02121): unclamped, a splat beside the camera got an
+// ellipse across the whole frame (KB2604f).
 /** The two inputs the projection reads (bindings 1 and 2), read only, so a vertex shader can project as well. */
 export const projectInputs = `
 @group(0) @binding(1) var<storage,read> positions:array<vec4f>;
@@ -29,7 +32,7 @@ fn projectSplat(index:u32)->Projected {
   if(depth>=f.settings.x&&depth<=f.settings.y&&world.w>0){
     let a=covariances[index*2];let b=covariances[index*2+1];let covariance=mat3x3f(vec3f(a.x,a.y,a.z),vec3f(a.y,a.w,b.x),vec3f(a.z,b.x,b.y));
     let rotation=mat3x3f(f.view[0].xyz,f.view[1].xyz,f.view[2].xyz);let c=rotation*covariance*transpose(rotation);
-    var jx=vec3f(f.viewport.z/depth,0,f.viewport.z*p.x/(depth*depth));var jy=vec3f(0,f.viewport.w/depth,f.viewport.w*p.y/(depth*depth));
+    let lim=0.65*f.viewport.xy/f.viewport.zw;let t=clamp(p.xy/depth,-lim,lim);var jx=vec3f(f.viewport.z/depth,0,f.viewport.z*t.x/depth);var jy=vec3f(0,f.viewport.w/depth,f.viewport.w*t.y/depth);
     if(f.settings.w>0.5){jx=vec3f(f.viewport.z,0,0);jy=vec3f(0,f.viewport.w,0);}
     let xx=dot(jx,c*jx)+0.3;let xy=dot(jx,c*jy);let yy=dot(jy,c*jy)+0.3;var opacity=world.w;
     if(f.counts.z==1u){opacity*=sqrt(max((xx-0.3)*(yy-0.3)-xy*xy,0.0)/max(xx*yy-xy*xy,1e-12));}

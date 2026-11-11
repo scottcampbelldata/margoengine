@@ -1952,7 +1952,7 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 
 | Claim | Evidence | Scope |
 | --- | --- | --- |
-| Cornell irradiance has measured error against Cycles | [Entry 108](perf-history.md), `packages/lightmap/scripts/rival-bench.mjs`, complete-scene lifecycle and direct-integral tests | MAE 0.069543, relative 0.211475 over 881 texels; no accuracy parity or convergence claim |
+| Cornell irradiance has measured error against Cycles | [Entry 108](perf-history.md), `packages/lightmap/scripts/rival-bench.mjs`, complete-scene lifecycle and direct-integral tests | MAE 0.024863, relative 0.087125 over 881 texels at one indirect bounce on both sides (KB2604h: the reference had used two); no accuracy parity or convergence claim |
 
 
 ## Batch 168 OIT reference

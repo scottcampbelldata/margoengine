@@ -2812,7 +2812,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   unit square light at height 2 above a 0.25 m receiver. Independent 128 by 128 midpoint quadrature fixes the scale, without reading Margo output. All 15 faces remain in Cycles throughout every bake. No frame-time row.
 - **Result:** picture error. Mean absolute error 0.069543, relative 0.211475, max 0.900128. Means 0.305736
   (Margo) and 0.328848 (Cycles). The 8-bit step is 0.016984. The short block top is snapped to (242, 165, 274).
-  Tracked in known-bugs.md. Publishing the number does not close it.
+  Tracked in known-bugs.md. Superseded by entry 116: the reference used two indirect bounces against Margo's one.
 - **Rerun:** `node packages/lightmap/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/lightmap`.
   Citation in clean-room.md. The snaps are `packages/lightmap/tests/cornell-box.test.js`.
   [Raw result](results/batch-168-lightmap.json).
@@ -2950,6 +2950,32 @@ The Box2D browser goal remains unmet. Quiet release reruns remain required; no a
   layer's canvas present, and is fixed in webgl2-compat (known-bugs.md, "ANGLE D3D11 flipped blit").
 - **Timing:** pending the quiet rerun (re-measure item 34).
 
+### 115. truck 7k against the published photograph after the projection fix (KB2604f, 2026-11-11, picture)
+
+- **Measurement:** `packages/splats/scripts/truck-photo.mjs` (correctness only, no clock): the published truck at
+  iteration 7,000, all 1,692,538 degree-3 splats natively (core asks the adapter's binding limits since d9be88943f),
+  the `000001` photograph's 979 x 546, black background, antialiasing off, both readings of `cameras.json`. RTX A6000.
+- **Result:** camera-to-world PSNR 20.882 dB (MAE 13.037); world-to-camera 10.360 dB. The 699,050 prefix of entry 103
+  scores 12.814 dB camera-to-world. Before the fix the full cloud scored 12.262 dB, so the prefix was not the cause:
+  the projection linearised the EWA Jacobian at each splat's true direction, and splats beside the camera drew
+  ellipses across the frame. The Jacobian's point is now clamped to 1.3 times the half-view tangent (the training
+  convention; Kerbl et al. 2023, Zwicker et al. 2001, Ye and Kanazawa 2023). Not the paper's dataset-average PSNR;
+  the rival row of entry 103 used the wrong pose and is rerun in the speed phase.
+- **Rerun:** `node scripts/gpu-lock.mjs run --owner=<you> --gpu=splats-truck-photo -- node packages/splats/scripts/truck-photo.mjs`.
+
+### 116. Cornell box irradiance against Cycles at matched bounces (KB2604h, 2026-11-11, picture error)
+
+- **Cause of entry 108's error:** the Cycles bake used `diffuse_bounces` 2 against Margo's 1 indirect bounce. The +1
+  dates from a time each face was baked alone and the ceiling came out black at 1; with every face present a Cycles
+  bake at 1 lights the ceiling (red mean 0.030) and matches Margo at 1 bounce. Margo at 2 path bounces against the
+  old reference: MAE 0.017055, means 0.3322 and 0.3288, the same picture.
+- **Measurement:** as entry 108, both sides one indirect bounce; Margo path mode (`bounceMode` 'path', 32 paths, 16
+  area samples, seed 1). Cycles 128 samples.
+- **Result:** MAE 0.024863 (relative 0.087125), max 0.284111; means 0.288177 and 0.285376; ceiling MAE 0.047937
+  (indirect light only). The mean of 8 seeds gives MAE 0.012063, under the 8-bit step 0.016813, so the rest is
+  Margo's per-bake ray noise (`bounceRays` stops at 32). [Raw result](results/batch-168-lightmap.json).
+- **Rerun:** `node packages/lightmap/scripts/rival-bench.mjs` (it refuses a reference whose bounce count differs).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2959,16 +2985,17 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
 
 - **Truck 7k prefix against GaussianSplats3D 0.4.7 (entry 103).** 10.765 ms against 4.500 ms for one still frame of
-  699,050 degree-3 splats. The rounds do not overlap. PSNR against the published photo is 12.226 dB (MAE 52.272).
+  699,050 degree-3 splats. The rounds do not overlap. The picture loss (12.226 dB) was a projection bug, fixed in
+  entry 115 (20.882 dB on the full cloud); the timed rerun uses the full cloud at the camera-to-world pose.
   Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
 
 - **10 million points against potree-core 2.0.17 (entry 105).** 9.000 ms against 5.400 ms for one settled frame.
   Both draw every point. The rounds do not overlap. Rerun:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
 
-- **Cornell box irradiance against Cycles (entry 108).** Mean absolute error 0.069543 per channel (relative
-  0.211475) over 881 texels. Blender 5.3.0 Beta, 128 samples. Not a frame time. Rerun:
-  `node packages/lightmap/scripts/rival-bench.mjs`.
+- **Cornell box irradiance against Cycles (entries 108 and 116).** Mean absolute error 0.024863 per channel
+  (relative 0.087125) over 881 texels at one indirect bounce on both sides; 0.012063 over 8 seeds. Blender 5.3.0
+  Beta, 128 samples. Not a frame time. Rerun: `node packages/lightmap/scripts/rival-bench.mjs`.
 
 - **Own 2D physics, the 100-row pyramid: 2.9 to 3.2 ms a step in Wasm against Box2D v3's Wasm 1.4 ms (entries
   83, 85 to 91; entry 91 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine,

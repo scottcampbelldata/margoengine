@@ -146,7 +146,7 @@ The commands preserve the existing workload and its correctness assertions.
 | `packages/scene/scripts/bulk-bench.mjs` | printed timing/throughput; no numeric speed budget |
 | `packages/sciviz/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget |
 | `packages/sky/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget |
-| `packages/splats/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget |
+| `packages/splats/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget; at the quiet rerun load the full 1,692,538-splat cloud (the 699,050 prefix was a 128 MiB binding workaround) and the camera-to-world pose (KB2604f) |
 | `packages/staging/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget |
 | `packages/tiles/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget |
 | `packages/tween/scripts/rival-bench.mjs` | printed timing/throughput; no numeric speed budget |
