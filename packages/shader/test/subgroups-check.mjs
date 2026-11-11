@@ -1,8 +1,14 @@
 // Real-adapter check (run from the repository root after building packages): node packages/shader/test/subgroups-check.mjs
 // Each operation is compared with what its lanes should see, worked out here from the lanes the hardware reported. The same graph
 // then runs on a device without the features, as one-lane subgroups and f32.
+// Under MARGO_COMPAT=1 the page runs on the WebGL2 layer, whose adapter offers neither 'subgroups' nor 'shader-f16'
+// (webgl2-compat src/device/device.ts featuresOf; docs/limits.md "Subgroups and half floats": the fallback is a
+// subgroup of one lane and f32). Asking for both then gives the fallback, which is asserted lane for lane like the
+// featureless run; only the hardware assertions (more than one lane, f16 rounding) are skipped, with a printed note.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
+const compat = compatRun();
 const context = await openBrowser({ startPath: '/packages/shader/test/subgroups-check.html', port: 5235 }),
   { page, hardware } = context,
   pageErrors = [];
@@ -82,10 +88,18 @@ try {
   const inputs = await page.evaluate(() => window.check.inputs),
     run = (features) => page.evaluate((f) => window.check.run(f), features);
   const fast = await run(['subgroups', 'shader-f16']);
-  assert.ok(fast.supported && fast.half, 'this check is meant for an adapter with subgroups and shader-f16');
-  const a = verify(fast, inputs);
-  assert.ok(a.lanes > 1, 'the hardware gave subgroups of more than one lane');
-  console.log('ok hardware: subgroups of', a.lanes, 'lanes, f16 off by', a.worst.toExponential(2));
+  if (compat) {
+    assert.ok(!fast.supported && !fast.half, 'the WebGL2 layer offers neither subgroups nor shader-f16');
+    const a = verify(fast, inputs);
+    assert.equal(a.lanes, 1, 'asking the layer for subgroups gives one-lane subgroups');
+    console.log('compat: no subgroups or shader-f16 on the WebGL2 layer, "more than one lane" and "f16 rounds" skipped');
+    console.log('ok requested on compat: one lane, f32 off by', a.worst.toExponential(2));
+  } else {
+    assert.ok(fast.supported && fast.half, 'this check is meant for an adapter with subgroups and shader-f16');
+    const a = verify(fast, inputs);
+    assert.ok(a.lanes > 1, 'the hardware gave subgroups of more than one lane');
+    console.log('ok hardware: subgroups of', a.lanes, 'lanes, f16 off by', a.worst.toExponential(2));
+  }
   const plain = await run([]);
   assert.ok(!plain.supported && !plain.half);
   const b = verify(plain, inputs);
