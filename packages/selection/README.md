@@ -36,6 +36,8 @@ The center wins. For an empty center, orthogonal neighbors win before diagonals,
 
 `Picking.attach(engine, {capture: false})` leaves the frame untouched (no second color target, no per-frame mesh snapshot) and renders the culled 3x3 pass for every pick; use it when picks are rare and frame rate matters more. Custom scene pipelines fall back to the micro pass; sections also use that pass so mutable core clipping uniforms stay current. Other mutable custom shader effects should render their changed state before picking. The cached ID texture costs four bytes per viewport pixel; the package remains optional and tree-shakable.
 
+The cached ID texture is written by the colour pass itself, so its coverage matches the drawn pixels exactly. The separate 3x3 pass rasterises again with its own shader; 100 km from the origin its edges can differ from the colour by a pixel unless a `FloatingOrigin` (`@margoengine/cameras/origin`) keeps the scene near local zero ([limits](../../docs/limits.md), `npm run test:browser:far-origin`).
+
 ## Many points at once
 
 A plain loop of `engine.pick`, awaited or under `Promise.all`, costs one readback a point and this package cannot merge them: core's queue answers overlapping picks one at a time and calls `onPick` for the next only when the last has finished, so a plugin never sees two at once. Merging them would be a core change.

@@ -1,5 +1,19 @@
 # Known bugs and unverified features
 
+### Terrain clipmaps and the virtual texture do not follow a FloatingOrigin (Rust finding U6, 2026-11-10, open)
+
+- **Repro:** attach `FloatingOrigin` (`@margoengine/cameras/origin`) to an engine with a `Terrain` whose `origin` is
+  1e5 m out, and `origin.lookAt` a point above it: after the rebase the camera is near local zero while the terrain
+  stays at its engine coordinates, so the rings are planned around the local eye and sample the heightfield 1e5 m
+  away (nothing of the terrain is drawn where it should be).
+- **Cause:** `packages/terrain/src/index.ts` `prepare` snaps each ring to `camera.position` and passes `options.origin`
+  unchanged; `rvt.ts` `#run` plans the cache windows from `camera.position` and addresses the toroidal cache by the
+  fragment's local XZ. Only `planet.ts` takes a floating origin.
+- **Fix to build:** a terrain option naming the FloatingOrigin; plan rings and cache windows from the float64 world eye,
+  pass the ring centres and the terrain origin as world less origin, and offset the cache address by the origin modulo
+  the coarsest level's period, so tiles and levels at 1e5 equal those at the origin. Decals, overlays, holes and CPU
+  queries need the same offset. A GPU test at a 1e5 offset compares tiles, levels and pixels with the origin case.
+
 Batch 170 React harness (2026-11-10): when an external engine module fails to evaluate (seen with an R3F build whose React bundle read `process.env`), `bench/scenes/page.js` top-level `await import(...)` rejects without setting `window.result`, so `bench/lib/browser.mjs` waits its full 600 s before the case errors. Repro: an engines.json entry whose module throws on import, then `scripts/parity-smoke-browser.mjs --standard=react --engines=margo,<that engine>`. Cause: the engine import is outside the harness's error reporting. Fix in the fix phase: report the import error as the case result, with a test that loads a throwing module.
 
 Lane B controls README (2026-11-10): strict TypeScript rejects a Spline passed directly as PathControls ControlPath because packages/splines/src/index.ts annotates at/tangent/atDistance as typeof output; declaration emission makes the defaulted output parameter optional, so the public return type includes undefined although every call returns an array. Repro: new PathControls(engine, new Spline([[0,0,0],[1,1,1]])) with strict checking of built declarations. The README uses explicit caller-owned output buffers through a ControlPath adapter; repair the owning splines return declarations with a consumer type regression in the fix phase.

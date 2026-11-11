@@ -69,6 +69,7 @@
     "prepack": "npm run build",
     "test:browser:xray-pulse": "node test/pulse.browser.mjs",
     "test:browser:area": "node test/area.browser.mjs",
+    "test:browser:far-origin": "node test/far-origin.browser.mjs",
     "test:browser:highlight": "node test/highlight.browser.mjs"
   },
   "peerDependenciesMeta": {
