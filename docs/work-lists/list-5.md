@@ -10,7 +10,7 @@ stream runs, stop, write the stream's handoff, and tell Scott with the event tim
 
 | Stream | Work | Batch | Package | Jobs | Status |
 | --- | --- | --- | --- | --- | --- |
-| N | AMD GPU bug hunt | R6 | every package with GPU tests, both backends | 4 | done (Beelink, stream N; rows and open items in amd-gpu-hunt.md) |
+| N | AMD GPU bug hunt | R6 | every package with GPU tests, both backends | 4 | in progress (Beelink, stream N; open rows in amd-gpu-hunt.md, dedicated hunts 26, 28, 29, 31, 33, 34) |
 | O | packages work together, part 1 | I1 | integration jobs J1 and J5 | 2 | in progress (Beelink stream O) |
 
 Run both streams at once; only one GPU job at a time on this machine (stream N holds the GPU most; stream O's J5 is

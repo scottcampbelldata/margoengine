@@ -476,8 +476,8 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `lensSettings` packs) at the unchanged 1e-4 bound. On the RTX A6000: 1.8e-6 native, 8.6e-6 on the WebGL2
   compatibility layer. The f64 `lensField` stays the truth for that reference: `tests/lens-f32.test.js` holds it within
   1e-4 of the f64 field on the same 2,400 cases (5.2e-5 measured) and fails it with the raw time * speed product (over
-  100 times worse), so a broken packing still fails. The short-time `math` case still compares with f64 at 1e-4. The
-  Radeon 680M rerun is still owed.
+  100 times worse), so a broken packing still fails. The short-time `math` case still compares with f64 at 1e-4. On
+  the Radeon 680M (Beelink, `b187ac2d4`, 2026-11-11): long-time 4.05e-5 on WebGPU and on the WebGL2 layer, math 5.9e-5.
 
 ### Fixed 2026-11-11: the instanced frame allocated 4,048 B, over its 292 B floor (list 5 R6 row 15, Radeon 680M, then RTX A6000)
 
@@ -505,6 +505,26 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   in the instanced scene; it was in the profile before the KB0378 fix too, hidden by the 15-row listing. The floors are
   never raised: the fix is to find the boxed value (a fractional number passed to a call V8 does not inline is the
   usual one) and remove it.
+- **Also on the Radeon 680M** (Beelink, Chromium through Playwright, `b187ac2d4`, 2026-11-11): instanced 304 B, shadowed
+  880 B, basic 328 B, post 1,476 B, dynamic 376 B, the same figures, so it is not one GPU's (list 5 R6 row 15).
+
+### Open: sciviz tiled export differs from the whole image by one level on the Radeon 680M (list 5 R6 row 18)
+
+- **What:** `npm run test:browser:export-media -w packages/sciviz` (`tests/export-media-browser.mjs`) on the Beelink
+  (Radeon 680M, WebGPU on D3D12), 2026-11-10 and again on `b187ac2d4`: "Tile seams differ: max 1, changed 0". The
+  RTX A6000 gives 0 on both backends.
+- **Repro:** the NOAA wind figure (`examples/sciviz-wind.html`, two line layers), `exportImage` at 320 x 240 with
+  `overlays: false`, tiled against `tileSize: 512` (diag `.lane/r6s6/media-diag.mjs` in the lane N worktree): 1,982 of
+  307,200 channel values differ, every one by exactly 1, spread over the line interiors (rows 7 to 230, not at tile
+  edges). 64 px and 128 px tiles differ at exactly the same values; 160 px tiles match the whole image exactly; two
+  whole-image exports match each other.
+- **Cause (not proven):** each tile draws with the whole-image projection cropped by `cropProjection`
+  (`packages/sciviz/src/media-tiles.ts`); with 64 and 128 px tiles the x scale is 5 or 2.5, with 160 px tiles 2, a
+  power of two that f32 keeps exact. A colour interpolated across a line from rounded clip positions then lands on the
+  other side of a rounding step on this GPU. WebGPU keeps a viewport inside its target, so tiles cannot reuse the
+  whole-image projection through a viewport offset. Not loosened: the check still asks for 0.
+- **Next:** confirm by drawing the 64 px tiles with power-of-two crop scales (tiles of width / 2^k), or interpolate the
+  line colour in a form that does not depend on the clip-space scale.
 
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 

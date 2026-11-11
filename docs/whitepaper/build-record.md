@@ -4956,3 +4956,9 @@ Every row, with what came out, the cause and its state, is in [amd-gpu-hunt.md](
   (row 24, known-bugs); the instanced frame's allocation in core's `uploadRows` (row 15, core); compat-only rows 26,
   28 and 29; rows 16 to 18 belong to the dev PC's commits of the same day.
 - **Machine:** ffmpeg n9.0 installed for the headless check, from the build linked by ffmpeg.org, sha256 checked.
+- **Reruns on `b187ac2d4` (2026-11-11, after the 11/10 19:09 crash):** row 15 fixed by `2bea967e7` (304 B left, the
+  open Edge 157 entry, same figures here); row 24 passes (4.05e-5 on both backends) after `eefc81bbc` and the f32
+  reference; row 32 gets its compat branch, row 18's notebook suite makes its own fixtures, and row 16's gallery page
+  loads gltf-pro with its first model (129,989 B to 56,264 B before the first frame; budget unchanged). Open: row 17
+  (the grass scene saturates, reported), row 18 export-media (known-bugs), row 19 (needs the path tracer, banned here),
+  and the dedicated hunts 26, 28, 29, 31, 33 and 34. The list 5 row stays in progress.

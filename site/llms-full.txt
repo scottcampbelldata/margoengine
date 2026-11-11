@@ -4004,6 +4004,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Springs by duration and bounce (`Spring` in `@margoengine/tween`, 2026-11-06) | By method: `duration` is the period with no damping, so a spring settles later than `duration`, and a `Spring` keeps only the `stiffness` and `damping` worked out from it. | By method: `bounce` runs from above -1 to below 1, as 1 would never settle. | A spring settles later than `duration`, because `duration` is the period with no damping. | Read `spring.settled` to know when it has come to rest, or give `stiffness` and `damping` directly. |
 | Custom ease curves (`@margoengine/tween/custom-ease`, 2026-11-06) | By method: x must run forward from exactly 0 to exactly 1, so a curve that loops back in time is refused. `easeFromStroke` needs a stroke that ends at another y than it began, and drops samples that go back in x. | The ease is a function of x, so x cannot go back in time. | A bezier is solved to about 1e-7 in x, as `cubicBezier` is. | Split a motion that loops back in time into two tweens in a `Timeline`, each with its own ease. |
 | Scroll-linked timelines (`@margoengine/tween/scroll`, 2026-11-06) | By method: follows the main thread's `scroll` event, so it trails a compositor-driven scroll by up to a frame, where a CSS `animation-timeline` does not. `Timeline.call` callbacks do not run, as for any seek. A page that cannot scroll stays at 0. Touch scrolling has not run on a device. | It follows the main thread's `scroll` event. | The timeline trails a compositor-driven scroll by up to a frame. | For CSS properties only, a CSS `animation-timeline` runs on the compositor and does not trail; a value driven through a `Timeline` has no such route. |
+| Selection masks (`PointCloud.setMask`, `Line.setMask`, sciviz `bindSelection`, 2026-11-11) | Enforced: one value a point in stored order, selected when true or above 0 (binary; fractional membership stays with bar and histogram bindings); a line segment is selected when both its points are; one mask style per cloud or line (fade, highlight or filter; fade and highlight amount in [0, 1], highlight colour and amount stored as 8-bit sRGB). By method: the look is computed on the displayed sRGB colour; solid helper fills of lines ignore the mask; picking skips filtered marks only. | One bit a point after a 16-byte header, so a selection change uploads count/8 + 16 bytes once and recompiles nothing; lines without a mask bind a zeroed 16-byte stand-in. | A 2M-point selection uploads 250,016 bytes. | Use per-point colours for graded membership on points or lines. |
 | Motion paths (`@margoengine/tween/motion-path`, 2026-11-06) | No counted threshold; the limits come from the method. | Speed follows the spline's arc-length table and rotation follows a rotation-minimising frame. | By method: speed is as even as the spline's arc-length table, `divisions` chords. Rotation is `SplineFrames`' rotation-minimising frame, which keeps no fixed world up: a long 3D curve can leave the object rolled, so `roll` in `frames` sets it. On a `yoyo` pass the object backs up, facing the path's direction. An easing past 0..1 waits at the end of the path. | Set `roll` in `frames`. |
 | Stagger (`@margoengine/tween/stagger`, 2026-11-06) | `staggerTimeline` takes an offset from a label to nine decimal places, a nanosecond. | By method: a target's offset is fixed when the call is made, so targets added later are not in it. | An easing that returns below 0 counts as 0. `from: 'random'` is the same on every run unless `seed` changes. | Change `seed` to get a different random order. |
 | Fitting (`fitSpline` in `@margoengine/splines/fit`) | Enforced: 2 to 10,000,000 points, a `tolerance` above 0. By method: the error is measured at each point's own curve parameter (an upper bound on the true nearest distance); pieces are cut at the worst point, so a curve can use a piece or two more than the fewest possible. | Cutting at the worst point is the usual way to keep fitting linear in the points. | Output may have more control points than a hand-placed curve. | Raise `tolerance`, or run the result through `KnotPath` and remove knots. |
@@ -9269,6 +9270,8 @@ The point budget must be an integer at least the root count; the default is max(
 The real demo archives only the root and first level of the 167,692,896,718-point Iowa EPT collection: 188,887 original points in nine LAZ files, 2,266,644 attribute bytes resident. Both backends draw 188,887 with budget 220,000 and 34,923 with budget 40,000; selection and recolouring read zero additional tiles. This proves view and work bounds for the archived levels, not full-density Iowa. A metadata-only billion-point CPU test allocates and loads two visible points and 20 attribute bytes. GPU elapsed-time and country-scale streaming performance remain for the deferred speed phase.
 
 Batch 175 job 2 size record: points/octree 9,179 to 9,372 B gzip (ceiling 9,267 to 9,654 B); points/copc 15,177 to 15,309 B, within its existing ceiling. New sciviz/pointcloud is 21,055 B gzip with ceiling 21,685 B. sciviz/link is 4,662 B. Core + stage remains 24,209 B. The optional bytes preserve typed attribute columns, stable source rows and all reader adapters; splitting those APIs would add consumer wiring and fragment a single figure-layer contract. The points renderer is lazy, so the entry introduces no static heavy-package leak.
+
+KB5588c size record (2026-11-11, min+gzip, before -> after): the native selection mask adds its packing class and WGSL to every points and lines entry that carries a PointCloud or Line: lines 20,314 -> 21,714 B, lines/edges 4,821 -> 5,716, lines/pick 5,957 -> 6,328, lines/trail 5,369 -> 6,267, lines/hidden 4,062 -> 4,963, lines/stroke 4,521 -> 5,424, lines/texture 6,699 -> 7,604, lines/debug 9,706 -> 10,582, points 25,180 -> 26,315, points/octree 9,599 -> 10,392, points/surfels 15,223 -> 16,254, points/pick 5,471 -> 5,768, points/clip 7,420 -> 8,221, sciviz/export-vector 3,957 -> 4,371 B; ceilings raised to match. points/octree crossed the 10,000 B heavy line, so sciviz/pointcloud now loads it with import() beside the points renderer (22,087 -> 22,097 B, no static leak), and `maskColor` is a shared function only the sciviz vector exporters carry (about 100 B off each entry above). Splitting the mask out would need a second pipeline and bind group layout per draw style. Core + stage unchanged.
 Review 4 Wang sampling (2026-11-10): resolveWang accepts the existing finite nonnegative relative weights, including a common scale near Number.MAX_VALUE or Number.MIN_VALUE. Positive matching candidates are normalized by their maximum before accumulating the distribution; zero weights stay excluded and no positive matches return GID 0. Selection remains deterministic for the same input and seed, subject to JavaScript number precision and the existing hash resolution. No API or rendering limits changed.
 ## Batch 177 job 4: chart polish and categorical data
 
@@ -10105,8 +10108,16 @@ is not an option, and the normal path builds with the hardware branch only.
   count smaller than the row stride` (142 calls of one 2048x12 `RGBA_INTEGER` upload from a 393,216-byte pixel buffer,
   alignment 1, in the lod page) and, in materials, `Tex image TEXTURE_2D level N is incurring lazy initialization`. Cause
   of (3) not found: the same call in a plain page (exact, larger or partly filled buffer, any usage) prints nothing.
-- **Next:** decide whether the checks ignore Firefox's own advisory warnings (a test change, so not made here) or the layer
-  stops causing them; (3) needs a smaller repro first. Owner: webgl2-compat (layer) and the two checks.
+- **Fixed 2026-11-11, (1):** Firefox 157's `RENDERER` names the GPU (the same string as the extension, measured in a plain
+  page under Playwright), so the layer asks for `WEBGL_debug_renderer_info` only where `RENDERER` is empty or the masked
+  `WebKit WebGL` (Chromium, WebKit). Regression: `packages/webgl2-compat/test/capabilities.test.js`, "the unmasked
+  renderer is asked for only where RENDERER is masked".
+- **Measured 2026-11-11, (3):** a plain Firefox 157 page prints the "final row" advisory for every `texSubImage2D` from a
+  pixel buffer, full rows from an exact buffer included, and "partial upload ... lazy initialization" for a partial
+  upload into a `texStorage2D` texture. Earlier "prints nothing" runs did not catch the console.
+- **Next:** (2) the checks assert the deliberate `loseContext()` line exactly once (coordinator call); (3) initialise data
+  textures at creation, and test whether another unpack alignment stops the "final row" advisory, else an upstream
+  report draft. Owner: webgl2-compat (layer) and the two checks.
 
 ### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
 
@@ -10328,6 +10339,18 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
+### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
+
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=lane-x -- node scripts/csp-check.mjs` exited 2 with
+  `ERR_GPU_COMMAND_NOT_GPU`. Helpers then started such checks directly, and 8 GPU users were seen at once against the
+  5-slot cap.
+- **Cause:** the admission check in `scripts/support/gpu-command.mjs` knew a node script as a GPU leaf only by a GPU
+  word in its file name (gpu, browser, pixel, capture, render, xr). Browser checks named for what they check carry none.
+- **Fix:** a node script that imports `playwright` or one of the repository's browser launchers, itself or through its
+  own relative imports up to three files deep, is a GPU leaf, so `run` admits it and it holds a slot. CPU commands are
+  classified as before. Not chosen: having the browser host take a slot itself, since one slot per lane and children
+  started without the nested marker could deadlock. Regression: tests/gpu-command.test.js.
+
 ### Fixed 2026-11-11: Playwright's headed Chromium and Firefox would not start from a packaged app's redirected %LOCALAPPDATA%
 
 - **Repro:** from a process of an MSIX-packaged app on Windows (the Claude desktop app), start
@@ -10534,8 +10557,8 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `lensSettings` packs) at the unchanged 1e-4 bound. On the RTX A6000: 1.8e-6 native, 8.6e-6 on the WebGL2
   compatibility layer. The f64 `lensField` stays the truth for that reference: `tests/lens-f32.test.js` holds it within
   1e-4 of the f64 field on the same 2,400 cases (5.2e-5 measured) and fails it with the raw time * speed product (over
-  100 times worse), so a broken packing still fails. The short-time `math` case still compares with f64 at 1e-4. The
-  Radeon 680M rerun is still owed.
+  100 times worse), so a broken packing still fails. The short-time `math` case still compares with f64 at 1e-4. On
+  the Radeon 680M (Beelink, `b187ac2d4`, 2026-11-11): long-time 4.05e-5 on WebGPU and on the WebGL2 layer, math 5.9e-5.
 
 ### Fixed 2026-11-11: the instanced frame allocated 4,048 B, over its 292 B floor (list 5 R6 row 15, Radeon 680M, then RTX A6000)
 
@@ -10563,6 +10586,26 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   in the instanced scene; it was in the profile before the KB0378 fix too, hidden by the 15-row listing. The floors are
   never raised: the fix is to find the boxed value (a fractional number passed to a call V8 does not inline is the
   usual one) and remove it.
+- **Also on the Radeon 680M** (Beelink, Chromium through Playwright, `b187ac2d4`, 2026-11-11): instanced 304 B, shadowed
+  880 B, basic 328 B, post 1,476 B, dynamic 376 B, the same figures, so it is not one GPU's (list 5 R6 row 15).
+
+### Open: sciviz tiled export differs from the whole image by one level on the Radeon 680M (list 5 R6 row 18)
+
+- **What:** `npm run test:browser:export-media -w packages/sciviz` (`tests/export-media-browser.mjs`) on the Beelink
+  (Radeon 680M, WebGPU on D3D12), 2026-11-10 and again on `b187ac2d4`: "Tile seams differ: max 1, changed 0". The
+  RTX A6000 gives 0 on both backends.
+- **Repro:** the NOAA wind figure (`examples/sciviz-wind.html`, two line layers), `exportImage` at 320 x 240 with
+  `overlays: false`, tiled against `tileSize: 512` (diag `.lane/r6s6/media-diag.mjs` in the lane N worktree): 1,982 of
+  307,200 channel values differ, every one by exactly 1, spread over the line interiors (rows 7 to 230, not at tile
+  edges). 64 px and 128 px tiles differ at exactly the same values; 160 px tiles match the whole image exactly; two
+  whole-image exports match each other.
+- **Cause (not proven):** each tile draws with the whole-image projection cropped by `cropProjection`
+  (`packages/sciviz/src/media-tiles.ts`); with 64 and 128 px tiles the x scale is 5 or 2.5, with 160 px tiles 2, a
+  power of two that f32 keeps exact. A colour interpolated across a line from rounded clip positions then lands on the
+  other side of a rounding step on this GPU. WebGPU keeps a viewport inside its target, so tiles cannot reuse the
+  whole-image projection through a viewport offset. Not loosened: the check still asks for 0.
+- **Next:** confirm by drawing the 64 px tiles with power-of-two crop scales (tiles of width / 2^k), or interpolate the
+  line colour in a form that does not depend on the clip-space scale.
 
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 
@@ -12458,18 +12501,17 @@ render at half-float. Regression: that check (failed on 16fbe3c86c, passes now).
 - **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.
 - **Still open, surfels:** `SurfelPlugin` at 4x refuses with `unsupported`: its sums need a multisampled float target to add into and the level multisamples neither `r32float` nor `rgba16float`. A 1x pass needs a sampleable copy of the scene depth, which core's own 4x attachments do not have. Next idea: two `rg11b10ufloat` sum targets where the adapter has `rg11b10ufloat-renderable` (6-bit mantissa sums, to be measured), front depth packed into `rgba8unorm` as eye-dome lighting packs it, resolve by masked draws per sample.
 
-### Sky and other packages draw HDR as display colour over PostStack's rg11b10ufloat capture (found 2026-11-11, open)
+### Fixed 2026-11-11: sky and other packages drew HDR as display colour over PostStack's rg11b10ufloat capture
 
-- **What:** at WebGPU's compatibility level, `PostStack` captures 4x in `rg11b10ufloat`. `@margoengine/sky` (base, aerial, Hillaire, shafts, volumetric clouds) decides linear HDR output by `format === 'rgba16float'`, so over that capture it encodes for display and then the stack tonemaps again: the sky draws up to 19 of 255 brighter than at the full level (11,842 of 12,288 bytes differ, RTX A6000). About 25 more sites in animation, creative, environment, gltf-pro, lod, scatter, splats, terrain, voxel, voxel-pathtracer and water test the same way.
-- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, read `levels.sky`.
-- **Cause:** no shared "linear target" test; each package names `rgba16float` (some also `rgba32float`).
-- **Needed:** one predicate in `packages/shared` (float formats are linear) used at every site, then compare `levels.sky` at 0 and assert the fogged frames equal.
+- **Was:** at WebGPU's compatibility level `PostStack` captures 4x in `rg11b10ufloat`. Sky (base, aerial, Hillaire, shafts, volumetric clouds) and 25 more sites in animation, creative, environment, gltf-pro, lod, materials, scatter, splats, terrain, voxel, voxel-pathtracer and water decided linear HDR output by `format === 'rgba16float'` (some also `rgba32float`), so over that capture they encoded for display and the stack tonemapped again: the sky drew up to 19 of 255 brighter than at the full level.
+- **Fix:** one predicate, `linearHdr` in `packages/shared/hdr-format.js` (every float format is linear), at every site; creative's planet and grass passes also accept the `rg11b10ufloat` capture instead of refusing it. The sky now differs from the full level by at most 3 of 255 and the fogged frame by 4, all in blue, the capture's 5-bit blue mantissa against rgba16float's 10 bits.
+- **Regression:** `tests/hdr-format.test.js` (fails on the old source: 25 sites compare a pass format with `rgba16float` alone); `packages/webgl2-compat/test/adapter-browser.mjs` asserts the sky and fogged frames within 4 of 255 (19 before); `packages/creative/tests/planet.test.js` draws into `rg11b10ufloat`.
 
-### Lone Bloom fails at 4x on WebGPU's compatibility level (found 2026-11-11, open)
+### Fixed 2026-11-11: a lone Bloom failed at 4x on WebGPU's compatibility level
 
-- **What:** `Bloom.attach(engine)` without `PostStack` creates a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"). `PostStack` picks `rg11b10ufloat` there; Bloom alone does not.
-- **Repro:** in `packages/webgl2-compat/test/adapter-browser.js` attach `Bloom` alone in a `PACKAGES` case.
-- **Needed:** the same capture-format choice as `PostStack` (`captureFormat` in `packages/post/src/stack.ts`), with a case in the adapter check.
+- **Was:** `Bloom.attach(engine)` without `PostStack` created a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"); `PostStack` picked `rg11b10ufloat` there, Bloom alone did not.
+- **Fix:** both take the capture format from one function, `captureFormat` in `packages/post/src/capture.ts`; Bloom's scene pipelines target the capture's format.
+- **Regression:** `packages/webgl2-compat/test/adapter-browser.mjs` case `post bloom alone 4x` (threw on the old source).
 
 ### Fixed 2026-11-11: external PBR display passes blend glass in encoded values (KB2281)
 
@@ -15372,7 +15414,7 @@ Fixed 2026-11-10: animation dependent cutscene replay (326c67544). The unchanged
 
 Fixed 2026-11-10: GPU runner registration on clean origin/main b47fdef13. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
-Compatibility mapping-range gap found while tracing LOD: CompatBuffer.mapAsync ignores offset/size, and getMappedRange slices without enforcing the mapped interval or non-overlap. Repro: map a subrange then request bytes outside it; cause is discarded map arguments in device/resources.ts. Outside this animation job; preserve WebGPU validation rules in the owning package's fix phase.
+Fixed 2026-11-11 (KB5128a, bug sweep L3): CompatBuffer.mapAsync ignored offset and size, and getMappedRange sliced without enforcing the mapped interval or non-overlap. Both now follow WebGPU's rules: mapAsync rejects with OperationError (and reports a validation error) for a mode the buffer lacks, an offset not on 8 bytes, a size not of whole words or a range past the buffer; getMappedRange throws OperationError outside the mapped range, unaligned or overlapping a range already returned. Regression: packages/webgl2-compat/test/device.test.js, "mapAsync and getMappedRange keep to the mapped range".
 
 Batch 220 job 2: the requested scalar interpolants/keyed-curve gap is implemented in math/curve; no open defect found by its analytic and ownership tests. Cubic overshoot and clamped time evaluation are explicit contracts in limits, not monotonic or periodic interpolation claims.
 
@@ -15545,7 +15587,7 @@ Fixed 2026-11-10: Build-phase tooling gap. GPU planner registrations and command
 
 ### Batch 229 job 1: imagery evidence
 No open defect identified in the job: native and compatibility clipmap, RVT and planet checks use exact XYZ/WMTS/GPU image equality, ordered composition, alpha, brightness and bounds. Operational and resource limits are in docs/terrain-imagery.md.
-- AnimatorGraph snapshot follow-up (batch 211, rules 21/22): capture graph.animator during a graph fade, change a bool/trigger or take a different interruption, restore the Animator snapshot and update. Graph bools/triggers and the selected interruption source/policy live in the controller and are outside AnimatorState, so restoring playback alone does not rewind graph decisions. Add a graph-level snapshot in the fix phase; live layer, tree and transition features are built.
+- Fixed 2026-11-11 (bug sweep L6, KB5322): AnimatorGraph.captureState() and restoreState() snapshot the bools, set triggers, the active transition (its interruption rule) and the source state and time with the Animator's playback; a snapshot that does not fit the graph is refused before anything changes. Regression: packages/animator/test/transitions.test.js (two graph snapshot tests). Original entry: AnimatorGraph snapshot follow-up (batch 211, rules 21/22): capture graph.animator during a graph fade, change a bool/trigger or take a different interruption, restore the Animator snapshot and update. Graph bools/triggers and the selected interruption source/policy live in the controller and are outside AnimatorState, so restoring playback alone does not rewind graph decisions. Add a graph-level snapshot in the fix phase; live layer, tree and transition features are built.
 
 ### Batch 261 label clusters
 No open correctness defect identified. Independent all-pairs component tests include negative cells, grid seams, chains, minimum size and zoom splitting. Renderer tests show camera zoom restores individual labels; browser tests show count-bubble centroid alignment and logical zoom recovery on native WebGPU and WebGL2.
@@ -15860,7 +15902,7 @@ Batch 184 packaging follow-up: the fur conflict resolution locale-sorted the gen
 
 The VFX JSON parse blocker above is resolved upstream by f359f4473; the batch 184 packaging continuation rebases onto that valid manifest before its final checks.
 Batch 174 job 1 regression: the linked mask uniform is visible to both vertex and fragment stages; link-browser.mjs renders and reads back keyed masks on both backends, catching an invalid pipeline caused by vertex-only uniform visibility. No open selection correctness defect remains from that failure.
-Batch 174 presentation follow-up: binding a styled scatter or line currently uses the optional mask renderer (round points and simple segment joins), so advanced point effects, variable sizes and detailed line styling are not preserved; vector SVG export still enumerates the original figure layers. Repro: bindSelection on an EDL cloud or styled line, select rows, then export SVG. Cause: optional mask drawables are separate from the native points/lines and vector-export enumerators. Tracked in the finish-later list (git-excluded, outside a clone) under rules 21 and 22.
+- Fixed 2026-11-11 (KB5588c): bindSelection on a scatter or line hid the layer and drew its marks through sciviz's own mask renderer (round points, plain segments), so eye-dome lighting, per-point sizes, square shapes, sphere shading, widths and dashes were lost, and toSVG/exportVector enumerated the original unmasked marks (exportVector even dropped the hidden source). Cause: the selection mask lived in a drawable separate from the points and lines plugins and both exporters. @margoengine/points (`PointCloud.setMask`/`updateMask`/`setMaskStyle`/`isSelected`) and @margoengine/lines (`Line.setMask` and the same methods) now take a native selection mask, one bit a point after a 16-byte style header (packages/shared/selection-mask.js), applied in their vertex shaders (fade, highlight or filter on the displayed sRGB colour, the highlight given as a linear `[r, g, b]`; filtered marks are not pickable); bindSelection feeds it, and toSVG and exportVector apply it with the same maths (the shared `maskColor` in packages/shared/selection-mask.js). Bars and histograms keep their f32 mask drawable and both exports now apply it too. The 2M-point stars binding uploads 250,016 bytes a selection instead of 8,000,000. Regressions: packages/sciviz/tests/link-browser.mjs (a bound EDL square scatter with per-point sizes and a dashed line draw byte-identical to unbound with nothing selected, and the SVG fades exactly the unselected points and keeps only the selected segment; failed on the parent at the first check), packages/points/tests/mask.test.js, packages/lines/tests/mask.test.js.
 Batch 174 landing repair, closed: main 72642362b duplicated the VFX test:gpu property without a separating comma, blocking all workspace parsing. Removed the obsolete member, retaining both parity backends. Regression: tests/package-exports.test.js.
 Fixed 2026-11-11 (batch 174 follow-up): the lazily materialized rowIds of the most recent SelectionStore change event read empty after dispose(), because disposal cleared the Set the event had captured. Disposal now replaces that set instead of clearing it. Regression: packages/sciviz/tests/link.test.js (rows after dispose, fixed and open stores).
 Batch 186 job 2: no open correctness defect found in shared atlas packing/filtering. Whole-atlas redraw on any dirty face and discrete resolution changes without hysteresis are documented trade-offs in limits.md; incremental dirty-tile updates remain later quality work.
@@ -15903,7 +15945,7 @@ Fixed 2026-11-11 (bug sweep L2, KB5663b; regression packages/gltf-pro/tests/dds.
 Batch 136 replacement proof: the geometric-normal unsigned-residue scoring defect is fixed with circular-distance and complete-payload selection; the sparse high-precision RAW cutoff is expanded within a fixed memory bound. Rust regressions and the 76-row two-decoder corpus pass with no open defect found in this scope.
 Fixed 2026-11-10: Build-phase follow-up. notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
-- Fix-phase investigation, existing sciviz glyph capture: glyph-browser.mjs produced too few compatibility pixels once for custom and once for line shapes in the batch 173 gate. Instrumented failures retain image/canvas/stats now; isolated and full diagnostic runs then matched native output exactly (line 151 pixels, custom 3158), and the original assertions with failure diagnostics pass both backends. Root cause remains unisolated, so this is not claimed as a fix or a timing-only miss. Logs stay in lane-X git-excluded batch173/job5/{gpu-glyph-browser.mjs,final-gpu-glyph,glyph-failure-data,glyph-diagnostic}.log. Investigate cold command replay/capture state without retries or lowered pixel bars.
+- Fix-phase investigation, existing sciviz glyph capture: glyph-browser.mjs produced too few compatibility pixels once for custom and once for line shapes in the batch 173 gate. Instrumented failures retain image/canvas/stats now; isolated and full diagnostic runs then matched native output exactly (line 151 pixels, custom 3158), and the original assertions with failure diagnostics pass both backends. Root cause remains unisolated, so this is not claimed as a fix or a timing-only miss. Logs stay in lane-X git-excluded batch173/job5/{gpu-glyph-browser.mjs,final-gpu-glyph,glyph-failure-data,glyph-diagnostic}.log. Investigate cold command replay/capture state without retries or lowered pixel bars. Closed 2026-11-11 (KB5663c, with KB5700d) as not reproduced: the unchanged suite (`node packages/sciviz/scripts/browser-root.mjs tests/glyph-browser.mjs`, both backends, a fresh browser each run) passed 10 of 10 cold runs and 30 of 30 runs under GPU load with 3 to 5 other gpu-lock holders active (check-owner-lifetime, gpu-packages, sweep-l2, sweep-l3, sweep-l5, check-readme-run, core34); every run gave line 151 lit pixels (hash 1716337270) and custom 3158 on WebGPU and WebGL2. No test or bar changed; a recurrence reopens it with the retained failure diagnostics.
 Batch 186 job 3: no open correctness defect found in cube projection or mixed spot/cube ownership. Filtering is the supplied-image bilinear contract; mipmapped minification and HDR inputs remain documented later quality extensions, not asserted here.
 
 Batch 186 job 3 regression: toggling cubes while spot images keep the shared hook active now invalidates cached shader declarations and bind layouts. The CPU regression fails on the pre-fix build, and live removal/reactivation is checked on both GPU backends.
@@ -15942,7 +15984,7 @@ API conventions lane (2026-11-10): unchanged materials dispersion compatibility 
 
 
 - Fixed 2026-11-11 (KB5700c, batch 174 multivariate brush history): after two axis brushes and SelectionStore.undo the controller kept its last range map, so the next axis gesture reapplied the undone range. SelectionStore brushes now carry an optional `predicate` kept through undo, redo, toJSON and fromJSON; parallel coordinates and scatter matrices store their ranges there and rebuild them on every store change. Regressions: packages/sciviz/tests/link.test.js (predicate history), parcoords-browser.mjs (period, radius, undo, then period).
-Batch 180 gate finding, existing glyph capture: node packages/sciviz/tests/glyph-browser.mjs once failed the unchanged >20 lit-pixel assertion for the thin line glyph on WebGL2 after shape replacement. Native had 151 pixels; subsequent unchanged assertions on both backends had exactly 151 and identical hashes. Cause is not isolated: the captured shape-transition frame lost expected thin-tube coverage; this is a value/capture nondeterminism, not a timing-only budget miss. No test threshold changed. Preserve the diagnostic and investigate readiness/resize/capture ordering in the glyph owner during the fix phase.
+Batch 180 gate finding, existing glyph capture: node packages/sciviz/tests/glyph-browser.mjs once failed the unchanged >20 lit-pixel assertion for the thin line glyph on WebGL2 after shape replacement. Native had 151 pixels; subsequent unchanged assertions on both backends had exactly 151 and identical hashes. Cause is not isolated: the captured shape-transition frame lost expected thin-tube coverage; this is a value/capture nondeterminism, not a timing-only budget miss. No test threshold changed. Preserve the diagnostic and investigate readiness/resize/capture ordering in the glyph owner during the fix phase. Closed 2026-11-11 (KB5700d) as not reproduced: 40 unchanged runs (10 cold, 30 under GPU load with 3 to 5 other gpu-lock holders) all gave line 151 pixels with identical hashes on both backends; see the KB5663c entry above.
 Batch 180 job 2: no open correctness defect in the requested vector-geography contract. Future near-plane ribbons and runtime style mutation are documented quality follow-ups. The fallback and newly rebased engineering/pointcloud browser scripts gained the same repository-root bootstrap as other sciviz browser scripts; existing browser-root.test.js caught the missing registrations.
 Fixed upstream: batch 183 navmesh package-directory bundle probes. e295cc68a anchors both pipeline inputs with fileURLToPath(new URL('../src/pipeline.ts', import.meta.url)); 3296cce94 creates their repository-anchored output directory and 6ede7aa75 removes duplicate imports. Rechecked 2026-11-10: all 121 unchanged navmesh CPU tests pass from packages/navmesh, including border and SIMD probes. No navigation algorithm or assertion changed in this sweep.
 Batch 183 gate finding (fixed 2026-11-11 by 38e03b1187): the sciviz package-local `npm test` lacked `--experimental-test-module-mocks` although tests/pointcloud.test.js calls mock.module. The package test script now passes the flag.
@@ -16707,7 +16749,8 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-faul
   slices and called `figure.render()`, which can change the size of the canvases it observes in the same frame.
 - **Fix:** the callback schedules one refit and redraw on the next animation frame (deliveries before it share it;
   dispose cancels it). Regression: packages/sciviz/tests/views-browser.mjs counts renders inside the delivery (must be
-  0) and after it (WebKit rerun owed on a machine with Playwright WebKit).
+  0) and after it. WebKit evidence: on the Mac mini (Apple M6, macOS 27.2) the views browser test passed 10 of 10
+  Playwright WebKit runs at 397545736b, compatibility layer off and on, with no ResizeObserver page error.
 
 ## Batch 132b audit: materials (fixed, 2026-11-11, lane N)
 
