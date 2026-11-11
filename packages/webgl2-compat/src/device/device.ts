@@ -8,6 +8,7 @@ import { webgl2Capabilities, type WebGL2Capabilities, type CompatTier } from '..
 import type { TierFormats } from '../tiers.js';
 import { extensions, type Extensions, GLObjects, GLState } from './gl.js';
 import { nextGPUTask } from './tasks.js';
+import { ExternalCopies } from './externals.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
@@ -307,7 +308,13 @@ export class CompatDevice extends EventTarget {
   readonly shown = new Set<{ keepFrame(): void }>();
   readonly replayer: Replayer;
   /** The texture each external source copies into, reused while its size stays. */
-  private readonly externals = new WeakMap<object, CompatTexture>();
+  // The storage behind imported external textures belongs to the layer, as a browser's does on native WebGPU: made
+  // directly, not through createTexture, and expired with the import (see externals.ts).
+  private readonly externals = new ExternalCopies<CompatTexture>(
+    (width, height) =>
+      new CompatTexture(this, { size: [width, height], format: 'rgba8unorm', usage: 0x16, label: 'external texture' }),
+    (end) => void nextGPUTask().then(end),
+  );
   /** The compute runtime, once its entry has loaded (the first compute pipeline loads it). */
   computeRuntime: ComputeRuntime | null = null;
   private computeLoad: Promise<void> | null = null;
@@ -442,6 +449,7 @@ export class CompatDevice extends EventTarget {
     for (const c of this.shown) c.keepFrame();
     this.shown.clear();
     this.lose('destroyed', 'The device was destroyed');
+    this.externals.destroy();
     this.objects.destroy();
     this.ext.lose?.loseContext();
   }
@@ -667,8 +675,9 @@ export class CompatDevice extends EventTarget {
     return new CompatQuerySet(this, descriptor);
   }
   /**
-   * A video element's or VideoFrame's current frame as an external texture: copied into an rgba8unorm texture (one
-   * per source, reused while its size stays), since WebGL2 has no zero-copy video.
+   * A video element's or VideoFrame's current frame as an external texture: copied into an rgba8unorm texture, since
+   * WebGL2 has no zero-copy video. The copy expires when the importing task ends, as WebGPU's external texture does,
+   * and the next import of the same size reuses it.
    */
   importExternalTexture(descriptor: GPUExternalTextureDescriptor): CompatExternalTexture {
     const source = descriptor.source as unknown as {
@@ -686,12 +695,7 @@ export class CompatDevice extends EventTarget {
         'The video has no frame yet; import it once it has data (readyState 2 or more)',
         'InvalidStateError',
       );
-    let t = this.externals.get(source);
-    if (!t || t.width !== w || t.height !== h || t.destroyed) {
-      t?.destroy();
-      t = this.createTexture({ size: [w, h], format: 'rgba8unorm', usage: 0x16, label: 'external texture' });
-      this.externals.set(source, t);
-    }
+    const t = this.externals.take(source, w, h);
     copyExternalImage(this, { source: descriptor.source as never }, { texture: t } as never, [w, h]);
     return new CompatExternalTexture(t.createView(), descriptor.label ?? '');
   }

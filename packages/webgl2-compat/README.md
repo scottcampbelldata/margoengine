@@ -159,7 +159,8 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   BC, ETC2 and ASTC textures are written with `writeTexture` where the browser's WebGL2 has their extensions (the
   adapter reports only those features); WebGL2 cannot read them back. Readbacks cover every other copyable format,
   depth, stencil, packed and snorm included; occlusion queries, render bundles and
-  external textures (each video frame is copied: WebGL2 has no zero-copy video) work. The adapter reports
+  external textures (each video frame is copied: WebGL2 has no zero-copy video; the copy expires when the importing
+  task ends, as on WebGPU, and the next frame of the same size reuses it, keeping at most two spare copies per device) work. The adapter reports
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
   flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back with a texel-fetch
   draw of its own (exact, one texel a pixel), not `blitFramebuffer` (see `docs/known-bugs.md`, "ANGLE D3D11 flipped

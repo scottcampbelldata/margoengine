@@ -40,6 +40,8 @@ import {
 export type * from './wgsl.js';
 export { COMPAT_VENDOR, CompatAdapter, CompatCanvasContext, CompatDevice, CompatGPU, type CompatGPUOptions };
 export { CompatInternalError, CompatValidationError, CompatQueue, CPU_WORK_BUDGET } from './device/device.js';
+/** @internal The layer's external-texture storage, exported for its tests. */
+export { ExternalCopies, SPARE_EXTERNALS } from './device/externals.js';
 export {
   CompatBindGroup,
   CompatBindGroupLayout,

@@ -485,6 +485,14 @@ export interface Directive extends Span {
     readonly names: readonly string[];
 }
 
+export class ExternalCopies<T extends Copy> {
+    constructor(make: (width: number, height: number) => T, afterTask: (end: () => void) => void);
+    take(source: object, width: number, height: number): T;
+    get size(): number;
+    expire(): void;
+    destroy(): void;
+}
+
 export interface ForStmt extends Span {
     readonly kind: 'for';
     readonly init?: Stmt;
@@ -788,6 +796,8 @@ export interface ReturnStmt extends Span {
     readonly value?: Expr;
 }
 
+export const SPARE_EXTERNALS = 2;
+
 export interface SamplerType {
     readonly kind: 'sampler';
     readonly comparison: boolean;
@@ -1052,6 +1062,12 @@ interface ComputeBuilt {
 interface ComputeRuntime {
     build(pipeline: CompatComputePipeline, deferred?: boolean): ComputeBuilt;
     dispatch(r: Replayer, pipeline: CompatComputePipeline, groups: readonly BoundGroup[], count: readonly number[]): void;
+}
+
+interface Copy {
+    readonly width: number;
+    readonly height: number;
+    destroy(): void;
 }
 
 class DrawRecorder {
