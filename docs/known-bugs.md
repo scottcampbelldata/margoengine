@@ -1110,9 +1110,9 @@ gate retaining its existing five known failures and no new failure.
   many-light GPU evidence below remain separate requirements. No speed claim.
 - Guiding evidence: guiding.html renders its convergence reference with the guided estimator itself and uses absolute bounds for dim scenes. Use an independent root/analytic reference and justified relative bounds.
 - Many-light evidence: restir.html covers diffuse receivers and absorption only. Rough metal, coat and scattering-media vertices need root-reference comparisons with relative bounds.
-- Reuse naming: /restir implements per-pixel RIS without spatial or temporal reuse. Implement reuse or rename the entry and documentation; retain the equal-cost work-count question without timing runs during the build phase.
+- Fixed reuse naming (2026-11-11): the per-pixel RIS entry, which has no spatial or temporal reuse, was named `/restir`. It is now `/resampled` (the class and factory were already `ResampledVoxelPathTracer` and `resampledEmitters`); README, limits, claims and reproduce follow. `tests/entry-names.test.js` fails on any entry or script named ReSTIR. Spatiotemporal reuse is not added: it correlates samples across pixels and frames, which a progressive converged render does not want, and no web rival ships it. The equal-cost work-count question stays open for the speed phase.
 - Fixed resampled README gate: isolated exact-example diagnostic passes the unchanged 20-second deadline on native WebGPU (Dawn). Its trace pipeline takes 15.5 seconds and capture 0.13 seconds, so this diagnostic is not ANGLE D3D11 compilation. The prior failure has no per-phase record; the actual runner selection also passes 1/1 at its unchanged deadline. No readiness wait, capture or deadline was removed.
-- Root emitter MIS: the full-distance medium-boundary regression is currently only in the optional restir GPU suite. Add it to the root GPU suite so a root-only run detects reversion.
+- Fixed root emitter MIS coverage (2026-11-11): the full-distance medium-boundary regression was only in the optional resampled GPU suite. The root `test:gpu` now runs `mediaboundary` (tests/browser-check.html and browser-check.mjs): voxel emission and an area light through an absorbing slab against independent quadrature at the same 0.02 bound. With the old last-segment distance restored it fails at 0.7557 against 0.6917.
 
 ### Fixed 2026-11-09: owned Chromium close waited on helper programs (SHUTDOWN_TIMEOUT, five lanes)
 
@@ -5706,7 +5706,7 @@ The rebased water GPU script also placed its build after the first test, violati
 
 Fixed in batch 274 decomp: zero-size factor stacks used to enter the matrix loop once per virtual matrix, allowing huge empty batches to stall. A zero-output work guard preserves empty factors with no kernel calls; packages/compute/tests/decomp.test.js checks the count (64 before, zero after) independently of time.
 
-Batch 274 fix-phase polish: removing/corrupting the served decomp-kernel.wasm asset, or denying its compilation by CSP, can expose native filesystem/CompileError failures rather than a help-linked MargoError. Cause: decomp.ts load() translates HTTP failures but does not wrap readFile/instantiate failures. Numerical decompositions and normal asset loading are complete; normalize these failure types in the fix phase (rule 22).
+Fixed 2026-11-11 (bug sweep L5): removing or corrupting decomp-kernel.wasm, or a CSP that denies its compilation, exposed a raw filesystem error or CompileError. load() in decomp.ts now wraps every read, fetch, compile and link failure as a `failed` MargoError with the original kept as `cause`; an abort stays an AbortError. Regression: packages/compute/tests/decomp.test.js "decomp Wasm read and compile failures reject as coded MargoErrors".
 Fixed batch 270 GPU gate registration: new parity checks ran only by hand because the vfx test:gpu manifest still listed its original five scripts. Added native and compatibility parity.mjs --all commands. Regression: packages/vfx/test/gpu-registration.test.js fails with the previous manifest (zero parity commands), and passes with both backend commands.
 Batch 184 fur: fixed the new coarsest-stack sampling defect before landing. Sampling the outer shell at normalized height 1 made two-shell fur's only outer sample empty, because every procedural strand tapers before height 1. Shells now sample k/shells; CPU and native/compat 1x/4x GPU regressions require a nonempty two-shell result. The caster output regression also checks a comma before the added UV varying, for input structs with no trailing comma. Existing unrelated wireframe compatibility findings remain tracked under rules 21/22.
 Batch 184 generated aliases: umbrella regeneration also supplies the missing post/mask alias for the already landed post entry; it is a generated facade and manifest mapping only.
@@ -5794,7 +5794,7 @@ Fixed 2026-11-10: GPU package-runner owner collision (batch 180). Unrelated work
 Batch 136 removal landing blocker fixed: supply-chain regeneration previously replaced the whole notices file and discarded appended asset credits. Explicit retained addenda, legacy-boundary migration, unknown-boundary rejection and an idempotence/stale-generated-content regression preserve them. No remaining blocker in this scope.
 Fixed 2026-11-10: Build-phase follow-up (batch 177 job 3). notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
-Batch 274 fix-phase API polish: Module.stateDict() and Tensor.read() in compute/nn expose no AbortSignal, so an in-flight large state readback cannot be cancelled by their callers. Repro: start model.stateDict() for a large model; there is no signal option to pass. Cause: the existing wrappers call GpuArray.read() without forwarding ReadOptions; BatchNorm follows that existing signature. Add optional wait/read options through nested modules in the fix phase. NN-extra numerical execution, gradients and saved state are complete.
+Fixed 2026-11-11 (bug sweep L5): Module.stateDict() and Tensor.read() in compute/nn took no options, so a large state readback could not be cancelled. Tensor.read(options) forwards ReadOptions; stateDict({ signal }) passes the signal to every parameter read and nested module, BatchNorm running statistics included. Regression: packages/compute/tests/nn.test.js "stateDict and Tensor.read forward an AbortSignal through nested modules".
 ### Fixed: batch 1 umbrella package test discovery
 
 The original fourteen packages were repaired by 68b55c2ed. The later umbrella package added tests/export-order.test.js without scripts.test, reproducing the same class: node --test tests/package-test-scripts.test.js reported the missing file. Its manifest now runs every tests/*.test.js file. Existing regression: tests/package-test-scripts.test.js, which failed before the manifest change.
@@ -5856,7 +5856,7 @@ Fixed 2026-11-11 (lane L4): water browser checks run with MARGO_COMPAT=1 and no 
 
 Fixed upstream: batch 203 duplicate navmesh package-directory probe finding. The entry anchoring in e295cc68a, output-directory creation in 3296cce94 and import repair in 6ede7aa75 are on main. All 121 unchanged CPU tests pass from the package directory on 2026-11-10, including both affected probes.
 
-- Batch 203 AVIF validation tail: malformed prem item references with no auxiliary alpha, multiple targets or a target other than the actual alpha are ignored rather than rejected. Repro: add such a prem reference to a valid AVIF primary item. Cause: image.rs tests equality with the one alpha ID and treats a mismatch as straight alpha. Valid straight/premultiplied alpha decoding is implemented; strict invalid-reference rejection is a fix-phase item under rule 22.
+- Fixed 2026-11-11 (bug sweep L5): Batch 203 AVIF validation tail. A 'prem' item reference with no auxiliary alpha, no or several targets, or a target other than the alpha item was read as straight alpha. image.rs now accepts only a 'prem' reference to exactly the one alpha item (ISO/IEC 23008-12 'prem' reference type; AVIF v1.1.0 section 4) and rejects every other shape as invalid. Regression: packages/decoders/native/avif/tests/premultiplied.rs.
 
 
 
@@ -5866,7 +5866,7 @@ Fixed 2026-11-10: nearestPoint now compares projectPoint's normalized near=0/far
 
 Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
 
-## Batch 132 audit: compute SVD does not converge on a matrix of many repeated columns
+## Fixed 2026-11-11: compute SVD does not converge on a matrix of many repeated columns
 
 Repro (CPU backend, any host): fill a 512 x 512 matrix row-major from `seed = (seed * 1103515245 + 12345) >>> 0`
 computed in doubles (the product loses its low bits, so the stream cycles and only about 15,600 distinct values fill
@@ -5879,6 +5879,8 @@ relative stopping test (Drmac and Veselic, LAPACK Working Note 170, 2007, sectio
 converging). Fix to build: treat a column whose norm falls below eps times the largest column norm as numerically
 zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
 relative accuracy the Jacobi method keeps for graded columns.
+
+Fixed (bug sweep L5): a column whose norm times the input scale is below 2^-150 (its f32 singular value is 0 in every case) is set to exactly zero, takes no more rotations and is completed orthogonally; graded columns above that floor keep every rotation (Rust test `svd_floor_keeps_graded_values_and_zeroes_only_f32_zero_columns`). The repro converges in 11 to 20 sweeps. The basis completion now picks the axis with the smallest row norm and orthogonalizes only it twice (CGS2), so the repro takes 8 s instead of 85 s on a loaded dev PC. Regression: packages/compute/tests/decomp.test.js "svd converges on a 512 x 512 matrix of many repeated columns".
 
 Fixed 2026-11-10: review 3 SV4 transfer-binding reentrant abort. The abort listener now exists before the initial caller render callback; an already-disposed initialization cannot subscribe to later transfer changes. Failed initialization restores the previous classifier and releases listeners, with both errors retained if restoration also fails. Regression: packages/sciviz/tests/transfer.test.js covers initial synchronous abort, throwing render callbacks and failed restoration; all three fail on the parent. Default LUT work, numerical transfer tests and rendering bounds are unchanged.
 

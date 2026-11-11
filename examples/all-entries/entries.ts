@@ -2518,7 +2518,7 @@ export * as e_margoengine_voxel_net_replay from 'margoengine/voxel-net/replay';
 export * as e_margoengine_voxel_net_webrtc from 'margoengine/voxel-net/webrtc';
 export * as e_margoengine_voxel_net_server_runtimes from 'margoengine/voxel-net/server-runtimes';
 export * as e_margoengine_voxel_pathtracer from 'margoengine/voxel-pathtracer';
-export * as e_margoengine_voxel_pathtracer_restir from 'margoengine/voxel-pathtracer/restir';
+export * as e_margoengine_voxel_pathtracer_resampled from 'margoengine/voxel-pathtracer/resampled';
 export * as e_margoengine_voxel_pathtracer_compose from 'margoengine/voxel-pathtracer/compose';
 export * as e_margoengine_voxel_pathtracer_studio from 'margoengine/voxel-pathtracer/studio';
 export * as e_margoengine_voxel_pathtracer_guiding from 'margoengine/voxel-pathtracer/guiding';
@@ -4213,7 +4213,7 @@ export * as e_margoengine_voxel_net_replay_2 from '@margoengine/voxel-net/replay
 export * as e_margoengine_voxel_net_webrtc_2 from '@margoengine/voxel-net/webrtc';
 export * as e_margoengine_voxel_net_server_runtimes_2 from '@margoengine/voxel-net/server-runtimes';
 export * as e_margoengine_voxel_pathtracer_2 from '@margoengine/voxel-pathtracer';
-export * as e_margoengine_voxel_pathtracer_restir_2 from '@margoengine/voxel-pathtracer/restir';
+export * as e_margoengine_voxel_pathtracer_resampled_2 from '@margoengine/voxel-pathtracer/resampled';
 export * as e_margoengine_voxel_pathtracer_compose_2 from '@margoengine/voxel-pathtracer/compose';
 export * as e_margoengine_voxel_pathtracer_studio_2 from '@margoengine/voxel-pathtracer/studio';
 export * as e_margoengine_voxel_pathtracer_guiding_2 from '@margoengine/voxel-pathtracer/guiding';

@@ -27,9 +27,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./restir": {
-      "types": "./dist/restir.d.ts",
-      "import": "./dist/restir.js"
+    "./resampled": {
+      "types": "./dist/resampled.d.ts",
+      "import": "./dist/resampled.js"
     },
     "./compose": {
       "types": "./dist/compose.d.ts",
@@ -86,9 +86,9 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-pathtracer",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu:restir": "cd ../.. && node packages/voxel-pathtracer/tests/restir-browser.mjs",
+    "test:gpu:resampled": "cd ../.. && node packages/voxel-pathtracer/tests/resampled-browser.mjs",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal glassfurnace analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism disposecompile convergence",
+    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal glassfurnace analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism disposecompile convergence mediaboundary",
     "test:gpu:denoise": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise denoise-diffuse denoise-opaque denoisepeak denoisehistory",
     "test:gpu:denoise-materials": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-materials denoise-materials",
     "test:gpu:denoise-caustics": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-caustics denoise-caustics",
@@ -119,7 +119,7 @@
   "margo": {
     "gpuTestTimeoutMinutes": {
       "test:gpu": 10,
-      "test:gpu:restir": 10,
+      "test:gpu:resampled": 10,
       "test:gpu:denoise": 10,
       "test:gpu:denoise-materials": 15,
       "test:gpu:denoise-caustics": 15,

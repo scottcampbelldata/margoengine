@@ -679,3 +679,38 @@ test('train and eval reach nested layers', async (t) => {
   assert.equal(inner.training, true);
   gpu.check();
 });
+
+// KB5663e: stateDict() and Tensor.read() took no options, so a large readback could not be cancelled.
+test('stateDict and Tensor.read forward an AbortSignal through nested modules', async (t) => {
+  const gpu = await gpuOf(t);
+  const { BatchNorm } = await import('@margoengine/compute/nn-extra');
+  const rand = new Random(gpu, { seed: 3 });
+  const model = new Sequential(new Sequential(new Linear(gpu, 3, 2, { rng: rand }), new BatchNorm(gpu, 2)));
+  const x = tensor(gpu.array(noise(6, 5), { shape: [2, 3] }));
+  const stopped = AbortSignal.abort(new DOMException('stop', 'AbortError'));
+  await assert.rejects(() => x.read({ signal: stopped }), { name: 'AbortError' });
+  await assert.rejects(() => model.stateDict({ signal: stopped }), { name: 'AbortError' });
+  const reads = [];
+  for (const layer of [model.layers[0].layers[0], model.layers[0].layers[1]])
+    for (const key of ['weight', 'bias', 'runningMean', 'runningVar']) {
+      const value = layer[key];
+      if (!value) continue;
+      const target = value.value ?? value;
+      const read = target.read.bind(target);
+      target.read = (options) => (reads.push(options?.signal), read(options));
+    }
+  const live = new AbortController();
+  const state = await model.stateDict({ signal: live.signal });
+  assert.ok(reads.length >= 6, `reads ${reads.length}`);
+  assert.ok(reads.every((signal) => signal === live.signal), 'every nested read receives the caller signal');
+  assert.deepEqual(Object.keys(state).sort(), [
+    'layers.0.layers.0.bias',
+    'layers.0.layers.0.weight',
+    'layers.0.layers.1.batchesTracked',
+    'layers.0.layers.1.bias',
+    'layers.0.layers.1.runningMean',
+    'layers.0.layers.1.runningVar',
+    'layers.0.layers.1.weight',
+  ]);
+  assert.deepEqual(await x.read({ offset: 1, length: 2 }), (await x.read()).subarray(1, 3));
+});

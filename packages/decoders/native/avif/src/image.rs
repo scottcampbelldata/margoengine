@@ -47,7 +47,16 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<Image> {
     let mut budget = limits.memory - bytes.len();
     let mut image = item(&file, file.primary, limits, &mut Vec::new(), &mut budget)?;
     image.raster = None;
-    if let Some(alpha_id) = file.alpha(file.primary)? {
+    let alpha_id = file.alpha(file.primary)?;
+    // A 'prem' reference (ISO/IEC 23008-12 item reference type; AVIF v1.1.0 section 4) goes from the colour item to
+    // the one alpha auxiliary item it was premultiplied by. Any other shape (no alpha item, no or several targets, a
+    // target that is not that alpha) is malformed: reading it as straight alpha would show wrong colours.
+    let premultiplied = match file.items[&file.primary].references.get(b"prem") {
+        None => false,
+        Some(ids) if alpha_id.is_some_and(|alpha| ids.as_slice() == [alpha]) => true,
+        Some(_) => return Err(Error::Invalid),
+    };
+    if let Some(alpha_id) = alpha_id {
         let alpha = item(&file, alpha_id, limits, &mut Vec::new(), &mut budget)?;
         if !alpha.color.monochrome || !alpha.color.full_range {
             return Err(Error::Invalid);
@@ -55,10 +64,6 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<Image> {
         if alpha.width != image.width || alpha.height != image.height {
             return Err(Error::Invalid);
         }
-        let premultiplied = file.items[&file.primary]
-            .references
-            .get(b"prem")
-            .is_some_and(|ids| ids.as_slice() == [alpha_id]);
         for (pixel, a) in image
             .rgba
             .chunks_exact_mut(4)

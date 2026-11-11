@@ -37,21 +37,38 @@ interface Kernel {
 async function load(signal?: AbortSignal): Promise<Kernel> {
   aborted(signal);
   const url = new URL(/* @vite-ignore */ './decomp-kernel.wasm?no-inline', import.meta.url);
-  let bytes: Uint8Array<ArrayBuffer>;
-  if (url.protocol === 'file:') {
-    url.search = '';
-    const name = 'node:fs/promises';
-    const fs = await import(/* @vite-ignore */ /* webpackIgnore: true */ name);
-    bytes = await fs.readFile(url, { signal });
-  } else {
-    const response = await fetch(url, { signal });
-    if (!response.ok) throw fault('failed', `Decomposition Wasm load failed: HTTP ${response.status}`, 'compute');
-    bytes = new Uint8Array(await response.arrayBuffer());
+  try {
+    let bytes: Uint8Array<ArrayBuffer>;
+    if (url.protocol === 'file:') {
+      url.search = '';
+      const name = 'node:fs/promises';
+      const fs = await import(/* @vite-ignore */ /* webpackIgnore: true */ name);
+      bytes = await fs.readFile(url, { signal });
+    } else {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw loadFailure(`HTTP ${response.status}`);
+      bytes = new Uint8Array(await response.arrayBuffer());
+    }
+    aborted(signal);
+    const { instance } = await WebAssembly.instantiate(bytes);
+    aborted(signal);
+    return instance.exports as unknown as Kernel;
+  } catch (error) {
+    // A cancelled load stays an AbortError; every read, fetch, compile or link failure (missing file, network,
+    // corrupt bytes, a CSP that forbids compilation) becomes one coded error with its cause kept.
+    aborted(signal);
+    if (error instanceof Error && error.name === 'MargoError') throw error;
+    throw loadFailure(error instanceof Error ? error.message : String(error), error);
   }
-  aborted(signal);
-  const { instance } = await WebAssembly.instantiate(bytes);
-  aborted(signal);
-  return instance.exports as unknown as Kernel;
+}
+function loadFailure(reason: string, cause?: unknown): Error {
+  const error = fault(
+    'failed',
+    `Decomposition Wasm load failed: ${reason}; serve decomp-kernel.wasm beside decomp.js and allow WebAssembly compilation (CSP 'wasm-unsafe-eval')`,
+    'compute',
+  );
+  if (cause !== undefined) Object.defineProperty(error, 'cause', { value: cause, configurable: true, writable: true });
+  return error;
 }
 const size = (s: readonly number[]): number => s.reduce((a, b) => a * b, 1);
 function validate(a: Operand): void {

@@ -13,8 +13,8 @@
 // K. Gimpel, arXiv 1606.08415, 2016), Adam (D. P. Kingma and J. Ba, ICLR 2015) and AdamW (I. Loshchilov and F. Hutter,
 // ICLR 2019).
 import { rangeError, typeError } from '../../shared/errors.js';
-import { GpuArray } from './array.js';
-import type { ComputeContext } from './context.js';
+import { GpuArray, type ReadOptions } from './array.js';
+import { aborted, type ComputeContext, type WaitOptions } from './context.js';
 import { type Operand, where } from './expr.js';
 import { matmul } from './linalg.js';
 import { Random } from './random.js';
@@ -111,9 +111,9 @@ export class Tensor {
     return this.value.context;
   }
 
-  /** The values as a TypedArray, in C order. */
-  read(): ReturnType<GpuArray['read']> {
-    return this.value.read();
+  /** The values as a TypedArray, in C order. `signal`, `offset` and `length` work as on `GpuArray.read`. */
+  read(options: ReadOptions = {}): ReturnType<GpuArray['read']> {
+    return this.value.read(options);
   }
   /** The one value of a single-element tensor. */
   item(): Promise<number> {
@@ -714,14 +714,16 @@ export abstract class Module {
     }
   }
 
-  /** The parameters and each child module's saved state, by dotted name. */
-  async stateDict(): Promise<Record<string, Float32Array>> {
+  /** The parameters and each child module's saved state, by dotted name. `signal` cancels every nested read. */
+  async stateDict(options: WaitOptions = {}): Promise<Record<string, Float32Array>> {
+    aborted(options.signal);
+    const read = { signal: options.signal };
     const out: Record<string, Float32Array> = {};
     const visit = async (name: string, value: unknown): Promise<void> => {
       if (value instanceof Tensor) {
-        if (value.requiresGrad) out[name] = (await value.value.read()) as Float32Array;
+        if (value.requiresGrad) out[name] = (await value.value.read(read)) as Float32Array;
       } else if (value instanceof Module) {
-        for (const [key, data] of Object.entries(await value.stateDict())) out[`${name}.${key}`] = data;
+        for (const [key, data] of Object.entries(await value.stateDict(read))) out[`${name}.${key}`] = data;
       } else if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i++) await visit(`${name}.${i}`, value[i]);
       }

@@ -51,7 +51,7 @@ including an empty array. The original standalone tracers remain available.
 ```ts
 import { Engine } from 'margoengine/core';
 import { ComposedVoxelPathTracer } from 'margoengine/voxel-pathtracer/compose';
-import { resampledEmitters } from 'margoengine/voxel-pathtracer/restir';
+import { resampledEmitters } from 'margoengine/voxel-pathtracer/resampled';
 import { causticGuiding } from 'margoengine/voxel-pathtracer/guiding';
 import { coloredMedia } from 'margoengine/voxel-pathtracer/media';
 import { triangleMeshes } from 'margoengine/voxel-pathtracer/mesh';
@@ -88,7 +88,7 @@ Updates copy caller arrays immediately, apply in call order and replace the scen
 
 | Entry | Factory | Feature options |
 | --- | --- | --- |
-| `/restir` | `resampledEmitters()` | `candidates: 1..64`, default 8 |
+| `/resampled` | `resampledEmitters()` | `candidates: 1..64`, default 8 |
 | `/guiding` | `causticGuiding()` | `guideStrength: 0..0.95`, default 0.5 |
 | `/media` | `coloredMedia()` | RGB `extinction` on scene media materials |
 | `/mesh` | `triangleMeshes()` | `meshes` on the scene |
@@ -101,7 +101,7 @@ triangle markers on native WebGPU and WebGL2 compatibility.
 
 ## Resampled emissive lighting
 
-`margoengine/voxel-pathtracer/restir` (or `@margoengine/voxel-pathtracer/restir`) exports
+`margoengine/voxel-pathtracer/resampled` (or `@margoengine/voxel-pathtracer/resampled`) exports
 `ResampledVoxelPathTracer`. Its options and lifecycle are the root tracer's, with `candidates` added:
 an integer from 1 to 64, default 8. One uses the original kernel exactly. Larger values combine
 `ceil(candidates / 2)` power-weighted emissive-face proposals and `floor(candidates / 2)` cosine
@@ -109,7 +109,7 @@ proposals (phase-function proposals inside media) in a visibility-aware reservoi
 
 ```ts
 import { Engine } from 'margoengine/core';
-import { ResampledVoxelPathTracer } from 'margoengine/voxel-pathtracer/restir';
+import { ResampledVoxelPathTracer } from 'margoengine/voxel-pathtracer/resampled';
 const engine = await Engine.create(document.querySelector('canvas')!, {
   camera: {position: [3, 2, 5], target: [0, 0, 0]},
 });
@@ -130,13 +130,15 @@ tracer.dispose();
 engine.dispose();
 ```
 
-This is independent resampled importance sampling, without spatial or temporal reservoir reuse. It only changes
+This is independent resampled importance sampling (RIS), without spatial or temporal reservoir reuse, so the entry
+is named `/resampled`, not ReSTIR; it was `/restir` before 2026-11-11. Each pixel sample draws fresh candidates, so
+progressive accumulation stays unbiased and samples stay independent. It only changes
 emissive surface lighting; camera emission, delta paths, sun, area lights and the environment retain their treatment.
 Every valid candidate evaluates visibility, and directional proposals also trace an intersection. Increasing the
 candidate count costs work; no wall-time speedup or universal variance reduction is claimed. Native WebGL2 reports
 `unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer); the WebGL2 compatibility layer runs
 the variant. The GPU regression keeps a 2x squared-error reduction requirement on its fixed 1,024-emitter ceiling
-scene at 32 samples against an 8,192-sample baseline reference. See `tests/restir-browser.mjs`.
+scene at 32 samples against an 8,192-sample baseline reference. See `tests/resampled-browser.mjs`.
 
 ## Caustic path guiding
 

@@ -5,7 +5,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
 import {VoxelPathTracer as BaseVoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
-const VoxelPathTracer=new URLSearchParams(location.search).has('spectral')?(await import('/packages/voxel-pathtracer/dist/spectral.js')).SpectralVoxelPathTracer:new URLSearchParams(location.search).has('media')?(await import('/packages/voxel-pathtracer/dist/media.js')).MediaVoxelPathTracer:new URLSearchParams(location.search).has('guiding')?(await import('/packages/voxel-pathtracer/dist/guiding.js')).GuidedVoxelPathTracer:new URLSearchParams(location.search).has('restir')?(await import('/packages/voxel-pathtracer/dist/restir.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
+const VoxelPathTracer=new URLSearchParams(location.search).has('spectral')?(await import('/packages/voxel-pathtracer/dist/spectral.js')).SpectralVoxelPathTracer:new URLSearchParams(location.search).has('media')?(await import('/packages/voxel-pathtracer/dist/media.js')).MediaVoxelPathTracer:new URLSearchParams(location.search).has('guiding')?(await import('/packages/voxel-pathtracer/dist/guiding.js')).GuidedVoxelPathTracer:new URLSearchParams(location.search).has('resampled')?(await import('/packages/voxel-pathtracer/dist/resampled.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
 import {motionCheck} from './motion-browser.js';
 const canvas=document.querySelector('canvas'),errors=[],messages=[],reports=[];
 const runtime=()=>engineRuntime(engine);
@@ -766,6 +766,34 @@ window.check={
  // casts a 16-unit shadow there (none with opaque false). Seen: the front shows its radiance, a one-sided panel's back
  // is black (opaque) or not there (the sky through it). Occlusion of another light: a dark panel between a floor and
  // a lit ceiling leaves the floor rho L (F_ceiling - F_panel), F the view factors of parallel rectangles centred above.
+ // KB0986d: the batch 99 full-distance emitter MIS repair, on the root tracer alone. A cosine square emitter (and
+ // then a square area light) at height 4 lights a floor through a 0.5-unit, density-0.4 absorbing slab it does not
+ // scatter in, so NEE and emitter hits must both convert their PDFs over the whole vertex-to-light distance. The
+ // floor's mean radiance is compared to an independent midpoint quadrature; the old last-segment distance gave 0.757
+ // for voxel emission against 0.690.
+ async mediaboundary(){
+  look([0,2,0],[0,0,0],{project:ortho(2),up:[0,0,-1]});
+  const slab={...model('slab',[32,1,32],()=>4),shapes:new Uint8Array(1024).fill(0x33)};
+  const base={revision:1,models:[model('floor',[32,1,32],()=>1),model('ceiling',[32,1,32],()=>2),slab],
+   instances:[{id:'floor',modelId:'floor',matrix:translate(-16,-1,-16)},{id:'ceiling',modelId:'ceiling',matrix:translate(-16,4,-16)},{id:'slab',modelId:'slab',matrix:translate(-16,2.5,-16)}],
+   materials:[{id:1,type:'diffuse',color:[1,1,1]},{id:2,type:'emit',color:[1,1,1],emission:1},{id:4,type:'media',color:[0,0,0],density:0.4}],
+   environment:{skyIntensity:0,sunIntensity:0,ground:false}};
+  const mean=(scene)=>withTracer(scene,{denoise:false,maxBounces:1},async(t)=>{
+   const img=await t.renderImage({width:16,height:16,samples:512,seed:317,jitter:false});
+   let sum=0;for(const v of img.color)sum+=v;return {mean:sum/img.color.length,finite:img.color.every(Number.isFinite)};
+  });
+  let expected=0;
+  for(let z=0;z<128;z++)for(let x=0;x<128;x++){
+   const dx=-16+(x+0.5)*0.25,dz=-16+(z+0.5)*0.25,r2=16+dx*dx+dz*dz;
+   expected+=16/(Math.PI*r2*r2)*Math.exp(-0.2*Math.sqrt(r2)/4)*0.25*0.25;
+  }
+  const out={expected};
+  out.emitter=await mean(base);
+  out.area=await mean({...base,instances:base.instances.filter((i)=>i.id!=='ceiling'),
+   lights:[{id:'panel',position:[0,4,0],direction:[0,-1,0],width:32,height:32,color:[1,1,1],intensity:1}]});
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  async arealight(){
   const out={},floor=model('f',[64,1,64],()=>1),mat=[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}];
   // Square panels centred over the origin facing down.

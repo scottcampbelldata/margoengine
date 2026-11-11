@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ComposedVoxelPathTracer } from '../dist/compose.js';
-import { resampledEmitters, ResampledVoxelPathTracer } from '../dist/restir.js';
+import { resampledEmitters, ResampledVoxelPathTracer } from '../dist/resampled.js';
 import { causticGuiding, GuidedVoxelPathTracer } from '../dist/guiding.js';
 import { coloredMedia, MediaVoxelPathTracer } from '../dist/media.js';
 import { triangleMeshes, MeshPathTracer } from '../dist/mesh.js';

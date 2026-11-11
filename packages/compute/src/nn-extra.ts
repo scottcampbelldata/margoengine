@@ -7,7 +7,7 @@ import { Random } from './random.js';
 import { concatenate, pad } from './shape.js';
 import { where } from './expr.js';
 import type { GpuArray, SliceSpec } from './array.js';
-import type { ComputeContext } from './context.js';
+import type { ComputeContext, WaitOptions } from './context.js';
 
 type Pair = readonly [number, number];
 const count = (s: readonly number[]) => s.reduce((a, b) => a * b, 1);
@@ -203,11 +203,12 @@ export class BatchNorm extends Module {
     if (this.weight) out = out.mul(this.weight.reshape(...shape)).add(this.bias!.reshape(...shape));
     return out;
   }
-  override async stateDict(): Promise<Record<string, Float32Array>> {
+  override async stateDict(options: WaitOptions = {}): Promise<Record<string, Float32Array>> {
+    const read = { signal: options.signal };
     return {
-      ...(await super.stateDict()),
-      runningMean: (await this.runningMean.read()) as Float32Array,
-      runningVar: (await this.runningVar.read()) as Float32Array,
+      ...(await super.stateDict(read)),
+      runningMean: (await this.runningMean.read(read)) as Float32Array,
+      runningVar: (await this.runningVar.read(read)) as Float32Array,
       batchesTracked: new Float32Array([this.batchesTracked]),
     };
   }

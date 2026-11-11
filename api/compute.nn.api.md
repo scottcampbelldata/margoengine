@@ -120,7 +120,7 @@ export abstract class Module {
     train(mode?: boolean): this;
     eval(): this;
     predict(input: GpuArray): GpuArray;
-    stateDict(): Promise<Record<string, Float32Array>>;
+    stateDict(options?: WaitOptions): Promise<Record<string, Float32Array>>;
     loadStateDict(state: Readonly<Record<string, ArrayLike<number>>>): void;
     dispose(): void;
     release(): void;
@@ -201,7 +201,7 @@ export class Tensor {
     get shape(): readonly number[];
     get ndim(): number;
     get context(): ComputeContext;
-    read(): ReturnType<GpuArray['read']>;
+    read(options?: ReadOptions): ReturnType<GpuArray['read']>;
     item(): Promise<number>;
     accumulate(g: GpuArray): void;
     backward(seed?: GpuArray): void;

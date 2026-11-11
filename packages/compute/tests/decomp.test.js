@@ -114,3 +114,71 @@ test('zero-size factors do no matrix work for any batch count', { timeout: 30000
     WebAssembly.instantiate = instantiate;
   }
 });
+// KB5765a: many exactly repeated columns once drove one-sided Jacobi's rounding-level residual columns into the
+// subnormal range, where the relative stopping test could never pass ("Jacobi iteration did not converge").
+test('svd converges on a 512 x 512 matrix of many repeated columns and keeps A = U S V^T', { timeout: 120000 }, async () => {
+  using ctx = await createCompute({ backend: 'cpu' });
+  const n = 512,
+    data = new Float32Array(n * n);
+  let seed = 1;
+  for (let i = 0; i < data.length; i++) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    data[i] = seed / 2 ** 32 - 0.5;
+  }
+  const a = ctx.array(data, { shape: [n, n] });
+  const { u, s, vh } = await svd(a);
+  const [U, S, V] = await Promise.all([u.read(), s.read(), vh.read()]);
+  for (let i = 1; i < n; i++) assert.ok(S[i] <= S[i - 1] && S[i] >= 0, `sorted nonnegative at ${i}`);
+  let error = 0,
+    norm = 0;
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++) {
+      let x = 0;
+      for (let k = 0; k < n; k++) x += U[r * n + k] * S[k] * V[k * n + c];
+      error = Math.max(error, Math.abs(x - data[r * n + c]));
+      norm = Math.max(norm, Math.abs(data[r * n + c]));
+    }
+  assert.ok(error <= 1e-4 * norm * Math.sqrt(n), `reconstruction ${error}`);
+  let orthogonal = 0;
+  for (let p = 0; p < n; p += 7)
+    for (let q = p; q < n; q += 5) {
+      let x = 0;
+      for (let r = 0; r < n; r++) x += U[r * n + p] * U[r * n + q];
+      orthogonal = Math.max(orthogonal, Math.abs(x - (p === q ? 1 : 0)));
+    }
+  assert.ok(orthogonal <= 1e-4, `U orthogonality ${orthogonal}`);
+});
+// KB5588a: a missing or corrupt decomp-kernel.wasm surfaced a raw ENOENT or WebAssembly.CompileError instead of a
+// help-linked MargoError. A private copy of dist keeps the shipped files untouched while other tests run.
+test('decomp Wasm read and compile failures reject as coded MargoErrors with the cause kept', { timeout: 60000 }, async () => {
+  const { cp, mkdtemp, rm, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { pathToFileURL } = await import('node:url');
+  const dir = await mkdtemp(join(tmpdir(), 'margo-decomp-'));
+  try {
+    await cp(new URL('../dist/', import.meta.url), dir, { recursive: true });
+    const compute = await import(pathToFileURL(join(dir, 'index.js')).href);
+    const decomp = await import(pathToFileURL(join(dir, 'decomp.js')).href);
+    using ctx = await compute.createCompute({ backend: 'cpu' });
+    const a = ctx.array([2, 0, 0, 3], { shape: [2, 2] });
+    assert.equal(await (await decomp.det(a)).item(), 6);
+    const coded = (cause) => (error) => {
+      assert.equal(error.name, 'MargoError');
+      assert.equal(error.code, 'failed');
+      assert.match(error.message, /Decomposition Wasm load failed/);
+      assert.match(error.message, /margoengine\.com\/errors#compute/);
+      assert.ok(cause(error.cause), String(error.cause));
+      return true;
+    };
+    await writeFile(join(dir, 'decomp-kernel.wasm'), new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 255]));
+    await assert.rejects(() => decomp.det(a), coded((cause) => cause instanceof WebAssembly.CompileError));
+    await rm(join(dir, 'decomp-kernel.wasm'));
+    await assert.rejects(() => decomp.det(a), coded((cause) => cause?.code === 'ENOENT'));
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(() => decomp.det(a, { signal: controller.signal }), { name: 'AbortError' });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -184,13 +184,34 @@ fn tall_svd(
     // 169, 2007, eq. 2.8) usually take m eps. 8 eps is Margo's choice, measured to converge on uniform random 700 x
     // 700, 1000 x 300 and 1180 x 40 (the workspace limit); outputs are f32, so the tighter test costs no visible
     // accuracy.
+    // Numerically zero columns. Exactly repeated columns leave a rounding-level residual column per repeat, which
+    // keeps rotating against the others, shrinking by about eps each time, until it reaches the subnormal range where
+    // the relative test above can no longer pass (Drmac and Veselic, LAWN 170, 2007, section 3.2: underflow can stop
+    // Jacobi converging). Inputs and outputs are f32, so a column whose norm times `scale` is below 2^-150 (half the
+    // smallest f32 subnormal) gives a singular value that rounds to 0 in every case: it is set to exactly zero, takes
+    // no further rotations and gets its left singular vector from the basis completion below. Graded columns above
+    // that floor keep every rotation, so one-sided Jacobi's relative accuracy (Demmel and Veselic, LAWN 15) holds for
+    // every singular value the output can represent.
+    let floor = (2.0_f64.powi(-150) / scale).powi(2);
     let mut converged = n < 2;
     for _ in 0..sweeps {
         let mut changed = false;
         for p in 0..n {
             for q in p + 1..n {
                 let alpha = dot(&columns[p], &columns[p]);
+                if alpha < floor {
+                    if alpha != 0.0 {
+                        columns[p].fill(0.0);
+                    }
+                    break;
+                }
                 let beta = dot(&columns[q], &columns[q]);
+                if beta < floor {
+                    if beta != 0.0 {
+                        columns[q].fill(0.0);
+                    }
+                    continue;
+                }
                 let gamma = dot(&columns[p], &columns[q]);
                 if gamma == 0.0 || gamma.abs() <= 8.0 * f64::EPSILON * alpha.sqrt() * beta.sqrt() {
                     continue;
@@ -238,29 +259,7 @@ fn tall_svd(
             }
         } else {
             // Complete a basis for zero singular values without disturbing A=USV^T.
-            let mut best = vec![0.0; m];
-            let mut largest = -1.0;
-            for axis in 0..m {
-                let mut v = vec![0.0; m];
-                v[axis] = 1.0;
-                for _ in 0..2 {
-                    for c in 0..j {
-                        let d: f64 = (0..m).map(|r| u[r * n + c] * v[r]).sum();
-                        for r in 0..m {
-                            v[r] -= d * u[r * n + c];
-                        }
-                    }
-                }
-                let norm = dot(&v, &v);
-                if norm > largest {
-                    largest = norm;
-                    best = v;
-                }
-            }
-            let norm = largest.sqrt();
-            for r in 0..m {
-                u[r * n + j] = best[r] / norm;
-            }
+            extend_basis(&mut u, n, m, j);
         }
         for c in 0..n {
             vh[j * n + c] = vectors[c * n + *old];
@@ -273,6 +272,45 @@ fn transpose(a: &[f64], m: usize, n: usize) -> Vec<f64> {
     (0..m * n).map(|i| a[(i % n) * m + i / n]).collect()
 }
 
+// Fills column `filled` of the row-major m-row matrix `u` (row stride `stride`) with a unit vector orthogonal to columns
+// 0..filled, which must be orthonormal. The axis e_k furthest from their span is the one whose row k has the smallest
+// sum of squares (its residual is 1 - |row k|^2), so one pass over the rows picks it and only that axis is
+// orthogonalized, twice (classical Gram-Schmidt with one reorthogonalization: Giraud, Langou and Rozloznik, "The loss of
+// orthogonality in the Gram-Schmidt orthogonalization process", Computers and Mathematics with Applications, 2005).
+// Trying every axis cost O(m^2 filled) per column, which made a rank-deficient 512 x 512 SVD spend most of a minute here.
+fn extend_basis(u: &mut [f64], stride: usize, m: usize, filled: usize) {
+    let mut axis = 0;
+    let mut smallest = f64::INFINITY;
+    for r in 0..m {
+        let row = &u[r * stride..r * stride + filled];
+        let norm = dot(row, row);
+        if norm < smallest {
+            smallest = norm;
+            axis = r;
+        }
+    }
+    let mut v = vec![0.0; m];
+    v[axis] = 1.0;
+    let mut d = vec![0.0; filled];
+    for _ in 0..2 {
+        d.fill(0.0);
+        for r in 0..m {
+            let row = &u[r * stride..r * stride + filled];
+            for c in 0..filled {
+                d[c] += row[c] * v[r];
+            }
+        }
+        for r in 0..m {
+            let row = &u[r * stride..r * stride + filled];
+            v[r] -= dot(row, &d);
+        }
+    }
+    let norm = dot(&v, &v).sqrt();
+    for r in 0..m {
+        u[r * stride + filled] = v[r] / norm;
+    }
+}
+
 fn complete(u: &[f64], m: usize, n: usize) -> Vec<f64> {
     let mut out = vec![0.; m * m];
     for r in 0..m {
@@ -281,28 +319,7 @@ fn complete(u: &[f64], m: usize, n: usize) -> Vec<f64> {
         }
     }
     for c in n..m {
-        let mut best = vec![0.; m];
-        let mut largest = -1.;
-        for axis in 0..m {
-            let mut v = vec![0.; m];
-            v[axis] = 1.;
-            for _ in 0..2 {
-                for j in 0..c {
-                    let d: f64 = (0..m).map(|r| v[r] * out[r * m + j]).sum();
-                    for r in 0..m {
-                        v[r] -= d * out[r * m + j];
-                    }
-                }
-            }
-            let norm = dot(&v, &v);
-            if norm > largest {
-                largest = norm;
-                best = v;
-            }
-        }
-        for r in 0..m {
-            out[r * m + c] = best[r] / largest.sqrt();
-        }
+        extend_basis(&mut out, m, m, c);
     }
     out
 }
@@ -539,6 +556,21 @@ mod tests {
                 near(&[d], &[if i == j { 1. } else { 0. }]);
             }
         }
+    }
+    #[test]
+    fn svd_floor_keeps_graded_values_and_zeroes_only_f32_zero_columns() {
+        // Graded: 1e-30 is far above the 2^-150 floor and keeps full relative accuracy.
+        let (_, s, _) = tall_svd(&[1., 0.5e-30, 0.5, 1e-30], 2, 2, 100).unwrap();
+        let exact = 0.75e-30 / (1.25_f64).sqrt();
+        assert!(
+            (s[1] - exact).abs() <= 1e-12 * exact,
+            "{} vs {}",
+            s[1],
+            exact
+        );
+        // A column below the floor gives exactly zero, never a nonconvergence.
+        let (_, s, _) = tall_svd(&[1., 1e-47, 0., 0.], 2, 2, 100).unwrap();
+        assert_eq!(s[1], 0.0);
     }
     #[test]
     fn svd_reconstruction_and_orthogonality() {

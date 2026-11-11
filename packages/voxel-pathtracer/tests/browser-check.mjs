@@ -16,6 +16,8 @@
 // - projections: markers land where the panorama (fitted to the width or the height), equidistant/equisolid/stereographic
 //   fisheye and Brown-Conrady formulas put them;
 //   per-pixel first hits of each agree with raycast along rays computed in the page;
+// - mediaboundary: voxel emission and an area light seen through an absorbing slab the path does not scatter in,
+//   against independent quadrature (emitter MIS over the full vertex-to-light distance, KB0986d).
 // - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
 //   panel occluding a lit ceiling against view factors;
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
@@ -358,6 +360,16 @@ try {
       assert.ok(t.hits > 300, `${name}: the view shows voxels`);
       assert.ok(t.same >= t.pixels - Math.ceil(t.pixels * 0.002), `${name}: GPU and CPU first hits differ`);
       assert.ok(t.maxRelativeDepth < 1e-4, `${name}: depth`);
+    }
+  }
+  if (wanted('mediaboundary')) {
+    const r = await run('mediaboundary');
+    console.log(
+      `  through an absorbing slab: emitter ${r.emitter.mean.toFixed(4)}, area light ${r.area.mean.toFixed(4)}, independent quadrature ${r.expected.toFixed(4)}`,
+    );
+    for (const name of ['emitter', 'area']) {
+      assert.equal(r[name].finite, true, `${name} through a medium boundary is finite`);
+      near(r[name].mean, r.expected, 0.02, `${name} MIS over the full vertex-to-light distance`);
     }
   }
   if (wanted('arealight')) {

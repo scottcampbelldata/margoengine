@@ -9754,7 +9754,7 @@
     "@margoengine/voxel-pathtracer/media": 2210,
     "@margoengine/voxel-pathtracer/mesh": 41562,
     "@margoengine/voxel-pathtracer/mesh-pbr": 47905,
-    "@margoengine/voxel-pathtracer/restir": 2190,
+    "@margoengine/voxel-pathtracer/resampled": 2190,
     "@margoengine/voxel-pathtracer/sky": 468,
     "@margoengine/voxel-pathtracer/spectral": 1471,
     "@margoengine/voxel-pathtracer/studio": 1303,

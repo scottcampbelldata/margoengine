@@ -1943,9 +1943,9 @@ Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics en
 
 | Capability | Limit | Cost and evidence |
 | --- | --- | --- |
-| Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/restir`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
+| Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/resampled`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
 
-Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,837 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
+Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, resampled 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,837 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
 
 ## Painterly post effects (batch 77, LIM-619)
 
@@ -2023,7 +2023,7 @@ analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; na
 `unsupported` and a registered help link. Native device restoration and disposal are exercised.
 
 Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
-Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,837 B remain unchanged. No existing size,
+Root 80,431 B, studio 1,047 B, resampled 1,934 B and core plus stage 23,837 B remain unchanged. No existing size,
 accuracy or time gate was relaxed.
 
 ## WFC heap and chunks (batch 69)
@@ -2562,7 +2562,7 @@ The calibration fixtures are authored stand-ins run on a real external binary. T
 establish exact subsurface, glass or atmosphere parity, independent whole-image repeatability,
 or a noise-free moving-camera denoiser. No speed claim is made.
 
-The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
+The corrected root entry measures 80997 B min+gzip. Optional resampled/guiding/sky/media/mesh/spectral
 entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
 strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
 
@@ -2711,7 +2711,7 @@ The WebGL2 compatibility README example also initializes independently of full t
 
 The sky README bakes its environment, then starts the progressive viewport independently of full tracer readiness. The bake still has its documented AbortSignal; no bake or driver-compilation deadline was raised. Preview-to-tracing startup is proven separately from any compilation-time bound.
 
-History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain ReSTIR 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
+History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain resampled 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
 
 
 ## Optional codec diagnostic restoration (2026-11-10)
@@ -6465,7 +6465,7 @@ Review 2 water composition: Caustics tracks live Water vertex deformation, inclu
 
 ## AVIF still images (batch 203 job 4)
 
-`@margoengine/decoders/avif` provides AVIFDecoder/decodeAVIF; /image dispatches lazily. The Margo-authored Rust SIMD decoder supports independent intra AV1 images, 8/10/12-bit 420/422/444 and monochrome, palettes, intra copy, grain, filters/restoration/superres, grids/identity, alpha/premultiplication and ordered clap/irot/imir. Output is straight RGBA8 by default or normalized RGBA16, retaining source bitDepth, CICP and ICC. ICC is metadata; output remains in the source encoded color space and has no automatic display profile or HDR tone map. RGB CICP matrices 0/1/2/4-14 are interpreted by H.273, with 2 defaulting to BT.601; derived systems require declared primaries/transfer. Reserved codes reject.
+`@margoengine/decoders/avif` provides AVIFDecoder/decodeAVIF; /image dispatches lazily. The Margo-authored Rust SIMD decoder supports independent intra AV1 images, 8/10/12-bit 420/422/444 and monochrome, palettes, intra copy, grain, filters/restoration/superres, grids/identity, alpha/premultiplication and ordered clap/irot/imir. A 'prem' reference must name exactly the primary item's one alpha auxiliary item; any other 'prem' reference rejects as invalid. Output is straight RGBA8 by default or normalized RGBA16, retaining source bitDepth, CICP and ICC. ICC is metadata; output remains in the source encoded color space and has no automatic display profile or HDR tone map. RGB CICP matrices 0/1/2/4-14 are interpreted by H.273, with 2 defaulting to BT.601; derived systems require declared primaries/transfer. Reserved codes reject.
 
 Defaults: maxPixels 2^26 per item, maxMemory 512 MiB (configurable through 1 GiB), workerLimit hardware concurrency capped at four (1-16), timeout 10 s plus 4 s/MiB. A conservative 128 bytes per padded luma sample bounds codec workspace before allocation; item/grid output also consumes the budget. The Wasm memory ceiling is 1 GiB. Input transfer defaults false. Aborting or disposing terminates the worker's active decode; later use creates a new worker. No core or stage code changes. Inter-frame/animated/progressive/layered streams, large-scale tile lists, protected/external items and derived tone-map/sample-transform items reject explicitly. These are outside the coordinator's independent intra still-image scope.
 

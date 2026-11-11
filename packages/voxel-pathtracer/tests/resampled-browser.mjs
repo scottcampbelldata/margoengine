@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {openBrowser} from '../../../scripts/browser.js';
 const results=[];
 for(const compat of [false,true]){
- const context=await openBrowser({startPath:'/packages/voxel-pathtracer/tests/restir.html',port:'free',...(compat&&process.platform==='win32'?{args:['--use-angle=vulkan']}:{})});
+ const context=await openBrowser({startPath:'/packages/voxel-pathtracer/tests/resampled.html',port:'free',...(compat&&process.platform==='win32'?{args:['--use-angle=vulkan']}:{})});
  const errors=[];context.page.on('pageerror',error=>errors.push(error.message));
  try{
   await context.page.waitForFunction(()=>window.ready,null,{timeout:120000});
@@ -27,7 +27,7 @@ for(const compat of [false,true]){
   results.push({compat,hardware:context.hardware,result});
  }finally{await context.close();}
 }
-const lifecycle=await openBrowser({startPath:'/packages/voxel-pathtracer/tests/browser-check.html?restir=1',port:'free'});
+const lifecycle=await openBrowser({startPath:'/packages/voxel-pathtracer/tests/browser-check.html?resampled=1',port:'free'});
 try{
  await lifecycle.page.waitForFunction(()=>window.ready,null,{timeout:120000});
  const result=await lifecycle.page.evaluate(()=>window.check.viewport());
@@ -38,4 +38,4 @@ try{
  results.push({lifecycle:result});
 }finally{await lifecycle.close();}
 await mkdir('test-results',{recursive:true});
-await writeFile('test-results/voxel-pathtracer-restir.json',JSON.stringify(results,null,2));
+await writeFile('test-results/voxel-pathtracer-resampled.json',JSON.stringify(results,null,2));

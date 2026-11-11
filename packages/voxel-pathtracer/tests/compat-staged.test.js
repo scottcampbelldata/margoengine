@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkWGSL } from '../../webgl2-compat/dist/wgsl.js';
 import { VoxelPathTracer } from '../dist/index.js';
-import { ResampledVoxelPathTracer, resampledEmitters } from '../dist/restir.js';
+import { ResampledVoxelPathTracer, resampledEmitters } from '../dist/resampled.js';
 import { GuidedVoxelPathTracer, causticGuiding } from '../dist/guiding.js';
 import { MediaVoxelPathTracer, coloredMedia } from '../dist/media.js';
 import { SpectralVoxelPathTracer, spectralTransport } from '../dist/spectral.js';
@@ -50,7 +50,7 @@ const meshScene = () => ({
 
 const cases = [
   ['base', (e) => VoxelPathTracer.attach(e, { scene: simpleScene() })],
-  ['restir', (e) => ResampledVoxelPathTracer.attach(e, { scene: simpleScene() })],
+  ['resampled', (e) => ResampledVoxelPathTracer.attach(e, { scene: simpleScene() })],
   ['guiding', (e) => GuidedVoxelPathTracer.attach(e, { scene: simpleScene() })],
   ['media', (e) => MediaVoxelPathTracer.attach(e, { scene: simpleScene() })],
   ['spectral', (e) => SpectralVoxelPathTracer.attach(e, { scene: simpleScene() })],

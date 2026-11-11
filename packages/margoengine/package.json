@@ -4995,9 +4995,9 @@
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"
     },
-    "./voxel-pathtracer/restir": {
-      "types": "./dist/voxel-pathtracer/restir.d.ts",
-      "import": "./dist/voxel-pathtracer/restir.js"
+    "./voxel-pathtracer/resampled": {
+      "types": "./dist/voxel-pathtracer/resampled.d.ts",
+      "import": "./dist/voxel-pathtracer/resampled.js"
     },
     "./voxel-pathtracer/compose": {
       "types": "./dist/voxel-pathtracer/compose.d.ts",

@@ -3350,7 +3350,7 @@ Clean-room equality matching on opposite face labels and the 24 determinant-posi
 
 ## Batch 99: resampled emissive lighting
 
-The optional voxel-pathtracer/restir entry was written from these papers only:
+The optional voxel-pathtracer/resampled entry was written from these papers only:
 
 - Talbot, Cline and Egbert, [Importance Resampling for Global Illumination](https://diglib.eg.org/bitstream/handle/10.2312/EGWR.EGSR05.139-146/139-146.pdf), 2005, sections 3-5: resampling correction, support and variance.
 - Bitterli et al., [Spatiotemporal reservoir resampling for real-time ray tracing with dynamic direct lighting](https://research.nvidia.com/sites/default/files/pubs/2020-07_Spatiotemporal-reservoir-resampling/ReSTIR.pdf), 2020, sections 2-3: streaming reservoirs and combining proposals with MIS.

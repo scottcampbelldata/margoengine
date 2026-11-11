@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VoxelPathTracer } from '../dist/index.js';
-import { ResampledVoxelPathTracer } from '../dist/restir.js';
+import { ResampledVoxelPathTracer } from '../dist/resampled.js';
 import { fakeDevice, fakeEngine, simpleScene } from './support.js';
 import { entries } from '../../../scripts/errors/entries.js';
 

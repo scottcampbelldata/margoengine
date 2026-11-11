@@ -216,7 +216,11 @@ console.log(gram.shape, await power.max().item(), smooth.size);
 matrices, NumPy style. They run in one lazily loaded SIMD Wasm module in f64 on every backend and return f32 arrays:
 partially pivoted LU, lower Cholesky, Householder QR, one-sided cyclic Jacobi SVD (Demmel and Veselic 1992; it never
 forms A^T A) and two-sided Jacobi for symmetric eigenpairs. Options: `fullMatrices` (default `false`, reduced Q and U)
-and `maxSweeps` (default 100, 1 to 1000; a Jacobi method that has not converged by then rejects). Each matrix must keep
+and `maxSweeps` (default 100, 1 to 1000; a Jacobi method that has not converged by then rejects). An SVD column whose
+singular value is below 2^-150, which rounds to 0 in f32, is set to exactly zero and its singular vector completed
+orthogonally, so rank-deficient inputs such as many repeated columns converge (512 by 512 in under 20 sweeps) while
+every representable small singular value keeps Jacobi's relative accuracy. A missing, blocked or corrupt
+`decomp-kernel.wasm` rejects with a `failed` MargoError that keeps the read or compile error as `cause`. Each matrix must keep
 `8 m n + 2 m^2 + 2 n^2` (plus `2 n k` for a solve with k right-hand sides) at or under 16,777,216 elements, so square
 matrices go up to 1182 (1094 for `solve` with as many columns); larger problems belong to the sparse solvers below.
 
@@ -346,7 +350,8 @@ package's own arrays, so a network runs unchanged on WebGPU and on the CPU backe
 A `Tensor` holds a GpuArray and how it was made. `tensor(array)` wraps your input, `parameter(array)` makes one to train, and
 `loss.backward()` fills `grad` on the parameters. Disposing a result (`using` does it for you) frees everything its forward and
 backward passes made; parameters, their gradients and your input arrays stay. `model.predict(array)` runs inference and keeps
-only the result. `await model.stateDict()` and `model.loadStateDict(state)` save and restore weights. Pass one
+only the result. `await model.stateDict()` and `model.loadStateDict(state)` save and restore weights;
+`model.stateDict({ signal })` and `tensor.read({ signal })` cancel a large readback. Pass one
 `rng: new Random(gpu, { seed })` to the layers to make starting weights repeat.
 
 ```ts
