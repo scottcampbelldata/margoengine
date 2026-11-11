@@ -637,6 +637,12 @@ Root Figure attachment still rejects the engine's WebGL2 preview backend; the op
 adapter adds surface and rectangle drawing below. CPU extraction is not integrated into that adapter yet.
 Strict surface/rectangle drawing parity passes on Chromium/RTX A6000; the other native layer paths remain pending.
 
+KB1405 evidence (2026-11-11): `Figure.create` axes (with scatter points), scatter, line and label volumes on the
+complete WebGL2 layer, on `/tiers` forced to half-float and on LDR, match native WebGPU at 192 x 144: mean(max RGB
+channel difference) at most 0.00004/255 and share(d > 8/255) 0 in every case, with identical tick-label text. The
+bounds were fixed before the first run (mean <= 1, share <= 0.02) in `packages/sciviz/tests/fallback-browser.mjs`,
+which fails when a case does not draw on the layer. This is the evidence for retiring the native `sciviz/webgl2` driver.
+
 Sciviz native drawing piece (batch 181, 2026-11-10): `await attachWebGL2(engine, { axes: false, ... })`
 returns a Figure on a real `backend: 'webgl2'` engine. CPU-backed surfaces, bars, histograms and heatmaps only;
 `signal` defaults absent and cancels module waiting/attachment with its exact reason; the module fetch may continue.
