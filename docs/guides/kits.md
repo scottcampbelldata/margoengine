@@ -78,6 +78,18 @@ that imports the physics entry ships exactly `rapier3d.wasm` (`packages/game/tes
 2026-11-10 the root re-exported `Physics`, `PhysicsBody` and `CharacterController`; change those imports to the
 physics subpath.
 
+## Browsers without WebGPU
+
+A kit starts on WebGPU. For a browser that has none, or blocks it (some school and office PCs, headless Firefox), install
+the WebGL2 layer next to the kit, `npm install @margoengine/webgl2-compat`, and run these two lines before
+`createStage`. The same scene then runs on WebGL2; a browser with WebGPU never downloads the layer, because it is a
+dynamic `import()`. The kits leave the layer out so that a page which never needs it carries nothing of it.
+
+```ts
+const webgpu = 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('@margoengine/webgl2-compat')).install();
+```
+
 ## Research and format choice
 
 Reviewed 2026-11-10, public documentation and published package metadata only. Registry versions, dependency

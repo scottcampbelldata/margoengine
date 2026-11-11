@@ -112,10 +112,15 @@ import { Picking, Selection } from 'margoengine/selection';
 import { Shadows } from 'margoengine/shadows';
 
 const status = document.querySelector('#status')!;
-if (!('gpu' in navigator)) {
-  status.textContent = 'This browser has no WebGPU, which this scene needs. See "Browser support" in the README.';
-  throw new Error('WebGPU unavailable');
-}
+const fail = (error: Error): never => {
+  status.textContent = `Margo could not start: ${error.message}. See "Browser support" in the README.`;
+  throw error;
+};
+
+// No WebGPU here (an older browser, or one that blocks it)? Load the WebGL2 layer first: it runs this same scene, and
+// a browser with WebGPU never downloads it.
+const webgpu = 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('margoengine/webgl2-compat')).install().catch(fail);
 
 // A 64 x 64 checkerboard painted in code, so the example needs no image file.
 const pixels = new Uint8Array(64 * 64 * 4);
@@ -127,10 +132,7 @@ for (let y = 0; y < 64; y++)
 const checker = new Texture({ data: pixels, width: 64, height: 64 }, { wrapS: 'repeat', wrapT: 'repeat' });
 
 // The stage mounts a canvas in #scene, adds orbit/pan/zoom with the mouse and starts the render loop.
-const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } }).catch((error: Error) => {
-  status.textContent = `Margo could not start: ${error.message}. See "Browser support" in the README.`;
-  throw error;
-});
+const stage = await createStage('#scene', { camera: { position: [4, 3, 6], target: [0, 0.6, 0] } }).catch(fail);
 const engine = stage.engine;
 
 // Aim the sun from the left and above, so the shadows fall to the right, where the camera can see them.
@@ -185,8 +187,8 @@ If the page is blank or shows an error:
 
 - Vite says `Failed to resolve import "margoengine"`: step 1 did not run in this folder. Run the `npm install` line from
   Route 2 again in the folder that holds `index.html` (and use `npx vite` there, not in the clone).
-- The status line says `This browser has no WebGPU` or `Margo could not start`: use desktop Chrome or Edge, or see
-  [Browser support](#browser-support).
+- The status line says `Margo could not start`: the browser has neither WebGPU nor the WebGL2 features the layer
+  needs (it names what is missing). Use desktop Chrome, Edge or Firefox, or see [Browser support](#browser-support).
 
 The scene is about 60 lines. Three things to know about it:
 
@@ -199,11 +201,12 @@ To change it: the ball's size is the first number of `sphereGeometry` (its radiu
 `setPosition`. A new mesh, such as a second crate, casts a shadow once you pass it to `shadows.add`, and the click handler
 names it once you add it to `names`.
 
-**WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
-in. Without WebGPU the page shows a message and stops. The site's demos run on WebGL2 without WebGPU through the optional
-[`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) layer. The small [`@margoengine/webgl2-compat/preview`](packages/webgl2-compat/README.md)
-preview renders plain meshes with flat shading on WebGL2, with no textures, shadows or effects, so it cannot run this
-quickstart. Details are under [Browser support](#browser-support).
+**WebGPU and the fallback.** Where the browser has no WebGPU, or blocks it (some school and office PCs, headless
+Firefox), the first lines of `main.ts` load the [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) layer,
+and the same scene runs on WebGL2 with its textures, shadows and picking. It is a dynamic `import()`, so a browser with
+WebGPU never downloads it and `createStage` stays the same size. Use the same two lines before `createStage` in your own
+pages. The small [`@margoengine/webgl2-compat/preview`](packages/webgl2-compat/README.md) preview renders plain meshes
+with flat shading only, so it cannot run this quickstart. Details are under [Browser support](#browser-support).
 
 Next: [Start here](docs/start-here.md) lists a guide for each goal: [textures and materials](docs/guides/textures-and-materials.md),
 [lights and shadows](docs/guides/lights-and-shadows.md), [camera and controls](docs/guides/camera-and-controls.md),

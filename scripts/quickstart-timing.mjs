@@ -15,7 +15,9 @@ import { speedBudget } from './speed/budgets.mjs';
 //   * INTERACTION: clicking the ball and the crate fires the page's pick handler (waited for, not a fixed time) and
 //     draws the orange outline; an orbit drag changes the picture and does not pick;
 //   * no console warning or error, page error or failed request on the shipped page;
-//   * the README's message when WebGPU is missing shows, and `Browser support` is a heading of the README.
+//   * FALLBACK: with no WebGPU, or an adapter request that answers null, the page loads the WebGL2 layer, draws the
+//     same scene and picks the ball;
+//   * the README's message when neither WebGPU nor WebGL2 is there shows, and `Browser support` is a heading of the README.
 // Gate: first command to verified interactive frame in under 300 s of machine time. Writes
 // test-results/quickstart-timing.json. Hard time limit for the whole run (default 900 s) with process-tree cleanup.
 //   node scripts/quickstart-timing.mjs [--route=1|2] [--source=<repo or url>] [--dir=<folder>] [--keep]
@@ -400,11 +402,20 @@ export async function main() {
     mark(`GPU lock held (waited ${sizes.gpuLockWaitSeconds} s behind other jobs; not counted)`);
     browser = await launchBrowser({ headless: true });
     notes.push(`browser ${browserLabel()} ${browser.version()} headless`);
-    const open = async (url, { noGpu = false, noAdapter = false } = {}) => {
+    const open = async (url, { noGpu = false, noAdapter = false, noWebGL2 = false } = {}) => {
       const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
       if (noGpu)
         await context.addInitScript(() => {
           delete Navigator.prototype.gpu;
+        });
+      if (noWebGL2)
+        await context.addInitScript(() => {
+          for (const Canvas of [HTMLCanvasElement, globalThis.OffscreenCanvas].filter(Boolean)) {
+            const get = Canvas.prototype.getContext;
+            Canvas.prototype.getContext = function (kind, ...rest) {
+              return kind === 'webgl2' ? null : get.call(this, kind, ...rest);
+            };
+          }
         });
       if (noAdapter)
         await context.addInitScript(() => {
@@ -419,6 +430,8 @@ export async function main() {
       );
       page.on('pageerror', (e) => page.problems.push(`page error: ${e.message}`));
       page.on('requestfailed', (r) => page.problems.push(`request failed: ${r.url()}`));
+      page.layerRequests = 0;
+      page.on('request', (r) => r.url().includes('webgl2-compat') && page.layerRequests++);
       page.on('response', async (r) => {
         if (r.status() >= 400) page.problems.push(`${r.status()} ${r.url()}`);
         page.bytes += Number(r.headers()['content-length'] ?? 0);
@@ -602,13 +615,58 @@ export async function main() {
     assert.doesNotMatch(await status(), /Picked/, 'an orbit drag must not pick');
     const secondsToInteractive = mark('interaction verified (pick handler, outline, orbit)');
     assert.deepEqual(page.problems, [], 'the shipped page logs no warning, error or failed request');
+    assert.equal(page.layerRequests, 0, 'a browser with WebGPU must not download the WebGL2 layer');
     await close(page);
 
-    // FAILURE PATH: no WebGPU shows the README's own message and then stops.
-    const none = await open(pageUrl('readme'), { noGpu: true });
-    await none.waitForFunction(() => /no WebGPU/.test(document.querySelector('#status').textContent), null, {
-      timeout: 8000,
-    });
+    // FALLBACK PATH: with no WebGPU, and with WebGPU whose adapter request answers null (a blocklisted driver, a remote
+    // desktop, headless Firefox), the README's first lines load the WebGL2 layer and the same scene draws and picks.
+    for (const [label, flags] of [
+      ['no WebGPU', { noGpu: true }],
+      ['no adapter', { noAdapter: true }],
+    ]) {
+      const fallback = await open(pageUrl('readme'), flags);
+      const shot = await waitForPicture(fallback, {
+        label: `the shipped page with ${label}`,
+        shoot,
+        pixels,
+        ready: (picture) =>
+          !findBall(picture)
+            ? 'the ball is not drawn'
+            : sharpEdges(picture, 560, 700, 20) > 300
+              ? true
+              : 'the floor shows no checker edges',
+        timeoutMs: 30_000,
+        evidenceDir: shotDir,
+      });
+      assert.ok(fallback.layerRequests > 0, `with ${label} the page never loaded the WebGL2 layer`);
+      assert.match(await fallback.textContent('#status'), /Drag to orbit/, `with ${label} the status line changed`);
+      const { cx, cy } = findBall(shot);
+      await fallback.mouse.click(Math.round(cx), Math.round(cy));
+      await fallback.waitForFunction(
+        () => /Picked the ball\./.test(document.querySelector('#status').textContent),
+        null,
+        { timeout: 8000 },
+      );
+      assert.deepEqual(
+        fallback.problems.filter((problem) => !problem.startsWith('console warning')),
+        [],
+        `with ${label} the page logs no error or failed request`,
+      );
+      notes.push(`${label}: drawn and picked on the WebGL2 layer (${fallback.layerRequests} layer requests)`);
+      await close(fallback);
+    }
+
+    // FAILURE PATH: neither WebGPU nor WebGL2 shows the README's own message, naming what is missing, and stops.
+    const none = await open(pageUrl('readme'), { noGpu: true, noWebGL2: true });
+    await none
+      .waitForFunction(() => /could not start/.test(document.querySelector('#status').textContent), null, {
+        timeout: 8000,
+      })
+      .catch(async () => {
+        throw new Error(
+          `with neither WebGPU nor WebGL2 the page still says "${await none.textContent('#status')}"; the reader sees no reason`,
+        );
+      });
     const message = await none.textContent('#status');
     assert.match(message, /Browser support/);
     assert.match(
@@ -616,23 +674,8 @@ export async function main() {
       /^## Browser support$/m,
       'the message points at a README heading that does not exist',
     );
-    notes.push(`no-WebGPU message: ${message}`);
+    notes.push(`no-WebGPU, no-WebGL2 message: ${message}`);
     await close(none);
-    // A browser that has WebGPU but no usable GPU (a blocklisted driver, a remote desktop): the adapter request answers null.
-    const blind = await open(pageUrl('readme'), { noAdapter: true });
-    await blind
-      .waitForFunction(() => /could not start/.test(document.querySelector('#status').textContent), null, {
-        timeout: 8000,
-      })
-      .catch(async () => {
-        throw new Error(
-          `with no adapter the page still says "${await blind.textContent('#status')}"; the reader sees no reason`,
-        );
-      });
-    const reason = await blind.textContent('#status');
-    assert.match(reason, /WebGPU unavailable.*Browser support/);
-    notes.push(`no-adapter message: ${reason}`);
-    await close(blind);
 
     // Gate. The timeline minus the later checks is the reader's machine time to the first interactive frame.
     const firstFrame = timeline.find((t) => t.step.startsWith('first frame')).seconds;
