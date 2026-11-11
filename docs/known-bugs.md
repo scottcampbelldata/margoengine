@@ -355,6 +355,35 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `packages/webgl2-compat/test/task-polling.test.js` ("a device fence is followed by a command of its own ...") and
   `packages/webgl2-compat/test/idle-fence-browser.mjs` in `test:gpu` (18 fence checks before, 1 after).
 
+### Fixed 2026-11-11: a voxel path tracer run could overrun a small GPU's watchdog (KB-BL1, Beelink Radeon 680M)
+
+- **Repro:** a path tracer GPU suite on the Beelink mini PC (Radeon 680M, integrated) crashed the machine. The tracer's
+  bound was 2^20 paths a dispatch (bug 25), measured on the RTX A6000 at the default 8 bounces: it did not count the
+  path loop (1,312 iterations a path at `maxBounces` 64 against 192 at 8, 6.8 times the work), nor the GPU (the 680M
+  runs the tracer about ten times slower), and the viewport put all of a frame's bands in the frame's one submission,
+  which a GPU that preempts only between submissions (AMD reports packet boundaries; KB4037 below) runs as one piece
+  against Windows' 2 s watchdog. `renderImage` dispatched a whole tile (up to 1,088 x 1,088 paths) at once.
+- **Cause:** the work bound counted paths, not path-iterations, per dispatch rather than per submission, and was fixed
+  to one GPU's speed.
+- **Fix (`packages/voxel-pathtracer/src/dispatch.ts`, `src/tracer.ts`):** a submission carries at most 2^20 x 192
+  path-iterations (`SUBMIT_WORK`; fewer paths at more bounces), and a tracer starts at a sixteenth of that, then sizes
+  its row bands to what its own GPU finished in 50 ms (`WorkPacer`, from submission to completion, at most twice the
+  step before). Every viewport band and every `renderImage` band is a submission of its own. Bands change no pixel's
+  sums and sample runs follow the fixed figure, so images do not depend on the GPU's speed: the browser check's
+  `determinism` case renders with one 8-row band a submission and gets the same image bit for bit. The WebGL2 route
+  already submits one part (2^17 paths) for one window (8 iterations) at a time, within the first budget. A converged
+  viewport submits nothing; a hidden tab draws no frames. Every shader loop is bounded by structure: the path loop by
+  `limit`, light loops by uniform counts, brick and cell walks step one cell along one axis each turn and stop outside
+  the grid (a NaN distance steps z), the instance tree visits each node once.
+- **Regression:** `packages/voxel-pathtracer/tests/dispatch-budget.test.js` (work per submission at 64 bounces, one
+  submission a band, the first budget a sixteenth, renderImage bands, converged frames submit nothing, the route's
+  window); three of its tests fail on the old code. `packages/voxel-pathtracer/tests/browser-check.mjs` `determinism`
+  (bands change no value). The machine-profile fallback that let the suite run there is fixed separately.
+- **Sources:** Microsoft, [Timeout Detection and Recovery (TDR)](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/timeout-detection-and-recovery)
+  (2 s default, per scheduled packet); Microsoft, [DXGI_COMPUTE_PREEMPTION_GRANULARITY](https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/ne-dxgi1_2-dxgi_compute_preemption_granularity)
+  (DMA buffer, dispatch, thread group, thread boundaries); S. Laine, T. Karras, T. Aila, "Megakernels Considered
+  Harmful: Wavefront Path Tracing on GPUs", HPG 2013 (bounded work per launch).
+
 ### Fixed 2026-11-11: the path tracer's transparent render never compiled on Direct3D 11 (WebGL2 layer)
 
 - **Repro:** `transparent` of `packages/voxel-pathtracer/tests/browser-check.mjs` with `MARGO_COMPAT=1` on ANGLE

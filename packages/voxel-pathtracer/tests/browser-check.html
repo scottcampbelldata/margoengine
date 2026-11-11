@@ -991,7 +991,11 @@ window.check={
     let equal=0;for(let i=0;i<a.color.length;i++)if(Object.is(a.color[i],whole.color[i]))equal++;
     passes={stopped:delta(before,after),horizon:delta(after,again),whole:delta(w0,w1),equal};
    }
-   return {values:a.color.length,identical:same,differentWithOtherSeed:other,passes,errors:errors.splice(0)};
+   // KB-BL1: renderImage traces in row bands sized by the measured GPU; the smallest bands (one 8-row band a
+   // submission) give the same image bit for bit (on WebGPU; the layer's route has parts of its own).
+   let banded;
+   if(!d.passes){d.voxelTraceWork=1;const small=await t.renderImage({width:96,height:64,samples:16,seed:5});delete d.voxelTraceWork;banded=0;for(let i=0;i<a.color.length;i++)if(Object.is(a.color[i],small.color[i]))banded++;}
+   return {values:a.color.length,identical:same,differentWithOtherSeed:other,passes,banded,errors:errors.splice(0)};
   }).finally(()=>{device().createBuffer=make;}).then(async(result)=>{
    // On the WebGL2 layer a tracer made again with the same scene and options makes no GL program: the layer shares one
    // per GLSL and vertex layout, so a rebuild neither compiles nor leaves dead programs for the browser to delete.

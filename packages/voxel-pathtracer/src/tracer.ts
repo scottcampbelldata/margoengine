@@ -54,7 +54,7 @@ import {
 } from './options.js';
 import { PngWriter } from './png.js';
 import { traceViewportSize } from './viewport.js';
-import { bandRowStep, planTrace, type TraceChunk } from './dispatch.js';
+import { bandRowStep, loopLimit, pathBudget, planTrace, WorkPacer, type TraceChunk } from './dispatch.js';
 import {
   buildSnapshot,
   checkNumber,
@@ -163,6 +163,10 @@ interface SceneBuffers {
 interface Gpu {
   device: GPUDevice;
   lost: boolean;
+  /** The work this device's trace submissions carry (dispatch.ts), from its measured speed. */
+  pacer: WorkPacer;
+  /** A viewport frame's submissions still being measured (one group at a time). */
+  pacing?: boolean;
   traceLayout: GPUBindGroupLayout;
   denoiseLayout: GPUBindGroupLayout;
   displayLayout: GPUBindGroupLayout;
@@ -874,6 +878,7 @@ export class VoxelPathTracer implements EnginePlugin {
       gpu: Gpu = {
         device,
         lost: false,
+        pacer: new WorkPacer(),
         traceLayout,
         denoiseLayout,
         displayLayout,
@@ -1584,7 +1589,8 @@ export class VoxelPathTracer implements EnginePlugin {
     const device = gpu.device,
       // Bands of whole workgroups (8 rows) whose offsets meet the storage alignment.
       step = Math.max(8, bandRowStep(width, device.limits.minStorageBufferOffsetAlignment ?? 256)),
-      chunks = planTrace(width, height, s0, count, step),
+      bounces = this.#settings.maxBounces,
+      chunks = planTrace(width, height, s0, count, step, pathBudget(bounces), pathBudget(bounces, gpu.pacer.budget)),
       write = (target: GPUBuffer, offset: number, k: TraceChunk) =>
         this.#writeFrame(
           device,
@@ -1630,13 +1636,31 @@ export class VoxelPathTracer implements EnginePlugin {
       this.#routeViewport(gpu, pipeline, groups, chunks, width, count);
       return true;
     }
-    const pass = c.encoder.beginComputePass();
-    pass.setPipeline(pipeline);
+    // Each band goes to the GPU in a submission of its own, ahead of the frame's commands (which read the image): a
+    // watchdog that preempts only between submissions sees at most one band's work at a time (dispatch.ts).
+    const t0 = performance.now(),
+      limit = loopLimit(this.#settings.maxBounces);
+    let work = 0;
     for (const [i, k] of chunks.entries()) {
+      const e = device.createCommandEncoder({ label: 'voxel-pathtracer viewport band' }),
+        pass = e.beginComputePass();
+      pass.setPipeline(pipeline);
       pass.setBindGroup(0, groups[i]);
       pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(k.rows / 8));
+      pass.end();
+      device.queue.submit([e.finish()]);
+      work += width * k.rows * k.count * limit;
     }
-    pass.end();
+    if (!gpu.pacing) {
+      gpu.pacing = true;
+      device.queue.onSubmittedWorkDone().then(
+        () => {
+          gpu.pacing = false;
+          gpu.pacer.observe(work, performance.now() - t0);
+        },
+        () => {},
+      );
+    }
     return true;
   }
 
@@ -1994,7 +2018,11 @@ export class VoxelPathTracer implements EnginePlugin {
               : (gpu.coverage ??= this.#traceKernel(gpu, 'coverage', false)))
           : undefined;
       let group: GPUBindGroup | undefined,
-        submitted = 0;
+        submitted = 0,
+        pending = 0,
+        since = performance.now();
+      // Bind groups of a tile's row bands, by rows; rebuilt with the tile's targets.
+      const bands = new Map<string, GPUBindGroup>();
       const check = () => {
         aborted(o.signal);
         this.#alive();
@@ -2023,47 +2051,89 @@ export class VoxelPathTracer implements EnginePlugin {
             this.#releaseTargets(targets);
             targets = this.#targets(gpu, undefined, w, h, o.denoise, snapshot.focusing);
             group = this.#traceGroup(gpu, frame, targets, copies);
+            bands.clear();
           }
-          const batch = Math.max(1, Math.min(16, Math.floor((1 << 20) / (w * h))));
+          // Samples a submission: at most 16, within the work budget for the loop's length (dispatch.ts; not timing,
+          // so the image's sums never depend on the GPU's speed).
+          const bounces = this.#settings.maxBounces,
+            limit = loopLimit(bounces),
+            batch = Math.max(1, Math.min(16, Math.floor(pathBudget(bounces) / (w * h)))),
+            // Band starts in whole workgroups whose offsets meet the storage alignment.
+            step = Math.max(8, bandRowStep(w, device.limits.minStorageBufferOffsetAlignment ?? 256));
           for (let s = 0; s < o.samples; s += batch) {
             check();
             const count = Math.min(batch, o.samples - s);
-            this.#writeFrame(
-              device,
-              frame,
-              camera,
-              [o.width, o.height, rx0, ry0],
-              [w, h, s, count],
-              o.seed,
-              o.jitter,
-              targets.caustics !== undefined,
-              layout,
-              snapshot,
-              o.wavelength,
-              o.transparent,
-            );
-            if ('sums' in kernels.trace)
+            if ('sums' in kernels.trace) {
+              this.#writeFrame(
+                device,
+                frame,
+                camera,
+                [o.width, o.height, rx0, ry0],
+                [w, h, s, count],
+                o.seed,
+                o.jitter,
+                targets.caustics !== undefined,
+                layout,
+                snapshot,
+                o.wavelength,
+                o.transparent,
+              );
               await (gpu.routeReady as TraceRoute).run(
                 kernels.trace,
                 (gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>).get(group!)!,
                 w,
                 h,
                 count,
-                this.#settings.maxBounces,
+                bounces,
                 check,
                 'image',
                 true,
               );
-            else {
+              continue;
+            }
+            // Row bands of the tile, each its own submission of at most the measured GPU's budget (bands change no
+            // pixel's sums); the frame uniform is written before each, in queue order.
+            // Test switch (browser-check's determinism case): a fixed band budget, to prove bands change no value.
+            const paced = (device as unknown as { voxelTraceWork?: number }).voxelTraceWork ?? gpu.pacer.budget;
+            for (const k of planTrace(w, h, s, count, step, pathBudget(bounces), pathBudget(bounces, paced))) {
+              const whole = k.rows === h,
+                key = `${k.y0}+${k.rows}`;
+              let banded = whole ? group! : bands.get(key);
+              if (!banded) {
+                banded = this.#traceGroup(gpu, frame, targets, copies, { frame: 0, at: k.y0 * w * 16, size: k.rows * w * 16 });
+                bands.set(key, banded);
+              }
+              this.#writeFrame(
+                device,
+                frame,
+                camera,
+                [o.width, o.height, rx0, ry0 + k.y0],
+                [w, k.rows, s, count],
+                o.seed,
+                o.jitter,
+                targets.caustics !== undefined,
+                layout,
+                snapshot,
+                o.wavelength,
+                o.transparent,
+              );
               const e = device.createCommandEncoder(),
                 pass = e.beginComputePass();
               pass.setPipeline(kernels.trace);
-              pass.setBindGroup(0, group!);
-              pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
+              pass.setBindGroup(0, banded);
+              pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(k.rows / 8));
               pass.end();
               device.queue.submit([e.finish()]);
+              pending += w * k.rows * count * limit;
+              // At most four submissions queued; each group's time (first submit to done) measures this GPU.
+              if (++submitted % 4 === 0) {
+                await device.queue.onSubmittedWorkDone();
+                gpu.pacer.observe(pending, performance.now() - since);
+                pending = 0;
+                since = performance.now();
+                check();
+              }
             }
-            if (++submitted % 4 === 0) await device.queue.onSubmittedWorkDone();
           }
           check();
           const e = device.createCommandEncoder();

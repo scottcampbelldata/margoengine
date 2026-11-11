@@ -7741,3 +7741,14 @@ positive (opacity 1 is infinite extinction), instead of 1 - 1e-6^k or a 0.999999
 already did. The cinematic path tracer keeps its 0.9999 extinction clamp (a finite free-flight distance). Evidence:
 case 8 of `tests/volume-physics-browser.mjs`, `opaque` in `tests/curvilinear-browser.mjs`, the opacity check of
 `tests/bricks-browser.js` and `tests/pick-gpu-browser.mjs` (threshold 1), both backends on the A6000.
+
+## GPU work per submission on small GPUs (KB-BL1, section 5 supplement, 2026-11-11)
+
+A voxel path tracer suite crashed the Beelink (Radeon 680M). The tracer's bound counted paths per dispatch (2^20,
+measured on the RTX A6000 at 8 bounces); it ignored the path loop's length, the GPU's speed, and that a viewport frame's
+bands shared one submission, which a GPU preempting only between packets runs whole against Windows' 2 s watchdog.
+The rule for GPU kernels now: bound work (items x loop iterations) per submission, not per dispatch; start a new device
+small and size later submissions from its measured speed; keep any timing-driven split to one that changes no value
+(row bands), with value-affecting splits (sample runs) fixed by work counts alone. Evidence: work counts in
+`packages/voxel-pathtracer/tests/dispatch-budget.test.js`; bit-identical bands in the browser check's `determinism`
+case. Still missing: the Beelink validation run under a heat watchdog (recorded in docs/known-bugs.md when done).

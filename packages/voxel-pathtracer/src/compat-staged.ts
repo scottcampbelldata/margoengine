@@ -43,7 +43,7 @@ export interface StagedTrace {
 }
 
 /** Iterations of the path loop for `maxBounces` (its `limit`, which the generator checks against the shader). */
-export const loopLimit = (maxBounces: number): number => maxBounces * 4 + 16 + (maxBounces + 1) * 16;
+export { loopLimit } from './dispatch.js';
 
 const LIMIT = 'let limit=f.config.x*4u+16u+(f.config.x+1u)*16u;';
 const RADIANCE = 'fn radiance(px:vec2u)->Path {';

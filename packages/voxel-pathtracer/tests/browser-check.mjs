@@ -527,6 +527,7 @@ try {
     );
     assert.equal(r.identical, r.values);
     assert.ok(r.differentWithOtherSeed > r.values / 2);
+    if (r.banded !== undefined) assert.equal(r.banded, r.values, 'the smallest row bands change no value');
     // On the WebGL2 layer the route marks finished paths in a stencil (later programs skip them) and stops a part's
     // path loop once a census finds every path finished, with no synchronous GPU read; the image is bit for bit the
     // one of the whole loop. The first render reads a census after every window; the second (the same image, bit for
