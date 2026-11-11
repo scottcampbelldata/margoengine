@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { compare } from '../../../scripts/support/visual-image.js';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -166,9 +167,12 @@ for (const compat of [false, true]) {
       JSON.stringify({ changed: comparison.changed, hot: comparison.hot, mean: comparison.mean, max: comparison.max }),
     );
     assert.deepEqual(errors, []);
+    // Pixel hashes, so a refactor can show its tiled and whole-image output is byte-identical to an earlier run.
+    const sha256 = (data) => createHash('sha256').update(Uint8Array.from(data)).digest('hex');
     reports.push({
       compat,
       ...result,
+      sha256: { tiled: sha256(images.tiled), full: sha256(images.full) },
       comparison: { changed: comparison.changed, hot: comparison.hot, mean: comparison.mean, max: comparison.max },
     });
   } finally {

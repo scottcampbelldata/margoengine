@@ -6321,6 +6321,8 @@ Optional sciviz/export-media captures real off-axis tiles on WebGPU and the shar
 
 Batch 178 job 3 measured gzip: sciviz/export-media 6994 B (ceiling 7250), lines/tiles 409 B (665), lines/batch 6263 -> 6592 B (6848), lines/pick 5989 -> 6465 B (6721), headless/video 7031 -> 7297 B (7553). Lines root is 20291 B inside 20524 B; sciviz root is 56915 B inside 58369 B. Core + stage remains 24209 B. Shared line-frame construction and coherent media lifetimes justify optional-entry growth; a split would duplicate state and file ownership.
 
+Lines pay only for tiles they import (2026-11-10): the tile row and capture step moved from the lines root into `lines/tiles`, which widens the Frame (96 to 112 bytes) and rewrites the shaders on the first `setLineCameraTile` through an internal frame hook. Measured gzip on the same main: lines root 20484 -> 20286 B (the root without any tile code or hook is 20243 B, so the hook costs 43 B; ceiling 20524 unchanged), lines/batch 6606 -> 6386 B, lines/pick 6465 -> 6281 B, lines/tiles 409 -> 1357 B (ceiling 665 -> 1613 B). The tiles entry now holds all the tiled-capture code that every lines user used to load; splitting it further would only move its renderer rebuild back into the root.
+
 
 Review 3 L1: direct MSFTMaterialLOD and ClusterLOD disposal unregisters the controller from its actual scene. Cluster frame passes are removed with the registration; source models, hierarchy geometry and anchors remain caller-owned. Repeated direct disposal and scene-initiated disposal are safe, and same-name plugins in another scene survive. No public API change.
 

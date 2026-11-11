@@ -5,7 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
-import type { LineExtension } from './extension.js';
+import { lineFrame, type LineExtension } from './extension.js';
 import { fillFrame } from './math.js';
 import {
   biasedShader,
@@ -109,9 +109,9 @@ export class Lines implements EnginePlugin {
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
   private frameBuffer?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
-  private readonly frameData = new Float32Array(28);
-  private readonly frameBits = new Uint32Array(this.frameData.buffer);
-  private readonly frameWritten = new Uint32Array(28);
+  private frameData = new Float32Array(24);
+  private frameBits = new Uint32Array(this.frameData.buffer);
+  private frameWritten = new Uint32Array(24);
   private frameValid = false;
   /** This frame's lines in draw order: depth-tested writers, depth-tested, on-top writers, on-top. */
   private readonly drawLists: Array<Array<[Line, Resources]>> = [[], [], [], []];
@@ -192,7 +192,7 @@ export class Lines implements EnginePlugin {
       buffer: { type: 'uniform', minBindingSize: size },
     });
     const frame = device.createBindGroupLayout({
-      entries: [uniform(112, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
+      entries: [uniform(96, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)],
     });
     const style = device.createBindGroupLayout({
       entries: [
@@ -203,7 +203,7 @@ export class Lines implements EnginePlugin {
     });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
     this.module(0);
-    this.frameBuffer = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.frameValid = false;
     this.frameGroup = device.createBindGroup({
       layout: frame,
@@ -229,6 +229,7 @@ export class Lines implements EnginePlugin {
       if (variant & FILL) code = filledShader(code);
       code = phasedShader(code, Math.floor(variant / STEP));
       if (extension) code = extension.shader(code);
+      if (lineFrame.hook) code = lineFrame.hook.shader(code);
       module = this.device!.createShaderModule({ code });
       this.modules.set(key, module);
     }
@@ -483,6 +484,7 @@ export class Lines implements EnginePlugin {
     stats.lines = stats.segments = stats.drawCalls = 0;
     if (context.backend !== 'webgpu' || !this.device || !this.engine) return;
     if (context.device !== this.device) return;
+    lineFrame.hook?.lines(this);
     const engine = this.engine as unknown as EngineKernel,
       device = this.device,
       lists = this.drawLists;

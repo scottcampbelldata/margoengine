@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14904000,
+  "total": 14904353,
   "history": [
     {
       "date": "2026-10-24",
@@ -8327,6 +8327,12 @@
       "commit": "178763cbb0",
       "reason": "fbx lean geometry build (typed working arrays, vertex-key hash table, two-pass fill) and the parser's transient inflate check: entry measured 22,685 B gzip against a 22,144 B budget; the bytes buy importing the documented 1,000,000-vertex cap inside the default memory caps (94 B a corner instead of about 267 B), and the build is one function on the conversion path, so a split would only add a module load",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "cae2c43cce",
+      "reason": "Lines pay only for tiles they import: the tile row, capture shader step and Frame rebuild moved from the lines root into lines/tiles. lines/tiles 409 -> 1357 B gzip; lines root 20484 -> 20286 B, lines/batch 6606 -> 6386 B, lines/pick 6465 -> 6281 B. The bytes are the feature itself, which every lines user carried before; a split would put the rebuild back in the root.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8818,14 +8824,14 @@
     "@margoengine/lightmap/probes": 3273,
     "@margoengine/lightmap/refracted": 9015,
     "@margoengine/lines": 20524,
-    "@margoengine/lines/batch": 6848,
-    "@margoengine/lines/debug": 10171,
+    "@margoengine/lines/batch": 6642,
+    "@margoengine/lines/debug": 9966,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
-    "@margoengine/lines/pick": 6721,
+    "@margoengine/lines/pick": 6537,
     "@margoengine/lines/stroke": 4663,
     "@margoengine/lines/texture": 6617,
-    "@margoengine/lines/tiles": 665,
+    "@margoengine/lines/tiles": 1613,
     "@margoengine/lines/trail": 5451,
     "@margoengine/loaders": 53650,
     "@margoengine/loaders dist/workers/usd.js": 8435,

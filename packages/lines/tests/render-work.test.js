@@ -21,15 +21,14 @@ test('line frames reuse exact uniform bytes across views and resource restoratio
     descriptor: { depthStencil: { format: 'depth24plus' }, multisample: { count: 1 } },
   };
   const run = passes(lines), frame = () => gpu.record(() => run(context));
-  const writes = (log) => log.filter((e) => e[0] === 'writeBuffer' && e[3].length === 224);
+  const writes = (log) => log.filter((e) => e[0] === 'writeBuffer' && e[3].length === 192);
   const check = () => {
-    const log = frame(), expected = new Float32Array(28);
+    const log = frame(), expected = new Float32Array(24);
     expected.set(camera.matrix);
     expected.set([context.width, context.height,
       engine.canvas.clientWidth ? context.width / engine.canvas.clientWidth : 1,
       (0.5 * context.height) / Math.tan((camera.fov * Math.PI) / 360),
       context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1], 16);
-    expected.set([1, 1, 0, 0], 24);
     assert.deepEqual(writes(log).map((e) => e[3]), [Buffer.from(expected.buffer).toString('hex')]);
     return log;
   };

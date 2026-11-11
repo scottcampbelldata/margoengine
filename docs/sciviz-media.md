@@ -33,8 +33,10 @@ Physical density is positive and at most 1000000 dpi. PNG carries pHYs; WebP car
 view-projection and tile rectangle. Line joins, caps, widths, distances and colour interpolation
 are constructed in that full coordinate system before the finished vertex is cropped. Capture
 vertices share a 1/256-pixel grid. Ordinary rendering keeps its existing unsnapped path. The
-remover is idempotent and cannot erase a newer assignment. Lines, batches, picking uniforms and
-shader variants share the extended frame layout; no core or stage changes are required.
+remover is idempotent and cannot erase a newer assignment. The first call widens the Frame of Lines,
+batches and picking from 96 to 112 bytes and adds the capture step to every shader variant, through the
+internal frame hook of `@margoengine/lines`; a page that never calls it keeps the base Frame and shaders.
+No core or stage changes are required.
 
 ## Timeline files and provenance
 

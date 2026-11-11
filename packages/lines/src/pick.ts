@@ -7,6 +7,7 @@ import { VERTICES_PER_SEGMENT } from './geometry.js';
 import type { Line } from './line.js';
 import type { Lines } from './lines.js';
 import { fillFrame } from './math.js';
+import { lineFrame } from './extension.js';
 import { biasedShader, clipCut, lineShader, pointWidthShader, ribbonShader } from './shader.js';
 import { beginPickPass, ensurePickBase } from '../../shared/pick-base.js';
 
@@ -45,6 +46,8 @@ interface Entry {
 
 interface Gpu {
   device: GPUDevice;
+  /** The Lines frame layout everything here was made against. */
+  layout: GPUBindGroupLayout;
   frame: GPUBuffer;
   frameGroup: GPUBindGroup;
   baseLayout: GPUBindGroupLayout;
@@ -101,7 +104,7 @@ export class LinePicking {
   private entries: Entry[] = [];
   private readonly standIns = new Map<Line, Mesh>();
   private readonly owners = new Map<Mesh, Line>();
-  private readonly frameData = new Float32Array(28);
+  private frameData = new Float32Array(24);
   private remove?: () => void;
 
   /**
@@ -124,8 +127,11 @@ export class LinePicking {
   }
 
   private resources(device: GPUDevice, layouts: NonNullable<Lines['layouts']>): Gpu {
-    if (this.gpu?.device === device) return this.gpu;
-    const frame = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+    if (this.gpu?.device === device && this.gpu.layout === layouts.frame) return this.gpu;
+    const hook = lineFrame.hook,
+      bytes = this.lines['frameData'].byteLength,
+      framed = (code: string) => (hook ? hook.shader(code) : code),
+      frame = device.createBuffer({ size: bytes, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
       baseLayout = device.createBindGroupLayout({
         entries: [
           {
@@ -136,8 +142,8 @@ export class LinePicking {
         ],
       }),
       layout = device.createPipelineLayout({ bindGroupLayouts: [layouts.frame, layouts.style, baseLayout] }),
-      plain = device.createShaderModule({ code: biasedShader(linePickShader()) }),
-      widths = device.createShaderModule({ code: biasedShader(pointWidthShader(linePickShader())) }),
+      plain = device.createShaderModule({ code: framed(biasedShader(linePickShader())) }),
+      widths = device.createShaderModule({ code: framed(biasedShader(pointWidthShader(linePickShader()))) }),
       ribbons = new Map<GPUCompareFunction, GPURenderPipeline>(),
       extended = new Map<string, GPURenderPipeline>(),
       pipeline = (depthCompare: GPUCompareFunction, module: GPUShaderModule, entryPoint = 'vertex') =>
@@ -148,8 +154,10 @@ export class LinePicking {
           primitive: { topology: 'triangle-list', cullMode: 'none' },
           depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare },
         });
+    this.frameData = new Float32Array(bytes / 4);
     return (this.gpu = {
       device,
+      layout: layouts.frame,
       frame,
       frameGroup: device.createBindGroup({
         layout: layouts.frame,
@@ -165,7 +173,9 @@ export class LinePicking {
         const key = extension.key + depthCompare;
         let made = extended.get(key);
         if (!made) {
-          const module = device.createShaderModule({ code: extension.shader(biasedShader(linePickShader()), true) });
+          const module = device.createShaderModule({
+            code: framed(extension.shader(biasedShader(linePickShader()), true)),
+          });
           made = device.createRenderPipeline({
             layout: device.createPipelineLayout({
               bindGroupLayouts: [layouts.frame, this.lines['styleLayout'](extension), baseLayout],
@@ -182,7 +192,7 @@ export class LinePicking {
       ribbon: (depthCompare) => {
         let made = ribbons.get(depthCompare);
         if (!made) {
-          const code = biasedShader(ribbonShader(linePickShader(), true));
+          const code = framed(biasedShader(ribbonShader(linePickShader(), true)));
           made = pipeline(depthCompare, device.createShaderModule({ code }), 'ribbonVertex');
           ribbons.set(depthCompare, made);
         }
@@ -214,10 +224,11 @@ export class LinePicking {
   drawPick(c: LinePickContext): void {
     const lines = this.lines,
       device = lines['device'],
-      layouts = lines['layouts'],
       engine = lines['engine'] as unknown as EngineKernel | undefined;
     this.entries = [];
-    if (!device || !layouts || !engine) return;
+    if (!device || !engine) return;
+    lineFrame.hook?.lines(lines);
+    const layouts = lines['layouts']!;
     lines['collect'](engine, 0);
     const lists = lines['drawLists'],
       // The hidden part of a line repeats a line that picks, and is not on show where the pick lands.

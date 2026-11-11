@@ -455,6 +455,31 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 - Hidden lines and points cut away by the material's clipping planes do not hit; nor does anything behind the ray origin or outside `near` and `far`. Hits ignore depth, as all `Raycaster` hits do: merge with mesh hits by `distance`.
 - A pick on a polyline of 100,000 segments takes 0.015 ms; the BVH behind it takes 51 ms to build, on the first pick and after the line changes (`node packages/bvh/scripts/bench-line-pick.js`, Node 26). A dashed line's matrix change counts as a change.
 
+## Tiled capture
+
+`@margoengine/lines/tiles` keeps joins, widths, dashes and edge distances in the whole image's pixels while a camera
+renders one tile of it, so tiles of a large image meet without seams (`@margoengine/sciviz/export-media` uses it). The
+first `setLineCameraTile` of a page widens the line renderers' Frame uniform from 96 to 112 bytes and adds a capture
+step to their shaders; a page that never calls it keeps the base Frame and shaders and ships none of this code.
+
+```ts
+import { Camera } from '@margoengine/core';
+import { setLineCameraTile } from '@margoengine/lines/tiles';
+const camera = new Camera({ position: [0, 1, 8], target: [0, 0, 0] });
+camera.update(16 / 9, true);
+// The top-left 1024 x 1024 tile of a 4096 x 2304 image: pass the uncropped matrix, then crop the camera to the tile.
+const release = setLineCameraTile(camera, {
+  matrix: camera.matrix,
+  fullWidth: 4096,
+  fullHeight: 2304,
+  x: 0,
+  y: 0,
+  width: 1024,
+  height: 1024,
+});
+release(); // Lines draw this camera normally again; calling it twice is harmless.
+```
+
 ## Limits
 
 - Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
@@ -509,7 +534,7 @@ The renderer now refuses the preview during setup, allowing automatic escalation
 ## Retained frame data
 
 Unchanged camera uniforms stay on the GPU: 101 identical frames queue one
-112-byte frame write instead of 101. Independent butt and square segments,
+96-byte frame write instead of 101. Independent butt and square segments,
 including default skeleton bones, omit 72 zero-area fan vertices. All visible
 triangles, dashes and pixel coverage stay the same. No options are required.
 
