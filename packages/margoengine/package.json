@@ -195,6 +195,10 @@
       "types": "./dist/audio/sprites.d.ts",
       "import": "./dist/audio/sprites.js"
     },
+    "./audio/spectrogram": {
+      "types": "./dist/audio/spectrogram.d.ts",
+      "import": "./dist/audio/spectrogram.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
@@ -726,6 +730,10 @@
     "./compute/quant": {
       "types": "./dist/compute/quant.d.ts",
       "import": "./dist/compute/quant.js"
+    },
+    "./compute/distance": {
+      "types": "./dist/compute/distance.d.ts",
+      "import": "./dist/compute/distance.js"
     },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
@@ -4238,6 +4246,10 @@
     "./terrain/blend": {
       "types": "./dist/terrain/blend.d.ts",
       "import": "./dist/terrain/blend.js"
+    },
+    "./terrain/planet-recipes": {
+      "types": "./dist/terrain/planet-recipes.d.ts",
+      "import": "./dist/terrain/planet-recipes.js"
     },
     "./terrain/planet": {
       "types": "./dist/terrain/planet.d.ts",

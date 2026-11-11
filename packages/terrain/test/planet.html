@@ -85,6 +85,33 @@ window.planet = {
     s.canvas.remove();
     return out;
   },
+  // A preset from `@margoengine/terrain/planet-recipes` on its own body; eye and target in radii from the centre.
+  async recipe({ name, eye, target, frames = 1 }) {
+    const { planetPreset, planetPresetRadius } = await import('/packages/terrain/dist/planet-recipes.js');
+    const radius = planetPresetRadius(name),
+      scale = (a) => a.map((v) => v * radius),
+      s = await make({ eye: scale(eye), target: scale(target), radius, height: planetPreset(name, { radius }), relief: 300, seaLevel: false, near: 1 });
+    await waitForPipelines(() => frame(s), { ready: () => s.planet.stats.built === 0 });
+    const error = await s.engine.gpu.popErrorScope(),
+      d = s.pixels;
+    let sum = 0,
+      sq = 0,
+      n = 0,
+      hash = 2166136261;
+    for (let i = 0; i < d.length; i += 4) {
+      if (isSky(d, i)) continue;
+      const l = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      sum += l;
+      sq += l * l;
+      n++;
+    }
+    for (let i = 0; i < d.length; i++) hash = Math.imul(hash ^ d[i], 16777619) >>> 0;
+    const out = { ground: n, mean: n ? sum / n : 0, deviation: n ? Math.sqrt(Math.max(0, sq / n - (sum / n) ** 2)) : 0, hash, error: error?.message ?? null, built: s.planet.stats.built };
+    s.planet.dispose();
+    s.engine.dispose();
+    s.canvas.remove();
+    return out;
+  },
   async flight() {
     const up = norm([0.3, 0.5, 0.8]),
       s = await make({ eye: up.map((v) => v * 3 * R), target: [0, 0, 0], origin: true }),

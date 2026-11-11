@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14999890,
+  "total": 15003330,
   "history": [
     {
       "date": "2026-10-24",
@@ -8369,6 +8369,12 @@
       "commit": "302130b61c",
       "reason": "New optional audio/spectrogram entry absent (0 B) to 5057 B min+gzip, budget 5313 B (plan ceiling 5500 B): windows, two-for-one real radix-2 FFT, STFT, ISTFT, spectrogram image and fast Griffin-Lim in one entry that shares the plan and window code; the GPU path loads compute/fft only when asked. No Wasm. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "29b4a5cea3",
+      "reason": "new entry @margoengine/terrain/planet-recipes (craters, ridged noise, domain warp, presets; planet entry unchanged)",
+      "grew": 1
     }
   ],
   "items": {
@@ -8408,7 +8414,7 @@
     "@margoengine/audio/music": 1828,
     "@margoengine/audio/occlusion": 1772,
     "@margoengine/audio/pan": 933,
-    "@margoengine/audio/spectrogram": 5313,
+    "@margoengine/audio/spectrogram": 5281,
     "@margoengine/audio/sprites": 1764,
     "@margoengine/audio/voices": 2373,
     "@margoengine/audio/zones": 1395,
@@ -9446,6 +9452,7 @@
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/overlays": 4061,
     "@margoengine/terrain/planet": 7538,
+    "@margoengine/terrain/planet-recipes": 3472,
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/rvt": 7126,
     "@margoengine/terrain/sculpt": 4873,

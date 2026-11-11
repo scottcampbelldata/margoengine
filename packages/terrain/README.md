@@ -1020,3 +1020,47 @@ The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl
 The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.
 
 `TerrainImagery` refuses the small preview through the shared `requireWebGPU` (`TerrainImagery needs WebGPU`, code `unsupported`, help link). Before 2026-11-10 it threw `unsupported` with `Imagery requires WebGPU or its compatibility device` and no help link, which the preview-contract gate counted as a silent skip, so `npm run verify` failed. It now also refuses an engine whose backend is `webgl2` even when a device object is present, as every shared refusal does. Regression: `test/imagery.test.js`.
+
+## Planet recipes: `@margoengine/terrain/planet-recipes`
+
+Ground functions for `PlanetTerrain`: impact craters with a real size distribution and profile, ridged noise, domain
+warp and ready-made moons, Mars-like worlds, asteroids and ice moons. Every function returns a `PlanetHeight`, so it
+goes straight into `PlanetTerrain`'s `height` and composes with `planetNoise`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PlanetTerrain} from 'margoengine/terrain/planet';
+import {planetPreset, planetPresetRadius} from 'margoengine/terrain/planet-recipes';
+const radius = planetPresetRadius('moon'); // 1,737,400 m
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 3 * radius], target: [0, 0, 0], near: 1, far: 1e9},
+});
+PlanetTerrain.attach(engine, {radius, height: planetPreset('moon', {radius}), relief: 4000, seaLevel: false});
+engine.render({delta: 0});
+```
+
+- `craterField({radius, density | count, dMin, dMax, exponent, seed, depthRatio, rimRatio, maxDepth, floor, ejecta, blend})`:
+  craters are Poisson placed, uniformly over the sphere, with diameters from a power law (cumulative exponent 2 by
+  default, Neukum et al. 2001) between `dMin` (default `radius / 20,000`) and `dMax` (`radius / 4`). `density` counts
+  craters of `dMin` or more per million square kilometres (default 1,000), or give `count` for the whole planet. Depth is
+  `0.196 D^1.01` and rim height `0.036 D^1.01` with D in kilometres (Pike 1977), a crater is never deeper than
+  `maxDepth` 3,400 m (larger ones are scaled, not clipped). The ejecta blanket is `0.14 R^0.74 (r / R)^-3` metres beyond
+  the rim (McGetchin et al. 1973), the rim uplift falls off as `(r / R)^-4`, both fade to nothing by 3 radii. `floor`
+  is the fraction of the radius that is flat floor (default 0). A younger crater replaces what an older one left inside
+  its rim and fades into it over `blend` radii (0.15). Heights are relative to the undisturbed ground: `combine` it with a base.
+  The result also has `craters(x, y, z, detail)`, the list of craters that reach a point (centre, diameter, age), for decals
+  or labels. A sample reads the 27 lattice cells around it for each octave of diameter; craters under twice `detail`
+  are skipped. A density that puts over 256 craters in one cell throws a `RangeError` that says to raise `dMin`.
+- `ridgeNoise({radius, relief, octaves, gain, frequency, seed})`: ridged multifractal noise between 0 and `relief`
+  (Musgrave et al. 1989); defaults 8,000 m, 6 octaves, gain 2, 2 cycles around the planet.
+- `domainWarp(height, {radius, amplitude, frequency, levels, seed})`: reads `height` at positions shifted by up to
+  `amplitude` metres (default 100,000) by noise; `levels: 2` warps by a warped noise.
+- `combine(heights, {mode, smooth})`: `'add'` (default), `'max'` or `'smoothMax'` (rounded joins, `smooth` 100 m).
+- `planetPreset('moon' | 'mars' | 'asteroid' | 'ice', {radius, seed})` and `planetPresetRadius(name)`: authored looks
+  (numbers in [limits](../../docs/limits.md)), made for the body's own radius; pass the same `radius` to `PlanetTerrain`.
+  The preset is shaded by `PlanetTerrain` with its height colours, so set `relief` to suit and `seaLevel: false`.
+
+Checked in `test/planet-recipes.test.js` (an isolated crater's depth and rim over diameter against the Pike ratios and its
+ejecta against McGetchin within 2%, a flat floor within 1e-6, diameters against the power law with a
+Kolmogorov-Smirnov statistic under 0.02, determinism, pruning by detail, bounded reads, validation) and on both GPU backends by
+`test/planet-recipes.browser.mjs` (every preset drawn on `PlanetTerrain`, deterministic, no validation error).

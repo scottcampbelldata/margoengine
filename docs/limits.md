@@ -6961,3 +6961,24 @@ convergence never worsens without momentum (tested); with momentum it can rise f
 arrays of frames x bins values. The phase vocoder (time stretch, pitch shift) is not built. A Rust/Wasm FFT was not
 built: the paired A/B is a timing run and timing runs wait for the speed phase (docs/work-lists/speed-phase.md); the
 TypeScript FFT does 11,264 butterflies per 2048-point frame and 4,121 frames took 132 ms on a busy machine.
+
+
+## Planet recipes (lague plan 8, 2026-11-10)
+
+`@margoengine/terrain/planet-recipes`, 3,216 B min+gzip (new entry; the planet entry is no larger: the shared noise moved to an
+internal module). Defaults, each with its source in the README: crater density 1,000 per 10^6 km^2 of diameter `dMin` or more,
+`dMin` radius / 20,000, `dMax` radius / 4 (at most the radius), cumulative exponent 2 (1 to 3), depth 0.196 D^1.01 and rim 0.036 D^1.01
+(D in km, Pike 1977; the coefficients are taken from the plan and were not re-read from the paper, which could not be opened
+here; only depth over diameter about 0.2 under 15 km and the 3,400 m depth ceiling were confirmed against its abstract),
+ejecta 0.14 R^0.74 (r / R)^-3 m (McGetchin et al. 1973, coefficients as in the plan), rim uplift (r / R)^-4 and the fade from 2.5
+to 3 radii are authored, as are the preset numbers and the blend rule.
+Work bound: one lattice per octave of diameter (about 13 on the Moon by default), 27 cells each, at most 256 craters in a
+cell (a denser setting throws). Measured on the CPU (Node, busy machine, diagnostic): a moon preset sample costs 6.6 us at
+full detail and 3.8 us at a coarse patch against 1.0 us for `planetNoise`, so a 1,089-vertex patch is about 7 ms; 0.001 craters
+reach a default sample on average (one at most in 100,000 samples). Placement is a jittered 3D lattice, not the equal-area
+cube-sphere cells of the plan: no face seams, 27 cells instead of 9. Diameters pass a Kolmogorov-Smirnov test under 0.02 and the
+crater count matches the density within 5% (24,627 craters on a 10 km test body).
+Not built: central peaks and terraces of complex craters (Pike 1977's complex-crater laws), rays, secondary crater chains.
+
+Steady-frame work counts (Scott's 60+ fps rule, 2026-11-10). Planet recipes: the render path is untouched, so draws, buffer writes, bind groups and allocations per frame are unchanged; heights run only when a patch is built (at least one patch a frame, about 6 ms of the 16.7 ms frame with the moon preset, the rest spread by `budget`). A miss against a 2 ms patch target is listed in the speed phase list.
+Water caustics after the range fix (commit c741c965a4): per frame one more compute pass (3 instead of 2: weights, 512 chunk sums, scale) and one more bind group; no buffer write and no allocation added (the weights buffer, 2 * segments^2 * 4 B, 128 KiB at the default and 2 MiB at 512 segments, and a 2 KiB partials buffer are created once); draws unchanged (one per depth slice plus the projection). Default size 0.52 ms native GPU timestamps; the WebGL2 layer 19 to 23 ms wall (water alone 12 ms), within 60 fps on the A6000, mid laptop iGPU not measured here.

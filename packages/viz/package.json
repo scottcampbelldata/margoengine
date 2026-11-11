@@ -235,6 +235,10 @@
       "types": "./dist/compute/quant.d.ts",
       "import": "./dist/compute/quant.js"
     },
+    "./compute/distance": {
+      "types": "./dist/compute/distance.d.ts",
+      "import": "./dist/compute/distance.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"
@@ -2030,6 +2034,10 @@
     "./terrain/blend": {
       "types": "./dist/terrain/blend.d.ts",
       "import": "./dist/terrain/blend.js"
+    },
+    "./terrain/planet-recipes": {
+      "types": "./dist/terrain/planet-recipes.d.ts",
+      "import": "./dist/terrain/planet-recipes.js"
     },
     "./terrain/planet": {
       "types": "./dist/terrain/planet.d.ts",

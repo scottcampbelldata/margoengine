@@ -75,6 +75,10 @@
       "types": "./dist/blend.d.ts",
       "import": "./dist/blend.js"
     },
+    "./planet-recipes": {
+      "types": "./dist/planet-recipes.d.ts",
+      "import": "./dist/planet-recipes.js"
+    },
     "./planet": {
       "types": "./dist/planet.d.ts",
       "import": "./dist/planet.js"

@@ -537,3 +537,10 @@ was 214 ms before the range kernels left the JavaScript compute tier. The WebGL2
   readback); target under 16.7 ms GPU on the A6000 and the mid laptop iGPU (Radeon 680M), so it can run every frame at that
   size; 4096^2 and 256^3 are one-shot sizes with the targets above. Unmeasured on the iGPU. audio/spectrogram is offline:
   the GPU path's WebGL2-layer time (1.7 s for 4,121 frames, busy machine) is a speed bug to diagnose before release.
+
+
+### Planet recipes per sample (lague plan 8, 2026-11-10)
+
+CPU, Node: `planetPreset` samples at 4.3 to 5.5 us (moon 5.5) against 1.0 us for `planetNoise`; a 1,089-vertex patch about 6 ms against the
+4 ms default `budget`. Work: per octave of diameter 27 hashed cells, one Poisson draw each. Target: under 2 ms a patch (a cheap
+cell test against the sphere shell before drawing, or a Wasm kernel per the Rust rule if measured worth it). Rerun on the quiet machine.
