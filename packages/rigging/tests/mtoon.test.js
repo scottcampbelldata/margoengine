@@ -189,3 +189,91 @@ test('authored queue offsets respect opaque, mask and both blend ranges', async 
     }
   }
 });
+test('blended MToon queues draw across models by renderQueueOffsetNumber, then in model order (KB5289a)', async () => {
+  const gpu = optionalGPU(),
+    store = await TransformStore.create(32),
+    engine = new Engine(
+      { width: 128, height: 96, clientWidth: 128, clientHeight: 96 },
+      store,
+      { backend: 'webgpu', gpu: gpu.engine.gpu, add() {}, remove() {}, render() {}, dispose() {} },
+      { position: [0, 0, 4], target: [0, 0, 0] },
+      null,
+    );
+  const load = (offsets) => {
+    const data = animatedTriangle(),
+      primitive = data.doc.meshes[0].primitives[0];
+    delete data.doc.skins;
+    delete data.doc.animations;
+    delete data.doc.nodes[0].skin;
+    data.doc.materials = offsets.map((renderQueueOffsetNumber) => ({
+      alphaMode: renderQueueOffsetNumber === undefined ? 'OPAQUE' : 'BLEND',
+      pbrMetallicRoughness: { baseColorFactor: [0.2, 0.5, 0.8, 0.5] },
+      extensions: { VRMC_materials_mtoon: { specVersion: '1.0', renderQueueOffsetNumber: renderQueueOffsetNumber ?? 0 } },
+    }));
+    data.doc.meshes[0].primitives = offsets.map((_, material) => ({ ...primitive, material }));
+    return parseGLTF(engine, data.doc, data.buffers, []);
+  };
+  // Scene order A, B; queues A0 2991, A1 3000, B0 2995. Unity and UniVRM draw 2991, 2995, 3000.
+  const a = load([-9, 0]),
+    b = load([-5]),
+    still = load([undefined]);
+  engine.camera.update(128 / 96, true);
+  store.tick(false);
+  const effects = [MToon.attach(a), MToon.attach(b), MToon.attach(still)],
+    labels = new Map(),
+    stack = [],
+    drawn = [];
+  for (const [name, model] of [
+    ['A', a],
+    ['B', b],
+    ['S', still],
+  ]) {
+    model.primitives.forEach((p, i) => labels.set(p.material, name + i));
+    const draw = model.draw;
+    model.draw = function (...args) {
+      stack.push(model);
+      try {
+        return draw.apply(this, args);
+      } finally {
+        stack.pop();
+      }
+    };
+  }
+  const context = { ...gpu.context, camera: engine.camera, draw() {} },
+    begin = context.encoder.beginRenderPass;
+  context.encoder.beginRenderPass = (...args) => {
+    const pass = begin(...args);
+    let pipeline;
+    return {
+      ...pass,
+      setPipeline(value) {
+        pipeline = value;
+      },
+      drawIndexed() {
+        if (/@fragment fn fragment\([^{]*\{\s*discard;/.test(pipeline.fragment.module.code)) return;
+        const model = stack[stack.length - 1];
+        drawn.push(...model.primitives.map((p) => labels.get(p.material)).filter(Boolean));
+      },
+    };
+  };
+  try {
+    // An opaque-only avatar adds no passes, so its models keep one render pass run.
+    let added = 0;
+    effects[2].registerPasses({ add: () => added++ });
+    assert.equal(added, 0);
+    engine.frameGraph.execute(context);
+    // The opaque avatar draws in the models' pass; the blended queues follow in queue order across models.
+    assert.deepEqual(drawn, ['S0', 'A0', 'B0', 'A1']);
+    // A draw outside a scene frame (a probe, an imposter) still draws every queue of its model inline.
+    drawn.length = 0;
+    a.draw(context, 'beauty', context.color, context.depth);
+    assert.deepEqual(drawn, ['A0', 'A1']);
+    // The next frame draws the same order (nothing from the earlier frame is left behind).
+    drawn.length = 0;
+    engine.frameGraph.execute(context);
+    assert.deepEqual(drawn, ['S0', 'A0', 'B0', 'A1']);
+  } finally {
+    for (const effect of effects) effect.dispose();
+    engine.dispose();
+  }
+});

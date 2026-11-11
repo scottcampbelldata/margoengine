@@ -2,7 +2,8 @@ import { legacyMToon, type LegacyMToon } from './mtoon-legacy.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { setMaterialDraw, type MaterialDrawCall } from '@margoengine/gltf-pro/material-draw';
 import type { PBRMaterial, PBRMaterialShading, PBRModel, PBRPrimitive, GLTFStreamedImage } from '@margoengine/gltf-pro';
-import type { Engine, Scene, EnginePlugin, PassContext } from '@margoengine/core/extension';
+import { PBRDrawRun } from '@margoengine/gltf-pro/model';
+import type { Engine, Scene, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { engineRuntime } from '@margoengine/core/extension';
 import { fault, rangeError } from '../../shared/errors.js';
 import { retire, writeUniform } from '../../shared/frame-resources.js';
@@ -53,6 +54,19 @@ interface Part {
   authored: { base: number[]; emission: number[]; maps: PBRMaterial['maps'] };
 }
 let serial = 0;
+/** Unity's first transparent queue: MToon blend queues (2500 + 0..9 with depth writes, 3000 - 9..0 without) and plain BLEND (3000). */
+const BLEND_QUEUE = 2500;
+/**
+ * Blended queues of every MToon model drawn in one scene frame, drawn after the models by queue (VRM 1.0 MToon
+ * renderQueueOffsetNumber), then in model draw order. A frame graph context is armed between its two passes; a draw
+ * outside them (a probe, an imposter, a replica, a direct `model.draw`) keeps drawing every queue inline.
+ */
+interface QueueFrame {
+  readonly drawn: { effect: MToon; queues: number[] }[];
+  /** Arm passes that ran for this frame; one running again means an earlier frame stopped before its queue pass. */
+  readonly arms: Set<string>;
+}
+const armed = new WeakMap<Context, QueueFrame>();
 const hiddenShader: PBRMaterialShading = {
   shader: (code) => code.replace(/(@fragment fn fragment\([^]*?\{)/, '$1 discard;'),
   bindings: () => [],
@@ -98,6 +112,8 @@ export class MToon implements EnginePlugin {
   private device?: GPUDevice;
   private context?: Context;
   private mode: MaterialDrawCall['mode'] = 'beauty';
+  /** The one blended queue the scene's queue pass is drawing for this model, else undefined. */
+  private only?: number;
   private readonly mipPipelines = new Map<unknown, unknown>();
   private readonly states: State[] = [];
   private readonly parts: Part[] = [];
@@ -262,6 +278,64 @@ export class MToon implements EnginePlugin {
       throw fault('unsupported', 'MToon needs WebGPU or the WebGL2 compatibility device; select a GPU backend');
     this.device = engine.gpu ?? undefined;
   }
+  /**
+   * Models with blended MToon or BLEND materials draw their blended queues after every model, sorted by queue across
+   * models. Opaque and mask avatars register nothing, so their frames keep the models' render pass run unchanged.
+   */
+  registerPasses(graph: FrameGraph): void {
+    if (
+      !this.parts.some((p) => this.queue(p.state) >= BLEND_QUEUE) &&
+      !this.model.primitives.some((p) => p.material.settings[0] === 2)
+    )
+      return;
+    // Every MToon registers the pair under its own name (passes leave with their plugin); the first of each pair to
+    // run that frame does the work and the later ones find it done.
+    graph.add({
+      name: this.name + ':arm',
+      order: 0.99,
+      joins: true,
+      execute: (c) => {
+        if (c.backend !== 'webgpu') return;
+        let frame = armed.get(c);
+        if (!frame || frame.arms.has(this.name)) armed.set(c, (frame = { drawn: [], arms: new Set() }));
+        frame.arms.add(this.name);
+      },
+    });
+    graph.add({
+      name: this.name + ':queues',
+      order: 1.2,
+      joins: true,
+      execute: (c) => {
+        if (c.backend === 'webgpu') MToon.drawQueues(c);
+      },
+    });
+  }
+  /** Draws the armed frame's blended MToon queues in ascending queue order, each queue in model draw order. */
+  private static drawQueues(c: Context): void {
+    const frame = armed.get(c);
+    if (!frame) return;
+    armed.delete(c);
+    const drawn = frame.drawn;
+    if (!drawn.length) return;
+    const queues = [...new Set(drawn.flatMap((d) => d.queues))].sort((a, b) => a - b),
+      run = new PBRDrawRun();
+    try {
+      for (const queue of queues)
+        for (const d of drawn) if (d.queues.includes(queue)) d.effect.drawQueue(c, queue, run);
+    } finally {
+      run.end();
+    }
+  }
+  /** Draws this model's blended primitives of one queue (scene queue pass). */
+  private drawQueue(c: Context, queue: number, run: PBRDrawRun): void {
+    if (this.disposed) return;
+    this.only = queue;
+    try {
+      this.model.draw(c, 'beauty', c.color, c.depth, 'blend', undefined, run);
+    } finally {
+      this.only = undefined;
+    }
+  }
   onPreUpdate(delta: number): void {
     this.time += delta;
     this.applyExpressions();
@@ -300,9 +374,17 @@ export class MToon implements EnginePlugin {
     const ordinary = model.primitives.filter((p) => !parts.some((part) => part.primitive === p));
     const ordinaryQueue = (p: PBRPrimitive) =>
       p.material.settings[0] === 2 ? 3000 : p.material.settings[0] === 1 ? 2450 : 2000;
-    const groups = [...new Set([...parts.map((p) => this.queue(p.state)), ...ordinary.map(ordinaryQueue)])].sort(
+    let groups = [...new Set([...parts.map((p) => this.queue(p.state)), ...ordinary.map(ordinaryQueue)])].sort(
       (a, b) => a - b,
     );
+    const frame = call.phase === 'all' ? armed.get(call.context as Context) : undefined;
+    if (call.phase === 'blend' && this.only !== undefined) groups = groups.includes(this.only) ? [this.only] : [];
+    else if (frame) {
+      // Inside a scene frame: opaque and mask queues now, the blended ones in the queue pass after every model.
+      const later = groups.filter((q) => q >= BLEND_QUEUE);
+      if (later.length) frame.drawn.push({ effect: this, queues: later });
+      groups = groups.filter((q) => q < BLEND_QUEUE);
+    }
     for (const queue of groups) {
       const selected = parts.filter((p) => this.queue(p.state) === queue),
         standard = ordinary.filter((p) => ordinaryQueue(p) === queue);

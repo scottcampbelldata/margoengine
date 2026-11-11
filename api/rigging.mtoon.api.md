@@ -4,7 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { PBRModel } from "@margoengine/gltf-pro";
 
 export class MToon implements EnginePlugin {
@@ -16,6 +16,7 @@ export class MToon implements EnginePlugin {
     constructor(model: PBRModel, options?: MToonOptions);
     static attach(model: PBRModel, options?: MToonOptions): MToon;
     setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

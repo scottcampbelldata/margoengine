@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15129072,
+  "total": 15129473,
   "history": [
     {
       "date": "2026-10-24",
@@ -8597,6 +8597,12 @@
       "commit": "688f3ffca9",
       "reason": "KB6027a/b: coincident boids part along the velocity difference or by order; Buckland obstacle push (behavior/steering 3827 to 3871 B measured)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "5409a42f82",
+      "reason": "KB5289a: blended MToon queues order across models (arm pass 0.99 and queue pass 1.2; armed beauty draws hand blended queues to one PBRDrawRun drawn by queue then model order). rigging/mtoon 9871 to 10260 B measured; the two passes and the queue record are the fix itself, and a split entry would add a fetch for every blended avatar. The static gltf-pro/model import is the PBRDrawRun class: MToon.attach takes a PBRModel, so gltf-pro/model is already loaded wherever MToon runs and the import adds no bytes or loads to any app.",
+      "grew": 2
     }
   ],
   "items": {
@@ -9405,7 +9411,7 @@
     "@margoengine/rigging/face": 2363,
     "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 3740,
-    "@margoengine/rigging/mtoon": 10168,
+    "@margoengine/rigging/mtoon": 10568,
     "@margoengine/rigging/pose-tracking": 5128,
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/rigging/springs": 5069,
@@ -10011,6 +10017,7 @@
     "leak @margoengine/navmesh/debug -> @margoengine/lines": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
+    "leak @margoengine/rigging/mtoon -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/save/materials -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/save/materials -> @margoengine/materials/serialization": 1,
     "leak @margoengine/scatter/imposter -> @margoengine/gltf-pro/model": 1,
