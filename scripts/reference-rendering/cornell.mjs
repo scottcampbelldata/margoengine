@@ -5,15 +5,18 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { pictureError, assertBudget } from './compare.mjs';
-import { cornellPicture } from './cornell-scene.mjs';
+import { cornellPicture, cornellDecomposition } from './cornell-scene.mjs';
 import { benchRoot, sha256, capturePathReference, readPathReference } from './path-reference.mjs';
 
 const point = process.argv.includes('--point'),
   compat = process.argv.includes('--compat'),
-  measure = process.argv.includes('--measure');
+  measure = process.argv.includes('--measure'),
+  decompose = process.argv.includes('--decompose'),
+  measureDecomposition = process.argv.includes('--measure-decomposition');
 const family = point ? 'clustered-point' : 'clustered',
   out = join(benchRoot, 'batch-160', family),
-  baselinePath = `docs/whitepaper/results/batch-160-${family}.json`;
+  baselinePath = `docs/whitepaper/results/batch-160-${family}.json`,
+  decompositionPath = `docs/whitepaper/results/batch-160-${family}-decomposition.json`;
 assert.ok(!measure || !existsSync(baselinePath), '--measure cannot replace an established budget');
 const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath)) : undefined;
 if (!measure) assert.ok(baseline, 'Freeze the first measurements before checking them');
@@ -65,6 +68,29 @@ try {
     if (baseline) assertBudget(metrics, compat ? baseline.compat.rows[mode].metrics : baseline.rows[mode].metrics);
     rows[mode] = { margo, metrics };
   }
+  // KB3573: how much of the shadowed residual each model difference explains (diagnostic variants, frozen scene).
+  let decomposition;
+  if (decompose || measureDecomposition) {
+    const frozen = existsSync(decompositionPath) ? JSON.parse(readFileSync(decompositionPath)) : undefined;
+    assert.ok(!measureDecomposition || !frozen, '--measure-decomposition cannot replace an established decomposition');
+    assert.ok(measureDecomposition || frozen, 'Record the decomposition with --measure-decomposition first');
+    decomposition = {};
+    for (const variant of cornellDecomposition(point)) {
+      const { name, ...options } = variant,
+        margo = await page.evaluate(({ payload, options }) => window.renderCornell(payload, true, 'webgpu', options), {
+          payload,
+          options,
+        });
+      assert.deepEqual(errors, []);
+      const png = Buffer.from(margo.png.split(',')[1], 'base64'),
+        metrics = pictureError(await decodePNG(png), reference.image);
+      writeFileSync(join(out, 'margo-' + name + (compat ? '-compat' : '') + '.png'), png);
+      // Every variant removes part of the frozen shadowed residual.
+      assert.ok(metrics.absolute < rows.shadowed.metrics.absolute, `${name} does not lower the residual`);
+      if (frozen) assertBudget(metrics, (compat ? frozen.compat : frozen.native)[name].metrics);
+      decomposition[name] = { options, metrics };
+    }
+  }
   const { image, ...ref } = reference;
   const result = {
     family,
@@ -81,6 +107,13 @@ try {
     join(out, compat ? 'comparison-compat.json' : 'comparison.json'),
     JSON.stringify(result, null, 2) + '\n',
   );
+  if (decomposition) {
+    writeFileSync(
+      join(out, compat ? 'decomposition-compat.json' : 'decomposition.json'),
+      JSON.stringify(decomposition, null, 2) + '\n',
+    );
+    console.log('DECOMPOSITION', JSON.stringify(decomposition));
+  }
   console.log('RESULT', JSON.stringify(result));
 } finally {
   await context.close();

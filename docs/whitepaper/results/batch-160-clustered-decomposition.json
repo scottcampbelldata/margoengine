@@ -1,0 +1,169 @@
+{
+  "family": "clustered",
+  "issue": "KB3573",
+  "domain": "Diagnostic variants of the frozen shadowed picture against the same Mitsuba hard-visibility reference; the frozen scene and its budgets are unchanged. Each row is an exact first-measured budget.",
+  "sceneSha256": "fd58a13c2e967685fafd233478b68e4ce712b753d3a26f76fa7276ed525b9ffc",
+  "reference": {
+    "linearSha256": "6f06355a3f855f96e4ff58dc2dd90783336b35e395d3d02d4334608f1d3e6308",
+    "referenceSha256": "f84fb83f72e6af3f7d6cb77501f2c8f56c876551ab9be73465480b6ae00809e9"
+  },
+  "frozenShadowed": {
+    "native": 567377,
+    "compat": 567377
+  },
+  "native": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "map-1024": {
+      "options": {
+        "local": {
+          "resolution": 1024
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 356406,
+        "square": 23081572,
+        "max": 144,
+        "mae": 0.45319366455078125,
+        "rmse": 5.41753971204416,
+        "foreground": 111786,
+        "foregroundAbsolute": 356406,
+        "foregroundMae": 1.0627627788810763,
+        "changed": 31662
+      }
+    },
+    "map-2048": {
+      "options": {
+        "local": {
+          "resolution": 2048
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 212780,
+        "square": 7345088,
+        "max": 106,
+        "mae": 0.2705637613932292,
+        "rmse": 3.0561024802502397,
+        "foreground": 111243,
+        "foregroundAbsolute": 212780,
+        "foregroundMae": 0.6375831887549479,
+        "changed": 30716
+      }
+    },
+    "map-4096": {
+      "options": {
+        "local": {
+          "resolution": 4096
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 213642,
+        "square": 8855536,
+        "max": 131,
+        "mae": 0.27165985107421875,
+        "rmse": 3.3556514004906086,
+        "foreground": 110998,
+        "foregroundAbsolute": 213642,
+        "foregroundMae": 0.6415791275518478,
+        "changed": 30627
+      }
+    }
+  },
+  "compat": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "map-1024": {
+      "options": {
+        "local": {
+          "resolution": 1024
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 356406,
+        "square": 23081572,
+        "max": 144,
+        "mae": 0.45319366455078125,
+        "rmse": 5.41753971204416,
+        "foreground": 111786,
+        "foregroundAbsolute": 356406,
+        "foregroundMae": 1.0627627788810763,
+        "changed": 31662
+      }
+    },
+    "map-2048": {
+      "options": {
+        "local": {
+          "resolution": 2048
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 212777,
+        "square": 7344743,
+        "max": 106,
+        "mae": 0.27055994669596356,
+        "rmse": 3.0560307065875696,
+        "foreground": 111243,
+        "foregroundAbsolute": 212777,
+        "foregroundMae": 0.6375741994252822,
+        "changed": 30716
+      }
+    },
+    "map-4096": {
+      "options": {
+        "local": {
+          "resolution": 4096
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 213643,
+        "square": 8855613,
+        "max": 131,
+        "mae": 0.27166112263997394,
+        "rmse": 3.3556659893645158,
+        "foreground": 110998,
+        "foregroundAbsolute": 213643,
+        "foregroundMae": 0.64158213060896,
+        "changed": 30627
+      }
+    }
+  }
+}

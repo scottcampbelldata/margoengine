@@ -22,3 +22,25 @@ export function cornellPicture(point = false) {
     })),
   };
 }
+
+/**
+ * KB3573 decomposition: diagnostic variants of the frozen shadowed picture (the frozen scene and budgets are
+ * unchanged). `light` is merged into the point light and `local` into the LocalShadows options. Range 0 with
+ * `shadow.far` equal to the authored range removes only the finite-range window (Karis 2013) and keeps the same
+ * shadow camera; larger maps show how much of the residual is shadow-map resolution and 3x3 PCF width.
+ */
+export function cornellDecomposition(point = false) {
+  const noWindow = { range: 0, shadow: { far: 20 } };
+  return point
+    ? [
+        { name: 'no-range-window', light: noWindow },
+        { name: 'map-2048', local: { resolution: 2048 } },
+        { name: 'map-4096', local: { resolution: 4096 } },
+        { name: 'no-range-window-map-4096', light: noWindow, local: { resolution: 4096 } },
+      ]
+    : [
+        { name: 'map-1024', local: { resolution: 1024 } },
+        { name: 'map-2048', local: { resolution: 2048 } },
+        { name: 'map-4096', local: { resolution: 4096 } },
+      ];
+}

@@ -2143,7 +2143,7 @@ IBL, cross-vendor byte-equality or speed claim.
 | Measurement | Proof | Scope |
 | --- | --- | --- |
 | Directional default-shadow MAE 0.7214571634928385 on both backends | [Frozen result](results/batch-160-clustered.json), tests/reference-cornell.test.js | Complete 15-quad scene; native WebGPU / actual WebGL2 compatibility; Mitsuba direct-only hard visibility. Unshadowed control MAE 48.63041687011719. |
-| Point default-shadow MAE 0.9285901387532552 / 0.9285939534505209 | [Frozen result](results/batch-160-clustered-point.json), same contracts and GPU-locked cornell.mjs --point | Exercises clustered selection and six-face LocalShadows. Unshadowed MAE 7.642925262451172 / 7.642930348714192. Authored range window, filtering/bias, contacts and antialiasing differences remain; no physical equivalence or speed claim. |
+| Point default-shadow MAE 0.9285901387532552 / 0.9285939534505209 | [Frozen result](results/batch-160-clustered-point.json), same contracts and GPU-locked cornell.mjs --point | Exercises clustered selection and six-face LocalShadows. Unshadowed MAE 7.642925262451172 / 7.642930348714192. Authored range window, filtering/bias, contacts and antialiasing differences remain, measured apart in [the decomposition](results/batch-160-clustered-point-decomposition.json) (range window 35.7 %, 2048 map 18.5 %; directional 2048 map 62.5 %, [file](results/batch-160-clustered-decomposition.json); KB3573); no physical equivalence or speed claim. |
 
 ## Batch 56 job 2: accumulated planar visibility
 

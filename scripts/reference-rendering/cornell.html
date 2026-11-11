@@ -6,15 +6,16 @@ import {DirectionalLights} from '/packages/clustered/dist/directional.js';
 import {LocalShadows} from '/packages/clustered/dist/shadows.js';
 import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
-window.renderCornell=async(payload,shadowed,backend='webgpu')=>{
+// variant (KB3573 decomposition only): {light} merged into the point light, {local} into the LocalShadows options.
+window.renderCornell=async(payload,shadowed,backend='webgpu',variant={})=>{
  const canvas=document.body.appendChild(document.createElement('canvas')),settings=payload.settings;
  const engine=await Engine.create(canvas,{backend,fallback:webglRenderer,camera:settings.camera});
  const errors=[];engine.gpu?.addEventListener('uncapturederror',e=>errors.push(e.error.message));
  try{
   engine.scene.background='#000000';engine.lighting.radiance.fill(0);engine.lighting.direction.set([0,1,0,0]);
   const lights=Clustered.attach(engine),suns=DirectionalLights.attach(engine,{lights});
-  const local=shadowed?LocalShadows.attach(engine,{lights}):undefined;
-  if(settings.light.position)lights.setLights([{...settings.light,castShadow:shadowed}]);
+  const local=shadowed?LocalShadows.attach(engine,{lights,...variant.local}):undefined;
+  if(settings.light.position)lights.setLights([{...settings.light,...variant.light,castShadow:shadowed}]);
   else suns.setLights([{...settings.light,castShadow:shadowed,shadow:{bounds:settings.bounds}}]);
   for(const q of payload.quads){
    const p=q.positions,u=[0,1,2].map(i=>p[i+3]-p[i]),v=[0,1,2].map(i=>p[i+9]-p[i]);

@@ -1,0 +1,225 @@
+{
+  "family": "clustered-point",
+  "issue": "KB3573",
+  "domain": "Diagnostic variants of the frozen shadowed picture against the same Mitsuba hard-visibility reference; the frozen scene and its budgets are unchanged. Each row is an exact first-measured budget.",
+  "sceneSha256": "31a417b175469c9bfeaa5b7d8fd16ec3a3d5a949442454b7e4e954cf8b65b379",
+  "reference": {
+    "linearSha256": "a88afe6cbe25e24a86542343b980908bdedaf77e0f2403ce164a53232f5ab5b6",
+    "referenceSha256": "e5e82e07e153b758d2a417df340563366045cc4eaac260b5e06b55da460df572"
+  },
+  "frozenShadowed": {
+    "native": 730273,
+    "compat": 730276
+  },
+  "native": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "no-range-window": {
+      "options": {
+        "light": {
+          "range": 0,
+          "shadow": {
+            "far": 20
+          }
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 469266,
+        "square": 19119300,
+        "max": 157,
+        "mae": 0.5967025756835938,
+        "rmse": 4.930663965791492,
+        "foreground": 241029,
+        "foregroundAbsolute": 469266,
+        "foregroundMae": 0.6489758493791203,
+        "changed": 48760
+      }
+    },
+    "map-2048": {
+      "options": {
+        "local": {
+          "resolution": 2048
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 595330,
+        "square": 12145136,
+        "max": 135,
+        "mae": 0.7570012410481771,
+        "rmse": 3.929801398283114,
+        "foreground": 240788,
+        "foregroundAbsolute": 595330,
+        "foregroundMae": 0.824141291647978,
+        "changed": 164172
+      }
+    },
+    "map-4096": {
+      "options": {
+        "local": {
+          "resolution": 4096
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 605700,
+        "square": 13438192,
+        "max": 143,
+        "mae": 0.7701873779296875,
+        "rmse": 4.133708354385271,
+        "foreground": 240767,
+        "foregroundAbsolute": 605700,
+        "foregroundMae": 0.8385700698185382,
+        "changed": 163850
+      }
+    },
+    "no-range-window-map-4096": {
+      "options": {
+        "light": {
+          "range": 0,
+          "shadow": {
+            "far": 20
+          }
+        },
+        "local": {
+          "resolution": 4096
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 346680,
+        "square": 13059744,
+        "max": 143,
+        "mae": 0.440826416015625,
+        "rmse": 4.0750856729874405,
+        "foreground": 240767,
+        "foregroundAbsolute": 346680,
+        "foregroundMae": 0.4799661083121856,
+        "changed": 46950
+      }
+    }
+  },
+  "compat": {
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "no-range-window": {
+      "options": {
+        "light": {
+          "range": 0,
+          "shadow": {
+            "far": 20
+          }
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 469265,
+        "square": 19119299,
+        "max": 157,
+        "mae": 0.5967013041178385,
+        "rmse": 4.930663836846813,
+        "foreground": 241029,
+        "foregroundAbsolute": 469265,
+        "foregroundMae": 0.6489744664196702,
+        "changed": 48760
+      }
+    },
+    "map-2048": {
+      "options": {
+        "local": {
+          "resolution": 2048
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 595333,
+        "square": 12145139,
+        "max": 135,
+        "mae": 0.7570050557454427,
+        "rmse": 3.929801883638052,
+        "foreground": 240788,
+        "foregroundAbsolute": 595333,
+        "foregroundMae": 0.82414544467886,
+        "changed": 164172
+      }
+    },
+    "map-4096": {
+      "options": {
+        "local": {
+          "resolution": 4096
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 605703,
+        "square": 13438195,
+        "max": 143,
+        "mae": 0.7701911926269531,
+        "rmse": 4.133708815798695,
+        "foreground": 240767,
+        "foregroundAbsolute": 605703,
+        "foregroundMae": 0.8385742232116528,
+        "changed": 163850
+      }
+    },
+    "no-range-window-map-4096": {
+      "options": {
+        "light": {
+          "range": 0,
+          "shadow": {
+            "far": 20
+          }
+        },
+        "local": {
+          "resolution": 4096
+        }
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 346677,
+        "square": 13059741,
+        "max": 143,
+        "mae": 0.4408226013183594,
+        "rmse": 4.07508520493624,
+        "foreground": 240767,
+        "foregroundAbsolute": 346677,
+        "foregroundMae": 0.4799619549190711,
+        "changed": 46948
+      }
+    }
+  }
+}
