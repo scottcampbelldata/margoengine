@@ -118,6 +118,12 @@ interface ShadowOptions {
     cadence?: readonly number[];
     colored?: boolean;
     effects?: readonly ShadowEffect<ShadowPassContext>[];
+    floatingOrigin?: ShadowOrigin;
+}
+
+interface ShadowOrigin {
+    readonly origin: ArrayLike<number>;
+    onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 
 type ShadowPassContext = Extract<PassContext, {

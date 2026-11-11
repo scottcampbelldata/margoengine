@@ -44,6 +44,8 @@ export function cascadeSplits(
  * the camera slice between consecutive `splits`, snapped to whole texels. `ranges` receives each cascade's depth
  * extent. Only the first `count` cascades are fitted; the rest of `matrices` and `ranges` is zeroed.
  * Sphere fit and texel snapping: Valient 2008, "Stable Rendering of Cascaded Shadow Maps" (ShaderX6).
+ * `anchor` is the float64 world point at local zero (a floating origin's `origin`): centres then snap to the world's
+ * texel grid, not the local one, so a rebase by any shift keeps every shadow edge on the same world texels.
  */
 export function fitCascades(
   camera: Camera,
@@ -56,6 +58,7 @@ export function fitCascades(
   margin = 100,
   result?: { matrices: Float32Array; ranges: Float32Array },
   count = 4,
+  anchor?: ArrayLike<number>,
 ): { matrices: Float32Array; ranges: Float32Array } {
   finiteVector(direction, 3, 'Shadow direction');
   if (
@@ -134,9 +137,16 @@ export function fitCascades(
     hypotOf(3);
     const radius = (Math.ceil(h[4] * 16) / 16) * (1 + 2 / resolution),
       texel = (2 * radius) / resolution;
-    const cx = Math.round((px * xx + py * xy + pz * xz) / texel) * texel,
-      cy = Math.round((px * yx + py * yy + pz * yz) / texel) * texel,
-      cz = Math.round((px * zx + py * zy + pz * zz) / texel) * texel,
+    // With an anchor the light-space centre snaps in float64 world units and comes back to local ones.
+    const ax = anchor ? anchor[0] * xx + anchor[1] * xy + anchor[2] * xz : 0,
+      ay = anchor ? anchor[0] * yx + anchor[1] * yy + anchor[2] * yz : 0,
+      az = anchor ? anchor[0] * zx + anchor[1] * zy + anchor[2] * zz : 0,
+      lx = px * xx + py * xy + pz * xz,
+      ly = px * yx + py * yy + pz * yz,
+      lz = px * zx + py * zy + pz * zz,
+      cx = anchor ? Math.round((lx + ax) / texel) * texel - ax : Math.round(lx / texel) * texel,
+      cy = anchor ? Math.round((ly + ay) / texel) * texel - ay : Math.round(ly / texel) * texel,
+      cz = anchor ? Math.round((lz + az) / texel) * texel - az : Math.round(lz / texel) * texel,
       depth = 2 * (radius + margin),
       offset = i * 16;
     matrices.fill(0, offset, offset + 16);

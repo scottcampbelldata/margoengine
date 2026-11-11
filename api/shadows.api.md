@@ -70,6 +70,12 @@ export interface ShadowOptions {
     cadence?: readonly number[];
     colored?: boolean;
     effects?: readonly ShadowEffect<ShadowPassContext>[];
+    floatingOrigin?: ShadowOrigin;
+}
+
+export interface ShadowOrigin {
+    readonly origin: ArrayLike<number>;
+    onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 
 export interface ShadowPrepareContext {
@@ -164,7 +170,7 @@ export function cascadeSplits(near: number, far: number, lambda?: number, out?: 
 export function fitCascades(camera: Camera, aspect: number, direction: Vec3, resolution: number, splits: Float32Array, matrices?: Float32Array<ArrayBuffer>, ranges?: Float32Array<ArrayBuffer>, margin?: number, result?: {
     matrices: Float32Array;
     ranges: Float32Array;
-}, count?: number): {
+}, count?: number, anchor?: ArrayLike<number>): {
     matrices: Float32Array;
     ranges: Float32Array;
 };

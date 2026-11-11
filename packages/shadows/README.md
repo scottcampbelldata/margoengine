@@ -379,6 +379,20 @@ const engine = await Engine.create(canvas, {backend: 'webgpu'});
 Shadows.attach(engine, {cadence: [1, 1, 2, 4]});
 ```
 
+## Far from world zero: `floatingOrigin`
+
+Under a `FloatingOrigin` the camera is local, so each rebase would move the cascades' texel grid by the shift and make every shadow edge jump by up to half a texel. Pass the origin and the cascades and `bounds` snap to whole texels of float64 world space instead: over 32 rebases 1e5 m from zero a world point keeps its texel phase within 0.01 texel (it moved by up to half a texel before). A rebase also redraws cascades that `cadence` holds. Without the option the fit is unchanged, bit for bit; the frame does the same draws, writes and allocations either way.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {Shadows} from 'margoengine/shadows';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const origin = FloatingOrigin.attach(engine);
+Shadows.attach(engine, {floatingOrigin: origin});
+```
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

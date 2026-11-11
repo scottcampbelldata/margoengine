@@ -136,6 +136,24 @@ export interface ShadowOptions {
    * Default none: the receivers' shaders and the frame are then unchanged.
    */
   effects?: readonly ShadowEffect<ShadowPassContext>[];
+  /**
+   * A floating origin (`FloatingOrigin` from `@margoengine/cameras/origin`) for scenes far from world zero: cascade
+   * and `bounds` centres snap to whole texels of float64 world space instead of local space, so a rebase by any shift
+   * leaves every shadow edge on the same world texels (without it, each rebase that is not a whole number of texels
+   * moves the edges by up to half a texel). `bounds` and `frustum` stay local, as every other position is. Fixed at
+   * construction. Default none: the fit is as it was, bit for bit.
+   */
+  floatingOrigin?: ShadowOrigin;
+}
+/**
+ * What `ShadowOptions.floatingOrigin` takes: the float64 world point at local zero and its rebase event. A
+ * `FloatingOrigin` from `@margoengine/cameras/origin` fits as is.
+ */
+export interface ShadowOrigin {
+  /** Float64 world position of local [0, 0, 0]. */
+  readonly origin: ArrayLike<number>;
+  /** Calls `listener` after each rebase with the new origin second; returns an unsubscribe. */
+  onRebase(listener: (shift: ArrayLike<number>, origin: ArrayLike<number>) => void): () => void;
 }
 /** What a custom `ShadowSource.drawShadow` receives for one cascade. Borrowed: use it synchronously. */
 export interface ShadowContext {
@@ -478,7 +496,23 @@ export class Shadows implements EnginePlugin {
       ...(typeof filter === 'object' && filter ? [filter] : []),
     ];
     this.validate();
+    const f = this.options.floatingOrigin;
+    if (f !== undefined) {
+      if (typeof f?.onRebase !== 'function' || f.origin?.length !== 3)
+        throw new TypeError('Invalid shadows floatingOrigin; pass a FloatingOrigin from @margoengine/cameras/origin.');
+      finiteVector(f.origin, 3, 'Shadows floatingOrigin origin');
+      const anchor = (this.anchor = new Float64Array(3));
+      anchor.set([f.origin[0], f.origin[1], f.origin[2]]);
+      // A rebase moves every local matrix, so a cascade `cadence` holds would be off by the shift: redraw them all.
+      this.unfollow = f.onRebase((_, at) => {
+        anchor.set([at[0], at[1], at[2]]);
+        this.dirty = true;
+      });
+    }
   }
+  // The floating origin's float64 world point at local zero, kept by its rebase event (no read, no array per frame).
+  private anchor?: Float64Array;
+  private unfollow?: () => void;
   get depthTexture(): GPUTexture | undefined {
     return this.combined;
   }
@@ -1037,6 +1071,7 @@ export class Shadows implements EnginePlugin {
         this.options.casterMargin ?? 100,
         this.fitted,
         this.cascadeCount,
+        this.anchor,
       );
     }
     if (cadence && !this.dirty) {
@@ -1340,8 +1375,12 @@ export class Shadows implements EnginePlugin {
       depth = frustum ? 2 * halfZ : 2 * (halfZ + (this.options.casterMargin ?? 100)),
       tx = (2 * rx) / resolution,
       ty = (2 * ry) / resolution,
-      px = frustum ? centerX : Math.round(centerX / tx) * tx,
-      py = frustum ? centerY : Math.round(centerY / ty) * ty,
+      // With a floating origin the centre snaps in float64 world units (light-space anchor ax, ay) and comes back.
+      a = this.anchor,
+      ax = a ? a[0] * xx + a[1] * xy + a[2] * xz : 0,
+      ay = a ? a[0] * yx + a[1] * yy + a[2] * yz : 0,
+      px = frustum ? centerX : a ? Math.round((centerX + ax) / tx) * tx - ax : Math.round(centerX / tx) * tx,
+      py = frustum ? centerY : a ? Math.round((centerY + ay) / ty) * ty - ay : Math.round(centerY / ty) * ty,
       pz = centerZ,
       // Composed apart and checked before anything is published, so a rejected fit keeps the last good matrix.
       m = (this.fitScratch ??= new Float32Array(16));
@@ -1786,6 +1825,8 @@ export class Shadows implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.unfollow?.();
+    this.unfollow = undefined;
     this.engine?.removePlugin(this.name);
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
