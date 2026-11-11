@@ -291,15 +291,15 @@ and headed (a window opens) for any step that needs WebGPU: headless Firefox ans
 Chromium-only step (`page.pdf`) prints `skipped: needs a Chromium browser, not firefox` and exits 0; a skip line is never
 a pass, so read the log. WebKit on Windows has no WebGPU, so a WebGPU suite there fails with "WebGPU unavailable".
 
-**Firefox will not start from a packaged app on Windows (`spawn UNKNOWN`).** A process of an MSIX-packaged app (the
+**Firefox and headed Chromium will not start from a packaged app on Windows (`spawn UNKNOWN`).** A process of an MSIX-packaged app (the
 Claude desktop app, for one) sees `%LOCALAPPDATA%` through the package's file-system redirection: Playwright's browsers
 land in the package's private `LocalCache` folder, and `%LOCALAPPDATA%\ms-playwright` opens there for that process only.
 `firefox.exe` names `mozglue` as a private side-by-side assembly, and Windows looks for it beside the path the process
 was started with, outside the redirection, so the start fails with `spawn UNKNOWN` and the Application event log
-says "Dependent Assembly mozglue ... could not be found". `scripts/lib/browser.mjs` starts Playwright's Firefox by its
+says "Dependent Assembly mozglue ... could not be found". `scripts/lib/browser.mjs` starts Playwright's Firefox and headed Chromium by their
 real path, which works everywhere. Your own Playwright script needs the same: pass
 `executablePath: realpathSync.native(firefox.executablePath())`, or set `PLAYWRIGHT_BROWSERS_PATH` to a folder outside
-`%LOCALAPPDATA%` and install the browsers there. Playwright's full Chromium (`chrome.exe`, used headed) fails the same way there; its headless shell, Edge and Chrome start (docs/known-bugs.md).
+`%LOCALAPPDATA%` and install the browsers there. Playwright's full Chromium (`chrome.exe`, used headed) failed the same way and is started by its real path too; its headless shell, Edge and Chrome never needed it. Your own script needs `executablePath: realpathSync.native(chromium.executablePath())` for a headed Chromium.
 
 ## The browser runner
 

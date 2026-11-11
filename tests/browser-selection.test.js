@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   browserLabel,
+  chromiumExecutablePath,
   chromiumLaunchOptions,
   FIREFOX_WEBGPU_PREFS,
   firefoxExecutable,
@@ -344,4 +345,59 @@ test('a browser that launches is returned and nothing is reported', async () => 
   const { text, code } = await attempt({ MARGO_BROWSER: 'chromium' }, { chromium: { launch: async () => browser } });
   assert.equal(text, '');
   assert.equal(code, undefined);
+});
+
+const fakeChromium = (path = 'C:/redirected/ms-playwright/chromium-1/chrome-win64/chrome.exe') => {
+  const launched = [];
+  return {
+    launched,
+    launcher: { executablePath: () => path, launch: async (options) => (launched.push(options), { close: async () => {} }) },
+  };
+};
+const realOf = (path) => path.replace('C:/redirected/', 'C:/real/');
+
+test('headed Playwright Chromium starts by the real path of its install (regression: spawn UNKNOWN from a packaged app)', async () => {
+  const { launched, launcher } = fakeChromium();
+  const browser = pick({ MARGO_BROWSER: 'chromium' });
+  assert.equal(
+    chromiumExecutablePath(browser, undefined, { headless: false }, { launcher, realpath: realOf }),
+    'C:/real/ms-playwright/chromium-1/chrome-win64/chrome.exe',
+  );
+  // Through launchBrowser, as every suite calls it (no browser host: the fake has no connect()).
+  await launchBrowser({
+    env: { MARGO_BROWSER: 'chromium' },
+    platform: 'win32',
+    argv: [],
+    headless: false,
+    launchers: { chromium: launcher, firefox: missing('firefox') },
+    report: (text) => assert.fail(text),
+    exit: (code) => assert.fail(`exit ${code}`),
+  });
+  assert.equal(launched.length, 1);
+  assert.ok(launched[0].executablePath.endsWith('chrome.exe'));
+  assert.equal(launched[0].headless, false);
+});
+
+test('Chromium: headless, Edge, Chrome, an explicit executable and a missing install keep their start unchanged', async () => {
+  const { launcher } = fakeChromium();
+  const same = (path) => path;
+  const chromium = pick({ MARGO_BROWSER: 'chromium' });
+  // Headless Playwright Chromium keeps its own headless shell (no executablePath), set or unset.
+  assert.equal(chromiumExecutablePath(chromium, undefined, {}, { launcher, realpath: same }), undefined);
+  assert.equal(chromiumExecutablePath(chromium, undefined, { headless: true }, { launcher, realpath: same }), undefined);
+  // A channel (Edge, Chrome) starts through its own install.
+  assert.equal(chromiumExecutablePath(pick(), 'msedge', { headless: false }, { launcher, realpath: same }), undefined);
+  assert.equal(chromiumExecutablePath(pick({ MARGO_BROWSER: 'chrome' }), 'chrome', { headless: false }, { launcher, realpath: same }), undefined);
+  // An executable the caller or BROWSER_EXECUTABLE names wins.
+  const own = pick({ MARGO_BROWSER: 'chromium', BROWSER_EXECUTABLE: '/own/chrome' });
+  assert.equal(chromiumExecutablePath(own, undefined, { headless: false }, { launcher, realpath: same }), '/own/chrome');
+  assert.equal(chromiumExecutablePath(chromium, undefined, { headless: false, executablePath: '/mine' }, { launcher, realpath: same }), '/mine');
+  // No launcher path: Playwright's own launch reports it.
+  assert.equal(chromiumExecutablePath(chromium, undefined, { headless: false }, { launcher: {}, realpath: same }), undefined);
+  // launchBrowser: a headless chromium and an Edge launch carry no executablePath.
+  for (const [env, headless] of [[{ MARGO_BROWSER: 'chromium' }, true], [{ MARGO_BROWSER: 'edge' }, false]]) {
+    const { launched, launcher: fake } = fakeChromium();
+    await launchBrowser({ env, platform: 'win32', argv: [], headless, launchers: { chromium: fake, firefox: missing('firefox') } });
+    assert.equal('executablePath' in launched[0], false, JSON.stringify(env));
+  }
 });

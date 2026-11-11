@@ -12,21 +12,6 @@
   the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
 
-### Playwright's Chromium and Firefox will not start from a packaged app's redirected %LOCALAPPDATA% (found 2026-11-11, Firefox fixed, Chromium open)
-
-- **Repro:** from a process of an MSIX-packaged app on Windows (the Claude desktop app), start
-  `%LOCALAPPDATA%\ms-playwright\chromium-1248\chrome-win64\chrome.exe --headless --dump-dom about:blank` with Node's
-  `spawnSync`: `spawn UNKNOWN`, and the Application event log reports a side-by-side error. The same file by its
-  real path (`fs.realpathSync.native`, inside the package's `LocalCache` folder) starts.
-- **Cause:** the package redirects `%LOCALAPPDATA%` for its own processes, but Windows builds the new process's
-  side-by-side activation context from the path it was given, outside the redirection, and finds no private assembly
-  beside it. Firefox (`mozglue`) and full Chromium hit it; Chromium's headless shell, Edge and Chrome do not.
-- **Fixed for Firefox:** `scripts/lib/browser.mjs` starts Playwright's Firefox by its real path
-  (`firefoxExecutable`, tests/browser-selection.test.js). **Open for Chromium:** a headed Playwright Chromium run
-  (`MARGO_BROWSER=chromium` with `headless: false`) from such an app still fails; the same real-path start fixes it,
-  and needs a go to change the Chromium launch in browser.mjs. Workaround: `BROWSER_EXECUTABLE=<real path>` or
-  `PLAYWRIGHT_BROWSERS_PATH` outside `%LOCALAPPDATA%` (docs/benchmarking.md).
-
 ### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
 
 - **Repro:** `MARGO_BROWSER=firefox node packages/voxel-pathtracer/tests/browser-check.mjs --compat --report=compat
@@ -261,6 +246,20 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   before that, the preview-contract baker comparison failed on the A6000 (layer 134, native 133 at texel (3, 0)).
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
+
+### Fixed 2026-11-11: Playwright's headed Chromium and Firefox would not start from a packaged app's redirected %LOCALAPPDATA%
+
+- **Repro:** from a process of an MSIX-packaged app on Windows (the Claude desktop app), start
+  `%LOCALAPPDATA%\ms-playwright\chromium-1248\chrome-win64\chrome.exe --headless --dump-dom about:blank` with Node's
+  `spawnSync`: `spawn UNKNOWN`, and the Application event log reports a side-by-side error. The same file by its
+  real path (`fs.realpathSync.native`, inside the package's `LocalCache` folder) starts.
+- **Cause:** the package redirects `%LOCALAPPDATA%` for its own processes, but Windows builds the new process's
+  side-by-side activation context from the path it was given, outside the redirection, and finds no private assembly
+  beside it. Firefox (`mozglue`) and full Chromium hit it; Chromium's headless shell, Edge and Chrome do not.
+- **Fix:** `scripts/lib/browser.mjs` starts Playwright's Firefox (`firefoxExecutable`, 34fe47227a) and its headed
+  Chromium (`chromiumExecutablePath`) by their real paths. Headless Chromium, Edge, Chrome, WebKit and an executable named
+  by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
+  headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
 
 ### Fixed 2026-11-11: README examples stalled behind the previous example's shader compiles in a shared browser
 

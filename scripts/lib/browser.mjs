@@ -411,6 +411,26 @@ export function firefoxLaunchOptions(browser, options = {}, { needs = 'webgpu', 
   };
 }
 
+/**
+ * The real path of Playwright's full Chromium, for a headed start, or undefined (see firefoxExecutable for the cause:
+ * chrome.exe fails the same way from a packaged app's redirected %LOCALAPPDATA%). Used only when nothing else names the
+ * executable and no channel is chosen; headless Playwright keeps its own headless shell, which starts there.
+ */
+export function chromiumExecutable(launcher, options) {
+  return firefoxExecutable(launcher, options);
+}
+
+/**
+ * The launch settings' `executablePath` for Playwright's own Chromium: the caller's or BROWSER_EXECUTABLE (already in
+ * `browser.executablePath`) first; else, when headed with no channel, the real path of Playwright's install.
+ */
+export function chromiumExecutablePath(browser, channel, options = {}, { launcher, realpath } = {}) {
+  if (options.executablePath) return options.executablePath;
+  if (browser.executablePath) return browser.executablePath;
+  if (channel || options.headless !== false) return undefined;
+  return chromiumExecutable(launcher, { realpath });
+}
+
 /** Exit code when the requested browser cannot be started (not a test failure, not a skip). */
 export const LAUNCH_FAILED = 3;
 
@@ -471,8 +491,9 @@ export async function launchBrowser({
         ...options,
         args: launchArgs(browser, args),
         ...(channel ? { channel } : {}),
-        ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
       };
+      const executablePath = chromiumExecutablePath(browser, channel, options, { launcher: launchers.chromium });
+      if (executablePath) settings.executablePath = executablePath;
       // A Chromium this module owns runs under a browser host of its own (scripts/support/browser-host.mjs), which holds
       // the process and everything that waits on it; this process only connects to it.
       if (hosting && typeof launchers.chromium.connect === 'function') {
