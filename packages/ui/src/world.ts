@@ -685,7 +685,8 @@ export class WorldPanels implements EnginePlugin {
 
   onDeviceRestored(engine: Engine): void {
     for (const panel of [...this.gpu.keys()]) this.release(panel);
-    for (const slot of this.cameras) slot.buffer.destroy();
+    // Slots are per view index; views that drew no panel leave holes.
+    for (const slot of this.cameras) slot?.buffer.destroy();
     this.cameras.length = 0;
     this.pipelines.clear();
     this.mipCache.clear();
@@ -699,7 +700,8 @@ export class WorldPanels implements EnginePlugin {
     this.detach = undefined;
     this.cancel();
     for (const panel of [...this.gpu.keys()]) this.release(panel);
-    for (const slot of this.cameras) slot.buffer.destroy();
+    // Slots are per view index; views that drew no panel leave holes.
+    for (const slot of this.cameras) slot?.buffer.destroy();
     this.cameras.length = 0;
     this.pipelines.clear();
     this.mipCache.clear();
