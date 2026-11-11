@@ -1547,9 +1547,11 @@ and the same with `--compat`. Repeat proofs, under the same lock:
 `MARGO_GPU=amd GPU_POWER=low-power` for the Radeon adapter, each with and without `--compat`.
 Every proof is three fresh browser processes, four devices and six frames, all 72 decoded
 captures identical. The top-level budgets are the NVIDIA RTX A6000 measurement; an `amd` section
-measured once on the Radeon adapter gates AMD proofs (proof-contract.mjs `viewerBudget`). All
+measured on the Radeon adapter gates AMD proofs (proof-contract.mjs `viewerBudget`), and for
+transmission and volume the AMD receipt `results/batch-160-amd-<case>.json` gates every reference of an AMD proof
+(`amdReceiptBudgets`); `run.mjs` prints its RESULT before the budget check, so a run over budget still reports. All
 budgets were measured on main's area-filter mip chain (65098f33fe); earlier measurements on other mip
-chains are void. SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11 after the height-correlated Smith G, from 877,419 and 877,434), 879,167 and 873,364 on AMD (not yet re-measured); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (from 2,425,911), 2,424,867 native and 2,426,643 compatibility on AMD (not yet re-measured). Proof report hashes: results/batch-160-job5-proofs.json.
+chains are void. SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11 after the height-correlated Smith G, from 877,419 and 877,434), 879,353 and 873,565 on AMD (re-measured 2026-11-11 on the dev PC's RDNA2 iGPU, KB3584, from 879,167 and 873,364); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (from 2,425,911), 2,409,579 native and 2,411,871 compatibility on AMD (re-measured 2026-11-11, from 2,424,867 and 2,426,643). Proof report hashes: results/batch-160-job5-proofs.json.
 
 ## Batch 65 roads
 

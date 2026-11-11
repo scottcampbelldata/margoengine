@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { openBrowser } from '../browser.js';
 import { runSuite } from '../support/shutdown.mjs';
@@ -10,7 +10,7 @@ import { prepareScene } from './scene.mjs';
 import { referenceCase } from './cases.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { pictureError } from './compare.mjs';
-import { assertReferenceProof, viewerBudget } from './proof-contract.mjs';
+import { amdReceiptBudgets, assertReferenceProof, viewerBudget } from './proof-contract.mjs';
 
 const family = process.argv.find((arg) => arg.startsWith('--case='))?.slice(7) ?? 'volume';
 const entry = referenceCase(family);
@@ -30,6 +30,12 @@ assert.equal(sha(input), entry.sourceSha256);
 const scene = prepareScene(input, entry);
 const baseline = JSON.parse(readFileSync(`docs/whitepaper/results/batch-160-${family}.json`));
 const compat = process.argv.includes('--compat');
+// On the AMD adapter a case with an AMD receipt is gated by what that receipt measured (KB3584).
+const receipt = `docs/whitepaper/results/batch-160-amd-${family}.json`;
+const amd =
+  process.env.MARGO_GPU === 'amd' && existsSync(receipt)
+    ? amdReceiptBudgets(JSON.parse(readFileSync(receipt)), baseline, compat)
+    : undefined;
 assert.equal(sha(scene.bytes), baseline.sceneSha256);
 const references = [];
 const add = async (name, path, hash, budget) => {
@@ -41,7 +47,7 @@ await add(
   'viewer',
   join(root, family, 'sample-viewer.png'),
   baseline.referenceSha256,
-  viewerBudget(baseline, compat, process.env.MARGO_GPU),
+  amd?.viewer ?? viewerBudget(baseline, compat, process.env.MARGO_GPU),
 );
 if (family === 'volume' || family === 'transmission') {
   const transport = JSON.parse(readFileSync(`docs/whitepaper/results/batch-160-${family}-transport.json`));
@@ -50,7 +56,7 @@ if (family === 'volume' || family === 'transmission') {
       mode,
       join(root, family, mode === 'full' ? 'cycles.png' : 'cycles-direct.png'),
       row.referenceSha256,
-      compat ? row.compat.metrics : row.metrics,
+      amd?.[mode] ?? (compat ? row.compat.metrics : row.metrics),
     );
   }
 }

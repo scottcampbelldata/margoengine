@@ -140,15 +140,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 2424867,
-        "square": 72838947,
+        "absolute": 2409579,
+        "square": 72786399,
         "max": 255,
-        "mae": 3.0833778381347656,
-        "rmse": 9.623903088177622,
+        "mae": 3.0639381408691406,
+        "rmse": 9.620430988959386,
         "foreground": 94389,
-        "foregroundAbsolute": 2424867,
-        "foregroundMae": 8.56338132621386,
-        "changed": 82935
+        "foregroundAbsolute": 2409579,
+        "foregroundMae": 8.509391984235451,
+        "changed": 84061
       }
     },
     "compat": {
@@ -195,15 +195,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 2426643,
-        "square": 72986541,
+        "absolute": 2411871,
+        "square": 72955815,
         "max": 255,
-        "mae": 3.0856361389160156,
-        "rmse": 9.633648640401464,
+        "mae": 3.066852569580078,
+        "rmse": 9.63162063192454,
         "foreground": 94389,
-        "foregroundAbsolute": 2426643,
-        "foregroundMae": 8.569653243492356,
-        "changed": 82858
+        "foregroundAbsolute": 2411871,
+        "foregroundMae": 8.517486147750267,
+        "changed": 83994
       }
     }
   },

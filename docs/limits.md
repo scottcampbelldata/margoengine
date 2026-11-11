@@ -1919,7 +1919,9 @@ Trade-off: iridescence and clearcoat now sit further from the Sample Viewer pict
 displayed texture and keeps the light direction exact; the other moves are gains. The clustered and clustered-point
 Cornell budgets did not move. The environment IBL budget was not re-recorded by this ruling: its native direct row was 1 over since
 `40e6f183dc`; Scott's separate ruling of the same day (KB3574) re-recorded it at 2,294,442 (batch 160 job 7 below). The AMD rows (`amd` in specular and ior,
-`batch-160-amd-*.json`) were measured before these changes and are not re-measured; an AMD rerun is owed.
+`batch-160-amd-*.json`) were re-measured on 2026-11-11 on the dev PC's AMD RDNA2 iGPU (KB3584, docs/known-bugs.md):
+specular +0.02%, ior -0.6%, transmission viewer -9.8% native, volume viewer -2.7% native; AMD proofs of transmission and
+volume are gated by their receipt's AMD measurement. Run with `MARGO_GPU=amd GPU_POWER=low-power`.
 Reproduce: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
 scripts/reference-rendering/run.mjs --case=<case> [--compat]`, then `transport.mjs --case=<transmission|volume>`.
 

@@ -17,6 +17,22 @@ export function viewerBudget(baseline, compat, vendor) {
   return row.metrics;
 }
 
+/**
+ * The budgets of an AMD proof of a case with transport references (transmission, volume), per reference name: the
+ * metrics its AMD receipt (`batch-160-amd-<case>.json`) measured on the same scene for that backend (KB3584). The NVIDIA
+ * budgets are measured exactly on NVIDIA, and the Radeon's picture differs from it by a few units, so an AMD proof is
+ * gated by what AMD measured, as the `amd` rows of specular and ior gate theirs.
+ */
+export function amdReceiptBudgets(receipt, baseline, compat) {
+  assert.equal(receipt.selection?.MARGO_GPU, 'amd', 'An AMD receipt must come from MARGO_GPU=amd');
+  assert.match(receipt.adapter, /AMD Radeon/i, 'An AMD receipt must come from the Radeon adapter');
+  const proof = receipt.proofs.find((row) => row.backend === (compat ? 'compat' : 'native'));
+  assert.ok(proof, `The AMD receipt has no ${compat ? 'compat' : 'native'} proof`);
+  assert.equal(proof.sceneSha256, baseline.sceneSha256, 'The AMD receipt must measure the frozen scene');
+  assert.equal(proof.variants, 1, 'The AMD receipt must come from a repeatable proof');
+  return proof.metrics;
+}
+
 /** Validate every capture; an incomplete or repeating subset cannot establish a repeatability proof. */
 export function assertReferenceProof(report, baseline, references, vendor) {
   assert.equal(report.runs.length, 3, 'Three fresh browser processes are required');

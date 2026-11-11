@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-09",
+  "date": "2026-11-11",
   "adapter": "AMD Radeon(TM) Graphics / RDNA 2",
   "driverVersion": "32.0.21042.62",
   "selection": {
@@ -7,206 +7,136 @@
     "GPU_POWER": "low-power",
     "enginePowerPreference": "low-power"
   },
-  "reason": "Scott ruling: NVIDIA 617.42 and Intel Arc 4x MSAA blend variation is documented separately. Fresh proofs after main teardown fixes cf699846f/20375ea56.",
-  "budgets": "All original frozen JSONs unchanged; every absolute/square/max/foreground gate passes.",
+  "reason": "KB3584: re-measured on the dev PC AMD RDNA2 iGPU (0x13C0, the adapter of the 2026-11-09 receipt) after da12bd07e1, 65098f33fe, 401c2e032b and edcb6debb7, under Scott 2026-11-11 re-record ruling. These metrics are the AMD budgets of this case (proof-contract amdReceiptBudgets).",
+  "budgets": "Each backend proof gates every reference (viewer, full, direct) by its own metrics here; the NVIDIA rows stay the shared budget for every other adapter.",
   "proofs": [
     {
       "backend": "native",
-      "report": "../engine-bench/batch-160/volume/proof-native-1794249055279-58964/proof.json",
-      "reportSha256": "4327b29be7353b9cdc1297c5e174bbb71b6e747ff786c10be57a59065bae5929",
+      "report": "../engine-bench/batch-160/volume/proof-native-1794404568133-73428/proof.json",
+      "reportSha256": "434eb547c7fd0caf570a3f9973a27f9bbfdd58bd2905f5d1901a100cf7090c1e",
+      "sceneSha256": "cd8c7470b54a673a16a077a4b22d17f99ff6522725fd3c525aa2956511cdaac4",
       "processes": 3,
       "devicesPerProcess": 4,
       "framesPerDevice": 6,
       "variants": 1,
       "decodedRGBAHashes": [
-        "9bd2f67e73075903b1c5abb27b21de9b16ed12d5f18d72b553427c8805eb77c3"
+        "4c7f62f5f4af413dc0d15406b168f75a6d9f8bb52a38dfb4662766ea23e64c86"
       ],
       "references": [
         {
           "name": "viewer",
-          "hash": "1a4101622a740030227496b539d790f683ec37791b85a9971782779e292d7eb7",
-          "budget": {
-            "pixels": 262144,
-            "absolute": 1680190,
-            "square": 31577626,
-            "max": 113,
-            "mae": 2.1364720662434897,
-            "rmse": 6.336641685654658,
-            "foreground": 150540,
-            "foregroundAbsolute": 1680190,
-            "foregroundMae": 3.7203622514503345,
-            "changed": 149932
-          }
+          "hash": "1a4101622a740030227496b539d790f683ec37791b85a9971782779e292d7eb7"
         },
         {
           "name": "full",
-          "hash": "384cf7a91a0a4a9e1c42ffbd6bb0774025327b8f8b80f1fd36feafba5f7422e8",
-          "budget": {
-            "pixels": 262144,
-            "absolute": 13792000,
-            "square": 1394430502,
-            "max": 148,
-            "mae": 17.537434895833332,
-            "rmse": 42.108313601486884,
-            "foreground": 150544,
-            "foregroundAbsolute": 13792000,
-            "foregroundMae": 30.538137244482233,
-            "changed": 146646
-          }
+          "hash": "384cf7a91a0a4a9e1c42ffbd6bb0774025327b8f8b80f1fd36feafba5f7422e8"
         },
         {
           "name": "direct",
-          "hash": "a2cb0b6406c1a550857413b7cd03378992a643f9785100697a2ebaf5a2f9ae96",
-          "budget": {
-            "pixels": 262144,
-            "absolute": 1843497,
-            "square": 70743471,
-            "max": 142,
-            "mae": 2.344127655029297,
-            "rmse": 9.484459664534075,
-            "foreground": 150544,
-            "foregroundAbsolute": 1843497,
-            "foregroundMae": 4.081856467212243,
-            "changed": 64277
-          }
+          "hash": "a2cb0b6406c1a550857413b7cd03378992a643f9785100697a2ebaf5a2f9ae96"
         }
       ],
       "metrics": {
         "viewer": {
           "pixels": 262144,
-          "absolute": 1512739,
-          "square": 23866175,
-          "max": 112,
-          "mae": 1.9235471089680989,
-          "rmse": 5.508848413035999,
+          "absolute": 1471185,
+          "square": 22587619,
+          "max": 110,
+          "mae": 1.8707084655761719,
+          "rmse": 5.359257673604908,
           "foreground": 150540,
-          "foregroundAbsolute": 1512739,
-          "foregroundMae": 3.349583720827244,
+          "foregroundAbsolute": 1471185,
+          "foregroundMae": 3.257572738142686,
           "changed": 149955
         },
         "full": {
           "pixels": 262144,
-          "absolute": 13741199,
-          "square": 1391740833,
+          "absolute": 13795751,
+          "square": 1392961299,
           "max": 148,
-          "mae": 17.472838083902996,
-          "rmse": 42.06768336107801,
+          "mae": 17.54220453898112,
+          "rmse": 42.086124627232145,
           "foreground": 150544,
-          "foregroundAbsolute": 13741199,
-          "foregroundMae": 30.425654072342084,
-          "changed": 146639
+          "foregroundAbsolute": 13795751,
+          "foregroundMae": 30.546442678995287,
+          "changed": 146637
         },
         "direct": {
           "pixels": 262144,
-          "absolute": 1746854,
-          "square": 64061998,
+          "absolute": 1810252,
+          "square": 65996060,
           "max": 142,
-          "mae": 2.2212397257486978,
-          "rmse": 9.025466351775112,
+          "mae": 2.301854451497396,
+          "rmse": 9.160694835801184,
           "foreground": 150544,
-          "foregroundAbsolute": 1746854,
-          "foregroundMae": 3.8678703014843943,
-          "changed": 64348
+          "foregroundAbsolute": 1810252,
+          "foregroundMae": 4.008245651326744,
+          "changed": 64341
         }
       }
     },
     {
       "backend": "compat",
-      "report": "../engine-bench/batch-160/volume/proof-compat-1794249072694-105668/proof.json",
-      "reportSha256": "22f005f682a622eb952cdfb6a947f335da458c5744186fb2780350ca678e2f1b",
+      "report": "../engine-bench/batch-160/volume/proof-compat-1794404583699-86780/proof.json",
+      "reportSha256": "96790fa8094f48550d7a15aad2f31673e0fddd55ac69b24242810598ddb15a1e",
+      "sceneSha256": "cd8c7470b54a673a16a077a4b22d17f99ff6522725fd3c525aa2956511cdaac4",
       "processes": 3,
       "devicesPerProcess": 4,
       "framesPerDevice": 6,
       "variants": 1,
       "decodedRGBAHashes": [
-        "e4b0f4f03d6f3bf47643e2466066a56adfb514b6f843018149343c2b78541d8f"
+        "293b3cc884b3095de228e60dbe1a1d350c03dc47d410aff538f105f4a843facf"
       ],
       "references": [
         {
           "name": "viewer",
-          "hash": "1a4101622a740030227496b539d790f683ec37791b85a9971782779e292d7eb7",
-          "budget": {
-            "pixels": 262144,
-            "absolute": 1680190,
-            "square": 31577626,
-            "max": 113,
-            "mae": 2.1364720662434897,
-            "rmse": 6.336641685654658,
-            "foreground": 150540,
-            "foregroundAbsolute": 1680190,
-            "foregroundMae": 3.7203622514503345,
-            "changed": 149932
-          }
+          "hash": "1a4101622a740030227496b539d790f683ec37791b85a9971782779e292d7eb7"
         },
         {
           "name": "full",
-          "hash": "384cf7a91a0a4a9e1c42ffbd6bb0774025327b8f8b80f1fd36feafba5f7422e8",
-          "budget": {
-            "pixels": 262144,
-            "absolute": 13792000,
-            "square": 1394430502,
-            "max": 148,
-            "mae": 17.537434895833332,
-            "rmse": 42.108313601486884,
-            "foreground": 150544,
-            "foregroundAbsolute": 13792000,
-            "foregroundMae": 30.538137244482233,
-            "changed": 146646
-          }
+          "hash": "384cf7a91a0a4a9e1c42ffbd6bb0774025327b8f8b80f1fd36feafba5f7422e8"
         },
         {
           "name": "direct",
-          "hash": "a2cb0b6406c1a550857413b7cd03378992a643f9785100697a2ebaf5a2f9ae96",
-          "budget": {
-            "pixels": 262144,
-            "absolute": 1843497,
-            "square": 70743471,
-            "max": 142,
-            "mae": 2.344127655029297,
-            "rmse": 9.484459664534075,
-            "foreground": 150544,
-            "foregroundAbsolute": 1843497,
-            "foregroundMae": 4.081856467212243,
-            "changed": 64277
-          }
+          "hash": "a2cb0b6406c1a550857413b7cd03378992a643f9785100697a2ebaf5a2f9ae96"
         }
       ],
       "metrics": {
         "viewer": {
           "pixels": 262144,
-          "absolute": 1512128,
-          "square": 23853036,
-          "max": 111,
-          "mae": 1.9227701822916667,
-          "rmse": 5.507331816347328,
+          "absolute": 1415249,
+          "square": 22196567,
+          "max": 110,
+          "mae": 1.7995821634928386,
+          "rmse": 5.312663595635184,
           "foreground": 150540,
-          "foregroundAbsolute": 1512128,
-          "foregroundMae": 3.3482308135157877,
-          "changed": 149956
+          "foregroundAbsolute": 1415249,
+          "foregroundMae": 3.1337163987423056,
+          "changed": 149969
         },
         "full": {
           "pixels": 262144,
-          "absolute": 13741752,
-          "square": 1391704910,
+          "absolute": 13823799,
+          "square": 1393348555,
           "max": 148,
-          "mae": 17.473541259765625,
-          "rmse": 42.06714044133848,
+          "mae": 17.577869415283203,
+          "rmse": 42.09197438475671,
           "foreground": 150544,
-          "foregroundAbsolute": 13741752,
-          "foregroundMae": 30.426878520565417,
-          "changed": 146666
+          "foregroundAbsolute": 13823799,
+          "foregroundMae": 30.608546338611966,
+          "changed": 146700
         },
         "direct": {
           "pixels": 262144,
-          "absolute": 1747921,
-          "square": 64074535,
+          "absolute": 1855106,
+          "square": 66426588,
           "max": 142,
-          "mae": 2.2225964864095054,
-          "rmse": 9.02634945517277,
+          "mae": 2.3588892618815103,
+          "rmse": 9.190526347067006,
           "foreground": 150544,
-          "foregroundAbsolute": 1747921,
-          "foregroundMae": 3.870232844439721,
-          "changed": 64367
+          "foregroundAbsolute": 1855106,
+          "foregroundMae": 4.107561023133879,
+          "changed": 64444
         }
       }
     }

@@ -10,6 +10,7 @@ import { referenceCase } from './cases.mjs';
 import { pictureError, assertBudget } from './compare.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { saveReference } from './reference.mjs';
+import { viewerBudget } from './proof-contract.mjs';
 
 const root = join(
   process.env.MARGO_ENGINE_BENCH ?? fileURLToPath(new URL('../../../engine-bench', import.meta.url)),
@@ -141,17 +142,20 @@ try {
     nativeWebGL2: native,
     metrics: pictureError(await decodePNG(actual), await decodePNG(reference)),
   };
-  if (!process.argv.includes('--measure')) {
-    const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-    assert.equal(result.referenceSha256, baseline.referenceSha256);
-    assert.equal(result.sceneSha256, baseline.sceneSha256);
-    assertBudget(result.metrics, process.argv.includes('--compat') ? baseline.compat.metrics : baseline.metrics);
-  }
+  // The measurement is written and printed before the budget check, so a run over its budget still reports what it
+  // measured (KB3584: the AMD rows could not be re-measured from a failing run).
   writeFileSync(
     join(out, process.argv.includes('--compat') ? 'comparison-compat.json' : 'comparison.json'),
     JSON.stringify(result, null, 2),
   );
   console.log('RESULT', JSON.stringify(result));
+  if (!process.argv.includes('--measure')) {
+    const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+    assert.equal(result.referenceSha256, baseline.referenceSha256);
+    assert.equal(result.sceneSha256, baseline.sceneSha256);
+    // An AMD run is gated by the case's own `amd` row when it has one, as proof.mjs does (proof-contract.mjs).
+    assertBudget(result.metrics, viewerBudget(baseline, process.argv.includes('--compat'), process.env.MARGO_GPU));
+  }
 } finally {
   await context.close();
 }

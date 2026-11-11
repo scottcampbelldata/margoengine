@@ -4031,12 +4031,22 @@ direct-light cases. Every budget is re-recorded at its measured value; before an
 docs/limits.md, "Batch 160 budgets re-recorded". The picture residual against the Sample Viewer stays open above.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3497/report.md`; it points at the KB3508 NVIDIA page and says the link is consistent, not proven.
 
-### Batch 160 AMD budgets not re-measured after the 2026-11-11 changes (open)
+### Fixed 2026-11-11: batch 160 AMD budgets not re-measured after the 2026-11-11 changes (KB3584)
 
-The `amd` rows of batch-160-specular.json and batch-160-ior.json and the budgets in batch-160-amd-transmission.json
-and batch-160-amd-volume.json were measured before da12bd07e1, 65098f33fe, 401c2e032b and KB5875a; only the NVIDIA
-rows were re-recorded. Repro: the same scripts with MARGO_GPU=amd on the Radeon (RDNA 2) machine. Cause: no AMD
-adapter on the dev PC. Owed: rerun there and re-record under the same ruling.
+The `amd` rows of batch-160-specular.json and batch-160-ior.json and the receipts batch-160-amd-transmission.json and
+batch-160-amd-volume.json were measured before da12bd07e1, 65098f33fe, 401c2e032b and KB5875a; only the NVIDIA rows
+were re-recorded. They were recorded on the dev PC's own AMD RDNA2 iGPU (PCI 1002:13C0, driver 32.0.21042.62, picked
+with `MARGO_GPU=amd GPU_POWER=low-power`), not the Beelink's 680M, so they were re-measured there under the same
+2026-11-11 ruling. Two tool defects hid this: `run.mjs` gated an AMD run by the NVIDIA budget and stopped before printing
+what it measured, and `proof.mjs` gated an AMD transmission or volume proof by the NVIDIA budgets, which the re-record
+set at NVIDIA's exact figures (AMD differs by a few units: volume native square 22,587,619 against 22,496,007,
+transmission compat foreground 66,994 against 67,046). `run.mjs` now prints its result first and gates by the case's
+`amd` row (`viewerBudget`), and an AMD proof of a case with a receipt is gated by that receipt's measurement
+(`amdReceiptBudgets`). Measured (absolute error, native / compat): specular 879,167 / 873,364 to 879,353 / 873,565
+(+0.02%, Smith G2); ior 2,424,867 / 2,426,643 to 2,409,579 / 2,411,871 (-0.6%); transmission viewer 1,749,897 /
+1,738,453 to 1,577,938 / 1,554,970 (linear glass); volume viewer 1,512,739 / 1,512,128 to 1,471,185 / 1,415,249; each
+proof 3 processes x 4 devices x 6 frames, one decoded variant. Regression: tests/reference-rendering.test.js (the AMD
+pins, the receipts and run.mjs's order and gate).
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 

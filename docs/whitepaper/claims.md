@@ -2437,6 +2437,12 @@ physical-equivalence or speed claim; unresolved transport residuals are recorded
 in known-bugs.md. Proof summaries will record actual completed reports.
 
 
+Re-measured 2026-11-11 (KB3584, same adapter and driver, after da12bd07e1, 65098f33fe, 401c2e032b and
+edcb6debb7): transmission viewer/full/direct native 1,577,938 / 4,155,211 / 2,625,420, compatibility 1,554,970 /
+4,152,961 / 2,608,796; volume native 1,471,185 / 13,795,751 / 1,810,252, compatibility 1,415,249 / 13,823,799 /
+1,855,106; one decoded variant per proof. These receipts now gate AMD proofs of both cases. The 2026-11-09 figures
+below are the job 4 record.
+
 Fresh job 4 AMD proof (driver 32.0.21042.62): all four commands passed with
 normal teardown. Each backend/model retains 72 identical decoded RGBA captures
 across three fresh processes, four devices and six frames. Transmission

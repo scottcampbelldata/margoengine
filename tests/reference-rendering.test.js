@@ -199,10 +199,11 @@ test('volume transport budgets are the 2026-11-11 re-recorded measurements', () 
 });
 
 // Batch 160 job 5, measured on main's area-filter mip chain (65098f33fe): NVIDIA rows are the shared budget, the AMD
+// rows (re-measured 2026-11-11 on the dev PC's AMD RDNA2 iGPU after edcb6debb7, KB3584)
 // rows gate AMD proofs. Each row: native absolute, compat absolute, native square, compat square.
 for (const [family, primitives, nvidia, amd] of [
-  ['specular', 24, [877623, 877629, 45728851, 45729151], [879167, 873364, 45728589, 45667350]],
-  ['ior', 23, [2411082, 2411082, 72778266, 72778266], [2424867, 2426643, 72838947, 72986541]],
+  ['specular', 24, [877623, 877629, 45728851, 45729151], [879353, 873565, 45729003, 45668835]],
+  ['ior', 23, [2411082, 2411082, 72778266, 72778266], [2409579, 2411871, 72786399, 72955815]],
 ])
   test(`${family} freezes the measured full-scene error on each adapter and PBR backend`, () => {
     const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
@@ -232,3 +233,32 @@ for (const [family, primitives, nvidia, amd] of [
     assert.match(b.compat.hardware.webglRenderer, /NVIDIA/);
     assert.match(b.amd.compat.hardware.webglRenderer, /AMD Radeon/);
   });
+
+// KB3584: the AMD receipts of transmission and volume were measured before four renderer changes and an AMD proof was
+// gated by the NVIDIA budgets, which the 2026-11-11 re-record set at NVIDIA's exact figures; the Radeon differs by a few
+// units (volume native square 22,587,619 against 22,496,007, transmission compat foreground 66,994 against 67,046), so
+// AMD proofs failed. Each receipt now holds the AMD measurement after those changes, and an AMD proof is gated by it.
+for (const family of ['transmission', 'volume'])
+  test(`${family}: the AMD receipt is a repeatable AMD measurement of the frozen scene and gates AMD proofs`, async () => {
+    const { amdReceiptBudgets } = await import('../scripts/reference-rendering/proof-contract.mjs');
+    const read = (name) => JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/${name}`, import.meta.url)));
+    const receipt = read(`batch-160-amd-${family}.json`),
+      baseline = read(`batch-160-${family}.json`);
+    assert.equal(receipt.date, '2026-11-11');
+    for (const compat of [false, true]) {
+      const budgets = amdReceiptBudgets(receipt, baseline, compat);
+      assert.deepEqual(Object.keys(budgets), ['viewer', 'full', 'direct']);
+      for (const metrics of Object.values(budgets)) assert.equal(metrics.pixels, 512 * 512);
+    }
+    assert.throws(() => amdReceiptBudgets({ ...receipt, adapter: 'NVIDIA RTX A6000' }, baseline, false), /Radeon/);
+    assert.throws(
+      () => amdReceiptBudgets(receipt, { ...baseline, sceneSha256: '0'.repeat(64) }, false),
+      /frozen scene/,
+    );
+  });
+
+test('run.mjs reports its measurement before the budget check and gates AMD by the amd row (KB3584)', () => {
+  const text = readFileSync(new URL('../scripts/reference-rendering/run.mjs', import.meta.url), 'utf8');
+  assert.ok(text.indexOf("console.log('RESULT'") < text.indexOf('assertBudget(result.metrics'));
+  assert.match(text, /assertBudget\(result\.metrics, viewerBudget\(baseline, .*process\.env\.MARGO_GPU\)\)/);
+});
