@@ -365,6 +365,7 @@ class GLTFAsset {
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
     setDecodedAccessor(id: unknown, values: Float32Array): void;
+    prepareMeshopt(): Promise<void>;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;
 }

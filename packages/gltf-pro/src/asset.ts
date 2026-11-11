@@ -2,7 +2,7 @@ import { margoError } from '../../shared/errors.js';
 import { parseJSON as parseSafeJSON } from '../../shared/json.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
-import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
+import type { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import type { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import type { PBRInstances } from './instancing.js';
@@ -261,6 +261,8 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_gaussian_splatting: 'splats',
   KHR_gaussian_splatting_compression_spz_2: 'splats',
 };
+// The built-in meshopt decoder is a dynamic import so a build that never loads a glTF does not bundle it.
+let meshoptSync: typeof meshoptDecodeGltfBuffer | undefined;
 const meshoptNames = ['EXT_meshopt_compression', 'KHR_meshopt_compression'];
 const meshopt = <T>(def: { extensions?: { EXT_meshopt_compression?: T; KHR_meshopt_compression?: T } }): T | undefined => {
   const extensions = def?.extensions;
@@ -593,7 +595,14 @@ export class GLTFAsset {
       if (this.hooks.meshopt) {
         bytes = new Uint8Array(length);
         this.hooks.meshopt.decodeGltfBuffer(bytes, count, stride, sourceBytes, mode, filter);
-      } else bytes = meshoptDecodeGltfBuffer(sourceBytes, count, stride, mode, filter);
+      } else {
+        if (!meshoptSync)
+          throw margoError(
+            'state',
+            'Meshopt geometry requires parseGLTFAsync or loadGLTF, or a meshopt decoder passed in decoders (or asset.decode() first)',
+          );
+        bytes = meshoptSync(sourceBytes, count, stride, mode, filter);
+      }
       this.reserveDecodedBytes(bytes.byteLength);
       this.viewCache.set(index, bytes);
       return bytes;
@@ -626,7 +635,16 @@ export class GLTFAsset {
     this.reserveDecodedBytes(values.byteLength);
     this.cache.set(index, values);
   }
+  /** Loads the built-in meshopt decoder, only when a buffer view declares a meshopt extension and no `meshopt` hook is set. */
+  async prepareMeshopt(): Promise<void> {
+    if (meshoptSync || this.hooks.meshopt) return;
+    if (
+      this.doc.bufferViews?.some((v) => v?.extensions?.EXT_meshopt_compression || v?.extensions?.KHR_meshopt_compression)
+    )
+      meshoptSync = (await import('@margoengine/decoders/meshopt')).meshoptDecodeGltfBuffer;
+  }
   async decode(signal?: AbortSignal): Promise<void> {
+    await this.prepareMeshopt();
     // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
     if (!hasDraco(this)) return signal?.throwIfAborted();
     const { decompressPrimitives } = await import('./compression.js');

@@ -8,7 +8,9 @@ import { build } from 'vite';
 
 // A message only PBRModel's constructor holds, and one only GLTFAsset's accessor reader holds.
 const MODEL = 'give each node one parent and valid child indices';
-const ASSET = /gltf-pro\/dist\/asset-[\w-]+\.js$|decoders\/dist\/meshopt\.js$/;
+const ASSET = /gltf-pro\/dist\/asset-[\w-]+\.js$/;
+// The meshopt decoder loads by a dynamic import, only for a glTF whose buffer views declare a meshopt extension.
+const MESHOPT = /decoders\/dist\/(meshopt[\w-]*|index)\.js$/;
 
 async function bundled(code) {
   const out = await build({
@@ -32,7 +34,7 @@ for (const [name, code] of [
   test(`a build that imports only ${name} holds no glTF model class or file reader`, { timeout: 120000 }, async () => {
     const app = await bundled(code);
     assert.ok(!app.code.includes(MODEL), 'PBRModel was bundled');
-    assert.deepEqual(app.modules.filter((id) => ASSET.test(id)), []);
+    assert.deepEqual(app.modules.filter((id) => ASSET.test(id) || MESHOPT.test(id)), []);
   });
 
 test('a mesh drawn with a Material bundles the PBR renderer, so the markers above are live', { timeout: 120000 }, async () => {
@@ -41,4 +43,9 @@ test('a mesh drawn with a Material bundles the PBR renderer, so the markers abov
   );
   assert.ok(app.code.includes(MODEL), 'PBRModel is in the build');
   assert.ok(app.modules.some((id) => ASSET.test(id)), 'the accessor reader is in the build');
+  assert.deepEqual(
+    app.modules.filter((id) => MESHOPT.test(id)),
+    [],
+    'a build that draws Material meshes and loads no glTF must not bundle the meshopt decoder',
+  );
 });

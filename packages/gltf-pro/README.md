@@ -197,7 +197,9 @@ await asset.decode();
 ```
 
 The existing `parseGLTF(engine, input, buffers, images)` remains synchronous for
-uncompressed and meshopt assets; Draco input directs callers to the async API.
+uncompressed assets, and for meshopt assets when you pass the decoder as
+`decoders: { meshopt }`; the built-in meshopt decoder loads on demand in
+`loadGLTF`, `parseGLTFAsync` and `asset.decode()`, so an app that never loads a glTF does not bundle it. Draco input directs callers to the async API.
 Both async APIs accept `{signal}`, an optional reusable `draco` decoder with a
 `decode` method, and an optional `ktx2` decoder with a `transcode` method. A supplied decoder stays owned by its caller. The default Draco
 decoder requires browser module workers; server callers can supply a decoder.

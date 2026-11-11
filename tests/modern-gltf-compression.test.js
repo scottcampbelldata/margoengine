@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { GLTFAsset, loadGLTF, parseGLTF, parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
+import { MeshoptDecoder } from '../packages/decoders/dist/meshopt.js';
 import { decodeDraco, initDraco } from '../packages/decoders/dist/codec.js';
 import { optionalGPU } from './support/optional-gpu.js';
 
@@ -377,7 +378,8 @@ test('meshopt attributes and triangle indices decode synchronously without fallb
   const { engine } = await scene(),
     { doc, buffers } = meshoptTriangle();
   try {
-    const model = parseGLTF(engine, doc, buffers);
+    // The built-in decoder loads in the async paths; a synchronous parse passes it in as `decoders.meshopt`.
+    const model = parseGLTF(engine, doc, buffers, [], { meshopt: MeshoptDecoder });
     assert.deepEqual([...model.primitives[0].indices], [0, 1, 2]);
     assert.deepEqual([...model.asset.accessor(0)], [...geometry().positions]);
     assert.equal(model.asset.view(0), model.asset.view(0), 'decoded views are cached');
@@ -430,7 +432,9 @@ test('meshopt EXPONENTIAL filtering matches reference bytes and rejects malforme
       },
     ],
   };
-  assert.deepEqual(new GLTFAsset(doc, [data]).view(0), Uint8Array.from(Buffer.from(vector.expected, 'base64')));
+  const exponential = new GLTFAsset(doc, [data]);
+  await exponential.prepareMeshopt();
+  assert.deepEqual(exponential.view(0), Uint8Array.from(Buffer.from(vector.expected, 'base64')));
   for (const change of [
     (ext) => {
       ext.count++;

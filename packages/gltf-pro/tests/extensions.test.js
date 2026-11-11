@@ -283,11 +283,9 @@ test('EXT_meshopt_compression decodes through the meshopt hook with the real dec
     meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2 }] }],
     nodes: [{ mesh: 0 }],
   };
-  assert.deepEqual(
-    new GLTFAsset(doc, [packed]).view(0),
-    bytes(streams[0].expected),
-    'built-in meshopt is available without a hook',
-  );
+  const builtIn = new GLTFAsset(doc, [packed]);
+  await builtIn.decode();
+  assert.deepEqual(builtIn.view(0), bytes(streams[0].expected), 'built-in meshopt loads in decode() without a hook');
   let decodes = 0;
   const meshopt = {
     decodeGltfBuffer(...args) {

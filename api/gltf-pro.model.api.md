@@ -32,6 +32,7 @@ export class GLTFAsset {
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;
     setDecodedAccessor(id: unknown, values: Float32Array): void;
+    prepareMeshopt(): Promise<void>;
     decode(signal?: AbortSignal): Promise<void>;
     accessor(id: unknown, type?: string): Float32Array;
 }
@@ -573,7 +574,7 @@ export function closeImages(images: readonly GLTFImage[]): void;
 
 export function loadGLTF(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly GLTFImage[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials'>, { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly GLTFImage[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'>, { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
 
 export function parseGLTFAsync(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffersOrOptions?: Array<ArrayBuffer | ArrayBufferView> | (AssetOptions & CompressionOptions), images?: readonly GLTFImage[], options?: GLTFLoadOptions): Promise<PBRModel>;
 

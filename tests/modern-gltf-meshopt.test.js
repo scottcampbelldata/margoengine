@@ -75,21 +75,23 @@ function triangle() {
   return { ...result, positions };
 }
 
-test('meshopt accepts required URI-less placeholder buffers without a fallback marker', () => {
+test('meshopt accepts required URI-less placeholder buffers without a fallback marker', async () => {
   const { doc, source, positions } = triangle(),
     before = structuredClone(doc);
   const asset = new GLTFAsset(doc, [source]);
+  await asset.prepareMeshopt();
   assert.equal(asset.buffers[1].byteLength, 0);
   assert.deepEqual(asset.accessor(0), positions);
   assert.equal(asset.view(0), asset.view(0), 'each decoded buffer view is retained once');
   assert.deepEqual(doc, before, 'decoding preserves the caller document');
 });
 
-test('optional meshopt extensions use compressed data even when ordinary fallback bytes are available', () => {
+test('optional meshopt extensions use compressed data even when ordinary fallback bytes are available', async () => {
   const { doc, source, positions } = triangle();
   delete doc.extensionsRequired;
   const fallback = new Uint8Array(doc.buffers[1].byteLength);
   const asset = new GLTFAsset(doc, [source, fallback]);
+  await asset.prepareMeshopt();
   assert.deepEqual(asset.accessor(0), positions);
   assert.deepEqual(fallback, new Uint8Array(fallback.length), 'fallback data remains untouched');
 });

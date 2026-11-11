@@ -10,8 +10,9 @@ const names = ['EXT_meshopt_compression', 'KHR_meshopt_compression'];
 const document = (name) => JSON.parse(original.replaceAll(names[0], name));
 
 for (const name of names) {
-  test(`${name} explicit and implicit placeholders decode identical bytes and cache each view`, () => {
+  test(`${name} explicit and implicit placeholders decode identical bytes and cache each view`, async () => {
     const expected = new GLTFAsset(document(names[0]), [packed]);
+    await expected.prepareMeshopt();
     for (const explicit of [true, false]) {
       const doc = document(name);
       if (!explicit) delete doc.buffers[1].extensions;

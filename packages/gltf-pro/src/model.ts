@@ -5552,13 +5552,13 @@ function capturePublicShadowGetter(model: typeof PBRModel): () => unknown {
   return Object.getOwnPropertyDescriptor(model.prototype, 'shadowPrimitives')!.get!;
 }
 const publicShadowGetter = /* @__PURE__ */ capturePublicShadowGetter(PBRModel);
-/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader and the `materials` shaders; `maxNodes` as for loadGLTF. */
+/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder and `materials` shaders; `maxNodes` as for loadGLTF. */
 export function parseGLTF(
   instance: EngineKernel,
   input: string | object | ArrayBuffer | ArrayBufferView,
   buffers: Array<ArrayBuffer | ArrayBufferView> = [],
   images: readonly GLTFImage[] = [],
-  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials'> = {},
+  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'> = {},
   { maxNodes }: Pick<AssetOptions, 'maxNodes'> = {},
 ): PBRModel {
   const { doc, binary } = container(input),
@@ -5668,6 +5668,7 @@ export async function parseGLTFAsync(
       options.maxNodes,
     );
   if (options.optimize) asset.reorder = await triangleOrder();
+  await asset.prepareMeshopt();
   // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
   if (hasDraco(asset))
     await (await import('./compression.js')).decompressPrimitives(asset, {
