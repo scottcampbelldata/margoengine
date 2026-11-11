@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Shadows } from '../dist/index.js';
+import { VirtualShadows } from '../dist/virtual.js';
 import { mockGPU, context, passes } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { box } from '../../core/dist/index.js';
@@ -10,6 +11,7 @@ import { box } from '../../core/dist/index.js';
 // '2d-array' views, so a one-layer map (one cascade with `bounds`) made without
 // the hint is a validation error at createBindGroup, and every frame's command buffer is invalid
 // (webgl2-compat adapter-browser.mjs). Every map receivers bind must be made for '2d-array'.
+// VirtualShadows binds its page table the same way: with `levels: 1` it is one layer too (KB6434d).
 async function harness({ scopes }) {
   const gpu = mockGPU(),
     device = gpu.device,
@@ -77,13 +79,15 @@ const mismatches = (shadows) =>
 
 const checked = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-for (const [name, options, scopes] of [
-  ['one cascade (bounds)', { resolution: 64, bounds: { min: [-2, -2, -2], max: [2, 2, 2] }, colored: true }, false],
-  ['two cascades', { resolution: 64, cascades: 2, colored: true }, false],
+for (const [Kind, name, options, scopes] of [
+  [Shadows, 'one cascade (bounds)', { resolution: 64, bounds: { min: [-2, -2, -2], max: [2, 2, 2] }, colored: true }, false],
+  [Shadows, 'two cascades', { resolution: 64, cascades: 2, colored: true }, false],
+  [VirtualShadows, 'a one-level page table', { poolSize: 1024, levels: 1 }, false],
+  [VirtualShadows, 'a four-level page table', { poolSize: 1024, levels: 4 }, false],
 ]) {
-  test(`Shadows: receivers bind ${name} through the view dimension its texture was made for`, async () => {
+  test(`${Kind.name}: receivers bind ${name} through the view dimension its texture was made for`, async () => {
     const h = await harness({ scopes }),
-      shadows = new Shadows(options);
+      shadows = new Kind(options);
     try {
       shadows.setup(h.engine);
       shadows.add(h.cube);

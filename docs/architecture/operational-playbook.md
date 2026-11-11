@@ -2479,7 +2479,8 @@ rebuild above. Containment in the package was tried and dropped: waiting for the
 every attach, restore and resize, and the rebuild already covers the failure (evidence
 `packages/shadows/test/alloc-failure.test.js`, `packages/materials/test/browser-check.mjs` catcherSun). On a device without
 `core-features-and-limits` (the compatibility level, the WebGL2 layer) every shadow map receivers bind as a '2d-array'
-view, a one-cascade map included, is made with `textureBindingViewDimension: '2d-array'` (KB-C34f; evidence
+view, a one-cascade map and a one-level `VirtualShadows` page table included, is made with
+`textureBindingViewDimension: '2d-array'` (KB-C34f, KB6434d; evidence
 `packages/shadows/test/compat-view-dimension.test.js` and `packages/webgl2-compat/test/adapter-browser.mjs`). Evidence:
 `tests/deep-core-allocation-failure.test.js` (out-of-memory reported once, device rebuilt, next frame draws; validation still
 throws), `scripts/restore-fault-sweep.mjs` (every allocation a restore makes, core's and each package's, failed once in a real

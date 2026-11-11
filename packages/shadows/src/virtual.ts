@@ -66,6 +66,13 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
   COPY_DST: number;
 };
+// Receivers bind the page table as a '2d-array' view. A device without core-features-and-limits (the compatibility
+// level, the WebGL2 layer) binds a texture only as the view dimension it was made for, '2d' by default for one layer
+// (`levels: 1`), so there the table says so; full-level devices get the descriptors they always did.
+const arrayBinding = (device: GPUDevice) =>
+  device.features?.has('core-features-and-limits') === false
+    ? ({ textureBindingViewDimension: '2d-array' } as const)
+    : undefined;
 /** The WebGPU pass context of a frame. */
 type VirtualPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /** Virtual shadow map settings; invalid values throw RangeError. */
@@ -469,6 +476,7 @@ export class VirtualShadows implements EnginePlugin {
       size: [PAGES_PER_SIDE, PAGES_PER_SIDE, levels],
       format: 'r32uint',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      ...arrayBinding(device),
     });
     this.table = new Uint32Array(PAGES_PER_SIDE * PAGES_PER_SIDE * levels);
     this.uploaded = new Uint32Array(this.table.length).fill(1);

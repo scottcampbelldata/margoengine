@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Shadows } from '../dist/index.js';
+import { VirtualShadows } from '../dist/virtual.js';
 import { mockGPU, context, passes } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { injectGPUFaults } from '../../../tests/support/gpu-faults.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GPURenderer } from '../../core/dist/renderer.js';
 import { box } from '../../core/dist/index.js';
 
-// KB6434b, KB-C34g. Shadows makes its maps outside error scopes on purpose: receivers bind them in the first frame after
+// KB6434b, KB6434d, KB-C34g. Shadows and VirtualShadows make its maps outside error scopes on purpose: receivers bind them in the first frame after
 // an attach, a restore or a new map size, so that frame is shadowed. A failed allocation reaches core's `uncapturederror`
 // listener, which (KB6434a) reports it once and rebuilds the device; the restore makes the maps again and frames go on.
 // Package containment (scoped maps, a fallback until the device confirms them) was tried on branch core34 and dropped:
@@ -131,6 +132,45 @@ for (const [what, method, select] of [
       const map = bound(shadows);
       assert.equal(map, shadows.depthTexture, 'receivers bind the remade map');
       assert.ok(!map.destroyed && map.width === 64);
+      for (const e of shadows.bindings()) {
+        const resource = e.resource?.buffer ?? e.resource?.texture;
+        if (resource) assert.ok(!resource.destroyed, `binding ${e.binding} is live`);
+      }
+      assert.equal(h.errors.length, 1, 'nothing more is reported');
+    } finally {
+      GPURenderer.create = create;
+      h.engine.dispose();
+    }
+  });
+}
+
+// KB6434d: VirtualShadows goes the same way. Its pools, page table, uniform and buffers are made outside error scopes,
+// so receivers bind them at once; an out-of-memory one is recovered by core's device rebuild.
+for (const [what, method, select] of [
+  ['page pool', 'createTexture', (d) => d.format === 'depth32float' && d.size?.[0] === 1024],
+  ['uniform', 'createBuffer', (d) => d.size === 528],
+]) {
+  test(`VirtualShadows: an out-of-memory ${what} is reported once and core's device rebuild gives a working pool (KB6434d)`, async () => {
+    const h = await harness(),
+      next = device(),
+      shadows = new VirtualShadows({ poolSize: 1024, levels: 4 }),
+      create = GPURenderer.create;
+    GPURenderer.create = async () => next.renderer;
+    try {
+      {
+        using faults = injectGPUFaults(h.first.device, { [method]: 1, select: (m, d) => m === method && select(d) });
+        h.engine.use(shadows);
+        shadows.add(h.cube);
+        assert.equal(faults.injected.length, 1, 'the allocation was made and failed');
+        assert.equal(bound(shadows).width, 1024, 'receivers bind the pool in the first frame');
+      }
+      for (let i = 0; i < 50 && h.engine.gpu !== next.device; i++) await new Promise((r) => setTimeout(r, 0));
+      assert.equal(h.first.device.destroyed, true, 'the failed device is destroyed');
+      assert.equal(h.engine.gpu, next.device, 'the engine moved to a new device');
+      assert.equal(h.errors.length, 1, 'reported once');
+      assert.match(String(h.errors[0].message), /GPU out of memory/);
+      h.frame(shadows, next);
+      assert.ok(!bound(shadows).destroyed && bound(shadows).width === 1024, 'receivers bind the remade pool');
       for (const e of shadows.bindings()) {
         const resource = e.resource?.buffer ?? e.resource?.texture;
         if (resource) assert.ok(!resource.destroyed, `binding ${e.binding} is live`);
