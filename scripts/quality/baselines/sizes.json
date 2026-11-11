@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15014173,
+  "total": 15015791,
   "history": [
     {
       "date": "2026-10-24",
@@ -8405,6 +8405,12 @@
       "commit": "d737a559a5",
       "reason": "gltf-pro progressive worker +33 B (16,713 to 16,746 gzip): its bundled meshopt decoder now refuses an index past 65,535 in a 16-bit index buffer instead of wrapping it; a split would move the decoder out of the worker it decodes in",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "8f31169fbf",
+      "reason": "loaders root +8 B gzip (53,650 to 53,658): toGeometries checks maxPartVertices and splitTriangles caps a part at 67,108,864 indices now that parts follow core's 11,184,810-vertex limit; no split possible for a check inside the function",
+      "grew": 1
     }
   ],
   "items": {
@@ -8907,7 +8913,7 @@
     "@margoengine/lines/texture": 6955,
     "@margoengine/lines/tiles": 1613,
     "@margoengine/lines/trail": 5451,
-    "@margoengine/loaders": 53650,
+    "@margoengine/loaders": 55268,
     "@margoengine/loaders dist/workers/usd.js": 8294,
     "@margoengine/loaders/3dm": 4094,
     "@margoengine/loaders/3ds": 3642,

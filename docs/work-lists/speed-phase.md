@@ -513,13 +513,13 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   instance count (likely core's per-frame CPU walk of 1.2M entities with culling off): a speed bug to diagnose with
   GPU timestamps (Stats with timestamp-query) and a CPU profile before release.
 
-- Loader meshes past the core vertex limit: a 2,828 x 2,828 height field (7,997,584 vertices, 15,983,858 triangles,
-  the parsers' default `maxVertices`) through `createMeshes`, split into 9 parts of at most 1,000,000 vertices
-  (`node packages/loaders/tests/split-scale-check.mjs`, native and `MARGO_COMPAT=1`). Work per frame: 9 draws of one
-  material (one per part); the split adds no per-frame buffer write, bind group or allocation, and a mesh under the
-  limit is one draw as before. Building the parts: 1.2 s on the CPU. Target: 60 fps on the RTX A6000 natively and on
-  the WebGL2 layer; mid laptop iGPU 30 fps natively. Busy-machine diagnostic 2026-11-10: 4.1 ms wall natively,
-  15.5 ms on the WebGL2 layer.
+- Loader meshes at scale: a 2,828 x 2,828 height field (7,997,584 vertices, 15,983,858 triangles, the parsers'
+  default `maxVertices`) through `createMeshes`, one part since loaders follow core's 11,184,810-vertex cap
+  (2026-11-11; 9 parts of 1,000,000 before) (`node packages/loaders/tests/split-scale-check.mjs`, native and
+  `MARGO_COMPAT=1`). Work per frame: 1 draw; no per-frame buffer write, bind group or allocation. Building: 1.3 s on
+  the CPU. Target: 60 fps on the RTX A6000 natively and on the WebGL2 layer; mid laptop iGPU 30 fps natively.
+  Busy-machine diagnostic 2026-11-11: 8.6 ms wall natively, 15.6 ms on the WebGL2 layer (2026-11-10, 9 parts: 4.1 and
+  15.5 ms).
 - Splats at the cloud bounds: 3,000,000 splats without SH, and 699,050 with degree-3 SH (the default device's binding
   bound), random in a cube filling a 640 x 400 view, sorted and drawn every frame (`node packages/splats/test/gpu/scale-check.mjs`,
   native and `MARGO_COMPAT=1`). Work per frame: one GPU depth sort and one instanced draw of the cloud. Target: 60 fps

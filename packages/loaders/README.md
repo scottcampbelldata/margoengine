@@ -92,7 +92,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseLAS` (`/las`, async) | See [LAS and LAZ](#las-and-laz) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
-Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `toGeometries` (the same, split into parts of at most 1,000,000 vertices with seam-free normals), `splitTriangles`, `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
+Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `toGeometries` (the same, split into parts of at most 11,184,810 vertices, core's limit, or `maxPartVertices`, with seam-free normals), `splitTriangles`, `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
 
 ## How it works
 
@@ -122,7 +122,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ## Limits
 
-- Core `Geometry` holds positions and normals only, at most 1,000,000 vertices: UVs and vertex colors are kept in `LoadedGeometry` but not rendered. `toGeometries` and `createMeshes` split a larger mesh into consecutive triangle ranges of at most 1,000,000 vertices each; smooth normals are computed over the whole mesh first, so the parts meet without seams, and a vertex on a cut is stored in both parts. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
+- Core `Geometry` holds positions and normals only, at most 11,184,810 vertices (`CORE_MAX_VERTICES`): UVs and vertex colors are kept in `LoadedGeometry` but not rendered. `toGeometries` and `createMeshes` split a larger mesh into consecutive triangle ranges of at most that many vertices (or `maxPartVertices`) and 67,108,864 indices each; smooth normals are computed over the whole mesh first, so the parts meet without seams, and a vertex on a cut is stored in both parts. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face properties are ignored. OFF per-face colors and binary OFF are not supported. VTK XML (`.vtp`, `.vtu`), other legacy dataset types, VERTICES/LINES cells and cell data are not read. PCD ignores fields other than position, normal, rgb/rgba and intensity.
 - 3MF: textures (`texture2dgroup`), composite materials, multi-properties, beam lattices, slices and ZIP64 or encrypted packages are not supported; objects of type `other` are skipped.
 - glTF lives in gltf and gltf-pro.
@@ -138,7 +138,7 @@ const signal = AbortSignal.timeout(30_000);
 const bytes = await (await fetch('/parts/bracket.stl', {signal})).arrayBuffer();
 const mesh = parseSTL(bytes, {signal});          // weld: true shares corners that have equal positions
 console.log(mesh.positions.length / 9, 'triangles', mesh.colors ? 'with colors' : 'without colors');
-const parts = toGeometries(mesh, {normals: 'flat'}); // core Geometries of at most 1,000,000 vertices each
+const parts = toGeometries(mesh, {normals: 'flat'}); // core Geometries of at most 11,184,810 vertices each
 ```
 
 | Result | Content |
@@ -231,7 +231,7 @@ model.dispose();
 `attributes.opacity` through `@margoengine/gltf-pro`. Group RGBA fills in only a missing channel; `baseColorFactor`
 multiplies the result, and any alpha below one draws blended. `parent`, `normals`, `roughness`, `metalness` and
 `doubleSided` work as in `createMeshes`; `unlit` uses the unlit material. It accepts triangle meshes of any size within `maxBytes`
-and at most 4096 parts (a part past 1,000,000 vertices becomes several primitives of one mesh, split as
+and at most 4096 parts (a part past 1,000,000 vertices, gltf-pro's primitive limit, becomes several primitives of one mesh, split as
 `toGeometries` splits), and refuses point clouds, malformed attributes, overlapping groups and data over
 `maxBytes` before allocating GPU resources. `npm run test:render:browser` checks the colors on the GPU.
 

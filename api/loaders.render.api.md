@@ -16,7 +16,7 @@ export function createPBRMeshes(engine: EngineKernel, loaded: LoadedGeometry, op
 
 // Not exported from this entry, but used by the exports above:
 
-interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>, PointsToGeometryOptions {
+interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>, PointsToGeometryOptions {
     parent?: Mesh | null;
     color?: string | readonly number[];
     roughness?: number;
@@ -54,5 +54,6 @@ interface PointsToGeometryOptions {
 interface ToGeometryOptions {
     normals?: 'auto' | 'smooth' | 'flat';
     group?: number | LoadedGroup;
+    maxPartVertices?: number;
 }
 ```

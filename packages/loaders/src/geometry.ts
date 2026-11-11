@@ -3,8 +3,15 @@ import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 import { computeVertexNormals, faceNormal } from './normals.js';
 
 const F = 'Geometry';
-/** Vertex limit of a core `Geometry`. */
-export const CORE_MAX_VERTICES = 1_000_000;
+/**
+ * Vertex limit of a core `Geometry`: 11,184,810, the most 24-byte vertices one buffer of WebGPU's default 256 MiB
+ * `maxBufferSize` holds (core's own check).
+ */
+export const CORE_MAX_VERTICES = 11_184_810;
+/** Most indices of one part {@link splitTriangles} makes: 67,108,864, a 256 MiB index buffer on a default device. */
+const CORE_MAX_INDICES = 67_108_864;
+/** Points {@link pointsToGeometry} keeps by default (6 marker vertices each, about 1,000,000 vertices). */
+const DEFAULT_MAX_POINTS = 166_666;
 
 /** Options of toGeometry: how normals are made and which group to build. */
 export interface ToGeometryOptions {
@@ -15,6 +22,11 @@ export interface ToGeometryOptions {
   normals?: 'auto' | 'smooth' | 'flat';
   /** Build only this group (an entry of `loaded.groups`, or its index). */
   group?: number | LoadedGroup;
+  /**
+   * `toGeometries` only: most vertices in one part, an integer from 3 to {@link CORE_MAX_VERTICES} (the default).
+   * Lower it for a renderer whose per-primitive limit is smaller (gltf-pro takes 1,000,000).
+   */
+  maxPartVertices?: number;
 }
 
 function selectTriangles(loaded: LoadedGeometry, group: ToGeometryOptions['group']): Uint32Array {
@@ -57,7 +69,8 @@ function normalsMode(options: ToGeometryOptions): 'auto' | 'smooth' | 'flat' {
 
 /**
  * Splits a triangle list into consecutive triangle ranges (offsets into `triangles`) that each use at most
- * `limit` distinct vertices (`flat`: 3 per triangle). Order is kept, so the ranges concatenate to the input.
+ * `limit` distinct vertices (`flat`: 3 per triangle) and at most 67,108,864 indices (a 256 MiB index buffer). Order is
+ * kept, so the ranges concatenate to the input.
  */
 export function splitTriangles(
   triangles: Uint32Array,
@@ -68,7 +81,7 @@ export function splitTriangles(
   if (!Number.isSafeInteger(limit) || limit < 3) throw new LoaderError(F, 'range', 'limit must be an integer of 3 or more');
   const ranges: { start: number; count: number }[] = [];
   if (flat) {
-    const step = Math.floor(limit / 3) * 3;
+    const step = Math.min(Math.floor(limit / 3) * 3, CORE_MAX_INDICES);
     for (let start = 0; start < triangles.length; start += step)
       ranges.push({ start, count: Math.min(step, triangles.length - start) });
     if (!ranges.length) ranges.push({ start: 0, count: 0 });
@@ -85,7 +98,7 @@ export function splitTriangles(
       c = triangles[t + 2];
     const fresh =
       Number(stamp[a] !== id) + Number(stamp[b] !== id && b !== a) + Number(stamp[c] !== id && c !== a && c !== b);
-    if (used + fresh > limit) {
+    if (used + fresh > limit || t - start >= CORE_MAX_INDICES) {
       ranges.push({ start, count: t - start });
       start = t;
       used = 0;
@@ -207,7 +220,7 @@ function compactGeometry(
 /**
  * Converts a loaded mesh (or one of its groups) to a core `Geometry`, compacting unused vertices and computing
  * normals when the file has none. Colors and UVs are dropped because core geometry stores position and normal only.
- * A core `Geometry` holds at most 1,000,000 vertices; {@link toGeometries} splits larger meshes.
+ * A core `Geometry` holds at most 11,184,810 vertices; {@link toGeometries} splits larger meshes.
  */
 export function toGeometry(loaded: LoadedGeometry, options: ToGeometryOptions = {}): Geometry {
   const mode = normalsMode(options),
@@ -226,17 +239,21 @@ export function toGeometry(loaded: LoadedGeometry, options: ToGeometryOptions = 
 }
 
 /**
- * Like {@link toGeometry}, but a mesh (or group) that needs more than the core limit of 1,000,000 vertices comes
- * back as several geometries: consecutive triangle ranges in source order, each with at most 1,000,000 vertices.
+ * Like {@link toGeometry}, but a mesh (or group) that needs more than the core limit of 11,184,810 vertices (or
+ * `options.maxPartVertices`) comes back as several geometries: consecutive triangle ranges in source order, each within
+ * that many vertices and 67,108,864 indices.
  * Smooth normals are computed over the whole mesh first, so the parts meet without seams; a vertex on a cut appears
  * in both parts. A mesh under the limit returns one Geometry, the same as toGeometry's.
  */
 export function toGeometries(loaded: LoadedGeometry, options: ToGeometryOptions = {}): Geometry[] {
   const mode = normalsMode(options),
     triangles = selectTriangles(loaded, options.group),
-    vertexCount = loaded.positions.length / 3;
+    vertexCount = loaded.positions.length / 3,
+    limit = options.maxPartVertices ?? CORE_MAX_VERTICES;
+  if (!Number.isSafeInteger(limit) || limit < 3 || limit > CORE_MAX_VERTICES)
+    throw new LoaderError(F, 'range', `maxPartVertices must be an integer from 3 to ${CORE_MAX_VERTICES}`);
   checkIndices(triangles, vertexCount);
-  const ranges = splitTriangles(triangles, vertexCount, mode === 'flat');
+  const ranges = splitTriangles(triangles, vertexCount, mode === 'flat', limit);
   const part = (r: { start: number; count: number }): Uint32Array => triangles.subarray(r.start, r.start + r.count);
   if (mode === 'flat') return ranges.map((r) => flatGeometry(loaded.positions, part(r)));
   if (ranges.length === 1) return [compactGeometry(loaded, triangles, mode)];
@@ -256,7 +273,10 @@ function build(positions: Float32Array, normals: Float32Array, indices: Uint32Ar
 export interface PointsToGeometryOptions {
   /** Half-size of each point marker in model units. Default 0.4% of the bounding box diagonal. */
   size?: number;
-  /** Evenly subsample to at most this many points. Default 166,666 (6 vertices each, under the core limit). */
+  /**
+   * Evenly subsample to at most this many points, 1 to 1,864,135 (6 vertices each, within the core limit). Default
+   * 166,666 (about 1,000,000 vertices, a frame budget).
+   */
   maxPoints?: number;
 }
 
@@ -267,7 +287,7 @@ export interface PointsToGeometryOptions {
 export function pointsToGeometry(loaded: LoadedGeometry, options: PointsToGeometryOptions = {}): Geometry {
   const source = loaded.positions,
     total = Math.floor(source.length / 3);
-  const maxPoints = options.maxPoints ?? Math.floor(CORE_MAX_VERTICES / 6);
+  const maxPoints = options.maxPoints ?? DEFAULT_MAX_POINTS;
   if (!Number.isSafeInteger(maxPoints) || maxPoints < 1 || maxPoints * 6 > CORE_MAX_VERTICES)
     throw new LoaderError(F, 'range', `maxPoints must be 1 to ${Math.floor(CORE_MAX_VERTICES / 6)}`);
   const finite = new Uint32Array(total);

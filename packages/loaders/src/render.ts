@@ -3,6 +3,9 @@ import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeomet
 import { SRGBToLinear } from '@margoengine/math/color';
 import type { CreateMeshesOptions } from './engine.js';
 import { splitTriangles, toGeometries } from './geometry.js';
+
+/** Vertices of one gltf-pro primitive (its packed geometry limit). */
+const PRIMITIVE_MAX_VERTICES = 1_000_000;
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 
 /**
@@ -40,7 +43,7 @@ function attribute(value: Float32Array | undefined, length: number, name: string
  * Source RGB is sRGB; opacity is linear. Group RGBA supplies only missing vertex channels, independently.
  * Uncovered index ranges render with white/opaque fallback. The explicit material factor multiplies RGBA.
  * Returns the renderer's owned model: dispose it once finished; its existing lifecycle restores GPU resources.
- * The input is never modified. A part past the core limit of 1,000,000 vertices becomes several primitives of one
+ * The input is never modified. A part past gltf-pro's limit of 1,000,000 vertices a primitive becomes several primitives of one
  * glTF mesh, split as toGeometries splits (normals seam-free). Point clouds, overlapping groups, more than 4096
  * parts, or an exceeded packed-data budget are refused before any GPU allocation.
  */
@@ -110,7 +113,7 @@ export function createPBRMeshes(
   const chunks: Uint32Array[][] = [];
   for (const part of parts) {
     const triangles = indices.subarray(part.start, part.start + part.count),
-      split = splitTriangles(triangles, count, mode === 'flat').map((r) =>
+      split = splitTriangles(triangles, count, mode === 'flat', PRIMITIVE_MAX_VERTICES).map((r) =>
         triangles.subarray(r.start, r.start + r.count),
       );
     chunks.push(split);
@@ -126,7 +129,7 @@ export function createPBRMeshes(
     doc: GLTFDocument = { asset: { version: '2.0' }, nodes: [], meshes: [], materials: [] };
   for (const [p, part] of parts.entries()) {
     // toGeometries splits the part exactly as splitTriangles did above, so cores[k] is built from chunks[p][k].
-    const cores = toGeometries(loaded, { normals: mode, group: part }),
+    const cores = toGeometries(loaded, { normals: mode, group: part, maxPartVertices: PRIMITIVE_MAX_VERTICES }),
       primitives: PreparedGeometry[] = [];
     let transparent = factor[3] < 1;
     for (const [k, core] of cores.entries()) {

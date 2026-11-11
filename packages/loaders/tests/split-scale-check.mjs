@@ -1,5 +1,5 @@
-// Real-GPU check that createMeshes draws a 7,997,584-vertex mesh (the parsers' default maxVertices) split into
-// core-sized parts: every part at most 1,000,000 vertices, every triangle kept, the field covers the frame, and WebGPU
+// Real-GPU check that createMeshes draws a 7,997,584-vertex mesh (the parsers' default maxVertices), within the core
+// limit of 11,184,810 as one part (one draw), every triangle kept, the field covers the frame, and WebGPU
 // reports no validation error. Wall time per frame is printed for the speed phase (diagnostic only).
 // Takes a GPU slot itself. Run from the repository root after building packages, natively and with MARGO_COMPAT=1:
 //   node packages/loaders/tests/split-scale-check.mjs
@@ -27,8 +27,8 @@ try {
     console.log(
       `${s.sourceTriangles} triangles in ${s.parts} parts (largest ${s.largest} vertices, ${s.vertices} stored), built in ${Math.round(s.buildMs)} ms`,
     );
-    assert.ok(s.parts >= 8, `${s.parts} parts`);
-    assert.ok(s.largest <= 1_000_000, `largest part ${s.largest}`);
+    assert.equal(s.parts, 1, `${s.parts} parts`);
+    assert.equal(s.largest, 7_997_584, `largest part ${s.largest}`);
     assert.equal(s.triangles, s.sourceTriangles);
     assert.equal(s.materials, 1);
     const f = await page.evaluate(() => window.check.frames());

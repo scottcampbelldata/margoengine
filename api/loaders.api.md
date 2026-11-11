@@ -15,9 +15,9 @@ export type AssetResolver = (path: string) => Promise<Uint8Array | string>;
 
 export type BinaryInput = ArrayBuffer | ArrayBufferView;
 
-export const CORE_MAX_VERTICES = 1000000;
+export const CORE_MAX_VERTICES = 11184810;
 
-export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>, PointsToGeometryOptions {
+export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>, PointsToGeometryOptions {
     parent?: Mesh | null;
     color?: string | readonly number[];
     roughness?: number;
@@ -678,6 +678,7 @@ export interface TileQuadsOptions {
 export interface ToGeometryOptions {
     normals?: 'auto' | 'smooth' | 'flat';
     group?: number | LoadedGroup;
+    maxPartVertices?: number;
 }
 
 export interface USDALayer {

@@ -2,10 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { computeVertexNormals, createMeshes, splitTriangles, toGeometries, toGeometry } from '../dist/index.js';
+import {
+  CORE_MAX_VERTICES,
+  computeVertexNormals,
+  createMeshes,
+  pointsToGeometry,
+  splitTriangles,
+  toGeometries,
+  toGeometry,
+} from '../dist/index.js';
 import { createPBRMeshes } from '../dist/render.js';
 
-// A bumpy height field of side x side vertices: 1,100 squared = 1,210,000 vertices, past the core limit of 1,000,000.
+// A bumpy height field of side x side vertices: 1,100 squared = 1,210,000 vertices, under the core limit of 11,184,810
+// and past gltf-pro's 1,000,000 a primitive; the split tests cut it at maxPartVertices 1,000,000.
 function field(side, normals = false) {
   const positions = new Float32Array(side * side * 3),
     indices = new Uint32Array((side - 1) * (side - 1) * 6);
@@ -33,7 +42,8 @@ function field(side, normals = false) {
   }
   return loaded;
 }
-const big = field(1100);
+const big = field(1100),
+  part = { maxPartVertices: 1_000_000 };
 
 test('splitTriangles keeps order and puts at most limit distinct vertices in each range', () => {
   const triangles = new Uint32Array([0, 1, 2, 2, 1, 3, 3, 4, 5, 5, 5, 5, 0, 6, 7]);
@@ -61,11 +71,26 @@ test('a mesh under the core limit gives one geometry equal to toGeometry', () =>
   }
 });
 
-test('toGeometries splits a 1,210,000-vertex mesh into core-sized parts with seam-free normals', () => {
-  assert.throws(() => toGeometry(big), (e) => e.code === 'limit' && /toGeometries/.test(e.message));
+test('the loaders follow the core cap: a 1,210,000-vertex mesh is one Geometry, and maxPartVertices is checked', () => {
+  // Before, loaders named 1,000,000 as the core limit and refused this mesh although core takes 11,184,810.
+  assert.equal(CORE_MAX_VERTICES, 11_184_810);
+  assert.equal(toGeometry(big).vertices.length / 6, 1_210_000);
+  assert.equal(toGeometries(big).length, 1);
+  for (const bad of [2, CORE_MAX_VERTICES + 1, 1.5])
+    assert.throws(() => toGeometries(big, { maxPartVertices: bad }), (e) => e.code === 'range');
+  // Flat shading needs 3 per triangle (7,253,406 here): still one part.
+  assert.equal(toGeometries(big, { normals: 'flat' }).length, 1);
+  // The point-cloud marker default stays 166,666 points (about 1,000,000 vertices).
+  const cloud = { kind: 'points', positions: Float32Array.from({ length: 600_000 }, (_, i) => i % 97) };
+  assert.equal(pointsToGeometry(cloud).vertices.length / 6, 166_666 * 6);
+  assert.equal(pointsToGeometry(cloud, { maxPoints: 200_000 }).vertices.length / 6, 200_000 * 6);
+  assert.throws(() => pointsToGeometry(cloud, { maxPoints: 1_864_136 }), (e) => e.code === 'range');
+});
+
+test('toGeometries splits a 1,210,000-vertex mesh at maxPartVertices with seam-free normals', () => {
   for (const mode of ['smooth', 'auto-file']) {
     const loaded = mode === 'smooth' ? big : field(1100, true),
-      parts = toGeometries(loaded, { normals: mode === 'smooth' ? 'smooth' : 'auto' });
+      parts = toGeometries(loaded, { normals: mode === 'smooth' ? 'smooth' : 'auto', ...part });
     assert.equal(parts.length, 2);
     let triangles = 0,
       wrongPosition = 0,
@@ -101,12 +126,12 @@ test('toGeometries splits a 1,210,000-vertex mesh into core-sized parts with sea
     for (let i = 0; i < normals.length; i++) worst = Math.max(worst, Math.abs(normals[i] - reference[i]));
     assert.ok(worst < 1e-6, `normal error ${worst}`);
   }
-  const flat = toGeometries(big, { normals: 'flat' });
+  const flat = toGeometries(big, { normals: 'flat', ...part });
   assert.equal(flat.length, Math.ceil(big.indices.length / 999_999));
   assert.ok(flat.every((g) => g.vertices.length / 6 <= 1_000_000));
 });
 
-test('createMeshes makes one mesh per part of a mesh past the core limit, sharing one material', () => {
+test('createMeshes makes one mesh per part of a mesh past maxPartVertices, sharing one material', () => {
   const engine = {
     createMesh: () => ({
       setGeometry(g) {
@@ -120,7 +145,8 @@ test('createMeshes makes one mesh per part of a mesh past the core limit, sharin
       dispose() {},
     }),
   };
-  const result = createMeshes(engine, big);
+  assert.equal(createMeshes(engine, big).meshes.length, 1);
+  const result = createMeshes(engine, big, part);
   assert.equal(result.meshes.length, 2);
   assert.equal(result.materials.length, 1);
   assert.equal(result.meshes[0].material, result.meshes[1].material);
@@ -130,7 +156,7 @@ test('createMeshes makes one mesh per part of a mesh past the core limit, sharin
   );
 });
 
-test('createPBRMeshes renders a mesh past the core limit as one node with several primitives', async (t) => {
+test('createPBRMeshes renders a mesh past the gltf-pro primitive limit as one node with several primitives', async (t) => {
   const gpu = optionalGPU(),
     store = await TransformStore.create(64);
   const engine = new Engine(
