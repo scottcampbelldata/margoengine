@@ -21,6 +21,10 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // - Luma: ITU-R BT.601 weights (0.299, 0.587, 0.114) on the display-encoded colour, which is already perceptual.
 // - RELATIVE 0.15: skip pixels whose contrast is under 15% of the brightest neighbour (soft gradients stay sharp).
 // - FLOOR 0.05: absolute floor (about 13 of 255 codes) so near-black noise is not smoothed.
+// - The gate is continuous: the final shift is scaled by smoothstep(gate, 2 * gate, contrast), so a pixel whose
+//   contrast crosses the gate fades in instead of jumping from untouched to fully blended (a one-code change used to
+//   move an isolated dot by nine codes, which made noise near the gate flicker). Taken from the native Rust engine's
+//   presentation filter, which found the jump; Lottes' FXAA 3.11 keeps the hard cut.
 // - END 0.25: an edge ends where the along-edge luma leaves the edge's mid luma by a quarter of the step across it.
 // - Steps: 1, 1, 1, 1 then 2, 3, 4, 5, 6, 7 pixels (10 fetches per side, 31 pixels reach): exact near the pixel,
 //   coarser far away where the shift is small anyway. Steps are whole pixels so each fetch stays on the boundary.
@@ -45,7 +49,8 @@ fn along(uv:vec2f)->f32 {return luma(textureSampleLevel(image,bilinear,uv,0));}
  let n=texel(q+vec2i(0,-1));let s=texel(q+vec2i(0,1));let w=texel(q+vec2i(-1,0));let e=texel(q+vec2i(1,0));
  let hi=max(m,max(max(n,s),max(w,e)));let lo=min(m,min(min(n,s),min(w,e)));
  let contrast=hi-lo;
- if(contrast<max(FLOOR,hi*RELATIVE)){return centre;}
+ let gate=max(FLOOR,hi*RELATIVE);
+ if(contrast<gate){return centre;}
  let nw=texel(q+vec2i(-1,-1));let ne=texel(q+vec2i(1,-1));let sw=texel(q+vec2i(-1,1));let se=texel(q+vec2i(1,1));
  // Orientation: total luma change across rows against across columns (centre row/column counts twice).
  let rows=2*(abs(n-m)+abs(s-m))+abs(nw-w)+abs(sw-w)+abs(ne-e)+abs(se-e);
@@ -80,7 +85,7 @@ fn along(uv:vec2f)->f32 {return luma(textureSampleLevel(image,bilinear,uv,0));}
  // Sub-pixel shift: how far the centre stands out from a low-pass of its neighbourhood, relative to the contrast.
  let low=(2*(n+s+w+e)+nw+ne+sw+se)/12;
  let blend=smoothstep(0.0,1.0,clamp(abs(low-m)/contrast,0.0,1.0));
- shift=max(shift,SUBPIXEL*blend*blend);
+ shift=max(shift,SUBPIXEL*blend*blend)*smoothstep(gate,2*gate,contrast);
  if(shift<=0){return centre;}
  return textureSampleLevel(image,bilinear,v.position.xy*size+across*shift,0);
 }`;

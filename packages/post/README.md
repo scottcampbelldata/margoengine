@@ -1042,8 +1042,9 @@ single-sampled output, such as phones and the light quality tier, which have no 
 captures the finished frame outside every other effect (order −80, presented at 50), so it also
 works around a standalone Bloom, SSAO, DOF or Tonemap, and costs one fullscreen pass plus a
 canvas-format colour and depth target. In a `PostStack` it runs last, on the display-encoded
-result. Luma is taken from display-encoded colour; edges below 1/32 contrast (or 1/8 of the local
-maximum) are left untouched. `SMAA` (below) is the sharper alternative; an engine takes one of the two.
+result. Luma is taken from display-encoded colour; edges below 0.05 contrast (or 15% of the local
+maximum) are left untouched, and from that gate to twice it the blend fades in (smoothstep), so noise whose
+contrast crosses the gate moves the output by at most about one 8-bit code instead of jumping. `SMAA` (below) is the sharper alternative; an engine takes one of the two.
 
 Import `Bloom` from `@margoengine/post/bloom` and `SSAO` from
 `@margoengine/post/ssao` to load each effect independently in native ESM or a
