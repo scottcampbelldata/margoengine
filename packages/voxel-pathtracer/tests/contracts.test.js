@@ -619,7 +619,7 @@ test('models up to 2048 per axis: a sparse 2048 x 64 x 2048 world, emitters past
   t2.dispose();
 });
 
-test("on the WebGL2 layer trace compiles as the route's fragment shader, and only there", async () => {
+test("on the WebGL2 layer trace compiles as the route's staged fragment programs, and only there", async () => {
   const compiled = async (adapterInfo) => {
     const device = fakeDevice(),
       modules = [],
@@ -633,22 +633,28 @@ test("on the WebGL2 layer trace compiles as the route's fragment shader, and onl
     device.createComputePipelineAsync = (d) => (kernels.push(d.compute.entryPoint), kernel(d));
     const tracer = VoxelPathTracer.attach(fakeEngine(device).engine, { scene: simpleScene() });
     await tracer.ready;
-    const draw = draws.find((d) => d.label === 'voxel-pathtracer trace');
+    const finish = draws.find((d) => d.label === 'voxel-pathtracer finish');
     tracer.dispose();
-    return { modules, draw, kernels };
+    return { modules, draws, finish, kernels };
   };
   const layer = await compiled({ vendor: 'margo-webgl2', architecture: 'webgl2' }),
-    sums = layer.modules.find((code) => code.includes('fn sums'));
-  assert.equal(layer.draw.fragment.targets.length, 4, 'one draw writes all four sums');
-  assert.ok(sums.includes('radiance(px)'), "the kernel's own sample loop");
+    sums = layer.modules.find((code) => code.includes('struct Sums'));
+  assert.equal(layer.finish.fragment.targets.length, 4, 'one draw writes all four sums');
+  assert.ok(sums.includes('zLoad(g)'), 'the sums read the finished path state of each sample');
   assert.ok(!/\baccum\b/.test(sums), 'the fragment shader stores nothing');
   assert.ok(layer.modules.some((code) => code.includes('fn add')));
+  for (const stage of ['hit', 'vertex', 'surface', 'shadow'])
+    assert.ok(layer.draws.some((d) => d.label === `voxel-pathtracer ${stage}`), stage);
   assert.ok(!layer.kernels.includes('trace'), 'no trace compute pipeline for the CPU tier');
+  // The preview kernel is one program holding a closest hit and a shadow ray, slower for Direct3D's compiler than the
+  // whole staged tracer, so the route does without it (docs/limits.md).
+  assert.ok(!layer.kernels.includes('preview'), 'no preview kernel on the route');
   assert.ok(layer.kernels.includes('add') && layer.kernels.includes('ids'));
   const native = await compiled(undefined);
-  assert.equal(native.draw, undefined);
-  assert.ok(native.kernels.includes('trace') && !native.kernels.includes('add'));
-  assert.ok(!native.modules.some((code) => code.includes('fn sums')));
+  assert.equal(native.finish, undefined);
+  assert.deepEqual(native.draws, []);
+  assert.ok(native.kernels.includes('trace') && native.kernels.includes('preview') && !native.kernels.includes('add'));
+  assert.ok(!native.modules.some((code) => code.includes('struct Sums')));
 });
 
 // d10222cf2: a comparison and an ampersand mixed without parentheses, which WGSL rejects, so no pipeline could be built.

@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { C2 } from '../scripts/support/composition-contracts.mjs';
-import {
-  COMPAT_VULKAN_MEMBERS,
-  SCENE_LIMIT_MS,
-  compatArgs,
-  groupRows,
-  runScene,
-} from '../scripts/support/composition-run.mjs';
+import { SCENE_LIMIT_MS, runScene } from '../scripts/support/composition-run.mjs';
 
 const never = () => new Promise(() => {});
 
@@ -59,33 +52,12 @@ test('the scene limit ends before the GPU lease reclaims an idle run', () => {
   assert.ok(SCENE_LIMIT_MS < 3 * 60_000);
 });
 
-test('compatibility rows with the path tracer use ANGLE Vulkan on Windows only', () => {
-  const tracer = ['post', 'toon', 'transitions', 'scenery', 'voxel-pathtracer'];
-  assert.deepEqual(compatArgs(tracer, 'win32'), ['--use-angle=vulkan']);
-  assert.deepEqual(compatArgs(tracer, 'linux'), []);
-  assert.deepEqual(compatArgs(tracer, 'darwin'), []);
-  assert.deepEqual(compatArgs(['post', 'toon', 'transitions', 'scenery'], 'win32'), []);
-  for (const member of COMPAT_VULKAN_MEMBERS.keys()) assert.ok(C2.includes(member), `${member} is not a C2 member`);
-});
-
-test('rows group by their browser arguments in first-seen order', () => {
-  const rows = [
-    { id: 'a', members: ['post'] },
-    { id: 'b', members: ['voxel-pathtracer'] },
-    { id: 'c', members: ['toon'] },
-  ];
-  assert.deepEqual(
-    groupRows(rows, (row) => compatArgs(row.members, 'win32')).map((g) => [g.args, g.rows.map((r) => r.id)]),
-    [
-      [[], ['a', 'c']],
-      [['--use-angle=vulkan'], ['b']],
-    ],
-  );
-});
-
-test('the browser runner bounds every scene and picks each row backend', () => {
+// The tracer rows ran on ANGLE Vulkan while the path tracer never compiled on Direct3D 11 (04f611773). Its staged route
+// compiles there now, so every compatibility row runs on the default backend again and none is moved off it.
+test('the browser runner bounds every scene and runs every row on the default ANGLE backend', () => {
   const runner = readFileSync(new URL('../scripts/composition-browser-tests.mjs', import.meta.url), 'utf8');
   assert.match(runner, /runScene\(\(\) => page\.evaluate\(/);
-  assert.match(runner, /groupRows\(rows, \(row\) => compatArgs\(row\.members\)\)/);
+  assert.match(runner, /for \(const compat of \[false, true\]\)/);
+  assert.doesNotMatch(runner, /use-angle|browserArgs|compatArgs/);
   assert.doesNotMatch(runner, /await browser\.page\.evaluate\(\(samples\) => window\.composition\.run/);
 });

@@ -99,6 +99,36 @@ stencil.destroy();
 device.destroy();
 ```
 
+The device owns every WebGL object it makes and deletes each one itself, never leaving one for the browser to delete
+when it collects the object's JS wrapper (a collection lands at a moment of its own, possibly in the middle of a
+replay). An object goes when its resource is destroyed (`destroy()` of a buffer, texture or query set), at the end of
+the first submission after its resource was collected (WebGPU bind groups, samplers and pipelines have no `destroy()`,
+and buffers and textures may be dropped without one), or with `device.destroy()`. A delete asked for while a
+submission replays waits for the end of the replay. Render pipelines with the same translated GLSL and vertex
+attributes share one GL program and vertex array, so a pipeline made again (a renderer rebuilt, a scene reloaded)
+compiles and links nothing; the device keeps up to 64 programs no live pipeline uses, the least recently used going
+first. `device.glObjects` counts the objects made and deleted per kind; after `device.destroy()` the two match:
+
+```js
+import { createCompatGPU } from '@margoengine/webgl2-compat/device';
+
+const adapter = await createCompatGPU().requestAdapter();
+if (!adapter) throw new Error('Full-tier WebGL2 is required');
+const device = await adapter.requestDevice();
+const code = `@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  return vec4f(f32(i & 1u) * 4.0 - 1.0, f32(i & 2u) * 2.0 - 1.0, 0.0, 1.0); }
+@fragment fn fs() -> @location(0) vec4f { return vec4f(1.0); }`;
+const make = () => device.createRenderPipeline({
+  layout: 'auto',
+  vertex: { module: device.createShaderModule({ code }), entryPoint: 'vs' },
+  fragment: { module: device.createShaderModule({ code }), entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+});
+const first = make(), again = make();
+console.log(device.glObjects.created.Program); // 1: `again` reuses the program of `first`
+device.destroy();
+console.log(device.glObjects.created, device.glObjects.deleted); // the same counts
+```
+
 Depth bias uses `EXT_polygon_offset_clamp` when available: positive `depthBiasClamp`
 caps the offset with `min`, negative uses `max`, and zero (the default) leaves it
 unclamped. Clamp changes, including reset to zero, are replayed with pipeline
@@ -177,9 +207,10 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
   with buffers, without a device (`workBudget` stops it past that many invocations plus loop iterations; default no
   limit; on a page without `unsafe-eval`, `await loadInterpreter()` once first). `device.dispatches` counts the dispatches each tier has run, `device.programs` the
-  render programs made with their translation and link time, and `device.state.counts` the state changes asked for
+  GL programs made (pipelines sharing one count once) with their translation and link time, and `device.state.counts` the state changes asked for
   and those the cache answered without a GL call (milestone M7 measures them on each ANGLE back end with
-  `test/perf-browser.mjs`).
+  `test/perf-browser.mjs`). `device.passes` counts the render passes replayed (`run`) and the draws that drew something
+  (`draws`), work counts a package can test its own route against.
 - **Package routes** (milestone M6): a package asks whether its device is the layer's (the adapter vendor
   `margo-webgl2`, never browser sniffing) and then loads a route of its own with `import()`, so pages with WebGPU never
   download it; until it has loaded the package keeps its WebGPU route, which the layer also runs, so no frame is drawn

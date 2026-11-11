@@ -20,7 +20,10 @@
 //   panel occluding a lit ceiling against view factors;
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
 //   the spectrum; a dispersive white furnace per channel;
-// - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
+// - environment: the equirectangular map's orientation; determinism: equal seeds give identical images (on the WebGL2
+//   layer also: the route skips the passes of finished paths; `test:gpu:d3d11` runs it on ANGLE Direct3D 11);
+// - disposecompile: disposing the tracer and then its engine one second after the programs were submitted returns, and
+//   `ready` rejects with `disposed` (bug 45; `test:gpu:d3d11-dispose` runs it on ANGLE Direct3D 11);
 // - textures: every pixel's albedo is the texel the CPU finds through the same face tiling, on a rotated block;
 // - cutout: rays and shadows pass texels cut away by alpha (a leaf wall, a leaf slab over a floor under a high sun);
 // - shapes: half-block shapes: per-pixel first hits on a random shaped model against raycast, a cut-out layer of
@@ -69,11 +72,12 @@ const started = performance.now(),
   reportName = args.find((a) => a.startsWith('--report='))?.slice(9),
   stallInRender = Number(args.find((a) => a.startsWith('--stall-in-render='))?.slice(18) ?? 0),
   stallMs = stallLimitMs(),
-  // On the layer, ANGLE's Vulkan backend on Windows: its Direct3D backend takes minutes on the tracer's kernels (limits.md).
+  // On the layer on Windows, the ANGLE backend: Vulkan unless `--angle=d3d11` (the browser default there) is asked for.
+  angle = args.find((a) => a.startsWith('--angle='))?.slice(8) ?? 'vulkan',
   context = await openBrowser({
     startPath: path + (args.includes('--spectral') ? '?spectral=1' : ''),
     port,
-    ...(args.includes('--compat') && process.platform === 'win32' ? { args: ['--use-angle=vulkan'] } : {}),
+    ...(args.includes('--compat') && process.platform === 'win32' ? { args: [`--use-angle=${angle}`] } : {}),
   }),
   { page, hardware } = context,
   pageErrors = [],
@@ -511,6 +515,41 @@ try {
     );
     assert.equal(r.identical, r.values);
     assert.ok(r.differentWithOtherSeed > r.values / 2);
+    // On the WebGL2 layer the route stops recording a part's path loop once a census read back finds every path
+    // finished, with no synchronous GPU read; the image is bit for bit the one of the whole loop (measured on ANGLE
+    // Vulkan, RTX A6000: 5,680 passes against 33,848, 0 stalls; the replay skip it replaces stalled 376 times).
+    if (r.passes) {
+      const { stopped, whole, equal } = r.passes;
+      console.log(
+        `  layer passes: ${stopped.run} replayed (${whole.run} with the whole loop), stalls ${stopped.stalls} and ${whole.stalls}; ${equal}/${r.values} values equal`,
+      );
+      assert.equal(equal, r.values, 'the early stop changes no value');
+      assert.equal(stopped.stalls, 0, 'no synchronous GPU read');
+      assert.equal(whole.stalls, 0, 'no synchronous GPU read with the whole loop');
+      assert.ok(stopped.run * 2 < whole.run, 'the stopped loop replays under half the passes');
+    }
+    // Regression (lane FA, 2026-11-10): webgl2-compat made a new GL program for every pipeline of a rebuilt tracer and
+    // left the old ones for the browser to delete at garbage collection, mid-render; on ANGLE Vulkan (NVIDIA 617.42)
+    // that preceded wrong writes to fragment output 7 in 13 of 78 renders. Three tracers made 72 programs before.
+    if (r.rebuild) {
+      console.log(`  tracer made again: ${r.rebuild.programs} new GL programs, ${r.rebuild.live} GL objects live`);
+      assert.equal(r.rebuild.programs, 0, 'a tracer made again reuses the layer programs');
+    }
+  }
+  if (wanted('disposecompile')) {
+    const r = await run('disposecompile');
+    console.log(
+      `  disposed while ${r.statusAtDispose}: tracer ${r.tracerMs} ms, engine ${r.engineMs} ms; ready ${r.ready}`,
+    );
+    assert.equal(r.status, 'disposed');
+    assert.equal(r.engineDisposed, true, 'engine disposal returns');
+    assert.ok(r.pageDraws, 'the page engine still draws after the other engine is disposed');
+    // On the WebGL2 layer the staged programs are still compiling a second after submission (bug 45's case); natively
+    // they may have finished, and disposal must return either way.
+    if (process.argv.includes('--compat')) {
+      assert.equal(r.statusAtDispose, 'compiling', 'disposed while the programs compile');
+      assert.equal(r.ready, 'disposed', 'ready rejects with disposed');
+    } else assert.ok(r.ready === 'disposed' || r.ready === 'ready', `ready settled: ${r.ready}`);
   }
   if (wanted('convergence')) {
     const r = await run('convergence');
@@ -636,6 +675,10 @@ try {
     assert.equal(r.disabled.differing, 0, 'disabled: the raster frame bit for bit');
     assert.ok(r.traced.differing > 1000, 'enabled: the traced image replaces it');
     assert.ok(r.newDevice);
+    // Both images converged, so the comparison is of the restore and not of how far each accumulation got.
+    assert.equal(r.statsBefore.converged, true, `the image before the restore converged (${r.statsBefore.samples} samples)`);
+    assert.equal(r.statsAfter.converged, true, `the image after the restore converged (${r.statsAfter.samples} samples)`);
+    assert.equal(r.statsBefore.samples, r.statsAfter.samples, 'the same sample count before and after the restore');
     assert.equal(r.restored.differing, 0, 'device restore: the same converged image');
     assert.equal(r.afterDispose.differing, 0, 'disposed: the raster frame again');
     assert.equal(r.resized.width, 400);

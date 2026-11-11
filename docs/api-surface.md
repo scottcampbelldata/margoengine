@@ -111,7 +111,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/water | `.` 8, `./fft` 4, `./query` 2, `./caustics` 2, `./ripples` 3, `./flow` 2, `./bodies` 7, `./scatter` 3, `./rain` 4, `./reflector` 3, `./underwater` 2, `./rivers` 3 | 95 |  | 20,599 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7, `./gltf` 3, `./lens` 5, `./cover` 4 | 17 |  | 5,078 |
 | @margoengine/web | `.` 14 |  |  | 321 |
-| @margoengine/webgl2-compat | `.` 16, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2, `./tiers` 9 | 247 |  | 107,674 |
+| @margoengine/webgl2-compat | `.` 16, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5, `./preview` 5, `./pick` 2, `./restore` 2, `./auto` 2, `./tiers` 9 | 253 |  | 107,674 |
 | @margoengine/wfc | `.` 4, `./overlapping` 6, `./constraints` 6, `./sockets` 3, `./chunks` 4, `./worker` 3, `./assemble` 5, `./tileset` 7, `./overlapping3d` 5, `./hex` 10 | 15 |  | 1,988 |
 | @margoengine/worker | `.` 5, `./canvas` 4, `./rpc` 10, `./auto` 6 | 4 |  | 2,595 |
 | @margoengine/xr | `.` 32, `./device-check` 10, `./models` 11, `./ar` 13, `./layers` 19, `./interaction` 11, `./pointer` 6, `./locomotion` 3, `./hands` 5, `./ar-extra` 17, `./performance` 7 | 173 |  | 9,218 |

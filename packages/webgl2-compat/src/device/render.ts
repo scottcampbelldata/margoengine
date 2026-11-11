@@ -120,28 +120,27 @@ function targetKey(t: TargetState | null): string {
   return `${blend}|${t?.writeMask ?? 0}`;
 }
 
-/** A GPURenderPipeline: a linked program, its vertex layout and VAO, its fixed-function state and its binding table. */
-export class CompatRenderPipeline {
-  // When the GLSL went to WebGL2 (device.programs.linkMs).
-  private handedOver = 0;
-  label: string;
-  readonly program: WebGLProgram | null = null;
-  readonly vao: WebGLVertexArrayObject | null = null;
-  readonly glsl: GLSLProgram | null = null;
-  /** Set when the pipeline cannot draw: the message of its validation error. */
-  failure: string | null = null;
-  readonly attributes: Attribute[] = [];
+/** Idle programs (no live pipeline uses them) a device keeps for pipelines made again with the same GLSL. */
+export const IDLE_PROGRAMS = 64;
+
+/**
+ * A GL program and VAO shared by every pipeline of the device with the same GLSL and vertex attributes (the device's
+ * `linked` cache), with its binding table and the uniform values and VAO bindings last set on it. Pipelines made
+ * again (a tracer rebuilt, a scene reloaded) reuse it instead of compiling and linking the same program again.
+ */
+export class LinkedProgram {
+  readonly program: WebGLProgram;
+  readonly vao: WebGLVertexArrayObject;
+  /** The pipelines using it, weakly: with none left it is idle, and the device deletes it beyond IDLE_PROGRAMS. */
+  readonly users: (WeakRef<object> | null)[] = [];
+  /** The link log when WebGL2 refused the program, '' when it linked; null until checked. */
+  refusal: string | null = null;
+  /** Texture units the binding table takes, and how many of them textures (the rest are storage buffers). */
+  units = 0;
+  pairs = 0;
   readonly uniforms: UniformSlot[] = [];
   readonly textures: TextureSlot[] = [];
   readonly storage: StorageSlot[] = [];
-  readonly mode: number;
-  readonly cull: number;
-  readonly frontFace: number;
-  readonly targets: readonly (TargetState | null)[];
-  readonly depthStencil?: GPUDepthStencilState;
-  readonly alphaToCoverage: boolean;
-  readonly sampleCount: number;
-  readonly unclippedDepth: boolean;
   baseVertex: WebGLUniformLocation | null = null;
   baseInstance: WebGLUniformLocation | null = null;
   /** Last values of per-program uniforms and VAO bindings, so draws skip unchanged ones. */
@@ -155,6 +154,172 @@ export class CompatRenderPipeline {
     modes: new Map<WebGLUniformLocation, string>(),
     info: new Map<WebGLUniformLocation, string>(),
   };
+  // When the GLSL went to WebGL2 (device.programs.linkMs).
+  private readonly handedOver = performance.now();
+  private readonly shaders: WebGLShader[] = [];
+
+  constructor(
+    private readonly device: CompatDevice,
+    private readonly glsl: GLSLProgram,
+    attributes: readonly Attribute[],
+  ) {
+    const gl = device.gl,
+      program = (this.program = gl.createProgram() as WebGLProgram);
+    device.programs.count++;
+    for (const stage of [glsl.vertex, glsl.fragment]) {
+      const s = gl.createShader(stage.stage === 'vertex' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER) as WebGLShader;
+      gl.shaderSource(s, stage.source);
+      gl.compileShader(s);
+      gl.attachShader(program, s);
+      this.shaders.push(s);
+    }
+    gl.linkProgram(program);
+    this.vao = gl.createVertexArray() as WebGLVertexArrayObject;
+    device.state.bindVertexArray(this.vao);
+    for (const a of attributes) {
+      gl.enableVertexAttribArray(a.location);
+      gl.vertexAttribDivisor(a.location, a.instance ? 1 : 0);
+    }
+    device.state.bindVertexArray(null);
+  }
+
+  /** True once the driver knows the link status (always without KHR_parallel_shader_compile). */
+  done(): boolean {
+    const ext = this.device.ext.parallel;
+    return (
+      this.refusal !== null || !ext || !!this.device.gl.getProgramParameter(this.program, ext.COMPLETION_STATUS_KHR)
+    );
+  }
+
+  /** Deletes the program and VAO (the device drops an idle program, or is destroyed). */
+  free(): void {
+    const { gl, state } = this.device;
+    state.forgetProgram(this.program);
+    state.forgetVertexArray(this.vao);
+    gl.deleteProgram(this.program);
+    gl.deleteVertexArray(this.vao);
+  }
+
+  /** Checks the link and builds the binding table (once). */
+  finish(): void {
+    if (this.refusal !== null) return;
+    this.device.programs.linkMs += performance.now() - this.handedOver;
+    const gl = this.device.gl,
+      program = this.program,
+      glsl = this.glsl;
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const logs = this.shaders.map((s) => gl.getShaderInfoLog(s)).filter(Boolean);
+      this.refusal = [...logs, gl.getProgramInfoLog(program)].join(' ');
+      return;
+    }
+    this.refusal = '';
+    for (const s of this.shaders) gl.deleteShader(s);
+    this.device.state.useProgram(program);
+    const points = new Map<string, UniformSlot>(),
+      units = new Map<string, TextureSlot>();
+    let textureUnits = 0;
+    for (const stage of [glsl.vertex, glsl.fragment] as GLSLStage[]) {
+      for (const u of stage.uniforms) {
+        const index = gl.getUniformBlockIndex(program, u.block);
+        if (index === gl.INVALID_INDEX) continue;
+        const key = `${u.group}:${u.binding}`;
+        let slot = points.get(key);
+        if (!slot) {
+          slot = { point: points.size, group: u.group, binding: u.binding, size: 0 };
+          points.set(key, slot);
+        }
+        gl.uniformBlockBinding(program, index, slot.point);
+        slot.size = Math.max(
+          slot.size,
+          gl.getActiveUniformBlockParameter(program, index, gl.UNIFORM_BLOCK_DATA_SIZE) as number,
+        );
+      }
+      for (const t of stage.textures) {
+        // A texture read only for its size or level count keeps a slot (the device sets those uniforms from the
+        // bound view) but takes no texture unit: the compiler drops its unused sampler.
+        const location = gl.getUniformLocation(program, t.name),
+          levels = t.levels ? gl.getUniformLocation(program, t.levels) : null,
+          size = t.size ? gl.getUniformLocation(program, t.size) : null,
+          mipFilter = t.mipFilter ? gl.getUniformLocation(program, t.mipFilter) : null;
+        if (!location && !levels && !size && !mipFilter) continue;
+        const key = `${t.group}:${t.binding}|${t.sampler ? `${t.sampler.group}:${t.sampler.binding}` : ''}|${t.gather ? `${t.gather.group}:${t.gather.binding}` : ''}`;
+        let slot = units.get(key);
+        if (!slot) {
+          slot = {
+            unit: -1,
+            group: t.group,
+            binding: t.binding,
+            sampler: t.sampler,
+            type: t.type,
+            levels: [],
+            sizes: [],
+            mipFilters: [],
+            modes: [],
+          };
+          units.set(key, slot);
+        }
+        if (location) {
+          if (slot.unit < 0) slot.unit = textureUnits++;
+          gl.uniform1i(location, slot.unit);
+        }
+        if (levels) slot.levels.push(levels);
+        if (size) slot.sizes.push(size);
+        if (mipFilter) slot.mipFilters.push(mipFilter);
+        const modes = t.gather ? gl.getUniformLocation(program, t.gather.name) : null;
+        if (modes && t.gather) slot.modes.push({ location: modes, group: t.gather.group, binding: t.gather.binding });
+      }
+    }
+    // Storage buffers read through data textures take the units after the textures.
+    const buffers = new Map<string, StorageSlot>();
+    for (const stage of [glsl.vertex, glsl.fragment] as GLSLStage[])
+      for (const b of stage.storage) {
+        const key = b.shared ? `g${b.group}` : `${b.group}:${b.binding}`;
+        let slot = buffers.get(key);
+        if (!slot) {
+          slot = { unit: textureUnits + buffers.size, group: b.group, binding: b.shared ? -1 : b.binding, info: [] };
+          buffers.set(key, slot);
+        }
+        const texture = gl.getUniformLocation(program, b.texture),
+          info = gl.getUniformLocation(program, b.info);
+        if (texture) gl.uniform1i(texture, slot.unit);
+        if (info) slot.info.push({ location: info, binding: b.binding });
+      }
+    this.units = textureUnits + buffers.size;
+    this.pairs = textureUnits;
+    this.storage.push(...buffers.values());
+    this.uniforms.push(...points.values());
+    this.textures.push(...units.values());
+    this.baseVertex = gl.getUniformLocation(program, '_bv');
+    this.baseInstance = gl.getUniformLocation(program, '_bi');
+  }
+}
+
+/** A GPURenderPipeline: a linked program, its vertex layout and VAO, its fixed-function state and its binding table. */
+export class CompatRenderPipeline {
+  label: string;
+  /** The shared program (null when the pipeline failed before it had GLSL). */
+  readonly linked: LinkedProgram | null = null;
+  readonly program: WebGLProgram | null = null;
+  readonly vao: WebGLVertexArrayObject | null = null;
+  readonly glsl: GLSLProgram | null = null;
+  /** Set when the pipeline cannot draw: the message of its validation error. */
+  failure: string | null = null;
+  readonly attributes: Attribute[] = [];
+  readonly uniforms: readonly UniformSlot[] = [];
+  readonly textures: readonly TextureSlot[] = [];
+  readonly storage: readonly StorageSlot[] = [];
+  readonly mode: number;
+  readonly cull: number;
+  readonly frontFace: number;
+  readonly targets: readonly (TargetState | null)[];
+  readonly depthStencil?: GPUDepthStencilState;
+  readonly alphaToCoverage: boolean;
+  readonly sampleCount: number;
+  readonly unclippedDepth: boolean;
+  baseVertex: WebGLUniformLocation | null = null;
+  baseInstance: WebGLUniformLocation | null = null;
+  /** The program's last uniform values and VAO bindings (see LinkedProgram.cache). */
+  readonly cache!: LinkedProgram['cache'];
   /**
    * Without OES_draw_buffers_indexed (ANGLE's OpenGL back end), WebGL2 has one blend state and one write mask for
    * all colour targets: a pipeline whose targets differ draws once per group of targets with the same state, each
@@ -163,9 +328,8 @@ export class CompatRenderPipeline {
   readonly splits: number[][] | null = null;
   /** @internal Sets per-draw uniforms of a program the device built itself (the compute tiers). */
   onDraw: (() => void) | null = null;
-  private linked = false;
+  private done = false;
   private readonly layouts: (CompatBindGroupLayout | null)[];
-  private readonly shaders: WebGLShader[] = [];
 
   constructor(
     readonly device: CompatDevice,
@@ -302,41 +466,31 @@ export class CompatRenderPipeline {
         });
       }
     }
-    this.handedOver = performance.now();
-    device.programs.count++;
-    device.programs.translateMs += this.handedOver - started;
-    const program = gl.createProgram() as WebGLProgram;
-    for (const stage of [this.glsl.vertex, this.glsl.fragment]) {
-      const s = gl.createShader(stage.stage === 'vertex' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER) as WebGLShader;
-      gl.shaderSource(s, stage.source);
-      gl.compileShader(s);
-      gl.attachShader(program, s);
-      this.shaders.push(s);
-    }
-    gl.linkProgram(program);
-    this.program = program;
-    const vao = gl.createVertexArray() as WebGLVertexArrayObject;
-    device.state.bindVertexArray(vao);
-    for (const a of this.attributes) {
-      gl.enableVertexAttribArray(a.location);
-      gl.vertexAttribDivisor(a.location, a.instance ? 1 : 0);
-    }
-    device.state.bindVertexArray(null);
-    this.vao = vao;
+    device.programs.translateMs += performance.now() - started;
+    // One GL program per GLSL and vertex layout: a pipeline made again reuses it (most recently used last).
+    const key = `${this.glsl.vertex.source}\n//\n${this.glsl.fragment.source}\n//\n${JSON.stringify(this.attributes)}`,
+      cached = device.linked.get(key),
+      e = cached ?? new LinkedProgram(device, this.glsl, this.attributes);
+    device.linked.delete(key);
+    device.linked.set(key, e);
+    e.users.push(device.objects.watch(this));
+    Object.assign(this, {
+      linked: e,
+      program: e.program,
+      vao: e.vao,
+      cache: e.cache,
+      uniforms: e.uniforms,
+      textures: e.textures,
+      storage: e.storage,
+    });
     if (!deferLink) this.finish();
   }
 
   /** Resolves once the program has linked (at once without KHR_parallel_shader_compile). */
   whenLinked(): Promise<void> {
-    const ext = this.device.ext.parallel,
-      gl = this.device.gl;
-    if (!this.program || this.linked || !ext) {
-      this.finish();
-      return Promise.resolve();
-    }
     return new Promise((resolve) => {
       const poll = () => {
-        if (this.device.destroyed || gl.getProgramParameter(this.program as WebGLProgram, ext.COMPLETION_STATUS_KHR)) {
+        if (this.device.destroyed || !this.linked || this.linked.done()) {
           this.finish();
           resolve();
         } else setTimeout(poll, 2);
@@ -347,99 +501,21 @@ export class CompatRenderPipeline {
 
   /** Checks the link and builds the binding table (once). */
   finish(): void {
-    if (this.linked || !this.program || this.failure) return;
-    this.linked = true;
-    this.device.programs.linkMs += performance.now() - this.handedOver;
-    const gl = this.device.gl,
-      program = this.program,
-      glsl = this.glsl as GLSLProgram;
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      const logs = this.shaders.map((s) => gl.getShaderInfoLog(s)).filter(Boolean);
-      this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: WebGL2 refused the translated program: ${[...logs, gl.getProgramInfoLog(program)].join(' ')}`;
+    const e = this.linked;
+    if (this.done || !e || this.failure) return;
+    this.done = true;
+    e.finish();
+    if (e.refusal) {
+      this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: WebGL2 refused the translated program: ${e.refusal}`;
       if (!this.deferLink) this.device.validationError(this.failure);
       return;
     }
-    for (const s of this.shaders) gl.deleteShader(s);
-    this.device.state.useProgram(program);
-    const points = new Map<string, UniformSlot>(),
-      units = new Map<string, TextureSlot>();
-    let textureUnits = 0;
-    for (const stage of [glsl.vertex, glsl.fragment] as GLSLStage[]) {
-      for (const u of stage.uniforms) {
-        const index = gl.getUniformBlockIndex(program, u.block);
-        if (index === gl.INVALID_INDEX) continue;
-        const key = `${u.group}:${u.binding}`;
-        let slot = points.get(key);
-        if (!slot) {
-          slot = { point: points.size, group: u.group, binding: u.binding, size: 0 };
-          points.set(key, slot);
-        }
-        gl.uniformBlockBinding(program, index, slot.point);
-        slot.size = Math.max(
-          slot.size,
-          gl.getActiveUniformBlockParameter(program, index, gl.UNIFORM_BLOCK_DATA_SIZE) as number,
-        );
-      }
-      for (const t of stage.textures) {
-        // A texture read only for its size or level count keeps a slot (the device sets those uniforms from the
-        // bound view) but takes no texture unit: the compiler drops its unused sampler.
-        const location = gl.getUniformLocation(program, t.name),
-          levels = t.levels ? gl.getUniformLocation(program, t.levels) : null,
-          size = t.size ? gl.getUniformLocation(program, t.size) : null,
-          mipFilter = t.mipFilter ? gl.getUniformLocation(program, t.mipFilter) : null;
-        if (!location && !levels && !size && !mipFilter) continue;
-        const key = `${t.group}:${t.binding}|${t.sampler ? `${t.sampler.group}:${t.sampler.binding}` : ''}|${t.gather ? `${t.gather.group}:${t.gather.binding}` : ''}`;
-        let slot = units.get(key);
-        if (!slot) {
-          slot = {
-            unit: -1,
-            group: t.group,
-            binding: t.binding,
-            sampler: t.sampler,
-            type: t.type,
-            levels: [],
-            sizes: [],
-            mipFilters: [],
-            modes: [],
-          };
-          units.set(key, slot);
-        }
-        if (location) {
-          if (slot.unit < 0) slot.unit = textureUnits++;
-          gl.uniform1i(location, slot.unit);
-        }
-        if (levels) slot.levels.push(levels);
-        if (size) slot.sizes.push(size);
-        if (mipFilter) slot.mipFilters.push(mipFilter);
-        const modes = t.gather ? gl.getUniformLocation(program, t.gather.name) : null;
-        if (modes && t.gather) slot.modes.push({ location: modes, group: t.gather.group, binding: t.gather.binding });
-      }
-    }
-    // Storage buffers read through data textures take the units after the textures.
-    const buffers = new Map<string, StorageSlot>();
-    for (const stage of [glsl.vertex, glsl.fragment] as GLSLStage[])
-      for (const b of stage.storage) {
-        const key = b.shared ? `g${b.group}` : `${b.group}:${b.binding}`;
-        let slot = buffers.get(key);
-        if (!slot) {
-          slot = { unit: textureUnits + buffers.size, group: b.group, binding: b.shared ? -1 : b.binding, info: [] };
-          buffers.set(key, slot);
-        }
-        const texture = gl.getUniformLocation(program, b.texture),
-          info = gl.getUniformLocation(program, b.info);
-        if (texture) gl.uniform1i(texture, slot.unit);
-        if (info) slot.info.push({ location: info, binding: b.binding });
-      }
-    const used = textureUnits + buffers.size;
-    if (used > this.device.limits.maxSampledTexturesPerShaderStage)
+    if (e.units > this.device.limits.maxSampledTexturesPerShaderStage)
       throw this.device.unsupported(
-        `a pipeline with ${textureUnits} texture and sampler pairs and ${buffers.size} storage buffers (WebGL2 has ${this.device.limits.maxSampledTexturesPerShaderStage} texture units, and each storage buffer takes one)`,
+        `a pipeline with ${e.pairs} texture and sampler pairs and ${e.storage.length} storage buffers (WebGL2 has ${this.device.limits.maxSampledTexturesPerShaderStage} texture units, and each storage buffer takes one)`,
       );
-    this.storage.push(...buffers.values());
-    this.uniforms.push(...points.values());
-    this.textures.push(...units.values());
-    this.baseVertex = gl.getUniformLocation(program, '_bv');
-    this.baseInstance = gl.getUniformLocation(program, '_bi');
+    this.baseVertex = e.baseVertex;
+    this.baseInstance = e.baseInstance;
   }
 
   getBindGroupLayout(index: number): CompatBindGroupLayout {
@@ -603,7 +679,7 @@ export class CompatQuerySet {
     const gl = this.device.gl,
       old = this.queries[i];
     if (old && !this.waiting.has(old)) gl.deleteQuery(old);
-    const q = gl.createQuery() as WebGLQuery;
+    const q = this.device.objects.own(this, gl.createQuery() as WebGLQuery);
     this.queries[i] = q;
     return q;
   }
@@ -1229,6 +1305,7 @@ export class Replayer {
   beginPass(desc: PassDescriptor): void {
     const gl = this.gl,
       s = this.device.state;
+    this.device.passes.run++;
     // What each attachment writes, brought up to date first (a pass that loads, or draws over part of a level).
     const prepare = (v: CompatTextureView, slice: number): Sub => {
       const t = v.texture;
@@ -1845,6 +1922,7 @@ export class Replayer {
 
   draw(count: number, instances: number, first: number, firstInstance: number): void {
     if (!count || !instances) return;
+    this.device.passes.draws++;
     const p = this.ready(0, firstInstance);
     if (p) this.split(p, () => this.gl.drawArraysInstanced(p.mode, first, count, instances));
   }
@@ -1869,6 +1947,7 @@ export class Replayer {
 
   drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number, firstInstance: number): void {
     if (!count || !instances) return;
+    this.device.passes.draws++;
     const index = this.pass?.index;
     if (!index?.buffer.element) {
       this.device.validationError('drawIndexed without an index buffer');

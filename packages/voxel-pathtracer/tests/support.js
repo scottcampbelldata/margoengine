@@ -13,6 +13,7 @@ Object.assign(globalThis, {
     VERTEX: 32,
     UNIFORM: 64,
     STORAGE: 128,
+    INDIRECT: 256,
   },
   GPUShaderStage: { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 },
   GPUMapMode: { READ: 1, WRITE: 2 },

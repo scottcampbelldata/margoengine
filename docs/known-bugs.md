@@ -1139,109 +1139,34 @@ process creation time before waiting, so recycled PIDs cannot spend the shutdown
 budget on an unrelated replacement. Both cases have regression coverage in
 `tests/browser-teardown.test.js`; no timeout or assertion was relaxed.
 
-### Open: test-page 45 context loss during D3D11 trace compilation
+### Fixed: test-page 45 context loss during D3D11 trace compilation, and the tracer on ANGLE Direct3D 11
 
-Repro on an RTX A6000 with ANGLE Direct3D11: force-install compatibility,
-create an engine, attach the test-page voxel scene and render the raster view.
-After the trace render pipeline has submitted compilation, wait one second,
-dispose the tracer, then dispose the engine. Tracer disposal returns, but engine
-disposal enters WEBGL_lose_context.loseContext and never returns before the
-unchanged 180 s hard limit kills its process tree. Immediate attach/dispose
-returns; awaiting tracer.ready instead encounters the existing D3D11 compilation
-defect below before disposal. These are distinct lifecycle boundaries.
+Was: on the WebGL2 layer under ANGLE Direct3D 11 the voxel path tracer's single `trace` program never finished
+compiling (`D3DCompile` still running at 3,000 s; its time grows 3.6 to 5.3 times per doubling of inlined code), so
+`tracer.ready` never settled, the page showed raster only, C2 tracer rows stalled, and disposing the engine during
+that compile hung in `WEBGL_lose_context.loseContext` until the 180 s process-tree limit (bug 45).
 
-Deleting all 15 tracked programs and 30 shaders after unbinding the current
-program returns normally, but does not resolve the context-loss hang. A raw
-OffscreenCanvas WebGL2 context reproduces it with only the captured trace vertex
-and fragment programs (366 and 134,593 bytes), compile/link, a one-second delay,
-a false COMPLETION_STATUS_KHR query and loseContext. No Margo module, buffer,
-texture, framebuffer, compute binding or draw is involved in that raw repro.
-A simple-program control links successfully and returns from context loss.
-All three failing probes end at the same three-minute GPU-lock limit.
+Cause: one fragment program held the whole path loop (camera maths, traversal, surface, lights, shadow, glass). Context
+loss waits for the driver's pending compiles, and that compile never ended.
 
-The active shader compilation/context-loss interaction is therefore sufficient;
-the reported float-target/compute-state leak is not required. The precise
-internal ANGLE/driver lock is not identified. This intersects the already
-documented monolithic D3D11 trace compilation defect below. A complete repair
-must preserve transport, materials, random sequences and precision while making
-the route compile and dispose correctly; staged transport is a candidate, not a
-completed fix. No runtime change or weakened test is claimed. Evidence and
-research comparisons are in testpage-bugs.md and testpage-research.md. Browser
-process teardown remains with its dedicated owner; no core change is implied.
+Fix (voxel-pathtracer `src/compat-staged.ts`, `src/compat.ts`): the WebGL2 route is a wavefront of staged programs, at
+most one traversal each (hit, vertex, surface, shadow and the rest), carrying the full path state between them in
+float and integer textures, with output bit-identical to the single-kernel route. Three further D3D11 faults found on
+the way are fixed at their cause: fxc X3511 on a generated one-pass loop (`unloop()` turns break and continue into
+guards, so no one-pass loop is emitted), the vertex program's draw-time recompile (split at `VERTEX_CUT` into vertex
+and surface: offline fxc 62.5 s to 14.4 s plus 25.8 s), and passes of finished paths (the CPU drives the loop in windows and reads a census back with
+`mapAsync` between them, then stops recording a part whose paths all finished; no synchronous GPU read).
+The preview kernel is not compiled on this route (docs/limits.md). No timeout, scene limit or tracing work changed.
 
-Current-main continuation (20375ea56 plus the documentation checkpoint): the
-same disposal sequence still hits the 180 s process-tree limit. Replacing the
-two large uniform blocks with the existing data-texture representation does
-not resolve it. Replacing every uniform block also leaves compilation pending
-after a 120 s poll, followed by the same context-loss hang. Making the direct
-lighting loop's bound uniform-dependent, with its engine-authored value
-unchanged, does not resolve that full program either. None of these diagnostic
-transformations is installed in the runtime.
-
-Ownership decision: raw reproduction does not make this browser-only work.
-Margo owns submission of the monolithic trace program followed by context loss
-while native compilation is pending. A smaller representation belongs in the
-optional voxel-pathtracer compatibility route; there is no evidence that an
-engine-side prevention is impossible. The browser owns native compiler and
-context shutdown internals, whose exact blocking mechanism remains unproved.
-There is no cancellation API that would turn a promise timeout into bounded
-native cleanup. Do not close this defect by omitting context destruction,
-rejecting a renderer by name, removing tracing work or raising a timeout.
-
-New compile diagnostics link the isolated camera, closest-hit, surface,
-shadow and glass-candidate trees. A one-light direct evaluation, retaining all
-five light-kind branches and exposing every Walk member, also links and the
-context-loss call returns. The original combined lighting tree stays pending
-at the same poll deadline. A CPU f32 diagnostic compares the combined loop
-against five ordered light steps: all 144 cases preserve radiance, the 22-word
-reservoir and RNG bits exactly (99 nonzero radiances, 3 populated reservoirs).
-These fixtures have no voxel geometry and do not prove glass traversal, a full
-staged route, state-texture serialization or GPU output parity. That repair and
-the actual failing lifecycle regression remain required; bug 45 stays OPEN.
-
-An additional raw one-light control calls context loss one second after link
-submission with completion still false. That call returns before the same
-180 s deadline; the whole supervised command completes in 92.2 s. This is a
-lifecycle observation, not a speed claim or a responsiveness guarantee. It
-supports dependence on the submitted compiler workload and is compatible with
-context destruction waiting for compilation; it does not identify a native
-deadlock. The initial compile probe's Walk starts empty, so carried-state
-compilation is a separate required check. No smaller-program result closes the
-monolithic trace defect or permits blocking application disposal for that long.
-
-The stronger one-light probe loads all Walk inputs and the partial light sum
-from runtime uniforms, retaining carried reservoir evaluation. Its 60,463-byte
-fragment is still incomplete at the 120 s poll deadline; context loss then
-returns before the unchanged 180 s process-tree limit. The command fails its
-compile-completion check (176.1 s overall), not the outer supervisor deadline.
-Thus the empty-reservoir success does not prove a bounded complete transport
-stage. A finer split, including the final reservoir/BSDF evaluation, needs proof.
-
-Cause (bug hunt, 2026-11-09): the hang is the trace program's compile, and
-context loss waits for it. Both raw probes whose loss returned did so only
-after tens of seconds (92.2 s and 176.1 s commands), and the trace program's
-`D3DCompile` does not finish within 3,000 s (entry below), so its loss does not
-return. The same ANGLE HLSL, captured with `WEBGL_debug_shaders` and compiled
-by the Windows SDK `fxc` on the CPU, reproduces the non-finishing compile with
-no browser or GPU. The compiler's time grows much faster than the code:
-calling `cameraRay` 1, 2 and 4 times takes 3.2, 17.1 and 89.7 s, and `closest`
-1 and 2 times 36.6 and 130.8 s. `/Od` is no faster (55.6 against 61.7 s), and a
-stubbed program that folds to 14 instructions still takes 119.5 s, so the time
-is spent on the inlined source before dead code is removed. `[loop]` on every
-loop and a table in place of the trig-reduction switch lower the constant only.
-In traversal, stubbing `march`'s shape cut and cut-through takes `closest`
-from 40 s to 11.5 s. Full table and method: testpage-research.md, "Bug 45 hunt".
-
-What this rules out: no shutdown-side change in Margo can bound the wait
-within the rules. Parallel compilation has no cancellation, and skipping
-context loss, rejecting a renderer by name or raising a limit are excluded
-above. The fix is the wavefront split listed under "The path tracer never
-compiles on ANGLE Direct3D 11", with a size budget per compiled program: at
-most one traversal and one copy of the precise camera maths in each, since one
-traversal alone costs 25 to 40 s here and doubling the code costs 3.6 to 5.3
-times as much. A smaller shape-cut/cut-through block in `march` belongs to the
-same work. Bug 45 closes with that split plus a disposal-during-compilation
-regression on ANGLE D3D11; it stays OPEN until then.
+Evidence (RTX A6000 PC, loaded): `npm run test:gpu:d3d11` passes in 117.9 s, 18,432 of 18,432 values identical with
+the same seed. `npm run test:gpu:d3d11-dispose` (the bug 45 sequence:
+attach, raster frame, dispose the tracer and then the engine one second after submission) passes: tracer disposal 1 ms,
+engine disposal returns in 29.0 s, `ready` rejects with `disposed`, the page's other engine still draws. C2 tracer rows
+c2-003/010/013/016/025/028/031 pass on native and on the default D3D11 backend at 1x and 4x within the unchanged 150 s
+scene limit. Regressions: packages/voxel-pathtracer/tests/browser-check.mjs (`determinism`, `disposecompile`),
+tests/compat-staged.test.js, packages/webgl2-compat/test/passes.test.js. Engine disposal during compilation still
+waits for the driver's longest pending compile (up to about 30 s here); that bound is recorded in docs/limits.md.
+History: docs/testpage-research.md ("Bug 45 hunt") and docs/testpage-bugs.md.
 
 ### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 
@@ -1579,6 +1504,34 @@ remaining unverified real-file variants. Their proof gaps are not claimed fixed 
 - **Evidence:** 40 cycles on the new path under the same load (2026-11-10 01:32 to 01:34): 0 timeouts, 0 leaks; close 347 ms median, 2,130 ms maximum; 5 cycles handed off at the grace, in which the kernel needed up to 9.3 s after the close to finish with the browser (cycles 33 to 35: 9,338, 4,950 and 5,230 ms), every browser, child and host process gone by then and no survivor file written; no Node process or pipe handle left in the suite. `tests/browser-host.test.js` (a real host process; a browser the kernel never finishes with is logged as a survivor at the bound, in the host) and `tests/browser-teardown.test.js` ("a browser process the kernel has not finished tearing down cannot hold the close past the grace"; the in-process design it replaces asserted `SHUTDOWN_TIMEOUT` for that case in its own test, and `tests/browser-host.test.js` runs it through `launchBrowser` against a real host whose browser never exits).
 - **False survivor, fixed 2026-11-10 (batch 217, lane P):** the host's waiter reported a listed child as a survivor 677 ms after the end, which failed the close with `SHUTDOWN_TIMEOUT` at `scripts/lib/browser.mjs:344`. The waiter read each pid's start time to tell ours from a newer process, and took a start time it could not read (PowerShell's getter gives `$null`) for a survivor. Measured as a black box: a process the waiter has found and the kernel then finishes with has no readable start time (its object already signalled: `WaitForExit(0)` true), while every process Chromium starts as this user stays readable through its teardown (9 of 9 listed; an 8 GB process killed mid-read stayed readable until it was gone); and 135 of 958 processes on the dev PC (services such as svchost, WmiPrvSE, SearchProtocolHost) are unreadable, so a pid such a service takes over was reported too. Both mean the pid names no process of ours, so the waiter now skips it. A survivor is still reported only after the waiter's bound. Regressions in `tests/browser-teardown.test.js`: "Windows waiter: an ended process gone before its start time was read is not a survivor" (the race widened by ending the process between lookup and read) and "a pid held by a process this user cannot query is not reported as ours" (pid 4); both fail on the parent with the pid reported.
 - **Still open:** why the kernel takes over 30 s in that machine state is not Margo's to find or fix. A line in `test-results/browser-host-survivors.log` is the signal to look at the Edge version or the driver; the GPU slot is released while the kernel may still be freeing the ended browser's allocations (docs/limits.md).
+
+### Open, outside Margo, worked around 2026-11-10: ANGLE Vulkan writes fragment output 7 wrong after dead programs are deleted
+
+- **What:** the voxel path tracer's `analytic` glass furnace (96 x 72, 512 samples, 64 bounces) on the WebGL2 layer
+  under ANGLE Vulkan (RTX A6000, NVIDIA driver 617.42, Edge 157) came out dark in 13 of 78 renders: for 5 to 7
+  consecutive parts (about 0.5 s) the values its loop programs wrote through fragment output location 7
+  (`COLOR_ATTACHMENT7`) were words of other state, so glass paths ended early. Swapping the attachment order moved the
+  damage to layer 0, so it follows output 7, not the texture. No GL error, no warning. ANGLE Direct3D 11: 28 of 28 right.
+- **Margo's defect (fixed):** webgl2-compat made 95 programs and 95 vertex arrays over four tracers and deleted none, and
+  left about 45 textures and 26 framebuffers to the browser, which deletes a WebGL object when it collects the JS
+  wrapper, at a moment of its own, possibly in the middle of a replay. Keeping every object reachable from JS gave 0
+  wrong in 26 renders; a capture of one render's 694,127 GL calls replayed bit-identical 80 of 80 times. Fix
+  (`packages/webgl2-compat/src/device/gl.ts` `GLObjects`, `render.ts` `LinkedProgram`): the device holds every object
+  its context makes and deletes it itself, on `destroy()` of its resource, at the end of the first submission after
+  the resource was collected, or with `device.destroy()`; a delete asked for during a replay waits for its end; render
+  pipelines with the same GLSL and vertex attributes share one program and VAO (up to 64 idle ones kept), so a rebuilt
+  tracer creates and deletes no program. Measured: three tracers made 72 programs and left 156 objects live before, 26
+  programs and 64 live objects after, and 0 objects live after the engine's disposal (`device.glObjects`). Vulkan repro
+  after the fix: 64 of 64 renders right (one image hash; p = 0.83^64, about 7e-6, at the old rate). Regression:
+  `packages/webgl2-compat/test/gl-objects.test.js` (created equals deleted after `destroy()`; a pipeline made again
+  reuses its program; collected pipelines' programs go at a submission, beyond 64 only; deletes wait for the end of a
+  replay; collected bind groups' textures go at a submission).
+- **Still open, outside Margo:** deleting programs a page no longer uses must not change what live programs write. The
+  repro still needs a self-contained page: a raw WebGL2 page with the tracer's texture and pass pattern renders right,
+  and a variant that makes new copies of its loop programs every round fails differently (whole page wrong, never
+  recovering), so it is not yet shown to be the same fault. A page that drops more than 64 distinct pipelines still has
+  their programs deleted between submissions; no wrong image has been seen from that path. A report for the ANGLE
+  tracker is drafted and waits for Scott.
 
 ### Fixed 2026-11-08: text extrusion API report
 
@@ -2104,60 +2057,6 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
-
-### The path tracer never compiles on ANGLE Direct3D 11 (parked)
-
-- **What:** on the WebGL2 layer, `@margoengine/voxel-pathtracer` compiles and runs on ANGLE Vulkan in about 20 s, but on
-  ANGLE Direct3D 11, the Windows default for a browser with no WebGPU, the `trace` fragment shader does not finish
-  compiling. `tracer.ready` stays pending and the page shows the raster image and never a traced frame. The page keeps
-  drawing at full rate meanwhile.
-- **Repro:** change `--use-angle=vulkan` to `--use-angle=d3d11` in `packages/voxel-pathtracer/tests/browser-check.mjs`
-  and run it with `--compat`. To time the compiler alone: read the HLSL with `WEBGL_debug_shaders` from a page with
-  `--use-angle=d3d11`, fill ANGLE's `@@` placeholders, and pass it to `D3DCompile` for `ps_5_0` (`fxc`).
-- **Measured** (2026-11-06, one RTX A6000 PC, three compiles at once, so diagnostic; the chain is WGSL, `translateWGSL`
-  GLSL, ANGLE HLSL, `D3DCompile`, and the HLSL is 210,679 bytes):
-
-  | What was compiled | Result |
-  | --- | --- |
-  | The whole of `trace` | Still running at 3,000 s |
-  | `precise` trig in `wideRay` replaced by native `sin` and `cos` | Still running at 3,000 s |
-  | That, and no `glassCandidates` and no shadow walk | Still running at 3,000 s |
-  | `direct`, `closest`, `shadow` and glass stubbed | 516 s, 159 KB of bytecode |
-  | Those and the precise trig stubbed | 125 s, 48 KB |
-  | Precise trig, `closest` and `shadow` stubbed | 524 s, 57 KB |
-  | Precise trig stubbed alone, or with `direct`, glass, or both | Over 560 s |
-  | `[loop]` on every loop, or on the path loop | No help within 280 to 560 s |
-  | One path iteration | Over 280 s |
-
-  A stub that zeroes `cameraRay` folds the whole shader to 1,132 bytes, so that timing says nothing.
-- **Cause boundary:** the earlier standalone HLSL experiments localize the compilation failure below WGSL/GLSL
-  translation, in native `D3DCompile`. Its inlining/optimization of the combined program is implicated; the exact
-  pathological compiler pass has not been identified, but the 2026-11-09 bug-45 probes show its time grows 3.6 to
-  5.3 times per doubling of inlined code, is no lower with `/Od`, and is spent before dead code is removed
-  (testpage-research.md, "Bug 45 hunt"). The stub results do not establish that every constituent
-  shader is unmanageable: the bug-45 continuation above now links isolated dependency trees, including one direct
-  light at a time. The original combined program still fails its bounded check.
-- **Ruled out:** native trig (the numbers above, and it would change the output); leaving features out per scene (the
-  third row drops glass candidates and the shadow walk and still does not finish).
-- **Needed to close:** a wavefront split of `radiance` into bounded fragment programs, preserving first hits,
-  ordered direct-light evaluation, surface sampling and all transport state. The typed-IR inventory has 98 scalar
-  words of persistent locals/private globals before phase scratch and liveness/bool packing, so the former
-  approximate 18-vec4 estimate is not an allocation contract. Integer/RNG state needs exact serialization as well
-  as float precision. Constituent compile probes and the CPU light-step comparison do not establish a working
-  staged path loop. Actual GPU output parity and disposal-during-compilation regressions remain required.
-- **Meanwhile:** a page on this route gets the raster view. WebGPU is the route on such a machine where the browser has
-  it, and ANGLE Vulkan works.
-- **C2 composition (2026-11-10):** integration row c2-003 (post/FXAA, toon, transitions, scenery/Moon and
-  voxel-pathtracer) never returned on the WebGL2 layer at 1x, and the GPU lease reclaimed the run after 195.7 s idle.
-  Bisected on an RTX A6000 under ANGLE Direct3D 11: voxel-pathtracer alone stalls at `await tracer.ready`, while the
-  other four together pass. Two programs never report `COMPLETION_STATUS_KHR` (45 s, context not lost): the `trace`
-  render pipeline (GLSL vertex 366 and fragment 134,717 bytes; ANGLE HLSL fragment 220,071 bytes, SHA-256 prefix
-  cc09ce32cd70a8b8) and the compute `preview` stand-in (GLSL vertex 70,244 bytes; HLSL 117,960 bytes, 7ca27c68a5387fb6),
-  read back with `WEBGL_debug_shaders`. The same page under `--use-angle=vulkan` on the same GPU passes with the
-  expected probes, so the cause is the native compile above, not an interaction between members. The C2 runner now runs
-  rows with this member on ANGLE Vulkan on Windows, as the tracer's own compatibility checks do, and bounds each scene
-  with `ERR_COMPOSITION_STALL` (docs/integration-composition.md). C2 coverage of the tracer on ANGLE Direct3D 11 stays
-  open with this entry.
 
 ### Three routes still break WebGPU compatibility-level rules
 

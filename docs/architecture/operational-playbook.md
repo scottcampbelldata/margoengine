@@ -1751,6 +1751,16 @@ Mapping details:
 - Without indexed draw-buffer state, outputs with matching blend state are grouped; depth/stencil-writing cases that
   cannot be preserved are refused.
 - Render shaders that write storage resources are refused.
+- The device owns every GL object its context makes (`GLObjects`, `device/gl.ts`) and deletes each one itself: on its
+  resource's `destroy()`, at the end of the first submission after the resource was collected (bind groups, samplers
+  and pipelines have no `destroy()`), or with `device.destroy()`; a delete asked for during a replay waits for its end.
+  Pipelines with the same GLSL and vertex attributes share one program and VAO (`LinkedProgram`, `device/render.ts`; up
+  to 64 idle ones kept, least recently used first out). Cause (2026-11-10): the layer had left programs, VAOs and some
+  textures and framebuffers for the browser to delete at wrapper collection, possibly mid-replay, and on ANGLE Vulkan
+  (NVIDIA 617.42) the voxel tracer's loop programs then wrote fragment output 7 wrong in 13 of 78 renders. Evidence:
+  `test/gl-objects.test.js` (created equals deleted after `destroy()`, program reuse, deletes only at a submission);
+  the same Vulkan repro after the fix, 64 of 64 renders right; `device.glObjects` counts per kind. Missing: a
+  self-contained driver repro (`docs/known-bugs.md`).
 
 ### 3.3 Compute tiers
 
@@ -1775,10 +1785,34 @@ Texture read-back left the layer's base on 2026-11-06 (`device/readback.ts`, 70,
 with a `copyTextureToBuffer` until the chunk has loaded, as it does for compute, and the sizes gate measures the chunk in
 the split's lazy number. Evidence: `tests/lazy-boundary.test.js` and `readbackOrder` in `compute-browser.mjs`.
 
-The voxel path tracer has a route too (`packages/voxel-pathtracer/src/compat.ts`): `trace` runs as a fragment shader
-cut from the WebGPU kernel's own text, writing four `rgba32float` targets, and a scatter kernel adds them to the image
-buffers. Evidence: `packages/voxel-pathtracer/tests/browser-check.mjs --compat` on ANGLE Vulkan. Still missing: a run on
-ANGLE Metal and on an integrated GPU. ANGLE on Direct3D 11, the default on Windows, does not finish `trace`: Microsoft's shader compiler was still running at the 50 minute limit, three times (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate. So that route shows the raster image and never a traced frame (`docs/known-bugs.md`).
+The voxel path tracer has a route too (`packages/voxel-pathtracer/src/compat.ts`, 2026-11-10): the path loop of
+`trace` runs as a sequence of fragment programs cut from the WebGPU kernel's own text (`src/compat-staged.ts`: start,
+then per iteration hit, vertex, surface, and sample, shadow and gather per light kind, then post, and finish), at most
+one traversal per program, with the path state in `rgba32uint` pages (about 50 MB for a part of 32,768 paths) and four
+`rgba32float` sums a small kernel adds to the image buffers. Every statement runs once in the same order with the same
+random numbers; against the single-kernel route 345 of 18,432 values differ by 1 or 2 units in the last place (at
+most 2.0e-7 relative, ANGLE Vulkan). Direct3D 11 needed three more changes, each
+at its cause: `D3DCompile`'s time grows 3.6 to 5.3 times per doubling of inlined code (the single program never
+finished), so the budget is one traversal and one copy of the precise camera maths per program, and the vertex program
+is cut in two (`VERTEX_CUT`; offline fxc 62.5 s to 14.4 s plus 25.8 s); fxc rejects the generated one-pass loop with
+X3511 at ANGLE's draw-time recompile, which lost the context, so `unloop()` emits guards instead of break and continue;
+and ANGLE recompiles every program with more than one fragment output at its first draw, synchronously, so the first
+traced frame on Direct3D 11 comes after about 90 s on an RTX A6000. The CPU drives the loop in windows of 4, 4, 8, 16,
+32, then 64 iterations, reads a census of each part back with `mapAsync` before every window but the first (no
+synchronous GPU read, `device.stalls` 0), and stops recording a part whose paths all finished; `device.passes` counts
+the passes replayed. The layer owns every GL object it creates and keeps one program per GLSL text (up to 64 idle,
+`IDLE_PROGRAMS`), so nothing is left for the browser to delete at garbage collection: on ANGLE Vulkan such deletions
+mid-render corrupted fragment output 7 of the live staged programs (docs/known-bugs.md). The quick preview kernel is not
+compiled on this route (142 to 168 s on Direct3D 11). Evidence: `browser-check.mjs --compat` rows traversal, analytic
+and determinism on ANGLE Vulkan and Direct3D 11 (`npm run test:gpu:d3d11`: traversal 94.8 s, analytic 124.1 s,
+determinism 1.9 s; 18,432 of 18,432 values identical for one seed; 5,680 passes replayed against 33,848 with every
+window recorded, the same values; 345 of 18,432 values 1 or 2 units in the last place from the single-kernel route);
+`analytic` on ANGLE Vulkan right in 64 of 64 renders (13 of 78 wrong before the GL ownership change);
+`npm run test:gpu:d3d11-dispose` (tracer then engine disposed one second after submission: engine disposal returns in
+25.5 s, bug 45); `tests/compat-staged.test.js`, `packages/webgl2-compat/test/passes.test.js` and
+`packages/webgl2-compat/test/gl-objects.test.js` on the CPU; the C2 tracer rows on the
+default Direct3D 11 backend. Still missing: a run on ANGLE Metal and on an integrated GPU, and a speed comparison of the
+staged route.
 
 The CPU tier's `new Function` applies only to this opt-in compatibility path, and a strict policy sends it to the
 interpreter instead of refusing it. General claims that nothing builds code at run time must stay scoped to the native
@@ -2928,6 +2962,11 @@ not help, and a program folded to 14 instructions still takes 119.5 s, so a
 D3D11 route needs a size budget per compiled program (one traversal, one copy
 of precise camera maths), not only a split. Evidence still missing: the split
 itself, GPU output parity and a disposal-during-compilation regression.
+
+Closed 2026-11-10: the staged WebGL2 route (section 3.3) is the split, with the per-program budget above; GPU output
+parity is `test:gpu:d3d11` (18,432 of 18,432 values identical) and the disposal regression is `test:gpu:d3d11-dispose`
+(engine disposal returns in 29.0 s against never before). Disposal during compilation still waits for the driver's
+current compile; that bound is in `docs/limits.md`.
 
 ### Batch 273: lower WebGL2 device tiers
 

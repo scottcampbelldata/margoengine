@@ -247,11 +247,17 @@ class CompatDevice extends EventTarget {
     }>;
     readonly ext: Extensions;
     readonly state: GLState;
+    readonly objects: GLObjects;
+    readonly linked: Map<string, LinkedProgram>;
     stalls: number;
     readonly dispatches: {
         fragment: number;
         scatter: number;
         cpu: number;
+    };
+    readonly passes: {
+        run: number;
+        draws: number;
     };
     readonly programs: {
         count: number;
@@ -284,6 +290,11 @@ class CompatDevice extends EventTarget {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+    collect(): void;
+    get glObjects(): {
+        readonly created: Readonly<Record<string, number>>;
+        readonly deleted: Readonly<Record<string, number>>;
+    };
     idle(): Promise<void>;
     queuePresent(context: {
         present(): void;
@@ -404,14 +415,15 @@ class CompatRenderPassEncoder extends DrawRecorder {
 class CompatRenderPipeline {
     readonly device: CompatDevice;
     label: string;
+    readonly linked: LinkedProgram | null;
     readonly program: WebGLProgram | null;
     readonly vao: WebGLVertexArrayObject | null;
     readonly glsl: GLSLProgram | null;
     failure: string | null;
     readonly attributes: Attribute[];
-    readonly uniforms: UniformSlot[];
-    readonly textures: TextureSlot[];
-    readonly storage: StorageSlot[];
+    readonly uniforms: readonly UniformSlot[];
+    readonly textures: readonly TextureSlot[];
+    readonly storage: readonly StorageSlot[];
     readonly mode: number;
     readonly cull: number;
     readonly frontFace: number;
@@ -422,16 +434,7 @@ class CompatRenderPipeline {
     readonly unclippedDepth: boolean;
     baseVertex: WebGLUniformLocation | null;
     baseInstance: WebGLUniformLocation | null;
-    readonly cache: {
-        baseVertex: number;
-        baseInstance: number;
-        element: number;
-        pointers: string[];
-        levels: Map<WebGLUniformLocation, number>;
-        sizes: Map<WebGLUniformLocation, string>;
-        modes: Map<WebGLUniformLocation, string>;
-        info: Map<WebGLUniformLocation, string>;
-    };
+    readonly cache: LinkedProgram['cache'];
     readonly splits: number[][] | null;
     onDraw: (() => void) | null;
     constructor(device: CompatDevice, descriptor: GPURenderPipelineDescriptor, deferLink?: boolean, prebuilt?: GLSLProgram);
@@ -624,6 +627,18 @@ interface FormatInfo {
 }
 
 type FormatKind = 'float' | 'sint' | 'uint' | 'depth' | 'depth-stencil' | 'stencil';
+
+class GLObjects {
+    readonly created: Record<string, number>;
+    readonly deleted: Record<string, number>;
+    dirty: boolean;
+    replaying: number;
+    constructor(gl: WebGL2RenderingContext);
+    watch(owner: object): WeakRef<object> | null;
+    own<T>(owner: object, o: T): T;
+    collect(): void;
+    destroy(): void;
+}
 
 type GLSLKind = 'float' | 'sint' | 'uint';
 
@@ -960,6 +975,34 @@ interface LayoutEntry {
         viewDimension: string;
     };
     readonly externalTexture?: object;
+}
+
+class LinkedProgram {
+    readonly program: WebGLProgram;
+    readonly vao: WebGLVertexArrayObject;
+    readonly users: (WeakRef<object> | null)[];
+    refusal: string | null;
+    units: number;
+    pairs: number;
+    readonly uniforms: UniformSlot[];
+    readonly textures: TextureSlot[];
+    readonly storage: StorageSlot[];
+    baseVertex: WebGLUniformLocation | null;
+    baseInstance: WebGLUniformLocation | null;
+    readonly cache: {
+        baseVertex: number;
+        baseInstance: number;
+        element: number;
+        pointers: string[];
+        levels: Map<WebGLUniformLocation, number>;
+        sizes: Map<WebGLUniformLocation, string>;
+        modes: Map<WebGLUniformLocation, string>;
+        info: Map<WebGLUniformLocation, string>;
+    };
+    constructor(device: CompatDevice, glsl: GLSLProgram, attributes: readonly Attribute[]);
+    done(): boolean;
+    free(): void;
+    finish(): void;
 }
 
 interface MatrixType {

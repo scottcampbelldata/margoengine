@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14878774,
+  "total": 14902778,
   "history": [
     {
       "date": "2026-10-24",
@@ -8315,6 +8315,12 @@
       "commit": "71eb890c0f",
       "reason": "physics bundles Rapier 0.21.0: the root entry joins its lazy solver chunk (39,906 B gzip, was the external rapier3d-compat peer of 1.64 MB) and grows 286 B for the Wasm load (URL, Response, bytes or Module, abort, build check); the Wasm is its own 1,176,707 B gzip file",
       "grew": 3
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "f8b119693",
+      "reason": "WebGL2 staged path tracer route and GL object ownership in the compat layer (fl-pathtracer). @margoengine/voxel-pathtracer 81115 B on origin/main to 88589 B: the staged wavefront route (one traversal per fragment program, CPU window loop with mapAsync census) lives in the lazy compat chunk only the WebGL2 layer loads (base 79628 B, lazy 9086 B); it replaces a single program that never compiled on ANGLE Direct3D 11. @margoengine/webgl2-compat 107674 to 108630 B, /device 107647 to 108592, /xr 107475 to 108414, /tiers 107394 to 108331: the device now owns and deletes every GL object and shares programs by GLSL text, which fixed 13 of 78 wrong renders on ANGLE Vulkan. A split would put the ownership wrapper in a second chunk every compat device loads at creation anyway, adding a request and duplicating the device's resource tracking for no saving.",
+      "grew": 5
     }
   ],
   "items": {
@@ -9555,7 +9561,7 @@
     "@margoengine/voxel-net/sql-store": 1614,
     "@margoengine/voxel-net/webrtc": 7194,
     "@margoengine/voxel-net/webtransport": 6511,
-    "@margoengine/voxel-pathtracer": 82733,
+    "@margoengine/voxel-pathtracer": 91247,
     "@margoengine/voxel-pathtracer/compose": 1589,
     "@margoengine/voxel-pathtracer/denoise-ml": 7023,
     "@margoengine/voxel-pathtracer/guiding": 2791,
@@ -9613,20 +9619,20 @@
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
-    "@margoengine/webgl2-compat": 107944,
+    "@margoengine/webgl2-compat": 111889,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 78190,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
-    "@margoengine/webgl2-compat/device": 108058,
+    "@margoengine/webgl2-compat/device": 111850,
     "@margoengine/webgl2-compat/glsl": 43584,
     "@margoengine/webgl2-compat/pick": 5054,
     "@margoengine/webgl2-compat/preview": 3699,
     "@margoengine/webgl2-compat/restore": 1106,
-    "@margoengine/webgl2-compat/tiers": 107679,
+    "@margoengine/webgl2-compat/tiers": 111581,
     "@margoengine/webgl2-compat/wgsl": 27240,
-    "@margoengine/webgl2-compat/xr": 107816,
+    "@margoengine/webgl2-compat/xr": 111667,
     "@margoengine/wfc": 2154,
     "@margoengine/wfc dist/workers/wfc.js": 3601,
     "@margoengine/wfc/assemble": 1721,

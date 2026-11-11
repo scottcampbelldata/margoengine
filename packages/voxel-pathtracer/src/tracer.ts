@@ -180,6 +180,17 @@ interface Gpu {
   route?: Promise<TraceRoute>;
   routeReady?: TraceRoute;
   inputs?: WeakMap<GPUBindGroup, TraceInputs>;
+  /**
+   * The viewport's trace on the route, running on its own (TraceRoute.run awaits its census read-backs): `landed` once
+   * its sums are complete, when a frame adds them into the image (`adds`, one per dispatch) and counts its samples.
+   */
+  routeJob?: {
+    epoch: number;
+    count: number;
+    width: number;
+    adds: { inputs: TraceInputs; rows: number }[];
+    landed: boolean;
+  };
   tableCoverage?: Promise<GPUComputePipeline>;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
@@ -326,6 +337,8 @@ export class VoxelPathTracer implements EnginePlugin {
   #ready!: Promise<void>;
   #settle?: [() => void, (error: unknown) => void];
   #samples = 0;
+  // Bumped whenever the accumulation restarts: a viewport trace of the WebGL2 route that lands after it is dropped.
+  #epoch = 0;
   // Whether the last frame drew the traced image (false while the display pipeline for its target compiles).
   #shown = false;
   #key = new Float64Array(30);
@@ -459,6 +472,7 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#snapshot = moving(buildSnapshot(scene, this.#cache, limit, this.sceneWordReserve()), this.#settings);
     this.#version++;
     this.#samples = 0;
+    this.#epoch++;
   }
 
   /**
@@ -550,6 +564,7 @@ export class VoxelPathTracer implements EnginePlugin {
   // A new image that the viewport's history must not blend into (the camera's moves keep it).
   #restart(): void {
     this.#samples = 0;
+    this.#epoch++;
     this.#history.valid = false;
   }
 
@@ -879,6 +894,7 @@ export class VoxelPathTracer implements EnginePlugin {
       gpu.lost = true;
     });
     this.#samples = 0;
+    this.#epoch++;
     if (this.#status !== 'compiling') this.#newReady();
     this.#status = 'compiling';
     const trace = (gpu.traceModule = device.createShaderModule({ code: this.tracingSource() })),
@@ -891,13 +907,17 @@ export class VoxelPathTracer implements EnginePlugin {
           layout: layout(l),
           compute: { module, entryPoint },
         });
-    // The small preview kernel first: the viewport shows a lit image while the full tracer compiles.
-    compute(trace, 'preview', traceLayout).then(
-      (p) => {
-        if (this.#gpu === gpu && !this.#disposed && !gpu.pipelines) gpu.preview = p;
-      },
-      () => {},
-    );
+    // The small preview kernel first: the viewport shows a lit image while the full tracer compiles. Not on the WebGL2
+    // layer's route: there the preview is one program holding a closest hit and a shadow ray, which Direct3D's compiler
+    // took longer for (142 to 168 s on an RTX A6000 PC) than for the whole staged tracer, so the viewport shows the
+    // raster image until the tracer is ready (docs/limits.md).
+    if (!gpu.route)
+      compute(trace, 'preview', traceLayout).then(
+        (p) => {
+          if (this.#gpu === gpu && !this.#disposed && !gpu.pipelines) gpu.preview = p;
+        },
+        () => {},
+      );
     Promise.all([
       this.#trace(gpu, false),
       compute(trace, 'ids', traceLayout),
@@ -957,6 +977,7 @@ export class VoxelPathTracer implements EnginePlugin {
     }
     gpu.view = undefined;
     this.#samples = 0;
+    this.#epoch++;
   }
 
   #releaseTargets(t: Targets | undefined): void {
@@ -1585,7 +1606,7 @@ export class VoxelPathTracer implements EnginePlugin {
       groups = view.bands.groups;
     }
     if ('sums' in pipeline) {
-      for (const [i, k] of chunks.entries()) this.#routeTrace(gpu, c.encoder, pipeline, groups[i], width, k.rows);
+      this.#routeViewport(gpu, pipeline, groups, chunks, width, count);
       return true;
     }
     const pass = c.encoder.beginComputePass();
@@ -1598,20 +1619,44 @@ export class VoxelPathTracer implements EnginePlugin {
     return true;
   }
 
-  #routeTrace(
+  // The viewport's samples on the WebGL2 route: its dispatches run one after another on their own (each part reads
+  // its census back between windows, so the frame cannot wait for them); nothing else is traced, and the frame
+  // uniforms are not rewritten, until a later frame adds the finished sums (#execute). A restart meanwhile (camera,
+  // scene, options, dispose, a lost device) stops it at its next window and its sums are dropped.
+  #routeViewport(
     gpu: Gpu,
-    encoder: GPUCommandEncoder,
     kernel: RouteKernel,
-    group: GPUBindGroup,
+    groups: GPUBindGroup[],
+    chunks: TraceChunk[],
     width: number,
-    rows: number,
+    count: number,
   ): void {
-    (gpu.routeReady as TraceRoute).encode(
-      encoder,
-      kernel,
-      (gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>).get(group)!,
-      width,
-      rows,
+    const route = gpu.routeReady as TraceRoute,
+      inputs = gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>,
+      job = {
+        epoch: this.#epoch,
+        count,
+        width,
+        adds: chunks.map((k, i) => ({ inputs: inputs.get(groups[i])!, rows: k.rows })),
+        landed: false,
+      },
+      stale = () => this.#disposed || gpu.lost || this.#gpu !== gpu || this.#epoch !== job.epoch,
+      check = () => {
+        if (stale()) throw new DOMException('The viewport image restarted', 'AbortError');
+      };
+    gpu.routeJob = job;
+    (async () => {
+      for (const [i, k] of chunks.entries())
+        await route.run(kernel, job.adds[i].inputs, width, k.rows, k.count, this.#settings.maxBounces, check, i, false);
+    })().then(
+      () => {
+        job.landed = true;
+      },
+      (error) => {
+        if (gpu.routeJob === job) gpu.routeJob = undefined;
+        // Stopped by a restart: the next frame traces the new image. Anything else is reported.
+        if (!stale()) this.#engine?.onError(error);
+      },
     );
   }
 
@@ -1653,6 +1698,7 @@ export class VoxelPathTracer implements EnginePlugin {
       Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false, this.#snapshot.focusing, true));
     if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) {
       this.#samples = 0;
+      this.#epoch++;
       this.#restarted = true;
     }
     // A new image (camera, scene, sampling options, reset, enable): the denoised one is stale even when the new
@@ -1683,8 +1729,22 @@ export class VoxelPathTracer implements EnginePlugin {
       // Until the full tracer is compiled: one preview sample per frame, written over the image.
       if (!this.#traceViewport(gpu, view, c, gpu.preview!, width, height, 0, 1, o.seed, false)) return;
       this.#samples = 1;
+    } else if (gpu.routeJob) {
+      // The WebGL2 route's trace is still running (#routeViewport): nothing new this frame. Once it has landed its sums
+      // are added in this frame's commands and its samples counted, so the image and its count change together; it
+      // traced the image as it was, so after a restart it is dropped.
+      const job = gpu.routeJob;
+      if (job.landed) {
+        gpu.routeJob = undefined;
+        if (job.epoch === this.#epoch) {
+          for (const [i, a] of job.adds.entries())
+            (gpu.routeReady as TraceRoute).add(c.encoder, a.inputs, job.width, a.rows, i);
+          this.#samples += job.count;
+        }
+      }
     } else if (!this.#capturing && this.#samples < o.maxSamples) {
-      const count = Math.min(
+      const pipeline = (this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace,
+        count = Math.min(
         o.samplesPerFrame === 'auto' ? this.#auto : o.samplesPerFrame,
         o.maxSamples - this.#samples,
       );
@@ -1693,7 +1753,7 @@ export class VoxelPathTracer implements EnginePlugin {
           gpu,
           view,
           c,
-          (this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace,
+          pipeline,
           width,
           height,
           this.#samples,
@@ -1705,7 +1765,8 @@ export class VoxelPathTracer implements EnginePlugin {
         )
       )
         return;
-      this.#samples += count;
+      // On the WebGL2 route the samples count once they land (above).
+      if (!('sums' in pipeline)) this.#samples += count;
       const now = performance.now();
       if (this.#lastTrace) {
         this.#frameMs = now - this.#lastTrace;
@@ -1960,16 +2021,27 @@ export class VoxelPathTracer implements EnginePlugin {
               o.wavelength,
               o.transparent,
             );
-            const e = device.createCommandEncoder();
-            if ('sums' in kernels.trace) this.#routeTrace(gpu, e, kernels.trace, group!, w, h);
+            if ('sums' in kernels.trace)
+              await (gpu.routeReady as TraceRoute).run(
+                kernels.trace,
+                (gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>).get(group!)!,
+                w,
+                h,
+                count,
+                this.#settings.maxBounces,
+                check,
+                'image',
+                true,
+              );
             else {
-              const pass = e.beginComputePass();
+              const e = device.createCommandEncoder(),
+                pass = e.beginComputePass();
               pass.setPipeline(kernels.trace);
               pass.setBindGroup(0, group!);
               pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
               pass.end();
+              device.queue.submit([e.finish()]);
             }
-            device.queue.submit([e.finish()]);
             if (++submitted % 4 === 0) await device.queue.onSubmittedWorkDone();
           }
           check();

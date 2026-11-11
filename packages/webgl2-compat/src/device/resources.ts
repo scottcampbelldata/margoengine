@@ -96,13 +96,14 @@ export class CompatBuffer {
       BufferUsage.MAP_READ |
       BufferUsage.INDIRECT;
     const staging = (usage & ~(BufferUsage.MAP_WRITE | BufferUsage.COPY_SRC)) === 0;
+    const own = <T>(o: T) => device.objects.own(this, o);
     this.gl =
-      !staging && usage & gpuUses && usage & ~(BufferUsage.INDEX | BufferUsage.COPY_DST) ? gl.createBuffer() : null;
+      !staging && usage & gpuUses && usage & ~(BufferUsage.INDEX | BufferUsage.COPY_DST) ? own(gl.createBuffer()) : null;
     if (this.gl) {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
       gl.bufferData(gl.COPY_WRITE_BUFFER, glSize, gl.DYNAMIC_DRAW);
     }
-    this.element = usage & BufferUsage.INDEX ? gl.createBuffer() : null;
+    this.element = usage & BufferUsage.INDEX ? own(gl.createBuffer()) : null;
     if (this.element) {
       device.state.bindVertexArray(null);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.element);
@@ -221,7 +222,7 @@ export class CompatBuffer {
       const shift = Math.min(11, Math.ceil(Math.log2(texels))),
         w = 1 << shift,
         h = Math.ceil(texels / w);
-      const texture = gl.createTexture() as WebGLTexture;
+      const texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w, h);
       this.data = { texture, shift, version: -1 };
@@ -366,27 +367,6 @@ function uploadRows(
   gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
 }
 
-/**
- * Deletes the shared data textures of bind groups the program dropped (WebGPU bind groups have no destroy()). The held
- * value is only a WeakRef to the device and an id into `sharedTextures`: a registry keeps held values strongly, and the
- * old `{ gl, texture }` reached the device through the context's canvas listeners, so every device that ever made such
- * a group, its engine and the group itself stayed alive (an engine with VFX on the WebGL2 layer ran the page out of
- * Wasm memory after about 124 engines; lane L, 2026-11-10).
- */
-const sharedTextures = new WeakMap<CompatDevice, Map<number, WebGLTexture>>();
-let sharedIds = 0;
-const dropped =
-  typeof FinalizationRegistry === 'function' && typeof WeakRef === 'function'
-    ? new FinalizationRegistry<{ device: WeakRef<CompatDevice>; id: number }>(({ device, id }) => {
-        const owner = device.deref(),
-          live = owner && sharedTextures.get(owner),
-          texture = live?.get(id);
-        if (!owner || !live || !texture) return;
-        live.delete(id);
-        if (!owner.gl.isContextLost()) owner.gl.deleteTexture(texture);
-      })
-    : null;
-
 /** A GPUTexture on WebGL2: a texture, or a multisample renderbuffer (plus a resolved texture when it is sampled). */
 export class CompatTexture {
   readonly id = id();
@@ -481,7 +461,7 @@ export class CompatTexture {
       this.target = 0;
       this.texture = null;
       this.primary = null;
-      this.renderbuffer = gl.createRenderbuffer();
+      this.renderbuffer = device.objects.own(this, gl.createRenderbuffer());
       gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
       gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, device.enum(info.internal), w, h);
       this.resolved =
@@ -508,7 +488,7 @@ export class CompatTexture {
 
   private allocate(target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): WebGLTexture {
     const gl = this.device.gl,
-      t = gl.createTexture() as WebGLTexture;
+      t = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
     this.device.state.scratch(target, t);
     const internal = this.device.enum(info.internal);
     if (target === gl.TEXTURE_3D || target === gl.TEXTURE_2D_ARRAY) gl.texStorage3D(target, levels, internal, w, h, d);
@@ -787,7 +767,7 @@ export class CompatSampler {
   private make(nearest: boolean): WebGLSampler {
     const gl = this.device.gl,
       d = this.d,
-      s = gl.createSampler() as WebGLSampler;
+      s = this.device.objects.own(this, gl.createSampler() as WebGLSampler);
     const wrap = (m?: GPUAddressMode) =>
       m === 'repeat' ? gl.REPEAT : m === 'mirror-repeat' ? gl.MIRRORED_REPEAT : gl.CLAMP_TO_EDGE;
     gl.samplerParameteri(s, gl.TEXTURE_WRAP_S, wrap(d.addressModeU));
@@ -1021,18 +1001,12 @@ export class CompatBindGroup {
         total += Math.max(1, Math.ceil(bound.size / 16));
       }
       if (!total) return null;
+      // Bind groups have no destroy(): the texture goes once the group is collected (GLObjects.own).
       const shift = Math.min(11, Math.ceil(Math.log2(total))),
-        texture = gl.createTexture() as WebGLTexture;
+        texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
       this.shared = { texture, shift, rows, versions: new Map() };
-      if (dropped) {
-        const id = ++sharedIds;
-        let live = sharedTextures.get(this.device);
-        if (!live) sharedTextures.set(this.device, (live = new Map()));
-        live.set(id, texture);
-        dropped.register(this, { device: new WeakRef(this.device), id });
-      }
     }
     const d = this.shared;
     for (const [binding, row] of d.rows) {

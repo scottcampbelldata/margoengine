@@ -32,10 +32,12 @@ test('optional RIS kernel and exact one-candidate baseline preserve tracer ident
     assert.match(many.sources[0], /candidate<8u/);
     assert.match(many.sources[0], /L\+=resampledEmitters\(kind,m,n,wo,o,mask\)/);
     assert.match(many.sources[0], /4.0\*light.pdfA\*d2\/cosine\+4.0\*bp/);
+    // The WebGL2 route's staged programs (src/compat-staged.ts) keep the text before the `trace` entry as the prefix
+    // every program shares, so a helper the variant adds must be declared there to reach the `sample` stage.
     const fragmentBoundary = many.sources[0].indexOf('@compute @workgroup_size(8,8) fn trace');
     for (const helper of ['fn directionalEmitter', 'fn resampledEmitters']) {
       const declaration = many.sources[0].indexOf(helper);
-      assert.ok(declaration >= 0 && declaration < fragmentBoundary, `${helper} must survive compatibility extraction`);
+      assert.ok(declaration >= 0 && declaration < fragmentBoundary, `${helper} must be in the staged programs' shared prefix`);
     }
   } finally {
     a.dispose();

@@ -1,5 +1,6 @@
 # Deferred speed phase
 
+- Voxel path tracer staged WebGL2 route, viewport throughput: 320 x 240 at 4 samples a batch measured 820 to 930 ms a batch on ANGLE Vulkan and a 1500 x 1100, 64-sample denoised capture 299.8 s (busy dev PC, diagnostic; old single-program route 24 ms a 400 x 240 frame, but it never compiled on Direct3D 11 and was wrong in 13 of 78 Vulkan renders). Time it on the quiet machine with `node packages/voxel-pathtracer/tests/browser-check.mjs --compat viewport`; candidates are a one-window lookahead (record the next window before the census read lands) and fewer, larger passes. See docs/limits.md, "Voxel path tracer on the WebGL2 compatibility layer".
 - Batch 165 job 1, row 10.21 / p-cube-lut: Cube parsing work-count and byte-identity proof is built in packages/tonemap/tests/cube-workcount.test.js. Keep the existing scene, both rival backends and budgets for tonight's quiet rerun. See docs/whitepaper/batch-165-workcounts.md; the historical 2.61x loss is not replaced by a speed claim.
 - Batch 165 job 2, row 11.2 / p-export-mesh: STL export skips unused world vertex normals; work-count and byte-identity proof in packages/exporters/tests/stl-workcount.test.js. Keep the existing scene and rival backends for the quiet rerun. See docs/whitepaper/batch-165-workcounts.md.
 

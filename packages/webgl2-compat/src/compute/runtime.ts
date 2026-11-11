@@ -387,10 +387,10 @@ class Runtime implements ComputeRuntime {
     if (!buffer.gl) return;
     const w4 = ws.width / 4;
     if (!ws.rows) {
-      ws.rows = gl.createTexture() as WebGLTexture;
+      ws.rows = this.device.objects.own(buffer, gl.createTexture() as WebGLTexture);
       state.scratch(gl.TEXTURE_2D, ws.rows);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w4, ws.height);
-      ws.fbo = gl.createFramebuffer() as WebGLFramebuffer;
+      ws.fbo = this.device.objects.own(buffer, gl.createFramebuffer() as WebGLFramebuffer);
       state.bindDrawFramebuffer(ws.fbo);
       gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ws.rows, 0);
       gl.drawBuffers([gl.COLOR_ATTACHMENT0]);

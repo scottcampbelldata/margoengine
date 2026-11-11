@@ -1,32 +1,7 @@
 // Running C2 composition scenes (scripts/composition-browser-tests.mjs): a hard limit per scene, so a scene that never
-// returns fails at once naming itself instead of holding the GPU until the lease monitor reclaims it, and the ANGLE
-// backend each row's compatibility pass needs on Windows.
-
-/**
- * Members whose WebGL2 compatibility route does not finish compiling on ANGLE Direct3D 11, Windows' default backend,
- * with the open defect that records it. A row holding one runs its compatibility pass on ANGLE Vulkan on Windows, as
- * the member's own compatibility checks do; the other rows keep the default backend.
- */
-export const COMPAT_VULKAN_MEMBERS = new Map([
-  ['voxel-pathtracer', 'docs/known-bugs.md, "The path tracer never compiles on ANGLE Direct3D 11 (parked)"'],
-]);
-
-/** Browser arguments for the compatibility pass of a row with `members` on `platform`. */
-export function compatArgs(members, platform = process.platform) {
-  return platform === 'win32' && members.some((m) => COMPAT_VULKAN_MEMBERS.has(m)) ? ['--use-angle=vulkan'] : [];
-}
-
-/** `rows` grouped by the browser arguments `argsFor(row)` returns, groups and rows in first-seen order. */
-export function groupRows(rows, argsFor) {
-  const groups = new Map();
-  for (const row of rows) {
-    const args = argsFor(row),
-      key = JSON.stringify(args);
-    if (!groups.has(key)) groups.set(key, { args, rows: [] });
-    groups.get(key).rows.push(row);
-  }
-  return [...groups.values()];
-}
+// returns fails at once naming itself instead of holding the GPU until the lease monitor reclaims it. Every row's
+// compatibility pass runs on the browser's default ANGLE backend (Direct3D 11 on Windows), the voxel path tracer's
+// included since its staged route compiles there (packages/voxel-pathtracer, test:gpu:d3d11).
 
 /**
  * The most one scene run (both of its pipeline waits and its readbacks) may take: under the GPU lease's 3 minute idle

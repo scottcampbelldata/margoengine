@@ -156,3 +156,105 @@ export class GLState {
     this.activeUnit(0);
   }
 }
+
+/** The WebGL object kinds a device makes: each has `create<Kind>` and `delete<Kind>` (a Sync: fenceSync, deleteSync). */
+const KINDS = ['Buffer', 'Texture', 'Framebuffer', 'Renderbuffer', 'Sampler', 'Program', 'Shader', 'VertexArray', 'Query', 'Sync'];
+
+/** Marks the objects of a device dirty when a resource that owns some of them is collected (see {@link GLObjects.own}). */
+const collected =
+  typeof FinalizationRegistry === 'function' && typeof WeakRef === 'function'
+    ? new FinalizationRegistry<WeakRef<GLObjects>>((objects) => {
+        const o = objects.deref();
+        if (o) o.dirty = true;
+      })
+    : null;
+
+/**
+ * Every WebGL object the device's context makes, held until the device deletes it: the browser deletes a WebGL object
+ * whose JS wrapper it collects, at a moment of its own, possibly in the middle of a replay (ANGLE on Vulkan has been
+ * seen to corrupt a live program's colour output 7 for about half a second after such a deletion). An object goes when
+ * the device deletes it (a resource's destroy()), at the first collect() after the resource that owns it was collected
+ * (WebGPU buffers, textures, samplers, bind groups and pipelines may be dropped without destroy()), or when the device
+ * is destroyed. Deletes asked for while a submission replays wait for the end of the replay. `created` and `deleted`
+ * count both per kind.
+ */
+export class GLObjects {
+  readonly created: Record<string, number> = {};
+  readonly deleted: Record<string, number> = {};
+  /** Set when an owner was collected: the next collect() deletes its objects. */
+  dirty = false;
+  /** Above 0 while a submission replays: deletes wait in `later`. */
+  replaying = 0;
+  private readonly live = new Map<object, [kind: string, owner: WeakRef<object> | null]>();
+  private readonly owners = new WeakMap<object, WeakRef<object>>();
+  private readonly later: object[] = [];
+  private readonly remove: Record<string, (o: object) => void> = {};
+  private readonly self = collected && new WeakRef(this);
+
+  constructor(gl: WebGL2RenderingContext) {
+    const g = gl as unknown as Record<string, (...a: unknown[]) => unknown>;
+    for (const kind of KINDS) {
+      const make = kind === 'Sync' ? 'fenceSync' : `create${kind}`,
+        free = `delete${kind}`,
+        create = g[make],
+        del = g[free];
+      if (typeof create !== 'function' || typeof del !== 'function') continue;
+      this.created[kind] = this.deleted[kind] = 0;
+      this.remove[kind] = (o) => del.call(gl, o);
+      g[make] = (...a) => {
+        const o = create.apply(gl, a) as object | null;
+        if (o) {
+          this.live.set(o, [kind, null]);
+          this.created[kind]++;
+        }
+        return o;
+      };
+      g[free] = (o) => {
+        if (!this.live.has(o as object)) del.call(gl, o);
+        else if (this.replaying) this.later.push(o as object);
+        else this.free(o as object);
+      };
+    }
+  }
+
+  /** A weak reference to `owner`, watched for collection (null without FinalizationRegistry). */
+  watch(owner: object): WeakRef<object> | null {
+    if (!this.self || !collected) return null;
+    let r = this.owners.get(owner);
+    if (!r) {
+      this.owners.set(owner, (r = new WeakRef(owner)));
+      collected.register(owner, this.self);
+    }
+    return r;
+  }
+
+  /** Ties `o` to `owner`: deleted at the first collect() after `owner` was collected. Returns `o`. */
+  own<T>(owner: object, o: T): T {
+    const entry = o && this.live.get(o as object);
+    if (entry) entry[1] = this.watch(owner);
+    return o;
+  }
+
+  /** Deletes the objects whose owner was collected and those deleted during a replay. */
+  collect(): void {
+    if (this.dirty) {
+      this.dirty = false;
+      for (const [o, [, owner]] of this.live) if (owner && !owner.deref()) this.free(o);
+    }
+    for (const o of this.later.splice(0)) this.free(o);
+  }
+
+  /** Deletes every object left (the device is being destroyed). */
+  destroy(): void {
+    this.replaying = 0;
+    for (const o of [...this.live.keys()]) this.free(o);
+  }
+
+  private free(o: object): void {
+    const entry = this.live.get(o);
+    if (!entry) return;
+    this.live.delete(o);
+    this.deleted[entry[0]]++;
+    this.remove[entry[0]](o);
+  }
+}

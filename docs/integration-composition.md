@@ -14,14 +14,10 @@ backend are common infrastructure, including when the post/FXAA adapter is absen
 
 Generated `.html` and `.ts` files live in `tests/composition/`. Regenerate with
 `node scripts/generate-composition.mjs`; the CPU test fails on stale output.
-`npm run test:composition:browser` holds one shared GPU slot and runs one native browser and compatibility browsers grouped
-by ANGLE backend, with every row at 1x and 4x MSAA. On Windows, compatibility rows that
-hold a member listed in `COMPAT_VULKAN_MEMBERS` (`scripts/support/composition-run.mjs`)
-run in a second compatibility browser on ANGLE Vulkan, as that member's own
-compatibility checks do; the other rows keep ANGLE's default Direct3D 11 backend.
-The one member listed is voxel-pathtracer, whose `trace` program never finishes
-compiling on Direct3D 11 (docs/known-bugs.md, "The path tracer never compiles on
-ANGLE Direct3D 11"). Each scene run has a 150 s limit, under the GPU lease's 3 minute
+`npm run test:composition:browser` holds one shared GPU slot and runs one native browser and one compatibility
+browser on the layer's default ANGLE backend (Direct3D 11 on Windows), with every row at 1x and 4x MSAA. Rows with
+voxel-pathtracer run there too: its staged WebGL2 route compiles on Direct3D 11 (packages/voxel-pathtracer README,
+`test:gpu:d3d11`), so the earlier routing of those rows to ANGLE Vulkan is gone. Each scene run has a 150 s limit, under the GPU lease's 3 minute
 idle window: a scene that does not return fails with `ERR_COMPOSITION_STALL`
 naming the row, backend, sample count and the page's pending pipelines, instead of
 holding the slot until the lease reclaims the whole run. Use `-- --packages=taa,dof` to select
@@ -87,10 +83,12 @@ scene project also type-checks with `node node_modules/typescript/bin/tsc -p tes
 
 ## Full 24-member expansion
 
-The full expansion exercises 24 adapters in 34 rows. The previous c2-003
-compatibility stall is the existing voxel-pathtracer ANGLE Direct3D 11 shader
-link defect, isolated and handled by main commit 04f611773. Tracer rows now use
-ANGLE Vulkan on Windows and each scene has a 150 s hard limit. The full run passes all 136 cases: 34 rows on both backends at 1x and 4x,
+The full expansion exercises 24 adapters in 34 rows. The earlier c2-003
+compatibility stall was the voxel path tracer's single `trace` program, which never finished compiling on ANGLE
+Direct3D 11; its staged route fixes that (docs/known-bugs.md, bug 45). On 2026-11-10 `npm run
+test:composition:browser -- --packages=voxel-pathtracer` passed all seven tracer rows (c2-003, 010, 013, 016, 025,
+028, 031) on native WebGPU and on the default Direct3D 11 backend at 1x and 4x, under the unchanged 150 s scene limit
+(RTX A6000 PC). The earlier full run, with tracer rows then on ANGLE Vulkan, passed all 136 cases: 34 rows on both backends at 1x and 4x,
 with 276/276 positive pairs and all four binary adapter states on each setting.
 The recorded local Windows run used NVIDIA RTX A6000 driver 617.42. Results,
 including every colour/depth/eye probe and the compatibility browser arguments,

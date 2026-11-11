@@ -942,10 +942,53 @@ window.check={
   look([18,14,26],[-3,3,-2]);
   const scene=scenes.materials();
   return withTracer(scene,{},async(t)=>{
-   const a=await t.renderImage({width:96,height:64,samples:16,seed:5}),b=await t.renderImage({width:96,height:64,samples:16,seed:5}),c=await t.renderImage({width:96,height:64,samples:16,seed:6});
+   // On the WebGL2 layer: the passes the layer replayed and its synchronous GPU reads (stalls) for the first render;
+   // the route stops each part's path loop once a census read back says every path finished.
+   const d=device(),count=()=>({run:d.passes?.run,stalls:d.stalls}),delta=(x,y)=>({run:y.run-x.run,stalls:y.stalls-x.stalls});
+   const before=count();
+   const a=await t.renderImage({width:96,height:64,samples:16,seed:5}),after=count(),b=await t.renderImage({width:96,height:64,samples:16,seed:5}),c=await t.renderImage({width:96,height:64,samples:16,seed:6});
    let same=0,other=0;for(let i=0;i<a.color.length;i++){if(a.color[i]===b.color[i])same++;if(a.color[i]!==c.color[i])other++;}
-   return {values:a.color.length,identical:same,differentWithOtherSeed:other,errors:errors.splice(0)};
+   let passes;
+   if(d.passes){
+    // The same render with every window of the loop recorded (the route's test switch): bit for bit the same image.
+    d.voxelTraceWholeLoop=true;
+    const w0=count(),whole=await t.renderImage({width:96,height:64,samples:16,seed:5}),w1=count();
+    d.voxelTraceWholeLoop=false;
+    let equal=0;for(let i=0;i<a.color.length;i++)if(Object.is(a.color[i],whole.color[i]))equal++;
+    passes={stopped:delta(before,after),whole:delta(w0,w1),equal};
+   }
+   return {values:a.color.length,identical:same,differentWithOtherSeed:other,passes,errors:errors.splice(0)};
+  }).then(async(result)=>{
+   // On the WebGL2 layer a tracer made again with the same scene and options makes no GL program: the layer shares one
+   // per GLSL and vertex layout, so a rebuild neither compiles nor leaves dead programs for the browser to delete.
+   const objects=device().glObjects;
+   if(objects){
+    const programs=()=>objects.created.Program,before=programs();
+    await withTracer(scene,{},(t)=>t.renderImage({width:96,height:64,samples:1,seed:5}));
+    result.rebuild={programs:programs()-before,live:Object.keys(objects.created).reduce((n,k)=>n+objects.created[k]-objects.deleted[k],0)};
+   }
+   return result;
   });
+ },
+ // Disposal while the tracer's programs compile (bug 45): a second engine on its own canvas draws a raster frame with a
+ // tracer attached, one second after its pipelines were submitted the tracer and then the engine are disposed. Both
+ // calls must return (on ANGLE Direct3D 11 the engine's context loss waits for the driver's compiles; the old single
+ // trace program never finished), `ready` rejects with `disposed`, and the page's own engine still draws afterwards.
+ async disposecompile(){
+  const own=document.createElement('canvas');own.width=320;own.height=240;document.body.append(own);
+  const second=await Engine.create(own,{backend:'webgpu',camera:{position:[18,14,26],target:[-3,3,-2],near:0.1,far:2000}});
+  const mesh=second.createMesh();mesh.setGeometry(box());mesh.setScale([3,3,3]);
+  const tracer=VoxelPathTracer.attach(second,{scene:scenes.materials()}),settled=tracer.ready.then(()=>'ready',(e)=>e.code??e.message);
+  second.render({delta:0});
+  await new Promise((r)=>setTimeout(r,1000));
+  const statusAtDispose=tracer.status;
+  let t0=performance.now();tracer.dispose();const tracerMs=performance.now()-t0;
+  t0=performance.now();second.dispose();const engineMs=performance.now()-t0;
+  own.remove();
+  const ready=await settled;
+  // The page's engine is untouched: a raster frame still draws and reads back.
+  const after=await shot();
+  return {statusAtDispose,status:tracer.status,ready,tracerMs:Math.round(tracerMs),engineMs:Math.round(engineMs),engineDisposed:second.disposed,pageDraws:after.some((v,i)=>i%4!==3&&v>0),errors:errors.splice(0)};
  },
  // Error against a 16384-sample reference falls as samples grow, for both projections (diffuse scene), and for the
  // glossy scene (reported: its small-sun glossy caustics converge slower).
@@ -1161,14 +1204,18 @@ window.check={
   await tracer.ready;
   tracer.enabled=false;const disabled=await shot();
   tracer.enabled=true;
-  let i=0;while(!tracer.stats.converged&&i++<200){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  // Frames until `done` holds, at most 500 (a guard against a tracer that stops, not a time budget). Both images are
+  // waited for alike: on the WebGL2 layer's route a frame launches a batch of samples that lands tens of frames later
+  // (docs/limits.md), so the image before the restore must not be read at a frame count the native route reaches first.
+  const until=async(done)=>{for(let i=0;!done()&&i<500;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}};
+  await until(()=>tracer.stats.converged);
   engine.render({delta:0});const traced=readCanvas(),statsBefore=tracer.stats;
   const old=device();await engine.rebootDevice();watch(device());
-  i=0;while(tracer.status!=='ready'&&i++<500)await new Promise((r)=>setTimeout(r,10));
-  i=0;while(!tracer.stats.converged&&i++<500){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  for(let i=0;tracer.status!=='ready'&&i<500;i++)await new Promise((r)=>setTimeout(r,10));
+  await until(()=>tracer.stats.converged);
   engine.render({delta:0});const restored=readCanvas(),statsAfter=tracer.stats;
-  // Resize: the traced size follows the canvas and accumulation restarts.
-  canvas.style.width='400px';await frames(1);const resized=tracer.stats;canvas.style.width='320px';
+  // Resize: the traced size follows the canvas and accumulation restarts (its first batch counted, not one more).
+  canvas.style.width='400px';await frames(1);await until(()=>tracer.stats.samples>0);const resized=tracer.stats;canvas.style.width='320px';
   tracer.dispose();const after=await shot();
   mesh.dispose();
   return {disabled:diff(disabled,raster),traced:diff(traced,raster),restored:diff(restored,traced),afterDispose:diff(after,raster),newDevice:device()!==old,statsBefore,statsAfter,resized,errors:errors.splice(0),messages:messages.splice(0)};

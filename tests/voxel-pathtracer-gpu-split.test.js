@@ -76,7 +76,21 @@ test('no package script runs the whole check with no case named', () => {
   for (const s of checkScripts())
     assert.ok(s.cases.length > 0, `${s.script} runs every case in one script, past the Arc's time limit`);
   // The variants (slow compile, spec maths) run one case each with their flag; they are extra runs, not the split.
-  for (const s of checkScripts().filter((x) => !SPLIT.includes(x.script))) assert.equal(s.cases.length, 1, s.script);
+  // A backend variant (`--compat --angle=<backend>`, the WebGL2 layer on one ANGLE backend) reruns a few named cases
+  // there; it must name only known cases, fewer than the whole list, and carry its own planned time limit.
+  const planned = plan().filter((t) => t.dir === 'voxel-pathtracer');
+  for (const s of checkScripts().filter((x) => !SPLIT.includes(x.script))) {
+    if (!s.flags.some((f) => f.startsWith('--angle='))) {
+      assert.equal(s.cases.length, 1, s.script);
+      continue;
+    }
+    assert.ok(s.flags.includes('--compat'), `${s.script} picks an ANGLE backend, so it runs on the WebGL2 layer`);
+    for (const name of s.cases) assert.ok(cases.includes(name), `${s.script} names the known case ${name}`);
+    assert.ok(s.cases.length < cases.length / 4, `${s.script} names ${s.cases.length} cases, not the whole check`);
+    const minutes = pkg.margo.gpuTestTimeoutMinutes[s.script];
+    assert.ok(minutes > 0, `margo.gpuTestTimeoutMinutes sets ${s.script}`);
+    assert.equal(planned.find((p) => p.script === s.script)?.minutes, minutes, `gpu-package-tests plans ${s.script}`);
+  }
 });
 
 test('every split script is planned by gpu-package-tests with its own time limit', () => {

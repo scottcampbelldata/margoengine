@@ -6,7 +6,7 @@ import type { CompatXR, CompatXROptions } from '../xr.js';
 import { fault } from '../../../shared/errors.js';
 import { webgl2Capabilities, type WebGL2Capabilities, type CompatTier } from '../index.js';
 import type { TierFormats } from '../tiers.js';
-import { extensions, type Extensions, GLState } from './gl.js';
+import { extensions, type Extensions, GLObjects, GLState } from './gl.js';
 import { nextGPUTask } from './tasks.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
@@ -25,6 +25,8 @@ import {
   CompatQuerySet,
   CompatRenderBundleEncoder,
   CompatRenderPipeline,
+  IDLE_PROGRAMS,
+  type LinkedProgram,
   Replayer,
   writeTexture,
   copyExternalImage,
@@ -265,10 +267,16 @@ export class CompatDevice extends EventTarget {
   readonly lost: Promise<{ reason: 'destroyed' | 'unknown'; message: string }>;
   readonly ext: Extensions;
   readonly state: GLState;
+  /** @internal Every WebGL object the context made, held until the device deletes it (see GLObjects in gl.ts). */
+  readonly objects: GLObjects;
+  /** @internal The GL programs of its render pipelines by GLSL and vertex layout, least recently used first. */
+  readonly linked = new Map<string, LinkedProgram>();
   /** Synchronous GPU-to-CPU reads the layer had to make (indirect arguments written by the GPU and the like). */
   stalls = 0;
   /** Compute dispatches run so far, per tier: fragment draws, point draws (scatter) and the CPU. */
   readonly dispatches = { fragment: 0, scatter: 0, cpu: 0 };
+  /** Render passes replayed so far, and the draws replayed that drew something (work counts for tests and tuning). */
+  readonly passes = { run: 0, draws: 0 };
   /**
    * Render programs made so far: how many, the milliseconds spent translating their WGSL to GLSL, and the
    * milliseconds from handing GLSL to WebGL2 to a known link status (with KHR_parallel_shader_compile, wall time
@@ -322,6 +330,7 @@ export class CompatDevice extends EventTarget {
     this.limits = Object.freeze({ ...adapter.limits, maxTextureArrayLayers: layers });
     this.adapterInfo = adapter.info;
     this.cpuWorkBudget = adapter.cpuWorkBudget;
+    this.objects = new GLObjects(gl);
     this.ext = extensions(gl);
     this.state = new GLState(gl);
     this.lost = new Promise((resolve) => (this.resolveLost = resolve));
@@ -433,7 +442,37 @@ export class CompatDevice extends EventTarget {
     for (const c of this.shown) c.keepFrame();
     this.shown.clear();
     this.lose('destroyed', 'The device was destroyed');
+    this.objects.destroy();
     this.ext.lose?.loseContext();
+  }
+
+  /**
+   * @internal At the end of each submission, never during one: deletes the oldest idle programs beyond IDLE_PROGRAMS
+   * (no live pipeline uses them), then the objects of collected resources and the deletes asked for while it replayed.
+   */
+  collect(): void {
+    if (this.objects.dirty) {
+      const idle: [string, LinkedProgram][] = [];
+      for (const [key, e] of this.linked) {
+        const live = e.users.filter((u) => !u || u.deref());
+        e.users.splice(0, e.users.length, ...live);
+        if (!live.length) idle.push([key, e]);
+      }
+      for (const [key, e] of idle.slice(0, Math.max(0, idle.length - IDLE_PROGRAMS))) {
+        e.free();
+        this.linked.delete(key);
+      }
+    }
+    this.objects.collect();
+  }
+
+  /**
+   * WebGL objects made and deleted so far, per kind (Buffer, Texture, Framebuffer, Program, VertexArray and the
+   * rest). The device deletes every object it makes itself, never leaving one to the browser's garbage collector:
+   * after destroy() the two counts match.
+   */
+  get glObjects(): { readonly created: Readonly<Record<string, number>>; readonly deleted: Readonly<Record<string, number>> } {
+    return this.objects;
   }
 
   /** Resolves when the GPU has finished every command submitted so far. */
@@ -722,7 +761,13 @@ export class CompatQueue {
     if (!d.computeRuntime && list.some((cb) => cb.compute)) this.hold(d.loadCompute());
     if (!d.readback && list.some((cb) => cb.readback)) this.hold(d.loadReadback());
     this.inOrder(() => {
-      for (const cb of list) if (!d.destroyed) d.replayer.run(cb.ops);
+      d.objects.replaying++;
+      try {
+        for (const cb of list) if (!d.destroyed) d.replayer.run(cb.ops);
+      } finally {
+        d.objects.replaying--;
+      }
+      d.collect();
       d.flushPresents();
     });
   }

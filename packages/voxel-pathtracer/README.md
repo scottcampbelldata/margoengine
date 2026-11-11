@@ -489,22 +489,41 @@ const scene: VoxelTraceScene = {
 await install();
 const engine = await Engine.create(canvas);
 const tracer = VoxelPathTracer.attach(engine, { scene });
-engine.start(); // the viewport progresses while full tracing compiles
+engine.start(); // raster frames until the tracer is ready, then the traced image
 window.addEventListener('pagehide', () => {
   tracer.dispose();
   engine.dispose();
 }, { once: true });
 ```
 
-The WebGL2 kernels are the WebGPU ones except `trace`: its stores cannot run on the GPU on WebGL2, so the same sample loop
-runs in a fragment shader writing four `rgba32float` targets and a small kernel adds them to the image. That route is a
-lazy chunk (`src/compat.ts`) only the layer downloads. Results agree with the analytic checks at the same tolerances, and
-the `trace` module stays the one source of the maths.
+The WebGL2 kernels are the WebGPU ones except `trace`: its stores cannot run on the GPU on WebGL2, so its path loop runs
+as a sequence of fragment programs cut from the same shader text (`src/compat-staged.ts`): `start` (the camera ray),
+then per loop iteration `hit`, `vertex`, `surface`, and `sample`, `shadow` and `gather` for each light kind, then
+`post`, and `finish`, which writes four `rgba32float` sums that a small kernel adds to the image. No program holds more
+than one traversal. Every statement runs once, in the same order and with the same random numbers; against the
+single-kernel route on ANGLE Vulkan, 345 of the 18,432 values of the `determinism` render differ, by 1 or 2 units in
+the last place (at most 2.0e-7 relative). The path's state lives between programs in `rgba32uint` pages, about 50 MB
+for a part of 32,768 paths. The CPU drives the loop: each part runs its iterations in windows of 4, 4, 8, 16, 32, then
+64, and before every window but the first a census of the part is read back with `mapAsync` (no synchronous GPU read);
+once every path of the part has finished, its remaining iterations are not recorded. Recording every window instead
+gives the same image bit for bit (`determinism`; `device.passes` in `@margoengine/webgl2-compat` counts the passes
+replayed). A tracer made again on the same device reuses the layer's compiled programs. The route is a lazy chunk
+(`src/compat.ts`) only the layer downloads, and the `trace` module stays the one source of the maths.
 
-Compile time decides whether this is useful. ANGLE on Vulkan compiled everything in about 20 s on an RTX A6000; ANGLE on Direct3D 11, the default on Windows, does not finish `trace`: Microsoft's shader compiler was still running at the 50 minute limit, three times (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate. So that route shows the raster image and never a traced frame (`docs/known-bugs.md`).
-Frames before `ready` show the raster image, so nothing stops working in the meantime. Speed against native WebGPU on one
-GPU, diagnostic because other jobs ran: a 1500 x 1100, 64-sample denoised render took 6.4 s against 2.3 s, and a
-400 x 240 viewport frame 24 ms against 9 ms.
+Both ANGLE backends on Windows run it. On an RTX A6000 PC, ANGLE Direct3D 11 (the default) passes `npm run
+test:gpu:d3d11` (`traversal` 94.8 s, most of it the driver compiling the programs at their first draw; the 64-bounce,
+512-sample `analytic` furnace 124.1 s; `determinism` 1.9 s), with 18,432 of 18,432 values identical for the same seed,
+and ANGLE Vulkan runs the same rows (`analytic` 105.0 s). On this route the quick preview
+kernel is not compiled (on Direct3D 11 it took longer than the whole staged tracer), so frames show the raster image
+until `ready`. Disposing the engine while the programs still compile waits for the driver to finish the one it is on
+(29 s measured, `test:gpu:d3d11-dispose`); `docs/limits.md` has the numbers.
+Frames before `ready` show the raster image, so nothing stops working in the meantime. In the viewport a frame starts a
+batch of `samplesPerFrame` samples that runs on its own and is added to the image (and counted in `stats.samples`) by
+the first frame after it lands; frames in between show the image as it was. Speed, diagnostic because other jobs ran:
+on ANGLE Vulkan a 320 x 240 batch of 4 samples took 820 to 930 ms, about 50 frames, set by the GPU work of the
+iterations, and a 1500 x 1100, 64-sample denoised capture 299.8 s (`docs/limits.md`). The single-program route this
+replaced, which never compiled on Direct3D 11, rendered that capture in 6.4 s against 2.3 s native and a 400 x 240
+viewport frame in 24 ms against 9 ms.
 
 ## Captures, float images and picks
 
