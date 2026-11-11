@@ -29,7 +29,8 @@ console.log(world.sample(0, 0).biomes, world.heightAt(0, 0)); // the biomes and 
 ```
 
 The [Biomes demo](../../examples/biomes/index.html) (`npm run dev:examples`, then open `/examples/biomes/`) shows the
-same world with every control below: climate sliders, presets, a map of each layer, painting and the file exports.
+same world with every control below: climate sliders, presets, a map of each layer, painting and the file exports. Classification is exact integer maths, so `sample`, `sampleRegion` and tiles answer within about 137,000 km of the
+origin and throw a `RangeError` past it.
 
 ## The layer gallery
 

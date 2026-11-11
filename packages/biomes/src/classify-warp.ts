@@ -1,4 +1,5 @@
 // Internal CPU ecotone warp, extracted without changing the classifier's expression order.
+import { rangeError } from '../../shared/errors.js';
 import { divFloor, ONE } from './fixed.js';
 import { fbm } from './hash.js';
 
@@ -15,8 +16,16 @@ export interface WarpLattice {
   readonly warpB: Int32Array;
 }
 
-/** Builds the existing two CPU fbm lattices over an n by depth rectangle. */
+/**
+ * Builds the existing two CPU fbm lattices over an n by depth rectangle.
+ * @throws RangeError when a lattice point's millimetre coordinate in Q16 passes 2^53 - 1 or a cell index leaves the
+ * 32-bit range the shifts work in: past about 137,000 km from the origin the integers would round and wrap.
+ */
 export function warpLattice(seed: number, cell: number, gx: number, gz: number, n: number, depth: number): WarpLattice {
+  // The farthest lattice point is 8 cells past the rectangle's far corner (two extra lattice rows, rounded down to 8).
+  const far = Math.max(Math.abs(gx), Math.abs(gz), Math.abs(gx + n), Math.abs(gz + depth)) + 16;
+  if (!(far < 0x7ffffff0 && far * cell * ONE <= Number.MAX_SAFE_INTEGER))
+    throw rangeError('Biome cells are exact only within 137,000 km', 'biomes');
   // Warp noise on the 8-cell lattice covering this grid: lattice point (a, b) is global cell (8 (a0 + a), 8 (b0 + b)).
   // The lattice spans both axes on their own: a point's grid (sample) need not start at the same lattice phase in x
   // and z (a tile's always does).
