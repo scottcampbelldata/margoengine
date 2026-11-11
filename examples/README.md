@@ -16,6 +16,10 @@ npm run dev:examples
 # http://127.0.0.1:5173/examples/flight-helmet.html
 ```
 
+The server watches only the files it has served, so pages load as soon as it starts, also with several tabs already
+open, and a page reloads when a file it loaded changes, a rebuilt package included (docs/limits.md, "Root dev server
+file watching").
+
 Pages use WebGPU, with a WebGL2 compatibility fallback where supported. A page shows a short notice when neither
 backend can run it.
 

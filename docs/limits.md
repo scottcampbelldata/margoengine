@@ -6849,3 +6849,16 @@ ANGLE D3D11 can retain retired index storage across a VAO element-buffer replace
 ### Batch 163 line retained data
 
 Lines keeps 112 bytes of last-uploaded frame words plus typed views and a validity flag per plugin. Six-vertex submission applies only to independent non-round segments without shader extensions; other lines and picking retain 78. Timing pending the quiet rerun. [Proof](whitepaper/bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).
+
+## Root dev server file watching (2026-11-10)
+
+The root Vite server (`npm run dev:examples`, `npm run modern:dev:extensions`, `npm run dev:ik`) watches only the
+files it has served: each page's html, its modules and the package builds they import are added to the watcher when
+the server first transforms them (`servedFilesWatch()` in vite.config.mjs). Vite's default watches the whole root,
+and chokidar opened one native watch per file before the first page was served: 62,864 paths in a lane checkout,
+where three sciviz tabs are served 137 files. Measured on the dev PC (busy machine, diagnostic): three sciviz tabs
+requested the moment `npm run dev:examples` prints its URL, cold dependency cache, all loaded 56.4 s after the start
+before and 1.2 to 1.7 s after (the first page with the watcher off: 2.4 s). Regression: `tests/dev-servers.test.js`
+("watches only what it serves": paths watched against files served, and an edit of a served file still reported).
+Limit: a file the server has not served yet is not watched, so a new page or an unrequested file causes no reload
+until it is first requested; editing or rebuilding anything an open page loaded reloads it as before.
