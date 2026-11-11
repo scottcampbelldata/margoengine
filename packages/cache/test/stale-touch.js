@@ -3,6 +3,13 @@ import { AssetCache } from '../dist/index.js';
 import { evictionIndex } from '../dist/eviction.js';
 import { base, bytes, read, server } from './support.js';
 
+/** Fails with the step's name when it takes over 20 s, so a stuck step is named instead of timing out the whole call. */
+const step = (label, work) =>
+  Promise.race([
+    work,
+    new Promise((_, no) => setTimeout(() => no(new Error(`staleTouch step "${label}" took over 20 s`)), 20_000)),
+  ]);
+
 export async function staleTouch(mode, indexed) {
   const files = { '/a': { body: bytes(100), etag: '"a"' }, '/b': { body: bytes(100, 2), etag: '"b"' } };
   const network = server(files),
@@ -27,6 +34,8 @@ export async function staleTouch(mode, indexed) {
   await read(await warm.fetch(base + 'a'));
   warm.dispose();
   await warm.flush();
+  // Nothing stored means no conditional request will come: fail here with the reason, not at the call limit.
+  if (warm.stats.stored !== 1) throw new Error(`the warm copy was not stored: ${JSON.stringify(warm.stats)}`);
   const cache = new AssetCache(options);
   hold = true;
   const pending = cache.fetch(base + 'a');
@@ -35,10 +44,10 @@ export async function staleTouch(mode, indexed) {
     return { bytes, files };
   };
   try {
-    await entered.promise;
+    await step('conditional request sent', entered.promise);
     if (mode === 'evict') {
-      await read(await cache.fetch(base + 'b'));
-      await cache.flush();
+      await step('fetch b', read(await cache.fetch(base + 'b')));
+      await step('flush after b', cache.flush());
     } else {
       files['/a'] = {
         body: bytes(80, 9),
@@ -46,14 +55,14 @@ export async function staleTouch(mode, indexed) {
         headers: { 'content-type': 'application/new', 'cache-control': 'max-age=600' },
       };
       const writer = new AssetCache({ ...options, fetch: network });
-      await read(await writer.fetch(base + 'a'));
+      await step('writer fetch a', read(await writer.fetch(base + 'a')));
       writer.dispose();
       await writer.flush();
     }
     const before = await usage();
     hold = false;
     gate.resolve();
-    const oldBody = await read(await pending);
+    const oldBody = await step('held fetch of a', read(await pending));
     await cache.flush();
     const after = await usage();
     if (mode === 'evict') {

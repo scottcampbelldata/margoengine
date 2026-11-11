@@ -197,6 +197,9 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
   `navigator.storage.estimate()`; `persist: true` calls `navigator.storage.persist()` (the browser may say no).
 - No IndexedDB (missing, blocked, some private modes) or any read/write error: every request goes to the network as
   if there were no cache. Loading never fails because of the cache.
+- Safari Private Browsing and other WebKit ephemeral sessions refuse Blobs in IndexedDB. The first refused write switches
+  that cache to storing the bytes (`ArrayBuffer`) instead, so it still caches there, at the cost of one in-memory copy of
+  each file while it is written.
 - Writes run one at a time; `dispose()` (or `using`) closes the database after them.
 
 ## Full offline (service worker)

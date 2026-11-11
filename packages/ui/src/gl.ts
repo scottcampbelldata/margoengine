@@ -153,6 +153,12 @@ class GlAtlas implements GlyphPages {
     // Tightly packed rows, read as given: a glyph is not flipped or premultiplied, and comes from memory, not a buffer.
     gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    // A caller's row length, skip rows, skip pixels or image height would shift every glyph row.
+    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+    gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+    gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+    gl.pixelStorei(gl.UNPACK_SKIP_IMAGES, 0);
+    gl.pixelStorei(gl.UNPACK_IMAGE_HEIGHT, 0);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.texSubImage3D(

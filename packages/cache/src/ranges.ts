@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { asBlob, blobRefused } from './bytes.js';
 import { byteRange, contentRange, defaultFetch, freshnessPolicy, ifRange, transact } from './http.js';
 
 /** Options for `new RangeCache(...)`. A negative or NaN `maxBytes` or `timeout`, or a `block` under 1, throws a RangeError. */
@@ -410,7 +411,7 @@ export class RangeCache {
     const parts: Blob[] = [],
       gone: number[] = [];
     for (let i = first; i <= last; i++) {
-      const blob = fetched.get(i) ?? (reads.get(i)?.result as Blob | undefined);
+      const blob = fetched.get(i) ?? asBlob(reads.get(i)?.result, file.type);
       if (blob) parts.push(blob);
       else gone.push(i);
     }
@@ -453,6 +454,9 @@ export class RangeCache {
     });
   }
 
+  /** True once this database refused a Blob: from then on the bytes are stored instead (see bytes.ts). */
+  private bytes = false;
+
   private blockBytes(i: number, size: number): number {
     return Math.min((i + 1) * this.block, size) - i * this.block;
   }
@@ -475,6 +479,11 @@ export class RangeCache {
       },
       others = records.filter((r) => r.url !== file.url).sort((a, b) => a.used - b.used);
     if (next.bytes > this.maxBytes) return;
+    let values: Map<number, Blob | ArrayBuffer> = blobs;
+    // WebKit's ephemeral sessions refuse Blobs in IndexedDB: once one is refused, keep the bytes (see bytes.ts).
+    const toBytes = async () =>
+      (values = new Map(await Promise.all([...blobs].map(async ([i, blob]) => [i, await blob.arrayBuffer()] as const))));
+    if (this.bytes) await toBytes();
     const attempt = async (limit: number) => {
       const evict: Stored[] = [];
       for (
@@ -490,7 +499,7 @@ export class RangeCache {
           for (const i of old.blocks) data.delete(key(old.url, i));
           if (old !== current) meta.delete(old.url);
         }
-        for (const [i, blob] of blobs) data.put(blob, key(file.url, i));
+        for (const [i, value] of values) data.put(value, key(file.url, i));
         meta.put(next, file.url);
       });
       this.stats.stored++;
@@ -498,7 +507,14 @@ export class RangeCache {
     };
     // Over the browser's quota: evict as many more bytes as these blocks need and try once more.
     try {
-      await attempt(this.maxBytes);
+      try {
+        await attempt(this.maxBytes);
+      } catch (error) {
+        if (this.bytes || !blobRefused(error)) throw error;
+        this.bytes = true;
+        await toBytes();
+        await attempt(this.maxBytes);
+      }
     } catch (error) {
       if ((error as Error)?.name !== 'QuotaExceededError') throw error;
       await attempt(

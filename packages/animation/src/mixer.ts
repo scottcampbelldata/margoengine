@@ -502,7 +502,17 @@ export class AnimationMixer implements EnginePlugin {
   }
   /** Existing cached action or null. */
   existingAction(clip: ActionClip | string | number, root = this.root): AnimationAction | null {
-    const resolved = this.resolve(clip, root);
+    // A lookup never creates anything: an unused root has no player yet, and an unknown clip is simply not cached.
+    const player = this.players.get(root);
+    const resolved =
+      typeof clip === 'object'
+        ? clip
+        : player instanceof Animation
+          ? typeof clip === 'number'
+            ? player.clips[clip]
+            : player.clips.find((c) => c.name === clip)
+          : undefined;
+    if (!resolved) return null;
     return this.actions.find((a) => a.getClip() === resolved && a.getRoot() === root) ?? null;
   }
   /** Default animation root. */

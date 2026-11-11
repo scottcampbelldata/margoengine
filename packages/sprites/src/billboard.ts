@@ -169,11 +169,19 @@ export function packBillboards(
 }
 
 /**
- * Puts `boards` back to front from `eye` in place (farthest first), by squared distance, then by add order, so blended
- * billboards cover each other in the right order.
+ * Puts `boards` back to front from `eye` in place (farthest first), then by add order, so blended billboards cover
+ * each other in the right order. Without `forward` the order is by squared distance from the eye; with the camera's
+ * unit viewing direction it is by depth along that direction, which is the right order under an orthographic camera
+ * (where the distance to the eye says nothing about depth) and for planar billboards under a perspective one.
  */
-export function sortBillboards(boards: Billboard[], eye: readonly [number, number, number]): void {
-  const d = (b: Billboard) => (b.x - eye[0]) ** 2 + (b.y - eye[1]) ** 2 + (b.z - eye[2]) ** 2;
+export function sortBillboards(
+  boards: Billboard[],
+  eye: readonly [number, number, number],
+  forward?: readonly [number, number, number],
+): void {
+  const d = forward
+    ? (b: Billboard) => (b.x - eye[0]) * forward[0] + (b.y - eye[1]) * forward[1] + (b.z - eye[2]) * forward[2]
+    : (b: Billboard) => (b.x - eye[0]) ** 2 + (b.y - eye[1]) ** 2 + (b.z - eye[2]) ** 2;
   boards.sort((a, b) => d(b) - d(a) || a.index - b.index);
 }
 
@@ -475,7 +483,8 @@ export class BillboardLayer implements EnginePlugin {
     const boards = this.drawList;
     boards.length = 0;
     for (const b of this.list) if (b.visible) boards.push(b);
-    if (this.transparent) sortBillboards(boards, camera.position);
+    const v = viewMatrix(this.view, camera);
+    if (this.transparent) sortBillboards(boards, camera.position, [-v[2], -v[6], -v[10]]);
     const state = this.states.get(c),
       need = boards.length * BILLBOARD_FLOATS;
     if (need > state.data.length) {
@@ -502,8 +511,7 @@ export class BillboardLayer implements EnginePlugin {
     state.fresh = false;
 
     // Frame block: viewProj (0 to 15), right (16 to 19), up (20 to 23), view size (24, 25), cut (26), flags (27).
-    const f = state.floats,
-      v = viewMatrix(this.view, camera);
+    const f = state.floats;
     f.set(camera.matrix, 0);
     if (this.lockY) {
       const length = Math.hypot(v[0], v[8]);

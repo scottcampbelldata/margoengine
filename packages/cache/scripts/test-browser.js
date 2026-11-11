@@ -40,7 +40,12 @@ const files = {
 const fileOf = (path) =>
   files[path] ??
   (/^\/cache-files\/tile\/\d+$/.test(path) ? Buffer.alloc(10, Number(path.split('/').pop()) & 255) : undefined);
-let releaseBody;
+let released = false;
+const held = [];
+const releaseBody = () => {
+  released = true;
+  for (const end of held.splice(0)) end();
+};
 
 const server = await createServer({
   root,
@@ -61,8 +66,11 @@ const server = await createServer({
           if (path === '/cache-files/stream-chair.glb') {
             response.setHeader('cache-control', 'max-age=3600');
             response.setHeader('content-length', glb.length);
+            // The first request is held after its first chunk until the check releases it. Any later request is
+            // answered whole at once, so a copy that was not stored fails an assertion instead of waiting here.
+            if (released) return response.end(glb);
             response.write(glb.subarray(0, 256));
-            releaseBody = () => response.end(glb.subarray(256));
+            held.push(() => response.end(glb.subarray(256)));
             return;
           }
           const body = fileOf(path);

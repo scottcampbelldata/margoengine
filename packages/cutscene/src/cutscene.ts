@@ -401,6 +401,19 @@ interface Later {
   path: string;
 }
 
+
+/** Set an own data property, so a key such as `__proto__` stays a plain entry and never reaches a prototype. */
+function define<T>(object: Record<string, T>, key: string, value: T): void {
+  Object.defineProperty(object, key, { value, writable: true, enumerable: true, configurable: true });
+}
+/** The own object stored under `key` (made if missing); an inherited `__proto__` or `constructor` is never returned. */
+function ownSlot<T extends object>(map: Record<string, T>, key: string): T {
+  if (Object.hasOwn(map, key)) return map[key];
+  const created = {} as T;
+  define(map, key, created);
+  return created;
+}
+
 /**
  * A validated, compiled cutscene. `evaluate(t)` gives the full state at any time as a pure function of the document
  * and `t`; `eventsBetween(from, to)` gives the instants passed between two times, in order. Build one from a
@@ -483,7 +496,7 @@ export class Cutscene {
         case 'transform': {
           const channels = compiled.channels.get(track)!,
             eases = compiled.eases.get(track)!,
-            out = (state.transforms[track.target] ??= {});
+            out = ownSlot(state.transforms, track.target);
           for (const name of ['position', 'rotation', 'scale'] as const) {
             const indices = channels[name];
             if (!indices.length) continue;
@@ -507,8 +520,11 @@ export class Cutscene {
           const { i, j, u } = segment(track.keys, compiled.eases.get(track)!, t);
           const a = track.keys[i].value,
             b = track.keys[j].value;
-          (state.properties[track.target] ??= {})[track.property] =
-            typeof a === 'number' ? a + ((b as number) - a) * u : lerp(a, b as number[], u);
+          define(
+            ownSlot(state.properties, track.target),
+            track.property,
+            typeof a === 'number' ? a + ((b as number) - a) * u : lerp(a, b as number[], u),
+          );
           break;
         }
         case 'animation':

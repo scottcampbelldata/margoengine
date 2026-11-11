@@ -54,6 +54,40 @@ interface Shape {
 
 let attachSerial = 0;
 
+
+/** Waits for `work`, but rejects with the signal's reason the moment it aborts (the work then ends unobserved). */
+async function untilOrAborted(work: Promise<unknown>, signal: AbortSignal | undefined): Promise<void> {
+  if (!signal) {
+    await work;
+    return;
+  }
+  signal.throwIfAborted();
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  work.catch(() => {});
+  try {
+    await Promise.race([work, aborted]);
+  } finally {
+    signal.removeEventListener('abort', onAbort!);
+  }
+  signal.throwIfAborted();
+}
+
+/** The canvas's content box in CSS pixels: its bounding rectangle less any border and padding the drawing never covers. */
+function contentRect(canvas: HTMLCanvasElement): { width: number; height: number } {
+  const rect = canvas.getBoundingClientRect();
+  if (typeof Element === 'undefined' || !(canvas instanceof Element) || typeof getComputedStyle !== 'function') return rect;
+  const style = getComputedStyle(canvas),
+    px = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0;
+  return {
+    width: rect.width - px('border-left-width') - px('border-right-width') - px('padding-left') - px('padding-right'),
+    height: rect.height - px('border-top-width') - px('border-bottom-width') - px('padding-top') - px('padding-bottom'),
+  };
+}
+
 /**
  * Screen-constant, SDF label layer with one instanced draw across all labels and atlas pages.
  * Create asynchronously, then attach with engine.use(layer). No DOM elements per point.
@@ -136,8 +170,7 @@ export class GPULabelLayer implements EnginePlugin {
   static async create(options: GPULabelOptions = {}): Promise<GPULabelLayer> {
     options.signal?.throwIfAborted();
     const layer = new GPULabelLayer(await import('@margoengine/text'), options);
-    await layer.font.load();
-    options.signal?.throwIfAborted();
+    await untilOrAborted(layer.font.load(), options.signal);
     return layer;
   }
 
@@ -343,7 +376,7 @@ export class GPULabelLayer implements EnginePlugin {
   }
   private draw(context: PassContext): void {
     const canvas = this.engine!.canvas,
-      rect = canvas.getBoundingClientRect();
+      rect = contentRect(canvas);
     const viewport = context.view?.viewport ?? [0, 0, context.width, context.height];
     const width = (viewport[2] * (rect.width || context.width)) / context.width;
     const height = (viewport[3] * (rect.height || context.height)) / context.height;

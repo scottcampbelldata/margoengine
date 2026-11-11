@@ -227,6 +227,21 @@ test('property-only clips bind once, restore originals and uncache releases thei
   assert.equal(mixer.existingAction(c), null);
 });
 
+test('existingAction answers null for an unknown clip or an unused root and creates nothing', async (t) => {
+  const mixer = new AnimationMixer(skeleton());
+  assert.equal(mixer.existingAction('missing'), null);
+  assert.equal(mixer.existingAction(3), null);
+  const engine = await ownerEngine(t),
+    data = skinnedStrip({ extraClip: true }),
+    model = new PBRModel(engine, new GLTFAsset(data.doc, data.buffers)),
+    other = new AnimationMixer(skeleton()),
+    scene = model.root.scene;
+  const before = scene.plugins?.size ?? scene.plugins?.length;
+  assert.equal(other.existingAction(0, model), null);
+  assert.equal(other.existingAction('nothing', model), null);
+  assert.equal(scene.plugins?.size ?? scene.plugins?.length, before, 'no Animation joined the scene');
+});
+
 test('glTF clips retain sparse channels and drive the real Animation model', async (t) => {
   const engine = await ownerEngine(t),
     data = skinnedStrip({ extraClip: true }),

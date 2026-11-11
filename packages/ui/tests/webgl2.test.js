@@ -104,6 +104,21 @@ test('on the WebGL2 backend UiRenderer draws the draw list: instanced rectangles
   renderer.dispose();
 });
 
+test('a glyph upload resets the unpack row length, skips and image height before texSubImage3D', async () => {
+  const { ui, renderer, run } = setup(),
+    gl = fakeGl();
+  ui.add(new Panel({ anchor: 'top-left', background: 'surface', children: [new Label({ text: 'Menu' })] }));
+  await drawn(run, renderer, gl);
+  const at = gl.calls.findIndex((c) => c[0] === 'texSubImage3D');
+  assert.ok(at > 0, 'a glyph was uploaded');
+  const before = gl.calls.slice(0, at).filter((c) => c[0] === 'pixelStorei');
+  for (const name of ['UNPACK_ROW_LENGTH', 'UNPACK_SKIP_ROWS', 'UNPACK_SKIP_PIXELS', 'UNPACK_SKIP_IMAGES', 'UNPACK_IMAGE_HEIGHT']) {
+    const set = before.filter((c) => c[1] === name.length && c[2] === 0);
+    assert.ok(set.length > 0, name + ' is reset to 0 before the upload');
+  }
+  renderer.dispose();
+});
+
 test('WebGL2 runs move the attribute offsets to their first instance (no base instance) and scissor clipped rows', async () => {
   const { ui, renderer, run } = setup(),
     gl = fakeGl();

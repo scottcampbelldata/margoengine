@@ -127,8 +127,18 @@ export async function transact(
   body(...stores.map((name) => t.objectStore(name)));
   await new Promise<void>((ok, no) => {
     t.oncomplete = () => ok();
-    t.onerror = t.onabort = () => no(t.error ?? new DOMException('Transaction aborted', 'AbortError'));
+    failure(t, no);
   });
+}
+
+/**
+ * Rejects `no` when the transaction fails. A failed request raises `error` on the transaction first, while
+ * `transaction.error` is still null; its own error (WebKit's UnknownError for a refused Blob) is the cause worth keeping.
+ */
+export function failure(t: IDBTransaction, no: (reason: unknown) => void): void {
+  const why = (event?: Event) =>
+    (event?.target as IDBRequest | null)?.error ?? t.error ?? new DOMException('Transaction aborted', 'AbortError');
+  t.onerror = t.onabort = (event) => no(why(event));
 }
 
 /**

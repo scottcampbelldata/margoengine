@@ -74,6 +74,18 @@ test('sortBillboards puts the farthest first and keeps add order for equal dista
   assert.deepEqual(list, [far, tieA, tieB, near]);
 });
 
+test('sortBillboards by depth along the view direction orders an orthographic view, where eye distance does not', () => {
+  const layer = new BillboardLayer({ atlas, transparent: true });
+  // Looking down -z: the side board is farther from the eye by distance but shallower than the one straight ahead.
+  const front = layer.add({ x: 60, z: 0 }),
+    back = layer.add({ x: 0, z: -10 });
+  const list = [front, back];
+  sortBillboards(list, [0, 0, 100], [0, 0, -1]);
+  assert.deepEqual(list, [back, front], 'the deeper board draws first');
+  sortBillboards(list, [0, 0, 100]);
+  assert.deepEqual(list, [front, back], 'eye distance alone gets this order wrong');
+});
+
 test('the layer: options, add and remove, a billboard in one layer only, dispose', () => {
   assert.throws(() => new BillboardLayer({}), TypeError);
   assert.throws(() => new BillboardLayer({ atlas, capacity: 0 }), RangeError);

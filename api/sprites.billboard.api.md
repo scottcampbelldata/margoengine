@@ -86,7 +86,7 @@ export interface PackedBillboards {
 
 export function packBillboards(boards: readonly Billboard[], data: Float32Array, atlasWidth: number, atlasHeight: number): PackedBillboards;
 
-export function sortBillboards(boards: Billboard[], eye: readonly [number, number, number]): void;
+export function sortBillboards(boards: Billboard[], eye: readonly [number, number, number], forward?: readonly [number, number, number]): void;
 
 // Not exported from this entry, but used by the exports above:
 

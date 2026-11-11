@@ -15,7 +15,7 @@ const MODIFIER_CODES: Record<Modifier, readonly string[]> = {
  * - `key`: `KeyboardEvent.code` (non-empty); 1 while held. With `modifiers` it is a chord (for example Ctrl+S):
  *   the key counts only while every listed modifier is also held.
  * - `mouse`: button 0..4; 1 while held.
- * - `pointer`: movement on `x`/`y` (pixels) or `wheel` (`WheelEvent.deltaY`) since the last update.
+ * - `pointer`: movement on `x`/`y` (pixels) or `wheel` (`WheelEvent.deltaY` in pixels: a line counts 16 and a page 800) since the last update.
  * - `gamepad-axis` / `gamepad-button`: axis or button `index` (integer >= 0) of gamepad `gamepad` (default 0);
  *   axes get the deadzone applied.
  * - `touch`: a control from `createStick`/`bindTouchButton` by `id`; `axis` reads a stick in [-1, 1], otherwise 1 while down.
@@ -194,7 +194,9 @@ export class Input {
         }
       });
       this.listen(target, 'wheel', (event) => {
-        this.motion.wheel += (event as WheelEvent).deltaY;
+        // WheelEvent.deltaMode: 0 pixels, 1 lines, 2 pages. Sum in pixels so a notched wheel and a trackpad agree.
+        const wheel = event as WheelEvent;
+        this.motion.wheel += wheel.deltaY * (wheel.deltaMode === 1 ? 16 : wheel.deltaMode === 2 ? 800 : 1);
       });
       this.listen(target, 'blur', () => this.reset());
       this.listen(target, 'pointercancel', () => this.reset());

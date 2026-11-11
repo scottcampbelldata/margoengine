@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { defaultFetch, freshnessPolicy, ifRange } from './http.js';
+import { asBlob, blobRefused } from './bytes.js';
+import { defaultFetch, failure, freshnessPolicy, ifRange } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
@@ -52,7 +53,7 @@ export interface AssetCacheEviction {
     meta: IDBObjectStore,
     data: IDBObjectStore,
     entry: AssetCacheEntry,
-    blob: Blob,
+    blob: Blob | ArrayBuffer,
     limit: number,
     squeeze: boolean,
     done: (evicted: number) => void,
@@ -226,7 +227,7 @@ export class AssetCache {
     body(t.objectStore(M), t.objectStore(D));
     await new Promise<void>((ok, no) => {
       t.oncomplete = () => ok();
-      t.onerror = t.onabort = () => no(t.error ?? new DOMException('Transaction aborted', 'AbortError'));
+      failure(t, no);
     });
     return true;
   }
@@ -324,7 +325,8 @@ export class AssetCache {
       this.stats.errors++;
       return;
     }
-    return isEntry(entry?.result) && data?.result ? [entry.result, data.result] : undefined;
+    const blob = asBlob(data?.result, isEntry(entry?.result) ? entry.result.type : '');
+    return isEntry(entry?.result) && blob ? [entry.result, blob] : undefined;
   }
 
   private serve(entry: Entry, blob: Blob, range: string | null, reason?: 'revalidated' | 'offline'): Response {
@@ -463,7 +465,20 @@ export class AssetCache {
     );
   }
 
+  /** True once this database refused a Blob: from then on the bytes are stored instead (see bytes.ts). */
+  private bytes = false;
+
   private async put(entry: Entry, blob: Blob, records: [string, unknown][] = []): Promise<void> {
+    try {
+      await this.store(entry, this.bytes ? await blob.arrayBuffer() : blob, records);
+    } catch (error) {
+      if (this.bytes || !blobRefused(error)) throw error;
+      this.bytes = true;
+      await this.store(entry, await blob.arrayBuffer(), records);
+    }
+  }
+
+  private async store(entry: Entry, blob: Blob | ArrayBuffer, records: [string, unknown][]): Promise<void> {
     const eviction = this.eviction;
     if (eviction) {
       const write = async (squeeze: boolean) => {

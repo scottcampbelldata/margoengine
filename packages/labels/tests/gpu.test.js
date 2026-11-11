@@ -130,3 +130,43 @@ test('attach joins the scene that was active when it was called, not the one act
   assert.equal(first.plugins.get(layer.name), layer);
   assert.equal(second.plugins.size, 0);
 });
+
+test('create stops waiting for a font that is still loading the moment its signal aborts', async () => {
+  const abort = new AbortController();
+  let finish;
+  const slow = { ...font, load: () => new Promise((resolve) => (finish = resolve)) };
+  const pending = GPULabelLayer.create({ font: slow, signal: abort.signal });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  abort.abort();
+  const outcome = await Promise.race([
+    pending.then(() => 'resolved', (error) => error.name),
+    new Promise((resolve) => setTimeout(() => resolve('still waiting'), 500)),
+  ]);
+  assert.equal(outcome, 'AbortError');
+  finish();
+});
+
+test('the layer sizes labels to the canvas content box, not its bordered bounding rectangle', async () => {
+  class FakeElement {
+    getBoundingClientRect() {
+      return { width: 220, height: 120 };
+    }
+  }
+  const saved = { Element: globalThis.Element, getComputedStyle: globalThis.getComputedStyle };
+  globalThis.Element = FakeElement;
+  const widths = { 'border-left-width': '10px', 'border-right-width': '10px', 'border-top-width': '5px', 'border-bottom-width': '5px' };
+  globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => widths[name] ?? '0px' });
+  try {
+    const layer = await GPULabelLayer.create({ font });
+    let run;
+    layer.setup({ canvas: new FakeElement() });
+    layer.registerPasses({ add: (pass) => (run = pass.execute) });
+    let seen;
+    layer.prepare = (_matrix, width, height) => ((seen = [width, height]), new Float32Array(0));
+    run({ width: 200, height: 110, camera: { matrix: identity }, backend: 'webgpu' });
+    assert.deepEqual(seen, [200, 110]);
+  } finally {
+    globalThis.Element = saved.Element;
+    globalThis.getComputedStyle = saved.getComputedStyle;
+  }
+});

@@ -461,3 +461,34 @@ test('fuzz: mutated and random input never crashes validateCutscene; parseCutsce
   }
   assert.throws(() => new Cutscene(doc([])).evaluate(NaN), RangeError);
 });
+
+test('a property or transform target named __proto__ or constructor never writes to Object.prototype', () => {
+  const keys = (value) => [
+    { time: 0, value },
+    { time: 2, value: value + 2 },
+  ];
+  const cut = new Cutscene(
+    doc([
+      { type: 'property', id: 'a', target: '__proto__', property: 'polluted', keys: keys(1) },
+      { type: 'property', id: 'b', target: 'x', property: '__proto__', keys: keys(5) },
+      { type: 'property', id: 'c', target: 'constructor', property: 'polluted', keys: keys(7) },
+      {
+        type: 'transform',
+        id: 'd',
+        target: '__proto__',
+        keys: [
+          { time: 0, position: [1, 2, 3] },
+          { time: 2, position: [4, 5, 6] },
+        ],
+      },
+    ]),
+  );
+  const state = cut.evaluate(1);
+  assert.equal({}.polluted, undefined, 'Object.prototype.polluted');
+  assert.equal({}.position, undefined, 'Object.prototype.position');
+  assert.equal(Object.getPrototypeOf(state.properties.x), Object.prototype);
+  assert.equal(state.properties.x.__proto__, 6);
+  assert.equal(Object.getOwnPropertyDescriptor(state.properties, '__proto__').value.polluted, 2);
+  assert.equal(state.properties.constructor.polluted, 8);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(state.transforms, '__proto__').value.position, [2.5, 3.5, 4.5]);
+});

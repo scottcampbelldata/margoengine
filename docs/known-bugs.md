@@ -496,27 +496,25 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   read, which replaces the drawing buffer). The voxel check now draws its disposed frame after the queue drains, as its
   other steps already did; the assertion (0 red pixels) is unchanged. To report upstream at bugs.webkit.org.
 
-### WebKit ephemeral sessions: AssetCache stores nothing, and the cache browser check hangs (WebKit sweep, 2026-11-11, open)
+### Fixed: WebKit ephemeral sessions: AssetCache and RangeCache stored nothing (WebKit sweep, 2026-11-11)
 
-- **What:** `cache` `test:browser` in Playwright WebKit 2370 on the Apple M6: `beginMiss` gets its 256-byte first chunk,
-  the rest of the 4,125,392-byte body is read to the end and `cache.flush()` resolves, then
-  `(await cache.fetch('/cache-files/stream-chair.glb')).arrayBuffer()` (the stored copy) never settles. Chromium passes.
-- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` on a Mac; it now stops after 180 s
-  with `finishMiss took over 180 s` (before, the step had no limit and held its GPU slot until the runner's 10 minutes).
-- **Cause (found 2026-11-11):** WebKit refuses every Blob put into IndexedDB in an ephemeral session (Playwright's
-  contexts, and Safari Private Browsing): the request fails with `UnknownError: Error preparing Blob/File data to be
-  stored in object store`, at 1,000 bytes as at 4 MB, whole or in 64 KB parts. Minimal repro, outside Margo: in Playwright
-  WebKit, `indexedDB.open(name, 1)`, create a store, `put({ blob: new Blob([new Uint8Array(1000)]) }, 'k')` in a
-  readwrite transaction; the request's error event fires with that message. Chromium stores it. So `AssetCache.put`
-  fails (counted in `stats.errors`, by design the load still succeeds) and the second fetch is a network miss; the
-  check's server holds every `stream-chair.glb` body until `releaseBody()`, which it calls only for the first request,
-  so the step waits instead of failing on `stats.stored`.
-- **Margo's side:** `AssetCache` (and `RangeCache`, which also stores Blobs) caches nothing in Safari Private Browsing.
-  The fix to build: detect the refusal once per database and store the bytes (`ArrayBuffer`, which WebKit accepts)
-  there, reading either kind back as a Blob; and the check's server answers every request for the held file, so a
-  failure shows as a failed assertion. Spec: IndexedDB 3.0 says values are stored with StructuredSerializeForStorage,
-  which covers Blob (https://www.w3.org/TR/IndexedDB/); WebKit's refusal is its own
-  limit in ephemeral sessions.
+- **What was wrong:** WebKit refuses every Blob put into IndexedDB in an ephemeral session (Safari Private Browsing,
+  Playwright contexts) with `UnknownError: Error preparing Blob/File data to be stored in object store`, so `AssetCache`
+  and `RangeCache` cached nothing there and `cache` `test:browser` waited on a second fetch that never came.
+- **Fix:** both caches see the refusal once per instance and store the bytes (`ArrayBuffer`, which WebKit accepts) from
+  then on, reading either kind back as a Blob (`packages/cache/src/bytes.ts`). The transaction helpers now reject with the
+  failed request's own error instead of a bare AbortError, which is what made the refusal detectable. The check's
+  server answers every request for the held file, so a copy that was not stored fails an assertion. Regression:
+  `packages/cache/test/blob-refused.test.js` (the fake IndexedDB gained `refuseBlobs`, WebKit's refusal); it fails on the parent.
+  In Playwright WebKit the cold, decoded, streamRanges, rangeOf and eviction steps of `test:browser` now pass.
+
+### WebKit: cache `test:browser` staleTouch step does not finish (found 2026-11-11, open)
+
+- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache`; every step before `staleTouch`
+  passes, then `staleTouch took over 180 s`. The warm copy is stored (`stats.stored` is 1), and the 20 s step limits
+  added to `packages/cache/test/stale-touch.js` do not fire, so the wait is in a call that has no step limit yet
+  (the warm fetch's body read, `flush` or `usage`). Chromium passes.
+- **Cause:** not found. Next: run `staleTouch` alone with a log line before every await to name the stuck call.
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
@@ -5217,7 +5215,7 @@ Fixed during batch 220 landing: inspector/gl imported the compatibility preview 
 
 Batch 258 job 4 closes preview GL's missing world-panel drawing in the optional world-gl entry; real pixels, depth, back faces, removal, mouse rays and foreign-state restoration are covered. Context-loss/XR hardware stress and oblique-filter polish remain certification follow-ups in private finish-later.
 
-Separate preview screen-UI follow-up: bind a PIXEL_UNPACK_BUFFER or non-default UNPACK_ROW_LENGTH before a new UiRenderer glyph upload; the existing screen path assumes unpack defaults in GlAtlas. Its owner must isolate that pass in the fix phase. The new world pass isolates and restores those states and its foreign-state regression passes.
+Fixed 2026-11-11: UiRenderer's glyph upload (GlAtlas.upload in packages/ui/src/gl.ts) reset the unpack buffer and alignment but not UNPACK_ROW_LENGTH, the skip counts or the image height, so a caller's row length shifted every glyph row. It now sets all of them to 0 before texSubImage3D. Regression: packages/ui/tests/webgl2.test.js (the unpack reset test fails on the parent).
 
 Batch 258 landing: existing image GPU fixture sampled two frames before the documented lazy preview painter finished loading. It now waits for the first submitted UI draw before exact pixel/cache assertions.
 
@@ -5237,7 +5235,7 @@ The final dependent check exposed the incoming exporters/sparse umbrella alias m
 Fixed in batch 208: StreamingAssetCache range misses left the background full-file body unread after its new response hook returned, so flush never finished and an offline full-file visit missed. Background fills now explicitly request complete buffered consumption. Regression: packages/cache/test/stream.test.js, background whole-file fill (5 s timeout before repair, exact 100-byte offline response afterward). Caller-facing streaming stays pull-driven.
 Fixed 2026-11-10: Batch 259 tooling follow-up. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
-Batch 210 job 1: requested action operations pass mixer.test.js and analytical/real-rig GPU checks. Cache lookup follow-up for the fix phase (under the 5% rule): existingAction on an unknown clip throws instead of returning null, and a fresh optional root can create an unnecessary player because the lookup calls resolve/player; repro new AnimationMixer(skeleton).existingAction("missing"), or existingAction(clip, anotherModel). The umbrella generator also restores the already-exported but missing exporters/splats alias; the existing umbrella consistency test covers that generated-file gap. Optional-root pointer rebinding and reverse-time scheduled starts receive broader fix-phase coverage in the finish-later list (git-excluded, outside a clone); all requested mixer operations are built.
+Batch 210 job 1: requested action operations pass mixer.test.js and analytical/real-rig GPU checks. Cache lookup follow-up, fixed 2026-11-11: existingAction on an unknown clip returns null and an unused root gets no player (Regression: packages/animation/tests/mixer.test.js, existingAction test). The umbrella generator also restores the already-exported but missing exporters/splats alias; the existing umbrella consistency test covers that generated-file gap. Optional-root pointer rebinding and reverse-time scheduled starts receive broader fix-phase coverage in the finish-later list (git-excluded, outside a clone); all requested mixer operations are built.
 
 ### Fixed while generating batch 224 aliases
 Origin/main 43e08376d added exporters/sparse without its umbrella facade. The ordinary umbrella generator needed for mesh-edit/boolean-batch also restores that upstream alias. Regression: tests/umbrella.test.js (manifest, identity and import-map checks). No exporter implementation changes.
@@ -5414,8 +5412,8 @@ Batch 216 job 1: no open physical-lens defect found. Invalid constructor setting
 No open correctness defect identified. The planar assignment replaces independent crossing-prone source/slot connections; a two-point fixture proves label reordering. Independent segment intersection/overlap checks cover integer, fractional, collinear, coincident, enormous and subnormal inputs. Browser tests check SVG-to-DOM endpoints and stable-frame writes on both native rendering backends.
 
 ### Labels GPU finish-phase edge cases (batch 261)
-- In-flight font cancellation: start GPULabelLayer.create with a Font whose load promise is pending, then abort its signal. Creation stays pending until Font.load resolves because cancellation is checked only before/after loading. Make the caller's wait abortable while retaining shared font loading in the fix phase.
-- Canvas borders: with a 400 px drawing content width plus a 3 px CSS border, GPU glyph CSS sizing uses the 406 px outer bounding rectangle and shrinks the intended size by 400/406. Cause: GPULabelLayer.draw derives CSS dimensions from getBoundingClientRect, including borders. Use the transformed content rectangle in the fix phase.
+- Fixed 2026-11-11: GPULabelLayer.create's wait for Font.load now races the signal, so an abort rejects with the signal's reason at once and the load ends unobserved. Regression: packages/labels/tests/gpu.test.js (create stops waiting for a font that is still loading).
+- Fixed 2026-11-11: GPULabelLayer.draw sizes labels from the canvas content box (bounding rectangle less border and padding), not the outer rectangle. Regression: packages/labels/tests/gpu.test.js (content box test).
 
 Batch 238 formats: no open format defect found by the malformed-input, real-data getter, SH and PLY round-trip checks. Existing transformed-bitmap alpha precision follow-up above remains outside these CPU entries.
 
@@ -5549,7 +5547,7 @@ The scroll job on batch-217-scroll (6660e0bb7) passed render/VFX/editor/curve in
 The base editor cancels pointerdown, so the browser suppresses native mouse/dblclick events, and its broad contains(focused) redraw check also treated focused child items as its own. This prevented native nested opening and moved keyboard focus to the parent after a child edit. The optional editor recognizes stationary pointer pairs after the native pointerup transaction; the base editor restores only its own nearest-panel focus. nested-browser.mjs verifies actual double-click opening, one child key nudge, shared undo, subsequent primitive authoring and two-level playheads without bypassing input handlers.
 
 
-Build-phase follow-up outside batch 217: numeric property targets named __proto__ (or constructor) use inherited dictionary entries in cutscene/src/cutscene.ts evaluate, unlike the new discrete handler's null-prototype maps. Repro: evaluate a numeric property track targeting __proto__, property x, value 1 at time 0; the inherited Object.prototype receives x because state.properties is {} and target lookup uses ??=. Replace numeric state dictionaries with own-key maps in the fix phase; do not change the discrete step semantics.
+Fixed 2026-11-11: cutscene state.transforms and state.properties no longer use inherited dictionary entries; a target or property named __proto__ or constructor stays an own data property and never reaches Object.prototype. Regression: packages/cutscene/tests/cutscene.test.js (__proto__ test).
 
 Build-phase documentation follow-up: current main already contains orphan >>>>>>> scatter merge-marker lines in clean-room.md, limits.md, whitepaper claims/reproduce and readme-owed.md (28bc61377, 654098cc1, d70b0d2eb). Their originating shared-doc merge left closing markers after content was combined. These do not alter batch 217 implementation or its generated API checks; clean the document merge artifacts in the fix phase.
 
@@ -6078,7 +6076,7 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
 - Spine IK keys that leave out `bendPositive`, `compress` or `stretch` keep the setup values; the JSON export format
   page says "Assume false if omitted" for keys, but it shows a 3.8 export and the 4.x default was not confirmed from a
   specification, so this is left as it is (spine.ts applyAnimation constraint loop).
-- `sortBillboards` sorts by distance from the eye, which is not view depth under an orthographic camera.
+- Fixed 2026-11-11: `sortBillboards` takes an optional `forward` direction and the layer sorts by depth along the view direction, which is right under an orthographic camera. Regression: packages/sprites/tests/billboard.test.js (depth sort test).
 - `BlendLayer` and `SkeletalLayer` multiply issue two draws per sprite or triangle; speed unmeasured.
 - Aseprite group compositing: header flag 2 says groups composite separately first; the parser multiplies a group's
   opacity into its children (documented in the README, not fixed).
@@ -6176,8 +6174,8 @@ Open (not fixed in the audit):
   app. Both checks now probe native lock and, only for that macOS reason, run against a Pointer Lock 2.0 stand-in with
   a printed note; any other refusal still fails. Native acquisition on this Mac stays unproven while it runs
   unattended; docs/limits.md "Native pointer lock on a locked Mac". Regression: tests/pointer-lock-harness.test.js.
-- `pointer` `wheel` bindings sum `WheelEvent.deltaY` in whatever `deltaMode` the browser uses (pixels, lines or pages),
-  so a wheel action's size differs between browsers; the README documents the raw value. UI Events gives no line height.
+- Fixed 2026-11-11: `pointer` `wheel` bindings now sum `WheelEvent.deltaY` in pixels (a line counts 16, a page 800), so a wheel
+  action's size matches across browsers. Regression: packages/input/test/input.test.js (wheel deltaMode test).
 - Fixed, lane S (2026-11-10): Pen uses azimuth zero for ambiguous flat, off-axis tilt when spherical readings are absent, matching the Pointer Events Level 3/4 conversion convention. Axis-aligned flat tilts retain their exact direction, and explicitly supplied altitude/azimuth remain authoritative. Regression: packages/input/test/pen.test.js covers all 12 sign/boundary combinations, action values, sample retention, four axes and supplied spherical data; the input browser gate checks the same boundary matrix.
 
 ## Batch 132 audit: net (fixed and open)

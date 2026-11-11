@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { MeshSurfaceSampler } from '../dist/sample.js';
 
 test('non-finite tessellation and sampling inputs reject before entering their loops', () => {
   const module = new URL('../dist/index.js', import.meta.url).href;
@@ -79,4 +80,25 @@ test('large finite ellipse sweeps normalize in bounded time and retain arc direc
   );
   assert.equal(child.error, undefined, 'Ellipse normalization did not return within the subprocess timeout');
   assert.equal(child.status, 0, child.stderr);
+});
+
+test('MeshSurfaceSampler refuses non-finite uvs, normals and colors with a RangeError', () => {
+  const base = () => ({
+    positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    uvs: new Float32Array([0, 0, 1, 0, 0, 1]),
+    indices: new Uint32Array([0, 1, 2]),
+  });
+  const bad = [Number.NaN, Number.POSITIVE_INFINITY];
+  for (const v of bad) {
+    const uvs = base();
+    uvs.uvs[3] = v;
+    assert.throws(() => new MeshSurfaceSampler(uvs), RangeError, 'uvs');
+    const normals = base();
+    normals.normals[4] = v;
+    assert.throws(() => new MeshSurfaceSampler(normals), RangeError, 'normals');
+    const colors = new Float32Array(9);
+    colors[2] = v;
+    assert.throws(() => new MeshSurfaceSampler(base(), { colors }), RangeError, 'colors');
+  }
 });

@@ -7,9 +7,10 @@
  * keys it wrote (a read-only one commits nothing), so overlapping transactions do not undo each other. Versioned open
  * runs onupgradeneeded with the old version; a lower version than stored fails with VersionError. Object stores support
  * createIndex(name, keyPath) and index(name).openCursor() in ascending key order, with cursor.continue() and delete().
+ * `refuseBlobs` makes a readwrite transaction that puts a Blob fail with UnknownError, as WebKit's ephemeral sessions do.
  * `counts.reads` counts the records handed out by get, getAll and cursors.
  */
-export function fakeIndexedDB({ quota = Infinity, broken = false } = {}) {
+export function fakeIndexedDB({ quota = Infinity, broken = false, refuseBlobs = false } = {}) {
   const databases = new Map(),
     counts = { reads: 0 },
     later = (fn) => setTimeout(fn, 0);
@@ -153,9 +154,18 @@ export function fakeIndexedDB({ quota = Infinity, broken = false } = {}) {
                   return live;
                 };
                 const next = new Map([...staged.keys()].map((n) => [n, after(n)]));
+                if (
+                  refuseBlobs &&
+                  mode === 'readwrite' &&
+                  [...next.values()].some((map) => [...map.values()].some((v) => v instanceof Blob))
+                ) {
+                  t.error = new DOMException('Error preparing Blob/File data to be stored in object store', 'UnknownError');
+                  t.onabort?.();
+                  return;
+                }
                 const bytes = [...next.values()]
                   .flatMap((map) => [...map.values()])
-                  .reduce((sum, v) => sum + (v instanceof Blob ? v.size : 0), 0);
+                  .reduce((sum, v) => sum + (v instanceof Blob ? v.size : v instanceof ArrayBuffer ? v.byteLength : 0), 0);
                 if (bytes > quota && mode === 'readwrite') {
                   t.error = new DOMException('quota', 'QuotaExceededError');
                   t.onabort?.();
