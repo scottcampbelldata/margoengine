@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { settleWgslReports, watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { trackPipelines } from './support/gpu-ready.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
-import { compatRun, compatShim } from './support/compat-shim.js';
+import { compatIgnoredLine, compatRun, compatShim } from './support/compat-shim.js';
 import { closeAll, traceShutdown } from './support/shutdown.mjs';
 
 /**
@@ -484,6 +484,9 @@ export async function openBrowser({
   // the machine has, including a software one on a runner without a GPU.
   softwareAdapterOk = false,
 } = {}) {
+  // A compatibility run never passes as one in silence on a page the script pins to native WebGPU.
+  const ignored = compatIgnoredLine(startPath, compat);
+  if (ignored) console.warn(ignored);
   await mkdir('test-results', { recursive: true });
   const { server, close: stopServer } = await startDevServer({ startPath, aliases, plugins, port }),
     serverErrors = [];

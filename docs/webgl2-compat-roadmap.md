@@ -459,6 +459,10 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   shader review passes whole. Both run in `npm run test:gpu`. Still to come in M3: the shadows check (its scene is a
   skinned robot, and skinning is compute), the tonemap half of the post-effects suite, and the environment
   background checks, which need splitting from their compute parts or the animation compat path first.
+  A page a check opens with `compat: false` stays on native WebGPU in such a run, and `openBrowser` then prints
+  `MARGO_COMPAT=1 not applied to <page>` (`tests/compat-ignored.test.js`): that page is no layer result unless the
+  script runs a layer leg of its own. The biomes GPU-backend hardware proofs (`test:gpu:backend-placement` and the
+  `gpu-*-check.mjs` tools) are WebGPU only; no check yet runs a biomes `backend: 'gpu'` world on a layer device.
 - **Bugs found and fixed, each with a regression test in `features-browser.mjs`.** (1) An upload while another texture
   unit was active went to that unit's texture: `GLState.scratch` selected unit 0 only when its binding changed (the
   materials check's canvas texture update showed the old image). (2) A draw that sampled a multisampled texture's

@@ -12,6 +12,18 @@ import { fileURLToPath } from 'node:url';
 export const compatRun = () => process.env.MARGO_COMPAT === '1' || process.argv.includes('--compat');
 
 /**
+ * The line a page opened with `compat: false` prints in a forced-compatibility run, so the run never passes as a WebGL2
+ * result in silence: the page runs native WebGPU, and only a leg of the script's own can cover the layer. Empty when
+ * the run is not a compatibility run or the page runs on the layer.
+ */
+export function compatIgnoredLine(startPath, applied, forced = compatRun()) {
+  return forced && !applied
+    ? `MARGO_COMPAT=1 not applied to ${startPath}: the script opens it on native WebGPU (compat: false); ` +
+        'this page is no WebGL2-layer result unless the script runs its own layer leg'
+    : '';
+}
+
+/**
  * The URL a page served by a package's own Vite server (rooted in the package, with the repository in `fs.allow`)
  * loads the layer from: pass it to `page.addInitScript(compatShim, compatUrl())`.
  */
