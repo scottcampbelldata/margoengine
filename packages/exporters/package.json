@@ -29,7 +29,8 @@
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build",
     "test:png:browser": "cd ../.. && node packages/exporters/tests/png-browser.mjs",
-    "test:capture:browser": "cd ../.. && node packages/exporters/tests/capture-browser.mjs"
+    "test:capture:browser": "cd ../.. && node packages/exporters/tests/capture-browser.mjs",
+    "test:normal:browser": "cd ../.. && node packages/exporters/tests/normal-roundtrip-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
