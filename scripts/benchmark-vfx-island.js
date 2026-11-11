@@ -85,6 +85,10 @@ function instrument() {
     passes = new WeakMap();
   const request = GPUAdapter.prototype.requestDevice;
   GPUAdapter.prototype.requestDevice = async function (d = {}) {
+    // The bench times passes itself, so it asks for timestamp queries; the full quality tier does not request them.
+    const wanted = d.requiredFeatures ?? [];
+    if (this.features.has('timestamp-query') && ![...wanted].includes('timestamp-query'))
+      d = { ...d, requiredFeatures: [...wanted, 'timestamp-query'] };
     const result = await request.call(this, d),
       info = result.adapterInfo ?? this.info;
     a.adapter = { vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter };
@@ -554,7 +558,8 @@ try {
     },
     { base: experimentBase },
   );
-  await page.goto('http://127.0.0.1:5199/', { waitUntil: 'domcontentloaded' });
+  // The full tier keeps the 1,000,000-particle default; a fresh profile otherwise starts on the light tier (100,000).
+  await page.goto('http://127.0.0.1:5199/?quality=high', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.sandbox || document.body.classList.contains('failed'), null, {
     timeout: 60000,
   });
