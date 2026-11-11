@@ -14,13 +14,18 @@ export type RowKey = string | number;
 
 export class SelectionBinding implements Drawable {
     readonly transparent = false;
-    visible: boolean;
     readonly source: string;
     maskWrites: number;
     constructor(figure: Figure, layer: LinkedLayer, store: SelectionStore, options?: SelectionBindingOptions);
+    get visible(): boolean;
+    set visible(value: boolean);
     get weights(): Float32Array;
-    get buffer(): GPUBuffer;
+    get buffer(): GPUBuffer | undefined;
     restore(): void;
+    vectorRect(index: number, rgb: readonly number[]): {
+        top: number;
+        rgb: number[];
+    } | null;
     center(): readonly [number, number, number];
     prepare(): void;
     draw(pass: GPURenderPassEncoder, context: GpuContext): void;

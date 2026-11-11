@@ -37,6 +37,7 @@ export type {
 export { SkeletonHelper } from './skeleton-helper.js';
 export type { SkeletonShape, JointsShape, GLTFSkinSource, SkeletonHelperOptions } from './skeleton-helper.js';
 export type { FogLike } from '../../shared/fog.js';
+export type { MaskStyle } from '../../shared/selection-mask.js';
 export {
   computeLineDistances,
   expandLine,

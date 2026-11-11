@@ -37,7 +37,7 @@ export interface TrailOptions extends Omit<LineOptions, 'positions' | 'colors' |
 
 // Not exported from this entry, but used by the exports above:
 
-class Line {
+class Line extends SelectionMasked {
     get memoryResources(): {
         cpu: readonly (ArrayLike<number> | null)[];
         gpu: readonly GPUBuffer[];
@@ -60,6 +60,7 @@ class Line {
     get attachedMesh(): Mesh | null;
     setPositions(positions: ArrayLike<number>, colors?: ArrayLike<number> | null): this;
     setColors(colors: ArrayLike<number> | null): this;
+    setMask(values: ArrayLike<number | boolean> | null, style?: MaskStyle): this;
     attach(mesh: Mesh | null): this;
     setMatrix(matrix: Mat4): this;
     update(_engine: EngineKernel, _delta?: number): boolean | void;
@@ -160,5 +161,23 @@ interface LineOwner {
         cpu: readonly ArrayLike<number>[];
         gpu: readonly GPUBuffer[];
     };
+}
+
+interface MaskStyle {
+  readonly mode?: 'fade' | 'highlight' | 'filter';
+  readonly fade?: number;
+  readonly highlight?: readonly [number, number, number];
+  readonly highlightAmount?: number;
+}
+
+abstract class SelectionMasked {
+  abstract readonly count: number;
+  mask: Uint32Array | null;
+  maskVersion: number;
+  get maskStyle(): Readonly<Required<MaskStyle>>;
+  setMaskStyle(style: MaskStyle): this;
+  updateMask(start: number, values: ArrayLike<number | boolean>): this;
+  isSelected(index: number): boolean;
+  takeMaskStyle(style?: MaskStyle): Readonly<Required<MaskStyle>>;
 }
 ```

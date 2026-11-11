@@ -138,7 +138,7 @@ export class LightsHelper extends Line {
     update(): boolean;
 }
 
-export class Line {
+export class Line extends SelectionMasked {
     get memoryResources(): {
         cpu: readonly (ArrayLike<number> | null)[];
         gpu: readonly GPUBuffer[];
@@ -161,6 +161,7 @@ export class Line {
     get attachedMesh(): Mesh | null;
     setPositions(positions: ArrayLike<number>, colors?: ArrayLike<number> | null): this;
     setColors(colors: ArrayLike<number> | null): this;
+    setMask(values: ArrayLike<number | boolean> | null, style?: MaskStyle): this;
     attach(mesh: Mesh | null): this;
     setMatrix(matrix: Mat4): this;
     update(_engine: EngineKernel, _delta?: number): boolean | void;
@@ -274,6 +275,13 @@ export class Lines implements EnginePlugin {
 export interface LinesOptions {
     name?: string;
     order?: number;
+}
+
+export interface MaskStyle {
+  readonly mode?: 'fade' | 'highlight' | 'filter';
+  readonly fade?: number;
+  readonly highlight?: readonly [number, number, number];
+  readonly highlightAmount?: number;
 }
 
 export class PlaneHelper extends Line {
@@ -416,5 +424,16 @@ interface LineOwner {
 class OneLightHelper<T extends LightShape> extends LightsHelper {
     readonly light: T;
     constructor(light: T, options: LightHelperOptions, expected: Kind);
+}
+
+abstract class SelectionMasked {
+  abstract readonly count: number;
+  mask: Uint32Array | null;
+  maskVersion: number;
+  get maskStyle(): Readonly<Required<MaskStyle>>;
+  setMaskStyle(style: MaskStyle): this;
+  updateMask(start: number, values: ArrayLike<number | boolean>): this;
+  isSelected(index: number): boolean;
+  takeMaskStyle(style?: MaskStyle): Readonly<Required<MaskStyle>>;
 }
 ```

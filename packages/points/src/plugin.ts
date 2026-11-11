@@ -53,6 +53,8 @@ interface CloudGpu {
   colors: GPUBuffer | null;
   sizes: GPUBuffer | null;
   order: GPUBuffer | null;
+  mask: GPUBuffer | null;
+  maskVersion: number;
   group: GPUBindGroup | null;
   groupView: GPUTextureView | null;
   groupSampler: GPUSampler | null;
@@ -172,7 +174,7 @@ export class PointsPlugin implements EnginePlugin {
     return r
       ? {
           cpu: [r.floats, r.uints, r.written, r.model, r.drawn],
-          gpu: [r.uniform, r.positions, r.colors, r.sizes, r.order].filter((b): b is GPUBuffer => b !== null),
+          gpu: [r.uniform, r.positions, r.colors, r.sizes, r.order, r.mask].filter((b): b is GPUBuffer => b !== null),
         }
       : { cpu: [], gpu: [] };
   }
@@ -396,6 +398,7 @@ export class PointsPlugin implements EnginePlugin {
         storage(4),
         { binding: 5, visibility: F, texture: { sampleType: 'float' } },
         { binding: 6, visibility: F, sampler: { type: 'filtering' } },
+        storage(7),
       ],
     });
     const spriteLayout = device.createBindGroupLayout({
@@ -680,6 +683,7 @@ export class PointsPlugin implements EnginePlugin {
       const colors = cloud.colors ? make(cloud.count * 4 * cloud.colorStride, storage) : null;
       const sizes = cloud.sizes ? make(cloud.count * 4, storage) : null;
       const order = cloud.direct ? null : make(cloud.count * 4, storage);
+      const mask = cloud.mask ? make(cloud.mask.byteLength, storage) : null;
       const data = new ArrayBuffer(CLOUD_BYTES);
       r = {
         structure: cloud.structure,
@@ -688,6 +692,8 @@ export class PointsPlugin implements EnginePlugin {
         colors,
         sizes,
         order,
+        mask,
+        maskVersion: -1,
         group: null,
         groupView: null,
         groupSampler: null,
@@ -716,6 +722,7 @@ export class PointsPlugin implements EnginePlugin {
     }
     cloud.dirty.positions.length = cloud.dirty.colors.length = cloud.dirty.sizes.length = 0;
     this.cloudGpu.set(cloud, r);
+    this.flushMask(cloud, r);
     return r;
   }
 
@@ -743,6 +750,16 @@ export class PointsPlugin implements EnginePlugin {
         }
       ranges.length = 0;
     }
+    this.flushMask(cloud, r);
+  }
+
+  /** Uploads the whole mask (header and bits, count/8 bytes) once after it changed. */
+  private flushMask(cloud: PointCloud, r: CloudGpu): void {
+    if (!r.mask || !cloud.mask || r.maskVersion === cloud.maskVersion) return;
+    this.device!.queue.writeBuffer(r.mask, 0, cloud.mask as Uint32Array<ArrayBuffer>);
+    r.maskVersion = cloud.maskVersion;
+    this.stats.uploads++;
+    this.stats.uploadBytes += cloud.mask.byteLength;
   }
 
   private releaseCloud(cloud: PointCloud): void {
@@ -753,6 +770,7 @@ export class PointsPlugin implements EnginePlugin {
     r.colors?.destroy();
     r.sizes?.destroy();
     r.order?.destroy();
+    r.mask?.destroy();
     this.cloudGpu.delete(cloud);
   }
 
@@ -1198,7 +1216,8 @@ export class PointsPlugin implements EnginePlugin {
       (m.shading === 'sphere' ? FLAG.sphere : 0) |
       (cloud.direct ? FLAG.direct : 0) |
       (cloud.colorSpace === 'srgb' ? FLAG.srgbColors : 0) |
-      (cloud.colorFormat === 'float' ? FLAG.floatColors : 0);
+      (cloud.colorFormat === 'float' ? FLAG.floatColors : 0) |
+      (cloud.mask ? FLAG.mask : 0);
     // Clipping planes: count in flags.y (bit 16: intersection), planes from byte 128, unused slots zeroed.
     const planes = m['clipping'];
     u[25] = planes.length / 4 + (m.clipIntersection ? 65536 : 0);
@@ -1232,6 +1251,7 @@ export class PointsPlugin implements EnginePlugin {
         { binding: 4, resource: { buffer: r.order ?? dummy } },
         { binding: 5, resource: view },
         { binding: 6, resource: sampler },
+        { binding: 7, resource: { buffer: r.mask ?? dummy } },
       ],
     });
     r.groupView = view;
@@ -1600,4 +1620,3 @@ export class PointsPlugin implements EnginePlugin {
     }
   };
 }
-

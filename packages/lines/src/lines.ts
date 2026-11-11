@@ -29,6 +29,9 @@ interface Resources {
   uniform: GPUBuffer;
   points: GPUBuffer;
   colors: GPUBuffer;
+  /** The selection mask, or null: the plugin's zeroed stand-in is bound instead. */
+  mask: GPUBuffer | null;
+  maskVersion: number;
   group: GPUBindGroup;
   capacity: number;
   version: number;
@@ -64,6 +67,13 @@ const ON_TOP = 1,
   RIBBON = 1024,
   STEP = 2048;
 
+/** The selection mask at binding 7 of every style layout (lines.ts and the optional entries' layouts). */
+const MASK_ENTRY: GPUBindGroupLayoutEntry = {
+  binding: 7,
+  visibility: 1,
+  buffer: { type: 'read-only-storage', minBindingSize: 16 },
+};
+
 /** Solid triangles write depth when nothing about them is translucent. */
 const fillWrites = (line: Line): boolean => line['fillOpaque'] && line.material.opacity === 1 && !line.material.behind;
 
@@ -89,7 +99,7 @@ export class Lines implements EnginePlugin {
     return r
       ? {
           cpu: [r.floats, r.uints, r.written],
-          gpu: [r.uniform, r.points, r.colors, ...(r.fill ? [r.fill.buffer] : [])],
+          gpu: [r.uniform, r.points, r.colors, ...(r.mask ? [r.mask] : []), ...(r.fill ? [r.fill.buffer] : [])],
         }
       : { cpu: [], gpu: [] };
   }
@@ -108,6 +118,8 @@ export class Lines implements EnginePlugin {
   private device?: GPUDevice;
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
   private frameBuffer?: GPUBuffer;
+  /** Zeroed stand-in for lines without a selection mask (binding 7 reads it as absent). */
+  private noMask?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
   private frameData = new Float32Array(24);
   private frameBits = new Uint32Array(this.frameData.buffer);
@@ -199,8 +211,10 @@ export class Lines implements EnginePlugin {
         uniform(STYLE_BYTES, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT),
         { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
         { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
+        MASK_ENTRY,
       ],
     });
+    this.noMask = device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
     this.module(0);
     this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -315,6 +329,7 @@ export class Lines implements EnginePlugin {
         Math.max(16, colors?.byteLength ?? 16),
         GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       );
+      const mask = line.mask ? make(line.mask.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) : null;
       extra = line['extension']?.create(device);
       const group = device.createBindGroup({
         layout: this.styleLayout(line['extension']),
@@ -322,6 +337,7 @@ export class Lines implements EnginePlugin {
           { binding: 0, resource: { buffer: uniform } },
           { binding: 1, resource: { buffer: points } },
           { binding: 2, resource: { buffer: colorBuffer } },
+          { binding: 7, resource: { buffer: mask ?? this.noMask! } },
           ...(extra?.entries ?? []),
         ],
       });
@@ -331,6 +347,8 @@ export class Lines implements EnginePlugin {
         uniform,
         points,
         colors: colorBuffer,
+        mask,
+        maskVersion: -1,
         group,
         capacity: line.capacityVersion,
         version: -1,
@@ -358,6 +376,7 @@ export class Lines implements EnginePlugin {
           { binding: 0, visibility: 3, buffer: { type: 'uniform', minBindingSize: STYLE_BYTES } },
           { binding: 1, visibility: 1, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
           { binding: 2, visibility: 1, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
+          MASK_ENTRY,
           ...extension.entries,
         ],
       });
@@ -373,6 +392,7 @@ export class Lines implements EnginePlugin {
     r.uniform.destroy();
     r.points.destroy();
     r.colors.destroy();
+    r.mask?.destroy();
     r.fill?.buffer.destroy();
     this.resources.delete(line);
   }
@@ -394,6 +414,7 @@ export class Lines implements EnginePlugin {
             { binding: 0, resource: { buffer: r.uniform } },
             { binding: 1, resource: { buffer } },
             { binding: 2, resource: { buffer: r.colors } },
+            { binding: 7, resource: { buffer: r.mask ?? this.noMask! } },
           ],
         }),
         bytes: corners.byteLength,
@@ -429,6 +450,11 @@ export class Lines implements EnginePlugin {
         if (line.colors)
           device.queue.writeBuffer(r.colors, 0, line.colors as Float32Array<ArrayBuffer>, 0, line.count * 4);
         r.version = line.version;
+      }
+      // The whole mask (header and bits, capacity/8 bytes), once after it changed.
+      if (r.mask && line.mask && r.maskVersion !== line.maskVersion) {
+        device.queue.writeBuffer(r.mask, 0, line.mask as Uint32Array<ArrayBuffer>);
+        r.maskVersion = line.maskVersion;
       }
       const f = r.floats,
         u = r.uints;
@@ -607,9 +633,7 @@ export class Lines implements EnginePlugin {
 
   /** Independent non-round segments have no joins or cap fans. Extensions keep their full vertex contract. */
   private vertexCount(line: Line): number {
-    return line.mode === 'segments' && line.material.cap !== 'round' && !line['extension']
-      ? 6
-      : VERTICES_PER_SEGMENT;
+    return line.mode === 'segments' && line.material.cap !== 'round' && !line['extension'] ? 6 : VERTICES_PER_SEGMENT;
   }
 
   onDeviceRestored(engine: Engine): void {
@@ -621,8 +645,9 @@ export class Lines implements EnginePlugin {
     for (const line of [...this.resources.keys()]) this.release(line);
     this.extendedLayouts.clear();
     this.frameBuffer?.destroy();
+    this.noMask?.destroy();
     this.fogGpu?.buffer.destroy();
-    this.frameBuffer = this.frameGroup = this.layouts = this.device = this.fogGpu = undefined;
+    this.frameBuffer = this.frameGroup = this.layouts = this.device = this.fogGpu = this.noMask = undefined;
     this.pipelines.clear();
     this.modules.clear();
   }

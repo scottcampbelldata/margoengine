@@ -3,6 +3,8 @@ import type { Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { buildBlocks, expandBlockBounds, packColors, packFloatColors, NO_BLOCK, type PointBlocks } from './math.js';
 import { PointsMaterial, type PointsMaterialOptions } from './material.js';
+import { MASK_HEADER, SelectionMasked, writeMaskBits, writeMaskHeader } from '../../shared/selection-mask.js';
+import type { MaskStyle } from '../../shared/selection-mask.js';
 
 /**
  * Point data. This is also the point-cloud output of `@margoengine/loaders`
@@ -70,7 +72,7 @@ export interface PointOwner {
  * A chunked, GPU-resident point cloud drawn with a `PointsMaterial`.
  * Add it to a `PointsPlugin` to draw it.
  */
-export class PointCloud {
+export class PointCloud extends SelectionMasked {
   /** @internal Allocation inventory consumed by optional diagnostic entries. */
   get memoryResources(): { cpu: readonly (ArrayLike<number> | null)[]; gpu: readonly GPUBuffer[] } {
     const live = this.owner?.memoryFor?.(this);
@@ -79,6 +81,7 @@ export class PointCloud {
         this.positions,
         this.colors,
         this.sizes,
+        this.mask,
         this.normals,
         this.matrix,
         this.sourceIndex,
@@ -128,6 +131,7 @@ export class PointCloud {
   private owner?: PointOwner;
 
   constructor(options: PointCloudOptions) {
+    super();
     if (!options || typeof options !== 'object' || !options.positions)
       throw new TypeError('PointCloud needs positions');
     const { positions } = options;
@@ -281,6 +285,26 @@ export class PointCloud {
       this.sizes = sizes;
     }
     if (notify) this.structure++;
+    return this;
+  }
+
+  /**
+   * Replaces or removes the selection mask: one value a point (stored order), selected when true or above 0. Every
+   * draw style keeps working (shapes, sizes, sphere shading, EDL, fog, picking): the mask only fades, highlights or
+   * filters the points, as `style` (or the current `maskStyle`) says. Adding or removing it reallocates; `updateMask`
+   * and `setMaskStyle` do not.
+   */
+  setMask(values: ArrayLike<number | boolean> | null, style?: MaskStyle): this {
+    const shown = this.takeMaskStyle(style),
+      had = this.mask !== null;
+    if (values !== null && values.length !== this.count)
+      throw new RangeError(`A mask needs ${this.count} values, one a point; pass one value per point`);
+    this.mask =
+      values === null
+        ? null
+        : writeMaskBits(writeMaskHeader(new Uint32Array(MASK_HEADER + Math.ceil(this.count / 32)), shown), values);
+    if (had !== (this.mask !== null)) this.structure++;
+    this.maskVersion++;
     return this;
   }
 

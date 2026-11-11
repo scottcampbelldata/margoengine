@@ -1,5 +1,6 @@
 import { LinearToSRGB, SRGBToLinear } from '@margoengine/math/color';
 import { fault } from '../../shared/errors.js';
+import { maskColor } from '../../shared/selection-mask.js';
 import type { Colormap } from './colormaps.js';
 import type { VectorGeometry } from './vector-types.js';
 import type { LineLayer, ScatterLayer } from './figure.js';
@@ -29,28 +30,61 @@ export function seriesSnapshot(layer: LineLayer | ScatterLayer | Line): VectorGe
         k < 3 ? Math.max(0, Math.min(1, LinearToSRGB(value * material.color[k]))) : value * material.opacity;
     }
   }
-  if (points)
-    return {
-      kind: 'points',
+  const mask = (points ?? line!).mask;
+  if (points) {
+    const sizes = Float32Array.from({ length: count }, (_, i) =>
+      Math.min(
+        points.material.maxPixelSize,
+        Math.max(points.material.minPixelSize, points.material.size * (points.sizes?.[i] ?? 1)),
+      ),
+    );
+    const snapshot = {
+      kind: 'points' as const,
       positions,
       colors,
       visible: points.visible,
       width: points.material.size,
       shape: points.material.shape,
-      sizes: Float32Array.from({ length: count }, (_, i) =>
-        Math.min(
-          points.material.maxPixelSize,
-          Math.max(points.material.minPixelSize, points.material.size * (points.sizes?.[i] ?? 1)),
-        ),
-      ),
+      sizes,
     };
+    if (!mask) return snapshot;
+    // The selection mask as the point shader applies it: filtered points leave, the rest fade or highlight.
+    const kept: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const shown = maskColor(mask, colors.subarray(i * 4, i * 4 + 3), i);
+      if (!shown) continue;
+      colors.set(shown, i * 4);
+      kept.push(i);
+    }
+    const pick = <T extends Float32Array>(a: T, n: number): T =>
+      Float32Array.from({ length: kept.length * n }, (_, k) => a[kept[Math.floor(k / n)] * n + (k % n)]) as T;
+    return { ...snapshot, positions: pick(positions, 3), colors: pick(colors, 4), sizes: pick(sizes, 1) };
+  }
+  const segments = line!.mode === 'segments';
+  if (!mask) return { kind: 'line', positions, colors, width: line!.material.width, visible: line!.visible, segments };
+  // A masked line becomes segments, each selected when both ends are, as the line shader draws it.
+  const pairs: number[] = [];
+  for (let i = 0; i + 1 < count; i += segments ? 2 : 1) pairs.push(i, i + 1);
+  const outPositions: number[] = [],
+    outColors: number[] = [];
+  for (let k = 0; k < pairs.length; k += 2) {
+    const ends = pairs
+      .slice(k, k + 2)
+      .map((i) => maskColor(mask, colors.subarray(i * 4, i * 4 + 3), pairs[k], pairs[k + 1]));
+    if (!ends[0] || !ends[1]) continue;
+    for (let e = 0; e < 2; e++) {
+      const i = pairs[k + e];
+      outPositions.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+      outColors.push(...ends[e]!, colors[i * 4 + 3]);
+    }
+  }
   return {
     kind: 'line',
-    positions,
-    colors,
+    positions: Float32Array.from(outPositions),
+    colors: Float32Array.from(outColors),
     width: line!.material.width,
     visible: line!.visible,
-    segments: line!.mode === 'segments',
+    segments: true,
   };
 }
 

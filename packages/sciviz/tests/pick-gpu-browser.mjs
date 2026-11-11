@@ -102,8 +102,8 @@ for (const fallback of [false, true]) {
         stop();
         fig.pick = old;
         const store=new SelectionStore([0,1,2]),binding=bindSelection(fig,layer,store,{rowIds:[0,1,2]});
-        check(!layer.cloud.visible && (await choose([0.5,0,0]))?.index===1,'linked replacement remains GPU pickable');
-        binding.visible=false;check(await choose([0.5,0,0])===null,'hidden replacement is not pickable');
+        check(layer.cloud.visible && layer.cloud.mask !== null && (await choose([0.5,0,0]))?.index===1,'a bound cloud draws its own masked points and stays GPU pickable');
+        binding.visible=false;check(await choose([0.5,0,0])===null,'a hidden bound cloud is not pickable');binding.visible=true;
         binding.dispose();store.dispose();
         fig.remove(layer);
         const cells = await fig.heatmap(new Float32Array([10, 20, 30, 40]), { nx: 2, ny: 2, x: [-1, 1], y: [-1, 1] });

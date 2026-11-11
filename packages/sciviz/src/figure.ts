@@ -11,6 +11,7 @@ import type { PointCloud, PointsPlugin } from '@margoengine/points';
 import type { Line, Lines } from '@margoengine/lines';
 import type { OrbitControls } from '@margoengine/controls/orbit';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { maskColor } from '../../shared/selection-mask.js';
 import { themeFont, validateThemeStyle } from './theme-style.js';
 import { Axes, THEMES, type AxesOptions, type Theme } from './axes.js';
 import { barRects, heatmapRects, histogram, type BinOptions } from './charts.js';
@@ -295,6 +296,9 @@ export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | Isos
 
 // Set by a selection binding (sciviz/link) on the source it hides while it draws that layer's marks itself.
 const LINKED_DRAW: unique symbol = Symbol.for('@margoengine/sciviz/linked-draw') as never;
+
+/** A bound rectangle as its selection binding draws it: height fraction and displayed sRGB colour, or null. */
+type BoundRect = { top: number; rgb: number[] } | null;
 
 const layerVisible = (layer: Layer): boolean => {
   const source = ('cloud' in layer ? layer.cloud : 'line' in layer ? layer.line : layer) as {
@@ -1764,24 +1768,37 @@ export class Figure extends EventTarget {
       rgb = (c: number) => hex((c & 255) / 255, ((c >>> 8) & 255) / 255, ((c >>> 16) & 255) / 255);
     for (const layer of layers.filter((l): l is RectsLayer => l instanceof RectsLayer)) {
       const r = layer.rects,
-        colours = layer.colours;
+        colours = layer.colours,
+        // A selection binding (sciviz/link) draws bound rectangles: export what it draws.
+        bound = (layer as { [LINKED_DRAW]?: { vectorRect?(k: number, rgb: readonly number[]): BoundRect } })[
+          LINKED_DRAW
+        ];
       for (let k = 0; k < layer.values.length; k++) {
         if (r[k * 4] === r[k * 4 + 2] && r[k * 4 + 1] === r[k * 4 + 3]) continue;
-        const [ax, ay] = at(r[k * 4], r[k * 4 + 3]),
+        const c = colours[k],
+          shown = bound?.vectorRect?.(k, [(c & 255) / 255, ((c >>> 8) & 255) / 255, ((c >>> 16) & 255) / 255]);
+        if (shown === null) continue;
+        const [ax, ay] = at(r[k * 4], r[k * 4 + 1] + (r[k * 4 + 3] - r[k * 4 + 1]) * (shown?.top ?? 1)),
           [bx, by] = at(r[k * 4 + 2], r[k * 4 + 1]);
         out.push(
-          `<rect x="${ax}" y="${ay}" width="${Math.round((bx - ax) * 100) / 100}" height="${Math.round((by - ay) * 100) / 100}" fill="${rgb(colours[k])}"/>`,
+          `<rect x="${ax}" y="${ay}" width="${Math.round((bx - ax) * 100) / 100}" height="${Math.round((by - ay) * 100) / 100}" fill="${shown ? hex(...(shown.rgb as [number, number, number])) : rgb(c)}"/>`,
         );
       }
     }
     for (const layer of layers)
       if ('kind' in layer && layer.kind === 'scatter') {
         const style = this.#styles.get(layer)!,
-          pos = layer.positions;
+          pos = layer.positions,
+          c = style.colors,
+          // The cloud's selection mask (sciviz/link or setMask) fades, highlights or filters points as drawn.
+          mask = layer.cloud.mask,
+          base = hexColor(style.color) ?? [1, 1, 1];
         for (let i = 0; i < layer.count; i++) {
+          const own = c ? [c[i * 3], c[i * 3 + 1], c[i * 3 + 2]] : base,
+            shown = mask ? maskColor(mask, own, i) : own;
+          if (!shown) continue;
           const [sx, sy] = at(pos[i * 3], pos[i * 3 + 1]),
-            c = style.colors;
-          const fill = c ? hex(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]) : style.color;
+            fill = c || mask ? hex(shown[0], shown[1], shown[2]) : style.color;
           out.push(`<circle cx="${sx}" cy="${sy}" r="${style.width / 2}" fill="${fill}"/>`);
         }
       }
@@ -1791,8 +1808,19 @@ export class Figure extends EventTarget {
           pos = layer.positions,
           n = pos.length / 3,
           c = style.colors;
-        const attrs = `stroke-width="${style.width}" stroke-linecap="round" stroke-linejoin="round" fill="none"`;
-        if (c)
+        const attrs = `stroke-width="${style.width}" stroke-linecap="round" stroke-linejoin="round" fill="none"`,
+          mask = layer.line.mask;
+        if (mask) {
+          // A masked line: one segment per pair, selected when both ends are, as the line shader draws it.
+          const base = hexColor(style.color) ?? [1, 1, 1];
+          for (let i = 0; i + 1 < n; i++) {
+            const shown = maskColor(mask, c ? [c[i * 3], c[i * 3 + 1], c[i * 3 + 2]] : base, i, i + 1);
+            if (!shown) continue;
+            const [ax, ay] = at(pos[i * 3], pos[i * 3 + 1]),
+              [bx, by] = at(pos[i * 3 + 3], pos[i * 3 + 4]);
+            out.push(`<path d="M${ax} ${ay}L${bx} ${by}" stroke="${hex(shown[0], shown[1], shown[2])}" ${attrs}/>`);
+          }
+        } else if (c)
           // Coloured by data: one segment per pair of vertices, in the first vertex's colour.
           for (let i = 0; i + 1 < n; i++) {
             const [ax, ay] = at(pos[i * 3], pos[i * 3 + 1]),

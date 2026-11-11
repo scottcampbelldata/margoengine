@@ -153,6 +153,13 @@ interface BaseMaterialOptions {
     clipIntersection?: boolean;
 }
 
+interface MaskStyle {
+  readonly mode?: 'fade' | 'highlight' | 'filter';
+  readonly fade?: number;
+  readonly highlight?: readonly [number, number, number];
+  readonly highlightAmount?: number;
+}
+
 interface PointBlocks {
     readonly order: Uint32Array;
     readonly starts: Uint32Array;
@@ -165,7 +172,7 @@ interface PointBlocks {
 
 type PointChannel = 'positions' | 'colors' | 'sizes';
 
-class PointCloud {
+class PointCloud extends SelectionMasked {
     get memoryResources(): {
         cpu: readonly (ArrayLike<number> | null)[];
         gpu: readonly GPUBuffer[];
@@ -206,6 +213,7 @@ class PointCloud {
     markDirty(channel: PointChannel, start?: number, count?: number): this;
     setColors(values: ArrayLike<number> | null, components?: 3 | 4, notify?: boolean): this;
     setSizes(values: ArrayLike<number> | null, notify?: boolean): this;
+    setMask(values: ArrayLike<number | boolean> | null, style?: MaskStyle): this;
     rebuild(): this;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -277,4 +285,15 @@ interface PointsMaterialOptions extends BaseMaterialOptions {
 }
 
 type PointsTextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
+
+abstract class SelectionMasked {
+  abstract readonly count: number;
+  mask: Uint32Array | null;
+  maskVersion: number;
+  get maskStyle(): Readonly<Required<MaskStyle>>;
+  setMaskStyle(style: MaskStyle): this;
+  updateMask(start: number, values: ArrayLike<number | boolean>): this;
+  isSelected(index: number): boolean;
+  takeMaskStyle(style?: MaskStyle): Readonly<Required<MaskStyle>>;
+}
 ```

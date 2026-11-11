@@ -15,6 +15,8 @@ import {
 import { clipPlanes, copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
 import { attachableMesh } from '../../shared/pass.js';
 import type { LineExtension } from './extension.js';
+import { MASK_HEADER, SelectionMasked, writeMaskBits, writeMaskHeader } from '../../shared/selection-mask.js';
+import type { MaskStyle } from '../../shared/selection-mask.js';
 
 /**
  * Style options for `LineMaterial` (and `Line`). Validated on set and every frame: out-of-range numbers throw
@@ -199,12 +201,12 @@ interface LineOwner {
 /**
  * A fat line: segments or a polyline drawn as screen-space quads with joins, caps, dashes and antialiasing.
  */
-export class Line {
+export class Line extends SelectionMasked {
   /** @internal Allocation inventory consumed by optional diagnostic entries. */
   get memoryResources(): { cpu: readonly (ArrayLike<number> | null)[]; gpu: readonly GPUBuffer[] } {
     const live = this.owner?.memoryFor?.(this);
     return {
-      cpu: [this.points, this.colors, this.fill, this.matrix, this.distancesFor, ...(live?.cpu ?? [])],
+      cpu: [this.points, this.colors, this.mask, this.fill, this.matrix, this.distancesFor, ...(live?.cpu ?? [])],
       gpu: live?.gpu ?? [],
     };
   }
@@ -243,6 +245,7 @@ export class Line {
   private distanceMode?: LineMode;
 
   constructor(options: LineOptions = {}) {
+    super();
     const { positions, colors, mode = 'strip', material, mesh = null, matrix, visible = true, ...style } = options;
     if (!MODES.includes(mode)) throw new TypeError('Unknown line mode; use the values listed in the line options');
     this.mode = mode;
@@ -279,6 +282,7 @@ export class Line {
       this.points = new Float32Array(count * 4);
       this.capacityVersion++;
       if (this.colors) this.growColors(count);
+      if (this.mask) this.growMask();
     }
     for (let i = 0; i < count; i++) {
       this.points[i * 4] = positions[i * 3];
@@ -317,6 +321,42 @@ export class Line {
     }
     this.version++;
     return this;
+  }
+
+  /**
+   * Replaces or removes the selection mask: one value a point, selected when true or above 0. A segment counts as
+   * selected when both its points are. Every line style keeps working (width, joins, caps, dashes, vertex colours,
+   * ribbons, fog, picking): the mask only fades, highlights or filters segments, as `style` (or the current
+   * `maskStyle`) says. Points added later by `setPositions` start selected. Adding or removing it reallocates;
+   * `updateMask` and `setMaskStyle` do not.
+   */
+  setMask(values: ArrayLike<number | boolean> | null, style?: MaskStyle): this {
+    this.takeMaskStyle(style);
+    if (values === null) {
+      if (this.mask) this.capacityVersion++;
+      this.mask = null;
+    } else {
+      if (values.length !== this.pointCount)
+        throw new RangeError(`A mask needs ${this.pointCount} values, one a point; pass one value per point`);
+      if (!this.mask) {
+        this.growMask();
+        this.capacityVersion++;
+      }
+      writeMaskBits(this.mask!, values);
+    }
+    this.maskVersion++;
+    return this;
+  }
+
+  /** Mask words for the point capacity, keeping the current bits; new points start selected. */
+  private growMask(): void {
+    const capacity = this.points.length / 4,
+      next = writeMaskHeader(
+        new Uint32Array(MASK_HEADER + Math.ceil(Math.max(capacity, 1) / 32)).fill(~0 >>> 0),
+        this.maskStyle,
+      );
+    if (this.mask) next.set(this.mask.subarray(MASK_HEADER, Math.min(this.mask.length, next.length)), MASK_HEADER);
+    this.mask = next;
   }
 
   private growColors(count: number): void {

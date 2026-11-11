@@ -46,9 +46,14 @@ console.log(store.predicate('axes')); // { period: [1, 20] }
 ```
 
 Store notifications expose source, active, revision and lazy row IDs. Subscriptions
-accept AbortSignal/unsubscribe. Bindings own aligned f32 masks (one per mark, minimum
-16 bytes), rebuild on device restoration, and restore visibility on disposal. Default
-fade brightness is 0.12; highlight/filter are explicit modes. Numerical bins are not
+accept AbortSignal/unsubscribe. A bound scatter or line takes the selection as the
+native mask of @margoengine/points or @margoengine/lines (one bit a mark,
+`layer.cloud.mask` or `layer.line.mask`), so it keeps its own drawing: eye-dome
+lighting, per-point sizes, shapes, sphere shading, widths and dashes. Bars and
+histograms bind aligned f32 masks (one per bar, minimum 16 bytes) that rebuild on
+device restoration and restore visibility on disposal. Both SVG exports (`toSVG` and
+`exportVector`) draw the selection as the canvas does. Default fade brightness is
+0.12; highlight/filter are explicit modes. Numerical bins are not
 recomputed by visual selection. The [linked-stars guide](../../../docs/sciviz-link.md)
 states aggregate membership semantics and the real 2MASS sample's selection bias.
 

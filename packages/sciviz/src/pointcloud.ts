@@ -2,13 +2,13 @@
 // Clean room: Schütz 2016 additive octrees; COPC 1.0; Vega-Lite keyed predicates.
 // Streaming, decoding and drawing stay in points. This entry owns the figure mapping and interaction.
 import type { PointsPlugin, PointCloud } from '@margoengine/points';
-import {
+// The octree streamer loads with the points renderer, so this entry imports neither statically.
+import type {
   OctreeCloud,
-  buildOctree,
-  type OctreeSource,
-  type OctreeNode,
-  type OctreeNodeData,
-  type OctreeCloudOptions,
+  OctreeSource,
+  OctreeNode,
+  OctreeNodeData,
+  OctreeCloudOptions,
 } from '@margoengine/points/octree';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { fault, rangeError } from '../../shared/errors.js';
@@ -86,16 +86,19 @@ export class PointCloudLayer extends EventTarget {
   #operation: SelectionOperation = 'replace';
   #colourWrites = 0;
 
-  /** Loads the points renderer lazily and attaches a complete layer to the figure. */
+  /** Loads the points renderer and octree streamer lazily and attaches a complete layer to the figure. */
   static async create(
     figure: Figure,
     source: OctreeSource,
     options: PointCloudLayerOptions = {},
   ): Promise<PointCloudLayer> {
     options.signal?.throwIfAborted();
-    const { PointsPlugin } = await import('@margoengine/points');
+    const [{ PointsPlugin }, { OctreeCloud }] = await Promise.all([
+      import('@margoengine/points'),
+      import('@margoengine/points/octree'),
+    ]);
     options.signal?.throwIfAborted();
-    const layer = new PointCloudLayer(figure, source, options, PointsPlugin);
+    const layer = new PointCloudLayer(figure, source, options, PointsPlugin, OctreeCloud);
     try {
       return figure.addLayer(layer);
     } catch (error) {
@@ -109,6 +112,7 @@ export class PointCloudLayer extends EventTarget {
     source: OctreeSource,
     options: PointCloudLayerOptions,
     Plugin: typeof PointsPlugin,
+    Octree: typeof OctreeCloud,
   ) {
     super();
     options.signal?.throwIfAborted();
@@ -143,7 +147,7 @@ export class PointCloudLayer extends EventTarget {
         return data;
       },
     };
-    this.octree = new OctreeCloud(
+    this.octree = new Octree(
       {
         add: <T extends PointCloud>(cloud: T): T => {
           const entry = this.#pending.get(cloud.positions)!;
@@ -411,7 +415,10 @@ export async function openPointCloud(
   if (options.format !== 'las' && options.format !== 'laz') throw rangeError('Unknown point cloud format', 'sciviz');
   const response = await (options.fetch ?? globalThis.fetch)(url, { signal: options.signal });
   if (!response.ok) throw fault('failed', `Point cloud request failed: HTTP ${response.status}`, 'sciviz');
-  const { parseLAS } = await import('@margoengine/points/las');
+  const [{ parseLAS }, { buildOctree }] = await Promise.all([
+    import('@margoengine/points/las'),
+    import('@margoengine/points/octree'),
+  ]);
   const data = await parseLAS(new Uint8Array(await response.arrayBuffer()), {
     signal: options.signal,
     origin: options.origin,

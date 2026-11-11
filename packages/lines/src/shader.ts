@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { BLOCK, FAN } from './geometry.js';
 import { fogWgsl } from '../../shared/fog.js';
+import { maskWgsl } from '../../shared/selection-mask-wgsl.js';
 
 /** The fragment's cut by clipping planes, shared with the pick shader. */
 export const clipCut = /* wgsl */ `let clipCount=style.flags.w&0xffffu;var clipBehind=0u;
@@ -18,6 +19,7 @@ struct Style{model:mat4x4f,color:vec4f,a:vec4f,b:vec4f,flags:vec4u,planes:array<
 @group(1) @binding(0) var<uniform> style:Style;
 @group(1) @binding(1) var<storage,read> points:array<vec4f>;
 @group(1) @binding(2) var<storage,read> colors:array<vec4f>;
+${maskWgsl(1, 7)}
 struct Out{
   @builtin(position) clip:vec4f,
   @location(0) color:vec4f,
@@ -151,6 +153,8 @@ fn fanCorner(k:u32,start:vec2f,sweep:f32,hwG:f32,atB:bool)->Corner{
   let raw=select(rawA,rawB,cr.atB);
   let fade=select(1.0,min(1.0,2.0*raw),aa>0.0);
   o.color=select(colA,colB,cr.atB)*vec4f(style.color.rgb,style.color.a*fade);
+  // The selection mask (a zeroed stand-in when the line has none): a segment is selected when both its points are.
+  if(margoMaskPresent()){let on=margoMaskOn(ia)&&margoMaskOn(ib);if(margoMaskHidden(on)){o.clip=vec4f(2.0,2.0,0.0,1.0);return o;}o.color=margoMaskColor(o.color,on);}
   var dA=points[ia].w;var dB=points[ib].w;
   if(mode==2u&&n>=3u&&ib==0u){dB=style.b.y;}
   o.dist=mix(dA,dB,select(ta,tb,cr.atB));
@@ -258,6 +262,7 @@ export const ribbonShader = (code: string, picking = false): string =>
   var tint=vec4f(1.0);
   if((style.flags.z&64u)!=0u){tint=colors[k];}
   o.color=tint*style.color;
+  if(margoMaskPresent()){let on=margoMaskOn(ii)&&margoMaskOn(ii+1u);if(margoMaskHidden(on)){o.clip=vec4f(2.0,2.0,0.0,1.0);return o;}o.color=margoMaskColor(o.color,on);}
   o.world=w;${picking ? 'o.segment=ii;' : ''}
   return o;
 }

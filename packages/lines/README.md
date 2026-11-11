@@ -314,6 +314,29 @@ lines.add(new PlaneHelper({normal: [0, 1, 0], size: 4, fillOpacity: 0.25, color:
 
 Fills take the helper's colour, opacity, fog and clipping planes, are not lit, and draw before the helper's lines. An opaque fill writes depth, whatever `depthWrite` says, so a solid head sorts against everything in the scene that follows; a translucent one writes none, so several overlapping ones blend in the order they were added. Fills do not pick.
 
+## Selection masks
+
+`line.setMask(values, style?)` marks points selected (true or above 0, one value a point); a segment is selected when
+both its points are, and the shader fades, highlights or hides the others while every other look stays: width, joins,
+caps, dashes, vertex colours, ribbons, fog, clipping and GPU picking (hidden segments cannot be picked). The mask is one
+bit a point after a 16-byte style header, so `updateMask(start, values)` uploads it once at the next frame and never
+reallocates or recompiles; points added later by `setPositions` start selected. Styles: `mode` 'fade' (default;
+unselected segments show `fade` of their displayed sRGB colour, default 0.12), 'highlight' (fade plus selected
+segments moved `highlightAmount`, default 0.7, toward `highlight`, default `[1, 0.4508, 0.0194]`, linear #ffb326) or 'filter' (unselected
+segments hidden). Lines without a mask bind a zeroed 16-byte stand-in, so they draw exactly as before. Solid helper
+fills ignore the mask.
+
+```ts
+import {Lines, Line} from 'margoengine/lines';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+const line = lines.add(new Line({positions: [0, 0, 0, 1, 1, 0, 2, 0, 0, 3, 1, 0], width: 4, dashed: true}));
+line.setMask([true, true, false, true], {mode: 'filter'}); // draws only the first segment
+line.setMaskStyle({mode: 'fade', fade: 0.3});
+console.log(line.isSelected(2)); // false
+```
+
 ## Fog
 
 `lines.setFog(fog)` fogs every line whose material has `fog: true` (the default) with `@margoengine/environment`'s `Fog`

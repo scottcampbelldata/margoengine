@@ -2,6 +2,7 @@ import { ditherWGSL } from '../../shared/screen-door.js';
 import { MargoError } from '@margoengine/math/errors';
 import { fogWgsl } from '../../shared/fog.js';
 import { surfaceEntry } from '../../shared/pass.js';
+import { maskWgsl } from '../../shared/selection-mask-wgsl.js';
 
 /** Flag bits of `Cloud.flags.x`, shared by the plugin and the point shader. */
 export const FLAG = {
@@ -14,6 +15,7 @@ export const FLAG = {
   direct: 64,
   srgbColors: 128,
   floatColors: 256,
+  mask: 512,
 } as const;
 
 /** WGSL: the colour of point `p`, from `colors` (as RGBA8 or float32) in linear, for shaders with `has` and `colors`. */
@@ -66,6 +68,7 @@ struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f,planes:a
 @group(1) @binding(4) var<storage,read> order:array<u32>;
 @group(1) @binding(5) var map:texture_2d<f32>;
 @group(1) @binding(6) var mapSampler:sampler;
+${maskWgsl(1, 7)}
 struct VOut{
   @builtin(position) clip:vec4f,
   @location(0) color:vec4f,
@@ -93,6 +96,8 @@ ${pointColorWgsl}
   clip=vec4f(clip.xy+corner*extent*2.0/frame.viewport.xy*clip.w,clip.zw);
   var color=cloud.color;
   if(has(${FLAG.colors}u)){color*=pointColor(p);}
+  // The selection mask (stored order) fades, highlights or hides the point; hidden points are also unpickable.
+  if(has(${FLAG.mask}u)){let on=margoMaskOn(p);if(margoMaskHidden(on)){out.clip=vec4f(0.0,0.0,-1.0,1.0);return out;}color=margoMaskColor(color,on);}
   out.clip=clip;out.color=color;out.quad=corner*extent;
   out.info=vec4f(radius,select(clip.w,1.0+(1.0-clip.z)/frame.depth.y,frame.depth.w>0.5),radius*clip.w/frame.viewport.z,0.0);
   out.center=world.xyz;

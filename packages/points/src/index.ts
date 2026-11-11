@@ -50,3 +50,4 @@ export type { ClassificationColorOptions, RampOptions } from './attributes.js';
 export { parseColor } from './color.js';
 export type { ColorInput } from './color.js';
 export type { FogLike } from '../../shared/fog.js';
+export type { MaskStyle } from '../../shared/selection-mask.js';

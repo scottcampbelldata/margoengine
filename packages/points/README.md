@@ -149,6 +149,30 @@ points.add(new SpriteBatch({material: {map, mipmaps: true}})).add({position: [1,
 
 A `GPUTexture` you pass keeps the mips it has, and they are used. A map with `alphaTest` tests the filtered alpha, so holes in a map soften as a point shrinks. Every upload, including `needsUpdate()` on a video or canvas, makes the chain again.
 
+## Selection masks
+
+`cloud.setMask(values, style?)` marks points selected (true or above 0, one value a point in stored order) and the
+shader fades, highlights or hides the others while every other look stays: shapes, per-point sizes, sphere shading,
+eye-dome lighting, fog, clipping and GPU picking (hidden points cannot be picked). The mask is one bit a point after a
+16-byte style header, so `updateMask(start, values)` uploads count/8 bytes once at the next frame and never reallocates
+or recompiles. Styles: `mode` 'fade' (default; unselected points show `fade` of their displayed sRGB colour, default
+0.12), 'highlight' (fade plus selected points moved `highlightAmount`, default 0.7, toward `highlight`, default
+`[1, 0.4508, 0.0194]`, linear #ffb326) or 'filter' (unselected points hidden). `setMaskStyle` changes the style, `isSelected(i)` reads a bit and
+`setMask(null)` removes the mask. `@margoengine/sciviz/link`'s `bindSelection` drives this mask.
+
+```ts
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const positions = Float32Array.from({length: 3000}, () => Math.random() * 4 - 2);
+const cloud = points.add(new PointCloud({positions, sizes: Array(1000).fill(2), material: {edl: true}}));
+cloud.setMask(Array.from({length: 1000}, (_, i) => i % 2 === 0), {mode: 'highlight'});
+cloud.updateMask(0, [false, true]); // one upload of the mask at the next frame
+cloud.setMaskStyle({mode: 'filter'});
+console.log(cloud.isSelected(1)); // true
+```
+
 ## Fog
 
 `points.setFog(fog)` fogs every cloud and sprite batch whose material has `fog: true` (the default) with
