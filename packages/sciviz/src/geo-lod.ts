@@ -66,7 +66,15 @@ interface TileGpu {
 interface TileData {
   pixels: ImageData;
   mesh: { vertices: Float32Array; indices: Uint32Array };
+  /** Every texel has alpha 255, so the tile at full opacity draws without blending. */
+  opaque: boolean;
   gpu?: TileGpu;
+}
+/** True when no texel is translucent. */
+function opaqueTexels(pixels: ImageData): boolean {
+  const data = pixels.data;
+  for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return false;
+  return true;
 }
 const shader = /* wgsl */ `${frameWGSL}
 struct Tile { model: mat4x4f, params: vec4f }
@@ -198,7 +206,7 @@ export class GeoLodLayer implements Drawable {
       this.#options.segments ?? 32,
       this.#options.skirt ?? 1000,
     );
-    return { pixels, mesh };
+    return { pixels, mesh, opaque: opaqueTexels(pixels) };
   }
   #upload(data: TileData): TileGpu {
     const device = this.#figure.renderer.device!;
@@ -285,44 +293,53 @@ export class GeoLodLayer implements Drawable {
   /** @internal */
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (!this.#drawn.length) return;
-    const pipeline = renderer.pipeline('geo-lod', context, (target) => {
-      const device = renderer.device!,
-        module = device.createShaderModule({ code: shader, label: 'geo-lod' });
-      return {
-        layout: device.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout] }),
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: 20,
-              attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x3' },
-                { shaderLocation: 1, offset: 12, format: 'float32x2' },
-              ],
-            },
-          ],
-        },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [
-            {
-              format: target.format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+    // A fully opaque tile at full opacity replaces what is under it, so it skips the blend unit: on the RTX A6000
+    // (D3D12) a src-alpha blend whose result is mathematically the source still changed one level at a few rounding
+    // ties from frame to frame with identical commands (KB-GEO1); an unblended write is bit-stable. Fading and
+    // translucent tiles keep the blend, in the same coarse-to-fine order.
+    const pipeline = (blend: boolean) =>
+      renderer.pipeline(blend ? 'geo-lod' : 'geo-lod-opaque', context, (target) => {
+        const device = renderer.device!,
+          module = device.createShaderModule({ code: shader, label: 'geo-lod' });
+        return {
+          layout: device.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout] }),
+          vertex: {
+            module,
+            entryPoint: 'vertex',
+            buffers: [
+              {
+                arrayStride: 20,
+                attributes: [
+                  { shaderLocation: 0, offset: 0, format: 'float32x3' },
+                  { shaderLocation: 1, offset: 12, format: 'float32x2' },
+                ],
               },
-            },
-          ],
-        },
-        primitive: { topology: 'triangle-list', cullMode: 'back' },
-        multisample: target.multisample,
-        depthStencil: { format: target.depth, depthWriteEnabled: false, depthCompare: 'greater-equal' },
-      };
-    });
-    pass.setPipeline(pipeline);
+            ],
+          },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            targets: [
+              blend
+                ? {
+                    format: target.format,
+                    blend: {
+                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                    },
+                  }
+                : { format: target.format },
+            ],
+          },
+          primitive: { topology: 'triangle-list', cullMode: 'back' },
+          multisample: target.multisample,
+          depthStencil: { format: target.depth, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+        };
+      });
+    let bound: boolean | undefined;
     for (const entry of this.#drawn) {
+      const blend = entry.alpha < 1 || !entry.data.opaque;
+      if (blend !== bound) pass.setPipeline(pipeline((bound = blend)));
       const g = entry.data.gpu!;
       pass.setBindGroup(1, g.group);
       pass.setVertexBuffer(0, g.vertices);

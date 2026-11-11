@@ -6101,6 +6101,25 @@ Fixed 2026-11-10: nearestPoint now compares projectPoint's normalized near=0/far
 
 Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
 
+## Fixed 2026-11-11: sciviz geo-lod frames not bit-stable on native WebGPU (KB-GEO1)
+
+Repro (RTX A6000, Edge 157 headless, native WebGPU on D3D12): `packages/sciviz/tests/geo-lod-browser.mjs` failed
+"retained data restores identical pixels" in about 1 run in 6. With the view unchanged, about 1 frame in 3 changed
+one level in one channel at one fixed pixel (sometimes 6 to 8 bytes), restore or not; the WebGL2 compatibility layer
+was stable. Cause, as far as it is located: below the calls Margo makes. Every geo-lod tile was drawn through a
+src-alpha blend. A per-frame log of every pass, pipeline, bind group, draw and buffer write (with a hash of the
+bytes) was identical between frames that differed, so draw order, uploads, uniforms and restore are ruled out. The
+pixel is covered once and its texel alpha is exactly 1, so the blend's result equals its source; even so, with 30
+frames per variant, the flips stayed with a blend that reads the destination (src-alpha or one / one-minus-src-alpha)
+and stopped with no blend or a one / zero blend; storing the MSAA colour instead of discarding it changed nothing.
+Nearest filtering also stopped them, by moving the value off the rounding tie. A standalone page with the same blend
+and 4x MSAA did not reproduce, so the driver or hardware mechanism is not isolated. Fix
+(`packages/sciviz/src/geo-lod.ts`): a tile whose texels are all opaque, at full opacity, draws with an unblended
+pipeline (it replaces what is under it, so the blend did no work); fading and translucent tiles keep the blend in the
+same coarse-to-fine order. Regression test: `geo-lod-browser.mjs` renders the unchanged view 24 more times and
+requires every frame byte-identical in all channels (6 of 24 frames differed before the fix), and the restore check
+now compares all channels, not only red.
+
 ## Fixed 2026-11-11: compute SVD does not converge on a matrix of many repeated columns
 
 Repro (CPU backend, any host): fill a 512 x 512 matrix row-major from `seed = (seed * 1103515245 + 12345) >>> 0`
