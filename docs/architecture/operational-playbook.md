@@ -1652,6 +1652,8 @@ Missing: a measured cost.
 
 Core's instance buffer (96 B a row, doubling with the meshes of one geometry) is bound by core only through `setVertexBuffer`, for draws and picks, so `maxStorageBufferBindingSize` never applies to it inside core; only `maxBufferSize` does, checked when the buffer is made. The `instances` case of `scale.browser.mjs` draws 1,200,000 boxes of one geometry (2,097,152 rows, 201 MB) with the same pixels as two geometries of 600,000, with no validation error, natively and on the WebGL2 layer, on the code before and after 2026-11-10. The storage-binding limit is a contract for packages that bind `geometryBuffers(g).instance` themselves: bind the rows in use with `offset` and `size` (`CulledMeshes`, c106034b1); `FrontToBack` in `@margoengine/culling` (through `InstanceSorter`) still binds the whole buffer (docs/known-bugs.md).
 
+The backbuffer's per-side cap is the device's `maxTextureDimension2D` (the canvas texture, the MSAA colour target and the depth target all share it), not a fixed 4096; when it applies both sides scale together so the CSS aspect holds. The pixel-ratio cap (at most 2, and at most 4 / samples, so 1 with 4x MSAA) and the quality tier's cap are unchanged, so a desktop canvas draws at most its CSS pixels with 4x MSAA as before: only canvases whose longer side passes 4096 such pixels (5120 ultrawide, 8K) draw more pixels now, as the display asks. A fallback renderer with no WebGPU device keeps 4096. Evidence: `packages/core/tests/backbuffer-cap.test.js` (stub limits 8192 and 16384, the aspect, the fallback) and the `backbuffer` case of `scale.browser.mjs` (5120 x 1440 kept and 10240 x 16 cut to 8192 x 13 on an 8192 device, natively and on the WebGL2 layer; 4096 x 1152 on the code before). Core does not ask for the adapter's `maxTextureDimension2D`, so a device has WebGPU's 8192 unless a package asks for more. Missing: frame time at 5120 x 1440 (speed phase).
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |
@@ -2248,8 +2250,8 @@ authority; the discrepancy should be removed when that area changes.
 `ResolutionScaler` defaults to a 12 ms budget, scale 0.5-1.0, a 30-sample window, 0.05 granularity, and eight ignored
 samples after a change. Over-budget scale falls approximately with the square root of target/current cost, never by
 more than 30% at once. A rise needs sustained cost below 70% of budget; an immediately reversed rise doubles holdoff
-up to 32 decisions. Core sizes to the lower of device pixel ratio, quality cap, sample-count cap, and 4096 pixels per
-side. Exact-size mode bypasses resizing.
+up to 32 decisions. Core sizes to the lower of device pixel ratio, quality cap, sample-count cap, and the device's
+`maxTextureDimension2D` per side (4096 before 2026-11-10; still 4096 for a fallback renderer with no WebGPU device). Exact-size mode bypasses resizing.
 
 `supersample` (`@margoengine/quality/ssaa`) makes stills: it renders whole frames into a view target with the camera's
 clip-space x and y moved along a Halton (2, 3) sequence, keeps running sums in linear light in `rgba32float`, and encodes

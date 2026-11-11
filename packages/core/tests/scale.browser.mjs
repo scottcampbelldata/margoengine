@@ -7,6 +7,9 @@
 // - instances: 1,200,000 boxes of one geometry (its instance buffer grows to 2,097,152 rows, 201 MB, past one 128 MiB
 //   storage binding) draw with no validation error or device loss, the same pixels as the field split over two
 //   geometries of 600,000 (each buffer under one binding).
+// - backbuffer: a 5120 x 1440 CSS canvas keeps 5120 x 1440 backing pixels on a device whose 2D textures go past 5120
+//   (before 2026-11-10 a fixed 4096 cap made it 4096 x 1152); one 1.25 times wider than the device limit is cut to the
+//   limit with its aspect kept. Both draw with no validation error.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -130,6 +133,26 @@ const cases = {
       drawn: engines.map((e) => e.stats.visible),
     };
   },
+  async backbuffer() {
+    const { Engine, box, PbrMaterial } = await import('/packages/core/dist/index.js');
+    const canvas = document.querySelector('canvas'),
+      results = [];
+    for (const wide of [5120, 0]) {
+      const engine = await Engine.create(canvas, { camera: { position: [0, 0, 5], target: [0, 0, 0] } }),
+        limit = engine.gpu.limits.maxTextureDimension2D,
+        errors = [];
+      engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+      const css = wide ? [wide, 1440] : [Math.round(limit * 1.25), 16];
+      canvas.style.width = `${css[0]}px`;
+      canvas.style.height = `${css[1]}px`;
+      engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#ff8000' }));
+      engine.render();
+      await engine.gpu.queue.onSubmittedWorkDone();
+      results.push({ css, limit, backing: [canvas.width, canvas.height], dpr: devicePixelRatio, errors });
+      engine.dispose();
+    }
+    return { results };
+  },
 };
 
 const shot = async (page, selector = 'canvas') => decodePNG(await page.locator(selector).first().screenshot());
@@ -166,6 +189,13 @@ const checks = {
     result.field = field;
     assert.equal(differing, 0, 'one geometry and two halves draw the same pixels');
     assert.ok(field > a.data.length / 4 / 4, 'the field covers the view');
+  },
+  backbuffer({ results: [wide, past] }) {
+    assert.equal(wide.dpr, 1);
+    assert.ok(wide.limit >= 8192, `a device allowing 8192 (${wide.limit})`);
+    assert.deepEqual(wide.backing, [5120, 1440], 'a 5120 x 1440 canvas is not reduced');
+    assert.deepEqual(past.backing, [past.limit, Math.round((16 * past.limit) / past.css[0])], 'cut to the limit, aspect kept');
+    assert.deepEqual([...wide.errors, ...past.errors], []);
   },
 };
 

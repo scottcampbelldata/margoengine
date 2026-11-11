@@ -697,7 +697,7 @@ with identical output; tiny grids select the direct stencil when cheaper. Counts
 include intermediate and centre reads, exclude initialization, copies, allocation
 and compilation. No elapsed-time, SIMD gain or rival-speed claim is made.
 
-Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 24664 B gzip, strictly below 25000 B.
+Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 24686 B gzip, strictly below 25000 B.
 
 ## Texture baker and WebGL2 tiers
 

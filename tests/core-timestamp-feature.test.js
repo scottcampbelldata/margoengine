@@ -46,6 +46,8 @@ function harness(t, offered) {
       };
       const device = {
         features: new Set(descriptor.requiredFeatures),
+        // A real GPUDevice always has limits; core sizes the backbuffer to maxTextureDimension2D.
+        limits: { maxTextureDimension2D: 8192 },
         resources,
         queries: 0,
         destroyed: false,

@@ -1036,8 +1036,9 @@ export class Engine {
     const dpr = Math.min(globalThis.devicePixelRatio ?? 1, globalThis.margoLow || 2, 4 / sceneSamples()),
       wide = Math.round(this.canvas.clientWidth * dpr) || this.canvas.width,
       tall = Math.round(this.canvas.clientHeight * dpr) || this.canvas.height,
-      // One scale for both sides keeps the CSS aspect when the longer side passes 4096: 5120 x 1440 is 4096 x 1152.
-      fit = Math.min(1, 4096 / Math.max(wide, tall)),
+      // One scale for both sides keeps the CSS aspect when the longer side passes the device's largest 2D texture (the
+      // MSAA and depth targets share it): 10240 x 1440 on an 8192 device is 8192 x 1152. A fallback without a device: 4096.
+      fit = Math.min(1, (this.gpu?.limits.maxTextureDimension2D ?? 4096) / Math.max(wide, tall)),
       width = Math.max(1, Math.round(wide * fit)),
       height = Math.max(1, Math.round(tall * fit));
     if (this.canvas.width !== width) this.canvas.width = width;

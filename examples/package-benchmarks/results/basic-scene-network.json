@@ -1,5 +1,5 @@
 {
-  "commit": "9fb5beacb9",
+  "commit": "f22c8278d4",
   "dirty": true,
   "browser": "msedge 157.0.4341.42 headless",
   "buildManifest": {
@@ -341,7 +341,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-D0jRferE.js",
+      "file": "assets/index-kAHB06kL.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -366,8 +366,8 @@
       "encoding": "identity",
       "transferred": 969,
       "raw": 719,
-      "gzip": 410,
-      "brotli": 260
+      "gzip": 411,
+      "brotli": 261
     },
     {
       "path": "assets/version-YYhCZP03.js",
@@ -379,15 +379,6 @@
       "brotli": 526
     },
     {
-      "path": "assets/preload-helper-CRzLMJPS.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 1168,
-      "raw": 1534,
-      "gzip": 798,
-      "brotli": 682
-    },
-    {
       "path": "assets/geometry-DkjIhA1v.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -397,13 +388,22 @@
       "brotli": 1810
     },
     {
-      "path": "assets/index-D0jRferE.js",
+      "path": "assets/preload-helper-CRzLMJPS.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 1168,
+      "raw": 1534,
+      "gzip": 798,
+      "brotli": 682
+    },
+    {
+      "path": "assets/index-kAHB06kL.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 26853,
-      "raw": 64429,
-      "gzip": 26471,
-      "brotli": 23350
+      "transferred": 26873,
+      "raw": 64471,
+      "gzip": 26491,
+      "brotli": 23365
     },
     {
       "path": "model.glb",
@@ -435,10 +435,10 @@
   ],
   "total": {
     "requests": 8,
-    "transferred": 42014,
-    "raw": 92416,
-    "gzip": 38124,
-    "brotli": 33601
+    "transferred": 42034,
+    "raw": 92458,
+    "gzip": 38145,
+    "brotli": 33617
   },
   "notFetched": [
     {
