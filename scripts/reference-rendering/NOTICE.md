@@ -71,3 +71,7 @@ Job 4: AttenuationTest, glTF-Sample-Assets 8f492390ddc7a2ae221a1369ef560589cf8c7
 CC-BY-4.0, Analytical Graphics, Inc., Ed Mackey, 2021. Original GLB SHA-256 7ca161b7f8a9e4b2ac1f7f75816b5848bb31f3b4c226c4cb731b487c8809b756.
 Original GLB/legal README, matched GLB, Sample Viewer PNG and Cycles EXR/linear/PNG files stay
 outside in engine-bench/batch-160/volume; result JSON records the frozen hashes.
+
+Job 5: SpecularTest, 8f492390ddc7a2ae221a1369ef560589cf8c70fb, CC-BY-4.0, Analytical Graphics, Inc., Ed Mackey, 2021. Original GLB SHA-256 cf789c68c3ab4b74877da3c5992c612c213f9c901ed4fafbf9be362f434e48d9. Source GLB/legal README and matched scene/reference pictures remain outside in engine-bench/batch-160/specular; frozen result records their hashes. No viewer source read.
+
+Job 5: IORTestGrid, 8f492390ddc7a2ae221a1369ef560589cf8c70fb, CC0-1.0, Eric Chadwick, 2023. Original GLB SHA-256 863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12. Source GLB/legal README and matched scene/reference pictures remain outside in engine-bench/batch-160/ior; frozen result records their hashes. No viewer source read.

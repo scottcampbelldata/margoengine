@@ -2110,6 +2110,8 @@ Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed sha
 
 Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
 
+Batch 160 job 5: SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. 512 x 512, fixed camera/white sun, black background, no IBL, neutral/sRGB, all RGB pixels counted; native WebGL2 explicitly refuses PBR. NVIDIA and AMD differ by under 0.7 percent of absolute error through hardware filtering and float-to-unorm rounding, which the APIs leave to the implementation, so each adapter keeps its own first measurement; the AMD WebGL2 figure includes the Direct3D 11 trilinear blend difference recorded below. Budgets: whitepaper/results/batch-160-specular.json and batch-160-ior.json. Direct-light evidence alone, no physical or IBL equivalence.
+
 Batch 99 heterogeneous RGB media: optional voxel-pathtracer/media adds finite RGB extinction coefficients
 in 0..1000000 per world unit on media palette materials. Explicit extinction overrides scalar density;
 absent means [density,density,density], density default 1. Single-scattering albedo stays color and phase

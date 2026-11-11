@@ -1,0 +1,140 @@
+{
+  "date": "2026-11-10",
+  "commit": "3432961089",
+  "mips": "65098f33fe area-filter mip chain (main); budgets measured earlier on other mip chains are void",
+  "selection": {
+    "nvidia": {
+      "MARGO_GPU": "nvidia"
+    },
+    "amd": {
+      "MARGO_GPU": "amd",
+      "GPU_POWER": "low-power"
+    }
+  },
+  "drivers": {
+    "nvidia": "32.0.16.1742",
+    "amd": "32.0.21042.62"
+  },
+  "proofs": [
+    {
+      "family": "specular",
+      "adapter": "nvidia",
+      "backend": "native",
+      "report": "../engine-bench/batch-160/specular/C:\\Development\\Projects\\engine-bench\\batch-160\\specular\\proof-native-1794372867987-77392/proof.json",
+      "reportSha256": "db85d50c269811378970616067283667a8670383f04b88df484069477a7c6fd2",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "4ca8f5ab682a254e9f178678d4bc8b36e1adbe7a6f75a0de0a23c881acfd9e20",
+      "primitives": 24,
+      "adapterDescription": "nvidia",
+      "budget": 877419,
+      "absolute": 877419
+    },
+    {
+      "family": "specular",
+      "adapter": "nvidia",
+      "backend": "compat",
+      "report": "../engine-bench/batch-160/specular/C:\\Development\\Projects\\engine-bench\\batch-160\\specular\\proof-compat-1794372878624-75396/proof.json",
+      "reportSha256": "98d227ccf0bbb490d5fa520bcbbe76d5f7d36ca54806cc54d20daec50d27be89",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "c1e3c122dc2a2cd77243a995c1ec875ebab586e3283b3a626af5a92be1124a4a",
+      "primitives": 24,
+      "adapterDescription": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "budget": 877434,
+      "absolute": 877434
+    },
+    {
+      "family": "specular",
+      "adapter": "amd",
+      "backend": "native",
+      "report": "../engine-bench/batch-160/specular/C:\\Development\\Projects\\engine-bench\\batch-160\\specular\\proof-native-1794372963276-42268/proof.json",
+      "reportSha256": "b216630a44b631ca779068d01a58ccfb66085b27ac94836e751226daeab7909c",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "ea8a91245ad739de9966ce69a62859ae0b1d2aef76aceb1739c6e9310c52e5e8",
+      "primitives": 24,
+      "adapterDescription": "amd",
+      "budget": 879167,
+      "absolute": 879167
+    },
+    {
+      "family": "specular",
+      "adapter": "amd",
+      "backend": "compat",
+      "report": "../engine-bench/batch-160/specular/C:\\Development\\Projects\\engine-bench\\batch-160\\specular\\proof-compat-1794372973362-82848/proof.json",
+      "reportSha256": "e7dfb0fd5881763fe753ca9e2056f8750ba026b1bda251c28dce785e99888538",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "807078c6b495477510ff0b1b93c1d2972baa1047c8b5553d116ccae2b6ce3ede",
+      "primitives": 24,
+      "adapterDescription": "WebGL2 compatibility layer (full) on ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "budget": 873364,
+      "absolute": 873364
+    },
+    {
+      "family": "ior",
+      "adapter": "nvidia",
+      "backend": "native",
+      "report": "../engine-bench/batch-160/ior/C:\\Development\\Projects\\engine-bench\\batch-160\\ior\\proof-native-1794372888688-105928/proof.json",
+      "reportSha256": "2489a387cd805e2bf1f028eaa3f37454f125dc92d7005b803e031e2dface648f",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "d27ddef4e184bf742a8087cb2c67c8c2e55688767fe870253b6faacd08a402ae",
+      "primitives": 23,
+      "adapterDescription": "nvidia",
+      "budget": 2425911,
+      "absolute": 2425911
+    },
+    {
+      "family": "ior",
+      "adapter": "nvidia",
+      "backend": "compat",
+      "report": "../engine-bench/batch-160/ior/C:\\Development\\Projects\\engine-bench\\batch-160\\ior\\proof-compat-1794372924357-65228/proof.json",
+      "reportSha256": "ec3dfd766299bb29d92377068fa8c5e4cae9e3a4451d7c04276ebfeba04bd65f",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "d27ddef4e184bf742a8087cb2c67c8c2e55688767fe870253b6faacd08a402ae",
+      "primitives": 23,
+      "adapterDescription": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "budget": 2425911,
+      "absolute": 2425911
+    },
+    {
+      "family": "ior",
+      "adapter": "amd",
+      "backend": "native",
+      "report": "../engine-bench/batch-160/ior/C:\\Development\\Projects\\engine-bench\\batch-160\\ior\\proof-native-1794372986642-11272/proof.json",
+      "reportSha256": "04929eb4125e37bda38972016fb49c35f24929adbe14a4e0b30bed2703906333",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "e88be982230a6782a76c44405aa9ccbfe8ad26321d3f8e65280cbc2c205c5298",
+      "primitives": 23,
+      "adapterDescription": "amd",
+      "budget": 2424867,
+      "absolute": 2424867
+    },
+    {
+      "family": "ior",
+      "adapter": "amd",
+      "backend": "compat",
+      "report": "../engine-bench/batch-160/ior/C:\\Development\\Projects\\engine-bench\\batch-160\\ior\\proof-compat-1794373024307-42908/proof.json",
+      "reportSha256": "bb0ed28e0e4041ce5c10c22de66fe4d6a98495a91e5839e2d369179929d5a3de",
+      "processes": 3,
+      "captures": 72,
+      "variants": 1,
+      "decodedRGBASha256": "1e453ba8a22e3f0cef8834814aa0df7da7477a106977f07bd5898fbac1d4f342",
+      "primitives": 23,
+      "adapterDescription": "WebGL2 compatibility layer (full) on ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "budget": 2426643,
+      "absolute": 2426643
+    }
+  ]
+}

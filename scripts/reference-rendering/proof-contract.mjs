@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict';
 import { assertBudget } from './compare.mjs';
 
+/**
+ * The Sample Viewer budget for one backend. A result measured separately on the AMD adapter (an `amd` section with
+ * the same scene and reference) gates AMD proofs; every other adapter uses the top-level NVIDIA measurement.
+ */
+export function viewerBudget(baseline, compat, vendor) {
+  const own = vendor === 'amd' ? baseline.amd : undefined;
+  if (!own) return compat ? baseline.compat.metrics : baseline.metrics;
+  const row = compat ? own.compat : own.native;
+  for (const key of ['sourceSha256', 'sceneSha256', 'referenceSha256'])
+    assert.equal(row[key], baseline[key], `The AMD budget must use the frozen ${key}`);
+  if (compat)
+    assert.match(row.hardware.webglRenderer, /AMD Radeon/i, 'The AMD budget must come from the Radeon adapter');
+  else assert.equal(row.hardware.webgpu.vendor, 'amd', 'The AMD budget must come from the AMD adapter');
+  return row.metrics;
+}
+
 /** Validate every capture; an incomplete or repeating subset cannot establish a repeatability proof. */
 export function assertReferenceProof(report, baseline, references, vendor) {
   assert.equal(report.runs.length, 3, 'Three fresh browser processes are required');
@@ -21,6 +37,11 @@ export function assertReferenceProof(report, baseline, references, vendor) {
         if (report.compat)
           assert.match(row.adapter.description, /AMD Radeon/i, 'The render device must be the Radeon adapter');
         else assert.equal(row.adapter.vendor, 'amd', 'The render device must be the AMD adapter');
+      }
+      if (vendor === 'nvidia') {
+        if (report.compat)
+          assert.match(row.adapter.description, /NVIDIA/i, 'The render device must be the NVIDIA adapter');
+        else assert.equal(row.adapter.vendor, 'nvidia', 'The render device must be the NVIDIA adapter');
       }
       for (const ref of references) {
         assert.equal(row.metrics[ref.name].pixels, 512 * 512, 'Every pixel must be compared');

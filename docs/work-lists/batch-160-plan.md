@@ -24,4 +24,6 @@ operational evidence and build record with each result. Run lint, hygiene, verif
 package checks with hard deadlines before rebasing and pushing. Mark the list row done only after job 8.
 
 Completed: job 1 on cfe0d2b54; job 2 clearcoat plus all 14 missing-asset skip removals.
-Job 3 sheen is complete. Jobs 4 through 8 remain; the list-1 row stays open.
+Job 3 sheen is complete. Jobs 4 and 6 to 8 are on main. Job 5 (specular and IOR) landed on 2026-11-10,
+measured on main's area-filter mip chain (65098f33fe). The list-1 row stays open for the NVIDIA
+multisample blend variation and the AMD voxel denoise watchdog (docs/known-bugs.md).

@@ -67,6 +67,26 @@ export const cases = {
       camera: { position: [0, 0, 40], target: [0, 0, 0], fov: 35, near: 0.01, far: 100 },
     },
   },
+  specular: {
+    model: 'SpecularTest',
+    license: 'CC-BY-4.0, Analytical Graphics, Inc., Ed Mackey, 2021',
+    sourceSha256: 'cf789c68c3ab4b74877da3c5992c612c213f9c901ed4fafbf9be362f434e48d9',
+    scale: 1,
+    settings: {
+      ...SETTINGS,
+      camera: { position: [-0.188, 0, 2.2], target: [-0.188, 0, 0], fov: 35, near: 0.01, far: 100 },
+    },
+  },
+  ior: {
+    model: 'IORTestGrid',
+    license: 'CC0-1.0, Eric Chadwick, 2023',
+    sourceSha256: '863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12',
+    scale: 1,
+    settings: {
+      ...SETTINGS,
+      camera: { position: [-0.068, 0.046, 1.5], target: [-0.068, 0.046, 0], fov: 35, near: 0.01, far: 100 },
+    },
+  },
 };
 
 export function referenceCase(name) {

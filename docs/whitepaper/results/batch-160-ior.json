@@ -1,0 +1,267 @@
+{
+  "family": "ior",
+  "domain": "RGB bytes after Khronos PBR Neutral and sRGB; all pixels, black background",
+  "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+  "sceneSha256": "0efb10537295b9b5a9d57ef6bc671d80fdd97e7e571dee2fcdc33d79d57e03f8",
+  "referenceSha256": "1dfe3cf55e0f25feec5152d97044b91f7983063775815845a5a6993cb49d0898",
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "margo": {
+    "adapter": {},
+    "backend": "webgpu",
+    "draws": 23,
+    "primitives": 23,
+    "width": 512,
+    "height": 512
+  },
+  "nativeWebGL2": {
+    "code": "unsupported",
+    "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
+  },
+  "metrics": {
+    "pixels": 262144,
+    "absolute": 2425911,
+    "square": 72834015,
+    "max": 255,
+    "mae": 3.084705352783203,
+    "rmse": 9.623577260474926,
+    "foreground": 94387,
+    "foregroundAbsolute": 2425911,
+    "foregroundMae": 8.567249727187006,
+    "changed": 82926
+  },
+  "compat": {
+    "family": "ior",
+    "domain": "RGB bytes after Khronos PBR Neutral and sRGB; all pixels, black background",
+    "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+    "sceneSha256": "0efb10537295b9b5a9d57ef6bc671d80fdd97e7e571dee2fcdc33d79d57e03f8",
+    "referenceSha256": "1dfe3cf55e0f25feec5152d97044b91f7983063775815845a5a6993cb49d0898",
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "margo": {
+      "adapter": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      },
+      "backend": "webgpu",
+      "draws": 23,
+      "primitives": 23,
+      "width": 512,
+      "height": 512
+    },
+    "nativeWebGL2": {
+      "code": "unsupported",
+      "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
+    },
+    "metrics": {
+      "pixels": 262144,
+      "absolute": 2425911,
+      "square": 72834015,
+      "max": 255,
+      "mae": 3.084705352783203,
+      "rmse": 9.623577260474926,
+      "foreground": 94387,
+      "foregroundAbsolute": 2425911,
+      "foregroundMae": 8.567249727187006,
+      "changed": 82926
+    }
+  },
+  "amd": {
+    "native": {
+      "family": "ior",
+      "domain": "RGB bytes after Khronos PBR Neutral and sRGB; all pixels, black background",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "sceneSha256": "0efb10537295b9b5a9d57ef6bc671d80fdd97e7e571dee2fcdc33d79d57e03f8",
+      "referenceSha256": "1dfe3cf55e0f25feec5152d97044b91f7983063775815845a5a6993cb49d0898",
+      "hardware": {
+        "webglRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "amd",
+          "architecture": "rdna-2",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "low-power",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "margo": {
+        "adapter": {},
+        "backend": "webgpu",
+        "draws": 23,
+        "primitives": 23,
+        "width": 512,
+        "height": 512
+      },
+      "nativeWebGL2": {
+        "code": "unsupported",
+        "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 2424867,
+        "square": 72838947,
+        "max": 255,
+        "mae": 3.0833778381347656,
+        "rmse": 9.623903088177622,
+        "foreground": 94389,
+        "foregroundAbsolute": 2424867,
+        "foregroundMae": 8.56338132621386,
+        "changed": 82935
+      }
+    },
+    "compat": {
+      "family": "ior",
+      "domain": "RGB bytes after Khronos PBR Neutral and sRGB; all pixels, black background",
+      "sourceSha256": "863cf24d0e48892ec830a7c712e4eb8bf5c0fd6cc2ae2f34d213b216f0bd6c12",
+      "sceneSha256": "0efb10537295b9b5a9d57ef6bc671d80fdd97e7e571dee2fcdc33d79d57e03f8",
+      "referenceSha256": "1dfe3cf55e0f25feec5152d97044b91f7983063775815845a5a6993cb49d0898",
+      "hardware": {
+        "webglRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer (full) on ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "low-power",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      },
+      "margo": {
+        "adapter": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer (full) on ANGLE (AMD, AMD Radeon(TM) Graphics (0x000013C0) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+        },
+        "backend": "webgpu",
+        "draws": 23,
+        "primitives": 23,
+        "width": 512,
+        "height": 512
+      },
+      "nativeWebGL2": {
+        "code": "unsupported",
+        "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
+      },
+      "metrics": {
+        "pixels": 262144,
+        "absolute": 2426643,
+        "square": 72986541,
+        "max": 255,
+        "mae": 3.0856361389160156,
+        "rmse": 9.633648640401464,
+        "foreground": 94389,
+        "foregroundAbsolute": 2426643,
+        "foregroundMae": 8.569653243492356,
+        "changed": 82858
+      }
+    }
+  },
+  "viewer": {
+    "url": "https://github.khronos.org/glTF-Sample-Viewer-Release/?model=https://margo-reference.invalid/scene.glb",
+    "resources": [
+      "https://github.khronos.org/glTF-Sample-Viewer-Release/libs/libktx.js",
+      "https://github.khronos.org/glTF-Sample-Viewer-Release/assets/index-CYJ9ofKn.js",
+      "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/model-index.json"
+    ],
+    "gl": {
+      "attributes": {
+        "alpha": false,
+        "antialias": true,
+        "depth": true,
+        "desynchronized": false,
+        "failIfMajorPerformanceCaveat": false,
+        "powerPreference": "default",
+        "premultipliedAlpha": true,
+        "preserveDrawingBuffer": false,
+        "stencil": false,
+        "xrCompatible": false
+      },
+      "samples": 4
+    },
+    "settings": {
+      "width": 512,
+      "height": 512,
+      "camera": {
+        "position": [
+          -0.068,
+          0.046,
+          1.5
+        ],
+        "target": [
+          -0.068,
+          0.046,
+          0
+        ],
+        "fov": 35,
+        "near": 0.01,
+        "far": 100
+      },
+      "light": {
+        "direction": [
+          0.4,
+          0.7,
+          0.6
+        ],
+        "intensity": 3
+      }
+    },
+    "referenceSha256": "1dfe3cf55e0f25feec5152d97044b91f7983063775815845a5a6993cb49d0898"
+  },
+  "source": {
+    "repository": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+    "commit": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
+    "model": "IORTestGrid",
+    "license": "CC0-1.0, Eric Chadwick, 2023"
+  }
+}

@@ -1530,13 +1530,24 @@ scripts/reference-rendering/NOTICE.md. Reports stay outside under
 engine-bench/batch-160/determinism; the committed summary is
 results/batch-160-determinism.json. No renderer or driver implementation is read.
 
-Full-scene reproductions still live on batch-160-job5-parked:
-GPU-locked scripts/reference-rendering/repeat.mjs --case=ior, and
---case=volume --compat. Both compare 24 complete-scene frames with unchanged inputs
-and budgets. Volume full-Cycles absolute error still spans 13,792,000..13,792,003
-against 13,792,000; native IOR spans 2,423,418..2,423,421 against 2,423,418. AMD repeats
-are stable but its IOR absolute error is 2,424,918, so changing adapter does not
-satisfy the original gate. Both jobs remain parked until repaired.
+The earlier full-scene IOR and volume repeat reproductions ran on a parked branch that has
+since been deleted; jobs 4 and 5 now reproduce from main (see "Batch 160 job 5" below).
+
+### Batch 160 job 5: specular and IOR
+
+Use the job 1 commands with `--case=specular` and `--case=ior` (Khronos SpecularTest and
+IORTestGrid, pinned at 8f492390ddc7a2ae221a1369ef560589cf8c70fb; NOTICE in
+scripts/reference-rendering). After `npm run build:packages`, each capture runs through the
+GPU lock, for example
+`node scripts/gpu-lock.mjs run --owner=<lane> --max=10 --gpu="reference capture" -- node scripts/reference-rendering/run.mjs --case=ior`
+and the same with `--compat`. Repeat proofs, under the same lock:
+`MARGO_GPU=nvidia node scripts/reference-rendering/proof.mjs --case=ior`, or with
+`MARGO_GPU=amd GPU_POWER=low-power` for the Radeon adapter, each with and without `--compat`.
+Every proof is three fresh browser processes, four devices and six frames, all 72 decoded
+captures identical. The top-level budgets are the NVIDIA RTX A6000 measurement; an `amd` section
+measured once on the Radeon adapter gates AMD proofs (proof-contract.mjs `viewerBudget`). All
+budgets were measured on main's area-filter mip chain (65098f33fe); earlier measurements on other mip
+chains are void. SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. Proof report hashes: results/batch-160-job5-proofs.json.
 
 ## Batch 65 roads
 

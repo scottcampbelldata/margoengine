@@ -10,7 +10,7 @@ import { prepareScene } from './scene.mjs';
 import { referenceCase } from './cases.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { pictureError } from './compare.mjs';
-import { assertReferenceProof } from './proof-contract.mjs';
+import { assertReferenceProof, viewerBudget } from './proof-contract.mjs';
 
 const family = process.argv.find((arg) => arg.startsWith('--case='))?.slice(7) ?? 'volume';
 const entry = referenceCase(family);
@@ -41,7 +41,7 @@ await add(
   'viewer',
   join(root, family, 'sample-viewer.png'),
   baseline.referenceSha256,
-  compat ? baseline.compat.metrics : baseline.metrics,
+  viewerBudget(baseline, compat, process.env.MARGO_GPU),
 );
 if (family === 'volume' || family === 'transmission') {
   const transport = JSON.parse(readFileSync(`docs/whitepaper/results/batch-160-${family}-transport.json`));

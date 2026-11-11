@@ -4305,6 +4305,8 @@ Batch 160 section 5 job 7 adds external constant-furnace IBL evidence for the fu
 
 Batch 160 section 5 job 8 adds independent direct-light picture evidence on the existing Cornell fixture: directional bounded orthographic shadows and point compute selection/six-face shadows, each with unshadowed control, on WebGPU and real compatibility. All pixels, default PCF/bias and exact first budgets are retained. Tests preserve every fixture quad/reflectance and frozen reference count/hash/budget; native WebGL2 explicitly refuses. Contact/visibility residuals stay open, and point finite-range attenuation differs from the ray-traced emitter. This does not repeat the batch 168 bake or prove GI, many-light stress or all shadow types. No core, package renderer or speed result changed.
 
+Batch 160 section 5 job 5 adds outside specular and IOR picture evidence (SpecularTest, 24 primitives; IORTestGrid, 23) on WebGPU and real compatibility, measured on main's area-filter mip chain. Repeat proofs pass on both adapters of the dev PC with 72 identical captures each. The top-level budget is the NVIDIA measurement; reference proofs on the Radeon adapter take its own one-time measurement when the record holds one, and NVIDIA proofs now check the adapter as AMD proofs already did. No renderer, core or stage code changed. The NVIDIA multisample blend variation stays open as a separate item.
+
 ### Accumulated planar shadows: section 5 evidence (batch 56, job 2)
 
 staging/accumulate reuses the contact receiver, caster variants and lifecycle through protected projection,

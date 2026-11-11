@@ -197,3 +197,38 @@ test('Radeon continuation retains the original volume transport budgets', () => 
   assert.equal(budget.rows.direct.metrics.absolute, 1843497);
   assert.equal(budget.rows.direct.compat.metrics.absolute, 1843497);
 });
+
+// Batch 160 job 5, measured on main's area-filter mip chain (65098f33fe): NVIDIA rows are the shared budget, the AMD
+// rows gate AMD proofs. Each row: native absolute, compat absolute, native square, compat square.
+for (const [family, primitives, nvidia, amd] of [
+  ['specular', 24, [877419, 877434, 45728215, 45728542], [879167, 873364, 45728589, 45667350]],
+  ['ior', 23, [2425911, 2425911, 72834015, 72834015], [2424867, 2426643, 72838947, 72986541]],
+])
+  test(`${family} freezes the measured full-scene error on each adapter and PBR backend`, () => {
+    const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
+    const rows = [b, b.compat, b.amd.native, b.amd.compat];
+    const budgets = (native, compat) => [
+      native.metrics.absolute,
+      compat.metrics.absolute,
+      native.metrics.square,
+      compat.metrics.square,
+    ];
+    assert.deepEqual(budgets(rows[0], rows[1]), nvidia);
+    assert.deepEqual(budgets(rows[2], rows[3]), amd);
+    for (const row of rows) {
+      assert.equal(row.metrics.pixels, 512 * 512);
+      assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
+      assert.equal(row.margo.primitives, primitives);
+      assert.equal(row.nativeWebGL2.code, 'unsupported');
+      assert.equal(row.sourceSha256, referenceCase(family).sourceSha256);
+      assert.equal(row.sceneSha256, b.sceneSha256);
+      assert.equal(row.referenceSha256, b.referenceSha256);
+    }
+    assert.equal(b.viewer.referenceSha256, b.referenceSha256);
+    assert.deepEqual(
+      rows.map((row) => row.hardware.webgpu.vendor),
+      ['nvidia', 'margo-webgl2', 'amd', 'margo-webgl2'],
+    );
+    assert.match(b.compat.hardware.webglRenderer, /NVIDIA/);
+    assert.match(b.amd.compat.hardware.webglRenderer, /AMD Radeon/);
+  });

@@ -2110,6 +2110,15 @@ evidence and the batch 168 physical contact-shadow loss remain unchanged.
 | --- | --- | --- |
 | RGB-byte MAE 0.5777244567871094 / 0.5777206420898438 | [Frozen result](results/batch-160-iridescence.json), tests/reference-rendering.test.js | Complete 346-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
 
+### Batch 160 specular and IOR, job 5
+
+Claim: Margo's KHR_materials_specular and KHR_materials_ior paths render the complete Khronos
+SpecularTest and IORTestGrid scenes within frozen all-pixel budgets against the glTF Sample Viewer,
+repeatably. Proof: results/batch-160-specular.json, batch-160-ior.json and
+batch-160-job5-proofs.json (72 identical captures per adapter and backend on NVIDIA RTX A6000 and
+AMD RDNA 2, native and WebGL2 compatibility). SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. Direct-light pictures only; no physical,
+IBL, cross-vendor byte-equality or speed claim.
+
 ### Batch 160 constant-environment IBL, job 7
 
 | Measurement | Proof | Scope |
