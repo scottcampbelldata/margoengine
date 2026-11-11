@@ -82,7 +82,12 @@ try {
   // Quality 95 JPEG and quality 0.9 lossy WebP of a rendered cube: a wrong table or transform is off by far more.
   const MEAN = 1,
     MOST = 30;
-  for (const key of ['jpeg420', 'jpeg444', 'lossy']) {
+  if (f.lossyUnsupported) {
+    // This browser's canvas has no WebP encoder: the coded error is the right answer, not a measurement.
+    assert.equal(f.lossyUnsupported.code, 'unsupported', JSON.stringify(f.lossyUnsupported));
+    assert.match(f.lossyUnsupported.message, /cannot encode lossy WebP/);
+  }
+  for (const key of f.lossyUnsupported ? ['jpeg420', 'jpeg444'] : ['jpeg420', 'jpeg444', 'lossy']) {
     assert.ok(f[key].mean < MEAN && f[key].largest <= MOST, `${key}: mean ${f[key].mean}, largest ${f[key].largest}`);
   }
   assert.deepEqual(f.jpeg420.size, [256, 192]);
@@ -97,7 +102,7 @@ try {
   assert.ok(f.exr.high > 1, `the linear frame holds a value over 1 (${f.exr.high})`);
   assert.equal(f.exr.exact, 0, 'half floats read back from the EXR are the texture values');
   console.log(
-    `ok formats: jpeg ${f.jpeg420.bytes} B (4:2:0) ${f.jpeg444.bytes} B (4:4:4), mean ${f.jpeg420.mean.toFixed(2)} ${f.jpeg444.mean.toFixed(2)}; lossy webp ${f.lossy.bytes} B, mean ${f.lossy.mean.toFixed(2)}; exr peak ${f.exr.high}`,
+    `ok formats: jpeg ${f.jpeg420.bytes} B (4:2:0) ${f.jpeg444.bytes} B (4:4:4), mean ${f.jpeg420.mean.toFixed(2)} ${f.jpeg444.mean.toFixed(2)}; lossy webp ${f.lossy ? `${f.lossy.bytes} B, mean ${f.lossy.mean.toFixed(2)}` : 'unsupported here (coded error)'}; exr peak ${f.exr.high}`,
   );
 } finally {
   await context.close();

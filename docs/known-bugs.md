@@ -524,11 +524,14 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   recording when hidden). Playwright WebKit's MP4 of the same kind is right (1.5 s, 44 frames in AVFoundation).
 - **Needed to close:** the Safari recording run in Scott's list in docs/whitepaper/proof-audit.md, with the screen unlocked.
 
-### WebKit `headless` browser check: lossy WebP encode is refused (batch 121, 2026-11-10, open)
+### WebKit `headless` browser check: lossy WebP encode is refused (batch 121, 2026-11-10; check fixed 2026-11-11, WebKit run needs a Mac)
 
-- **What:** `packages/headless/tests/browser-check.mjs` passes its WebM and MP4 rows in Playwright WebKit and then stops on
-  `This runtime cannot encode lossy WebP`. WebKit's canvas has no WebP encoder, and the library says so with its coded error;
-  the check expects every browser to encode WebP. Not changed in batch 121.
+- **What:** `packages/headless/tests/browser-check.mjs` passed its WebM and MP4 rows in Playwright WebKit and then stopped on
+  `This runtime cannot encode lossy WebP`: WebKit's canvas has no WebP encoder, and the library says so with its coded error,
+  but the check expected every browser to encode WebP. `packages/headless/tests/browser-check.js` now probes the canvas:
+  where it has no WebP encoder the check requires the coded `unsupported` error instead of a measurement, and where it
+  has one it measures as before (Chromium native and compat pass). Playwright WebKit on Windows has no WebGPU adapter,
+  so the unsupported branch is unconfirmed until a Mac run.
 
 ### Batch 238 follow-up: transformed bitmap alpha precision
 
@@ -4929,7 +4932,7 @@ Lane G reran all twelve embedded historical predictor3 streams on the shipped
 Wasm; every stream still returns code5. The width repair above does not close
 this independent reconstruction gap.
 
-Outside this decoder repair: packageInputs in scripts/package-stamps.mjs omits native Rust folders (PACKAGE_INPUTS lists package.json, tsconfig.json, src and scripts), so a native-only edit can leave API freshness stamps unchanged. Repro: inspect packageInputs(root, 'decoders', manifest), then change native/draco/src/integer.rs; no listed input changes. Full builds still compile the crate. Tooling ownership; deferred under rule 6.
+Fixed 2026-11-11: packageInputs in scripts/package-stamps.mjs now lists the Rust folders `native` and `kernel`, so an edit there changes the package's API freshness stamp (cargo `target` stays skipped). Regression: tests/package-stamps.test.js (changed Rust file test).
 
 ### Batch 265 native React binding scope
 
@@ -5412,7 +5415,7 @@ The former crossfade-only live composition gap is closed for all four built-ins,
 
 Fixed for this landing: compatibility render pipelines accepted explicit layouts missing statically used resources, and async validation also emitted uncaptured errors. render.ts now checks the reflected resource interface and routes async failure only to rejection. device.test.js and compute-limits.test.js retain the regressions. The global WGSL corpus also lacked labels shaders already on main; a scoped real-GPU recording refresh now covers it for the owning package CPU gate. Recorded labels shader ownership is identified by exact equality to packages/labels/src/gpu-shader.ts.
 Batch 213 landing correction: the job 2 local rebase helper took maxima for unrelated size ceilings, restoring eight older limits and six stale umbrella keys. Job 3 restores the incoming main limits and removes those stale keys; the helper now applies only the job delta to incoming main, with a three-way check. No runtime, test or tolerance was changed for this correction.
-- Build gate concurrency finding (batch 222): running quality while React's subpath tests create and remove packages/react/tests/.subpaths-* can make quality's untracked-file snapshot read a deleted orbit-cube.js (ENOENT). Source: repoFiles includes temporary test outputs that disappear before cleanRoomGate reads them. Repro: run those CPU tests concurrently with quality; serialize the gates during the build phase. Owning quality scanner cleanup waits for the fix phase.
+- Fixed 2026-11-11: quality's scanners (clean-room, duplicates, tests floor) read repo files through readRepoFile, which skips a listed file removed before the read (the React `.subpaths-*` case was ignored earlier). Regression: tests/quality-inventory.test.js (scanners skip a removed file).
 
 
 Batch 216 job 1: no open physical-lens defect found. Invalid constructor settings, live edits and tracked focus reject before camera/DOF output writes; physical-lens.test.js covers this contract.

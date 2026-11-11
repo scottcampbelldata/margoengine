@@ -53,6 +53,26 @@ test('a new entry makes its package and the packages built after it stale, and n
   assert.deepEqual(stalePackages(root), []);
 });
 
+// Regression (2026-11-11): packageInputs left out the Rust crates, so an edit under native/ or kernel/ left every stamp
+// as it was and the API freshness check passed on a stale build.
+test('a changed Rust file under native or kernel makes its package stale', (t) => {
+  const { root, write, built, cleanup } = fixture();
+  t.after(cleanup);
+  write('packages/a/native/draco/src/lib.rs', 'pub fn a() {}\n');
+  write('packages/c/kernel/src/lib.rs', 'pub fn c() {}\n');
+  write('packages/c/kernel/target/debug/out.bin', 'build output\n');
+  built();
+  assert.deepEqual(stalePackages(root), []);
+  write('packages/a/native/draco/src/lib.rs', 'pub fn a() { 1; }\n');
+  assert.deepEqual(stalePackages(root), ['a', 'b']);
+  built();
+  write('packages/c/kernel/src/lib.rs', 'pub fn c() { 2; }\n');
+  assert.deepEqual(stalePackages(root), ['c']);
+  built();
+  write('packages/c/kernel/target/debug/out.bin', 'changed build output\n');
+  assert.deepEqual(stalePackages(root), [], 'a cargo target folder is not an input');
+});
+
 test('a changed source file, shared module or build tool makes the right packages stale', (t) => {
   const { root, write, built, cleanup } = fixture();
   t.after(cleanup);

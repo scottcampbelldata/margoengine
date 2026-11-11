@@ -15,6 +15,19 @@ export function repoFiles(root) {
     .filter((f) => f && existsSync(join(root, f)));
 }
 
+/**
+ * A listed file's content, or undefined when the file went between the listing and this read (an untracked temporary
+ * test output). A scanner skips it; every other read error still throws.
+ */
+export function readRepoFile(root, file, encoding) {
+  try {
+    return readFileSync(join(root, file), encoding);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
 /** [{ dir, name, manifest, entries: [{ subpath, specifier, dist, src }] }] sorted by dir. */
 export function packageList(root, files = repoFiles(root)) {
   const known = new Set(files);

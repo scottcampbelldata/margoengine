@@ -205,8 +205,21 @@ window.check.formats = async () => {
   }
   const opaque = await decoded(await encodeWebP(pixels), 'image/webp');
   out.opaque = distance(opaque.data, pixels.data);
-  const lossy = await encodeWebP(pixels, { quality: 0.9 });
-  out.lossy = { bytes: lossy.length, ...distance((await decoded(lossy, 'image/webp')).data, pixels.data) };
+  // Lossy WebP is the browser's own encoder. Where its canvas has none (WebKit hands back a PNG), the library must say
+  // so with its coded error; where it has one, the encode must work.
+  const probeCanvas = new OffscreenCanvas(1, 1);
+  probeCanvas.getContext('2d');
+  const probe = await probeCanvas.convertToBlob({ type: 'image/webp' });
+  if (probe.type === 'image/webp') {
+    const lossy = await encodeWebP(pixels, { quality: 0.9 });
+    out.lossy = { bytes: lossy.length, ...distance((await decoded(lossy, 'image/webp')).data, pixels.data) };
+  } else {
+    const refusal = await encodeWebP(pixels, { quality: 0.9 }).then(
+      () => 'encoded',
+      (error) => ({ code: error.code, message: error.message }),
+    );
+    out.lossyUnsupported = refusal;
+  }
   const texture = stack.sceneTexture,
     hdr = await readTexture(engine, texture),
     file = await encodeEXR(hdr),

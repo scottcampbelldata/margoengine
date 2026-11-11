@@ -6,9 +6,8 @@
 // Items: `untested <package>` -> 1, `unimported <specifier>` -> 1.
 // Coverage is not measured: node's --experimental-test-coverage over the whole suite costs more than the suite itself,
 // and a third-party tool (c8) is not allowed; the entry floor stands in for it.
-import { readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
-import { slash } from './packages.js';
+import { readRepoFile, slash } from './packages.js';
 
 const RUN = /^(tests\/[^/]+\.test\.js|packages\/[^/]+\/tests?\/[^/]+\.test\.js)$/;
 const HELPER = /^(tests\/[^/]+|packages\/[^/]+\/tests?\/[^/]+)\.(js|mjs)$/;
@@ -27,7 +26,8 @@ export function testsGate({ root, files, packages }) {
   const imported = new Set(); // specifiers
   const testedPackages = new Set();
   const scan = (file, isTest) => {
-    const text = readFileSync(join(root, file), 'utf8');
+    const text = readRepoFile(root, file, 'utf8');
+    if (text === undefined) return; // removed since the listing
     const own = /^packages\/([^/]+)\//.exec(file)?.[1];
     if (own && isTest) testedPackages.add(own);
     for (const [, s] of text.matchAll(/['"`]((?:@margoengine\/|margoengine|\.{1,2}\/|packages\/)[^'"`\s]*)['"`]/g)) {

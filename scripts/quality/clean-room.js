@@ -9,6 +9,7 @@
 //  - a mention in ALLOWED_MENTIONS: a test that asserts the engine is NOT used.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readRepoFile } from './packages.js';
 
 const LIBRARIES =
   'three(?:/[^\'"`]*)?|@react-three/[^\'"`]*|babylonjs|@babylonjs/[^\'"`]*|pixi\\.js|@pixi/[^\'"`]*|playcanvas|ogl|regl|twgl\\.js|@luma\\.gl/[^\'"`]*|aframe|cesium|filament|gl-matrix|wgpu-matrix';
@@ -39,7 +40,8 @@ export function cleanRoomGate({ root, files, packages }) {
   const items = {};
   for (const file of files) {
     if (!file.startsWith('packages/') || file in ALLOWED_MENTIONS) continue;
-    const bytes = readFileSync(join(root, file));
+    const bytes = readRepoFile(root, file);
+    if (!bytes) continue; // removed since the listing
     if (bytes.subarray(0, 8000).includes(0)) continue; // binary
     let count = 0;
     for (const m of bytes.toString('utf8').matchAll(ENGINES)) if (!THREE_CASE.test(m[0]) || m[0] === 'THREE') count++;

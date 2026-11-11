@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { readRepoFile } from './packages.js';
 import { isInstallKit } from '../umbrella.mjs';
 
 export const WINDOW = 6;
@@ -93,7 +94,9 @@ export function duplicatesGate({ root, files, packages }) {
   const lines = new Map(); // file -> normalised lines
   for (const file of sources) {
     const pkg = SOURCE.exec(file)[1];
-    const norm = normalise(readFileSync(join(root, file), 'utf8'));
+    const source = readRepoFile(root, file, 'utf8');
+    if (source === undefined) continue; // removed since the listing
+    const norm = normalise(source);
     lines.set(file, norm);
     const lineHashes = norm.map((l) => hash(l.text));
     for (let i = 0; i + WINDOW <= norm.length; i++) {
@@ -172,7 +175,8 @@ export function duplicatesGate({ root, files, packages }) {
   const families = {};
   for (const file of sources) {
     const pkg = SOURCE.exec(file)[1];
-    const text = readFileSync(join(root, file), 'utf8');
+    const text = readRepoFile(root, file, 'utf8');
+    if (text === undefined) continue; // removed since the listing
     for (const [name, pattern] of Object.entries(FAMILIES))
       if (pattern.test(text)) (families[name] ??= new Set()).add(pkg);
   }

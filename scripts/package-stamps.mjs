@@ -27,8 +27,8 @@ export const STAMP_DIR = 'test-results/package-stamps';
 
 /** Where every package build starts: build:packages runs build-modern, which imports the rest of the shared pipeline. */
 const BUILD_ENTRY = 'scripts/build-modern.js';
-/** Folders under a package that its build reads. */
-const PACKAGE_INPUTS = ['package.json', 'tsconfig.json', 'src', 'scripts'];
+/** Folders under a package that its build reads; `native` and `kernel` hold the Rust crates compiled to Wasm. */
+const PACKAGE_INPUTS = ['package.json', 'tsconfig.json', 'src', 'scripts', 'native', 'kernel'];
 const SKIP = new Set(['node_modules', 'dist', 'test-results', 'target']);
 // Relative module specifiers after `from`, `import` or `import(` (static, side-effect and dynamic imports, re-exports).
 // A specifier built in a template literal names no fixed file, so one holding `$` is left out.
