@@ -84,10 +84,24 @@ export interface MSFTMaterialLODOptions {
 }
 interface MaterialSlot {
   primitive: PBRPrimitive;
-  entry: MaterialLODEntry;
+  /** The chain of the material the primitive shows at full detail now (its file material or the selected variant's). */
+  entry?: MaterialLODEntry;
+  /** The variant material the primitive shows at full detail now; undefined for its own material. */
+  variant?: number;
+  /** The material object this controller last saw on the primitive; another means selectVariant or an edit replaced it. */
+  seen: unknown;
   center: readonly number[];
   radius: number;
   level: number;
+}
+/** The material KHR_materials_variants maps `primitive` to for the model's selected variant, if any. */
+function variantMaterial(model: PBRModel, primitive: PBRPrimitive): number | undefined {
+  const index = model.selectedVariant;
+  if (index === undefined) return undefined;
+  const mappings = primitive.definition.extensions?.KHR_materials_variants?.mappings as
+    | readonly { material: number; variants: readonly number[] }[]
+    | undefined;
+  return mappings?.find((m) => m.variants.includes(index))?.material;
 }
 let serial = 0;
 /**
@@ -118,9 +132,13 @@ export class MSFTMaterialLOD implements EnginePlugin {
     const entries = new Map(readMaterialLODs(model.asset.doc).map((entry) => [entry.material, entry]));
     this.hysteresis = hysteresis;
     this.bias = bias;
+    this.entries = entries;
     this.slots = [...model.primitives, ...model.pointsAndLines].flatMap((primitive) => {
-      const entry = entries.get(primitive.definition.material!);
-      if (!entry) return [];
+      const mappings = primitive.definition.extensions?.KHR_materials_variants?.mappings as
+        | readonly { material: number }[]
+        | undefined;
+      // Managed when the file material or any variant material has a chain; the chain in use follows the variant.
+      if (!entries.has(primitive.definition.material!) && !mappings?.some((m) => entries.has(m.material))) return [];
       const min = [Infinity, Infinity, Infinity],
         max = [-Infinity, -Infinity, -Infinity];
       for (let i = 0; i < primitive.vertices.length; i += 20)
@@ -130,8 +148,18 @@ export class MSFTMaterialLOD implements EnginePlugin {
         }
       const center = min.map((v, k) => (v + max[k]) / 2);
       const radius = Math.hypot(...min.map((v, k) => max[k] - v)) / 2;
-      return [{ primitive, entry, center, radius, level: 0 }];
+      const slot: MaterialSlot = { primitive, center, radius, level: 0, seen: undefined };
+      this.follow(slot);
+      return [slot];
     });
+  }
+  private readonly entries: Map<number, MaterialLODEntry>;
+  /** Starts a slot over at full detail of the material the primitive shows now. */
+  private follow(slot: MaterialSlot): void {
+    slot.variant = variantMaterial(this.model, slot.primitive);
+    slot.entry = this.entries.get(slot.variant ?? slot.primitive.definition.material!);
+    slot.level = 0;
+    slot.seen = slot.primitive.material;
   }
   /** Attaches a controller, after checking all material chains. */
   static attach(engine: EngineKernel, model: PBRModel, options?: MSFTMaterialLODOptions): MSFTMaterialLOD {
@@ -173,6 +201,9 @@ export class MSFTMaterialLOD implements EnginePlugin {
     const changes: { primitive: PBRPrimitive; material: number }[] = [],
       chosen: { slot: MaterialSlot; level: number }[] = [];
     for (const slot of this.slots) {
+      // selectVariant (or a direct material edit) put a full-detail material on the primitive: follow its chain.
+      if (slot.primitive.material !== slot.seen) this.follow(slot);
+      if (!slot.entry) continue;
       const m = meshRuntime(slot.primitive.node).matrix,
         [x, y, z] = slot.center;
       const wx = m[0] * x + m[4] * y + m[8] * z + m[12],
@@ -183,23 +214,33 @@ export class MSFTMaterialLOD implements EnginePlugin {
         ? Math.abs(c[3] * wx + c[7] * wy + c[11] * wz + c[15])
         : Math.hypot(wx - e.camera.position[0], wy - e.camera.position[1], wz - e.camera.position[2]);
       const coverage = w ? (radius * yScale) / (w * this.bias) : Infinity;
-      const threshold = (level: number) => slot.entry.screenCoverage?.[level - 1] ?? 0.25 * 0.5 ** (level - 1);
+      const entry = slot.entry,
+        threshold = (level: number) => entry.screenCoverage?.[level - 1] ?? 0.25 * 0.5 ** (level - 1);
       let next = 0;
-      while (next + 1 < slot.entry.levels.length && coverage <= threshold(next + 1)) next++;
+      while (next + 1 < entry.levels.length && coverage <= threshold(next + 1)) next++;
       if (next < slot.level && coverage <= threshold(slot.level) * (1 + this.hysteresis)) next = slot.level;
       if (next !== slot.level) {
-        changes.push({ primitive: slot.primitive, material: slot.entry.levels[next] });
+        changes.push({ primitive: slot.primitive, material: entry.levels[next] });
         chosen.push({ slot, level: next });
       }
     }
     if (changes.length) this.model.setPrimitiveMaterials(changes);
-    for (const { slot, level } of chosen) slot.level = level;
+    for (const { slot, level } of chosen) {
+      slot.level = level;
+      slot.seen = slot.primitive.material;
+    }
   }
   /** Restores the initial materials and releases the controller, retaining the caller-owned model. */
   dispose(): void {
     if (this.disposed) return;
+    // Back to full detail of the material in use (the selected variant's, else the file's); a primitive whose material
+    // another call replaced since is left as it is.
     if (!this.model.disposed)
-      this.model.setPrimitiveMaterials(this.slots.map(({ primitive }) => ({ primitive, material: undefined })));
+      this.model.setPrimitiveMaterials(
+        this.slots
+          .filter((slot) => slot.level > 0 && slot.primitive.material === slot.seen)
+          .map(({ primitive, variant }) => ({ primitive, material: variant })),
+      );
     this.disposed = true;
     const engine = this.engine;
     this.engine = undefined;

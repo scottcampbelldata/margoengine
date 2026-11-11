@@ -229,7 +229,7 @@ The fade patches core's mesh shader while `LODFade` is attached, and adds a ligh
 
 ## Levels from a file: `LOD.fromModel`
 
-A glTF with `MSFT_lod` loads its level nodes too, hidden, as `model.lods`; `extras.MSFT_screencoverage` gives the switches, read as the bounding sphere's height over the viewport's. Only node levels are read, not `MSFT_lod` on materials.
+A glTF with `MSFT_lod` loads its level nodes too, hidden, as `model.lods`; `extras.MSFT_screencoverage` gives the switches, read as the bounding sphere's height over the viewport's. `LOD.fromModel` reads node levels; `MSFT_lod` on materials is the next section.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -238,6 +238,21 @@ import {LOD, LODSystem} from 'margoengine/lod';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/city.glb');
 LOD.fromModel(LODSystem.attach(stage.engine), model);
+```
+
+### Material levels: `margoengine/lod/msft`
+
+`MSFTMaterialLOD` switches each primitive between a material and the lower-detail materials its `MSFT_lod` names, by the same coverage rule (default thresholds 0.25, 0.125, ... without hints), with `hysteresis` (default 0.1) and `bias` (default 1, above 1 picks coarser materials sooner). Geometry is kept; only the material bindings change. It follows `KHR_materials_variants`: after `model.selectVariant(name)` a primitive uses the chain of the variant's material (or none, when that material has no `MSFT_lod`), and `dispose()` leaves the selected variant's full-detail material in place.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {MSFTMaterialLOD} from 'margoengine/lod/msft';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/city.glb');
+const materials = MSFTMaterialLOD.attach(stage.engine, model, {hysteresis: 0.1});
+if (model.variants.length) model.selectVariant(0); // the controller switches to that variant's material chain
+console.log(materials.levels); // the level each managed primitive shows, 0 = full detail
 ```
 
 ## Levels built for you: `margoengine/lod/auto`

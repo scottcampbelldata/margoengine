@@ -1450,6 +1450,11 @@ private batch-273 handoff indexes each suite, failure and suspected cause.
 fragment-stage storage buffers and recommends weighted OIT. The base OIT check
 passes first. Review the advertised storage capabilities, the existing documented
 ExactOIT limit, and its refusal/help contract before changing either test or route.
+Closed 2026-11-11 (bug sweep L3b, KB1042j): the refusal is the documented contract (oit README,
+"Exact (ExactOIT)"), and since 5a6087049c `exact-check.mjs` under MARGO_COMPAT=1 asserts it: the coded
+`unsupported` with the message naming the fix (use OIT) at 1x and 4x, core's sorted blend and the weighted
+fallback drawing the layers. Passed under MARGO_COMPAT=1 on 6077d08e87. Regression:
+packages/oit/test/gpu/exact-check.mjs.
 
 
 ### Fixed 2026-11-09: voxel memory admission and browser revalidation
@@ -4544,6 +4549,12 @@ step 2. No repair commit or historical failure cause is established by this
 single passing control, so this is not claimed fixed. The KTX2 continuation's
 canonical FlightHelmet test is demo work and was not rerun during this sweep.
 
+Bug sweep L3b (KB1042a, KB4278b, 2026-11-11): five consecutive MARGO_COMPAT=1 runs of the
+unchanged check on 6077d08e87 (RTX A6000, ANGLE Direct3D 11, a shared GPU) passed every step with
+0 of 153,600 pixels different, shadowed move step 2 included. Closed as not reproduced; the
+regression guard is that exact check, packages/culling/test/gpu/dynamic-check.mjs (culling
+test:gpu, native and MARGO_COMPAT=1). A recurrence reopens it here with the failing step.
+
 The new optional tiers policy is not yet a completed parity row. Repro for the repaired
 copy class: on an LDR device, create two rgba32float textures, one
 sample-only (COPY_SRC | COPY_DST | TEXTURE_BINDING) and one additionally used as
@@ -5700,7 +5711,7 @@ No open defect found in the new volume/profile computations; boundary, transform
 ### Fixed: batch 217 inherited API summary merge boundaries
 
 Concurrent main contained nested conflict markers in docs/api-surface.md. Scoped api:update refused it, and api:check failed its generated-summary comparison. A full api:update regenerates the summary from the built exports; no unrelated API implementation changed. scripts/api-report-scope.mjs already rejects marked summaries, and the normal api:check remains the regression gate.
-Batch 222 job 2: authored material-chain checks found no remaining defect. External KHR_materials_variants and a material LOD controller both selecting a primitive require caller coordination; a unified selection policy is a fix-phase quality follow-up.
+Batch 222 job 2: authored material-chain checks found no remaining defect. Fixed 2026-11-11 (bug sweep L3b, KB5405b): KHR_materials_variants and MSFTMaterialLOD both selected a primitive's material. Repro: attach MSFTMaterialLOD, then `model.selectVariant(name)`: the variant's finest material stayed on a far primitive (the controller kept its old level), a variant selected before attach was ignored, and dispose put the file's material back over the variant. Cause: the controller read only each primitive's file material chain and restored `undefined` (the file material). Fix: the controller follows the material the primitive shows at full detail, the selected variant's mapping or else its file material, and its MSFT_lod chain; when selectVariant or an edit replaces the material it starts over at full detail of the new one; dispose restores that variant material. Regression: packages/lod/test/msft.test.js ("follows the selected KHR_materials_variants material", "variant selected before attach").
 
 Batch 222 job 2 scope receipt: msft-check passes native and compatibility, including later UV2, retained vertex buffers and original material restoration. Shader-review and extension checks pass both backends. The broader compatibility materials permutation reproduced a 16-fragment-sampler overflow (test-results/batch222-msft-gpu.log); fixed 2026-11-11 by aa3e347dac (complete physical permutations budgeted for compatibility sampler units, five base maps packed into shared float layers), with regressions in `packages/gltf-pro/tests/base-textures.test.js`, `materials-ext.test.js` and `tests/integration-json.test.js`.
 Batch 248 job 2: selection rectangles built; no new open defect identified in the job.

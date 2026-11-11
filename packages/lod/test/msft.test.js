@@ -183,3 +183,60 @@ test('material edits validate ownership and all indices before changing any prim
     e.dispose();
   }
 });
+test('material LOD follows the selected KHR_materials_variants material and restores the variant on dispose (KB5405b)', async () => {
+  // Both selected a primitive's material: selectVariant put the variant's finest material back over a coarse level,
+  // the controller kept the level of the old chain, and dispose restored the file's material over the variant.
+  const { e, model } = await fixture((d) => {
+    d.materials.push(
+      { pbrMetallicRoughness: { baseColorFactor: [1, 1, 0, 1] }, extensions: { MSFT_lod: { ids: [4] } } },
+      { pbrMetallicRoughness: { baseColorFactor: [0, 1, 1, 1] } },
+    );
+    d.extensionsUsed = ['KHR_materials_variants', 'MSFT_lod'];
+    d.extensions = { KHR_materials_variants: { variants: [{ name: 'yellow' }] } };
+    d.meshes[0].primitives[0].extensions = { KHR_materials_variants: { mappings: [{ material: 3, variants: [0] }] } };
+    return [];
+  });
+  const base = (i) => Array.from(model.primitives[i].material.base);
+  try {
+    const controller = MSFTMaterialLOD.attach(e, model, { hysteresis: 0 });
+    controller.update();
+    assert.deepEqual(controller.levels, [0, 2]);
+    model.selectVariant('yellow');
+    controller.update();
+    assert.deepEqual(controller.levels, [0, 1], 'the far primitive takes the variant chain\'s coarse level');
+    assert.deepEqual(base(0), [1, 1, 0, 1]);
+    assert.deepEqual(base(1), [0, 1, 1, 1]);
+    model.selectVariant('yellow');
+    assert.deepEqual(base(1), [1, 1, 0, 1], 'selectVariant itself shows the finest variant material');
+    controller.update();
+    assert.deepEqual(base(1), [0, 1, 1, 1], 'the next update brings the coarse level back');
+    controller.dispose();
+    assert.deepEqual([base(0), base(1)], [[1, 1, 0, 1], [1, 1, 0, 1]], 'dispose keeps the selected variant');
+    model.selectVariant(undefined);
+    assert.deepEqual([base(0), base(1)], [[1, 0, 0, 1], [1, 0, 0, 1]]);
+  } finally {
+    e.dispose();
+  }
+});
+test('a variant selected before attach sets the chain the controller starts from (KB5405b)', async () => {
+  const { e, model } = await fixture((d) => {
+    d.materials.push(
+      { pbrMetallicRoughness: { baseColorFactor: [1, 1, 0, 1] }, extensions: { MSFT_lod: { ids: [4] } } },
+      { pbrMetallicRoughness: { baseColorFactor: [0, 1, 1, 1] } },
+    );
+    d.extensions = { KHR_materials_variants: { variants: [{ name: 'yellow' }] } };
+    d.meshes[0].primitives[0].extensions = { KHR_materials_variants: { mappings: [{ material: 3, variants: [0] }] } };
+    return [];
+  });
+  try {
+    model.selectVariant(0);
+    const controller = MSFTMaterialLOD.attach(e, model, { hysteresis: 0 });
+    controller.update();
+    assert.deepEqual(controller.levels, [0, 1]);
+    assert.deepEqual(Array.from(model.primitives[1].material.base), [0, 1, 1, 1]);
+    controller.dispose();
+    assert.deepEqual(Array.from(model.primitives[1].material.base), [1, 1, 0, 1]);
+  } finally {
+    e.dispose();
+  }
+});
