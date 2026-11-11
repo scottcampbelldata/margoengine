@@ -412,7 +412,7 @@ share one interface, `read`, `write`,
 | `memoryStorage()` | a Map (tests, servers, undo snapshots) | yes |
 | `webStorage(storage = localStorage, prefix = 'margo-save:')` | Web Storage, base64; about 5 MB per origin | one `setItem` |
 | `indexedDBStorage({database, store, factory})` | IndexedDB, binary, large | one transaction |
-| `fileStorage(directory)` from `margoengine/save/node` | one file per key | temporary file renamed into place; on Windows a save another program has open cannot be replaced, so the write rejects and the old save stands |
+| `fileStorage(directory, {maxBytes})` from `margoengine/save/node` | one file per key | temporary file, made exclusively, renamed into place; a read refuses a file past `maxBytes` (default 256 MiB) from its size, before reading it; one writer per folder; on Windows a save another program has open cannot be replaced, so the write rejects and the old save stands |
 
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
 API throws `'unsupported'`. `saveGame` never writes an invalid document.

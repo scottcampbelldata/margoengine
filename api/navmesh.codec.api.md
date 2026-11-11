@@ -211,6 +211,7 @@ class TiledNavMesh implements NavSurface {
             x: number;
             z: number;
         } | null)[];
+        scale: number;
     };
     snapshot(level: boolean): TiledState;
     restore(state: TiledState): void;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14767288,
+  "total": 14767693,
   "history": [
     {
       "date": "2026-10-24",
@@ -8267,6 +8267,12 @@
       "commit": "f259362f2",
       "reason": "controls +102 B, controls/arcball +87 B: RangeError checks keep NaN script motion off the camera (rust port R5)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "24645f602",
+      "reason": "save/node +149 B: exclusive temporary files and size-bounded reads (rust port R9)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9093,7 +9099,7 @@
     "@margoengine/save": 7286,
     "@margoengine/save/engine": 8438,
     "@margoengine/save/materials": 461,
-    "@margoengine/save/node": 1405,
+    "@margoengine/save/node": 1810,
     "@margoengine/save/opfs": 1763,
     "@margoengine/save/remote": 3411,
     "@margoengine/save/safe": 2102,
