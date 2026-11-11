@@ -149,6 +149,19 @@ async function suite() {
   }
   assert.deepEqual(await page.evaluate(() => window.check.readbackOrder()), { lazy: true, value: 1 });
   lines.push('the first read-back loads its chunk and keeps the queue in order');
+  // KB2604d: a writable storage binding past one 128 MiB word texture keeps every store (160 MiB, two word textures).
+  const large = await page.evaluate(() => window.check.largeWords());
+  assert.deepEqual(
+    { ...large, values: undefined },
+    { values: undefined, tier: 'scatter', error: null, gl: 0 },
+    'a 160 MiB scatter target runs clean',
+  );
+  assert.deepEqual(large.values, {
+    start: [101, 102],
+    edge: [7, 7, 103, 104, 105, 106, 7, 7],
+    end: [107, 108],
+  });
+  lines.push('a 160 MiB scatter target (two word textures) keeps stores on both sides of 128 MiB');
   const refusal = await page.evaluate(() => window.check.refusal());
   assert.match(
     refusal,

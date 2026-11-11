@@ -105,8 +105,12 @@ function limitsOf(caps: WebGL2Capabilities): Record<string, number> {
   cap('maxSamplersPerShaderStage', l.MAX_TEXTURE_IMAGE_UNITS);
   cap('maxUniformBuffersPerShaderStage', Math.min(l.MAX_VERTEX_UNIFORM_BLOCKS, l.MAX_FRAGMENT_UNIFORM_BLOCKS));
   // A uniform buffer larger than a GL uniform block is read through a data texture: WebGPU's 64 KiB stands.
-  // A storage buffer is read through an RGBA32UI data texture at most 2,048 texels (32 KiB) wide.
-  cap('maxStorageBufferBindingSize', 2048 * 16 * l.MAX_TEXTURE_SIZE);
+  // A storage buffer is read through its bind group's RGBA32UI data texture, at most maxTextureDimension2D texels on
+  // each side, and written through R32UI word textures, as many as it needs: both hold 16 x maxTextureDimension2D
+  // squared bytes (1 GiB at 8,192), so a binding may span a buffer that large (KB2604d; it stopped at WebGPU's 128 MiB).
+  const most = 16 * out.maxTextureDimension2D ** 2;
+  out.maxStorageBufferBindingSize = most;
+  out.maxBufferSize = Math.max(out.maxBufferSize, most);
   out.minUniformBufferOffsetAlignment = Math.max(256, l.UNIFORM_BUFFER_OFFSET_ALIGNMENT);
   cap('maxVertexAttributes', l.MAX_VERTEX_ATTRIBS);
   // WebGL caps vertexAttribPointer strides at 255 bytes.
@@ -342,7 +346,18 @@ export class CompatDevice extends EventTarget {
       layers = Math.max(defaultLayers, descriptor.requiredLimits?.maxTextureArrayLayers ?? defaultLayers);
     if (layers > adapter.limits.maxTextureArrayLayers)
       throw new RangeError('Requested array layer limit exceeds the adapter capacity; use adapter.limits.maxTextureArrayLayers or fewer layers');
-    this.limits = Object.freeze({ ...adapter.limits, maxTextureArrayLayers: layers });
+    // As in WebGPU, a limit the adapter raises past the default needs requiredLimits (array layers above; storage
+    // bindings and buffers, which reach 1 GiB at maxTextureDimension2D 8,192 since KB2604d).
+    const raised = (name: 'maxStorageBufferBindingSize' | 'maxBufferSize') => {
+      const base = Math.min(WEBGPU_DEFAULT_LIMITS[name], adapter.limits[name]);
+      return Math.max(base, descriptor.requiredLimits?.[name] ?? base);
+    };
+    this.limits = Object.freeze({
+      ...adapter.limits,
+      maxTextureArrayLayers: layers,
+      maxStorageBufferBindingSize: raised('maxStorageBufferBindingSize'),
+      maxBufferSize: raised('maxBufferSize'),
+    });
     this.adapterInfo = adapter.info;
     this.cpuWorkBudget = adapter.cpuWorkBudget;
     this.objects = new GLObjects(gl);

@@ -172,7 +172,7 @@ test('without polygon offset clamp, nonzero clamp refuses sync and async pipelin
   } finally { device.destroy(); }
 });
 
-test('limits come from the context, never above WebGPU defaults; vertex strides stop at WebGL 255 bytes', async () => {
+test('limits come from the context, never above WebGPU defaults except storage bindings and buffers (what a data texture holds); vertex strides stop at WebGL 255 bytes', async () => {
   const gpu = createCompatGPU({
     createContext: () =>
       fakeContext({
@@ -196,13 +196,49 @@ test('limits come from the context, never above WebGPU defaults; vertex strides 
   assert.equal(limits.maxInterStageShaderVariables, 15);
   assert.equal(limits.maxColorAttachments, 4, 'the smaller of attachments and draw buffers');
   assert.equal(limits.maxVertexBufferArrayStride, 255);
-  assert.equal(limits.maxStorageBufferBindingSize, 134217728, 'WebGPU default: 2,048 x 16 x 16,384 bytes is more');
+  // Bug KB2604d (bug sweep L4): the layer held storage bindings and buffers at WebGPU's defaults (128 and 256 MiB),
+  // though one data texture of maxTextureDimension2D squared RGBA32UI texels reads 1 GiB and the compute tier writes
+  // through as many word textures as a buffer needs, so a 325 MB SH binding (the 1,692,538-splat truck) was refused.
+  assert.equal(limits.maxStorageBufferBindingSize, 16 * 8192 * 8192, 'one 8,192 x 8,192 RGBA32UI data texture');
+  assert.equal(limits.maxBufferSize, 16 * 8192 * 8192, 'a storage binding can span a whole buffer');
   assert.ok(Object.isFrozen(limits));
   // A small context caps storage bindings at what a 2,048-texel-wide RGBA32UI data texture of its size holds.
   const small = await createCompatGPU({
     createContext: () => fakeContext({ limits: { MAX_TEXTURE_SIZE: 2048 } }),
   }).requestAdapter();
   assert.equal(small.limits.maxStorageBufferBindingSize, 2048 * 16 * 2048);
+  assert.equal(small.limits.maxBufferSize, 268435456, 'never below the WebGPU default');
+});
+
+// Bug (KB2604d follow-up, bug sweep L4): a device took every adapter limit, so once the adapter offered more than
+// WebGPU's defaults, a device made without requiredLimits had 1 GiB storage bindings where a WebGPU device has 128 MiB
+// (the vfx scale check sized its default-device capacity from them and passed VFX's own slot cap). As in WebGPU, a
+// limit the adapter raises past the default needs requiredLimits.
+test('a device has the WebGPU default storage binding and buffer sizes unless it asks for more', async () => {
+  const fresh = async () => {
+    const gl = new Proxy(fakeContext({ limits: { MAX_TEXTURE_SIZE: 8192 } }), {
+      get: (context, key) => (key in context ? context[key] : () => ({})),
+    });
+    return createCompatGPU({ createContext: () => gl }).requestAdapter();
+  };
+  const plain = await (await fresh()).requestDevice();
+  assert.equal(plain.limits.maxStorageBufferBindingSize, 134217728);
+  assert.equal(plain.limits.maxBufferSize, 268435456);
+  const adapter = await fresh(),
+    raised = await adapter.requestDevice({
+      requiredLimits: {
+        maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+        maxBufferSize: adapter.limits.maxBufferSize,
+      },
+    });
+  assert.equal(raised.limits.maxStorageBufferBindingSize, 1 << 30);
+  assert.equal(raised.limits.maxBufferSize, 1 << 30);
+  // A requirement below the default still gives the default, as in WebGPU.
+  const low = await (await fresh()).requestDevice({ requiredLimits: { maxBufferSize: 1024 } });
+  assert.equal(low.limits.maxBufferSize, 268435456);
+  plain.destroy();
+  raised.destroy();
+  low.destroy();
 });
 
 test('array layer capacity is advertised from GL and negotiated independently for each device', async () => {

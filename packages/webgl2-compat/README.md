@@ -495,7 +495,8 @@ there for tools and tests.
 
 Driver workaround (2026-11-10, lane I): Chrome on ANGLE's Metal back end drops the first draw through a framebuffer
 after the WebGL2 context's canvas was shown with `transferToImageBitmap` when that framebuffer's texture was uploaded to
-since its last draw, with no GL error. Scatter-tier dispatches refresh a buffer's word texture with such an upload, so
+since its last draw, with no GL error. Scatter-tier dispatches refresh a buffer's word texture (R32UI, 4,096 x 8,192 words; a buffer past 128 MiB gets as many
+as it needs, one draw each, so a storage binding reaches `maxStorageBufferBindingSize`, 1 GiB at 8,192) with such an upload, so
 on a Mac the second and later frames of a compute pass lost their stores. The device now attaches each cached
 framebuffer again on its first use after every shown frame (one re-attach and status check per framebuffer and frame,
 no new GL objects). Raw repro: `node test/metal-dropped-draw-repro.mjs`; regression: `scatterAfterWrite` in

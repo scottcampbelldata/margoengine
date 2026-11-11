@@ -2887,19 +2887,20 @@ Measured but not fixed. Their history, sources and rerun commands are in
   Batch 182 diagnoses unequal anisotropic stepping/lighting and extra Margo depth/capture work; its separate
   isotropic controls record full workloads. Two per-frame matrix allocations are removed with exact uniform-byte
   regression coverage. The elapsed-time loss remains open; [controls and reproduction](sciviz-rivals.md).
-- **A degree-3 cloud of 1,692,538 splats does not attach on the WebGL2 layer** (`@margoengine/splats` on
-  `@margoengine/webgl2-compat`, perf history entry 103): the published truck at iteration 7,000, 325 MB of SH (16
-  coefficients per channel as float32, 192 bytes a splat). Natively it attaches and draws since core asks the adapter
-  for its binding size (d9be88943f): 61.0% of the frame on the RTX A6000. The 3,000,000-splat case without SH, refused
-  on the layer from 1e5d2f94d3 (`createBindGroup: its storage bindings total 360000016 bytes, over the 268435456
-  bytes`), is fixed 2026-11-11: the shared data texture grows wider than 2,048 texels instead of refusing the group
-  (Regression: `packages/webgl2-compat/test/device.test.js`, "a bind group whose storage bindings pass 2,048 x
-  maxTextureDimension2D rows"; `MARGO_COMPAT=1 node packages/splats/test/gpu/scale-check.mjs` draws it). Still open on
-  the layer: `maxStorageBufferBindingSize` and `maxBufferSize` stay at the WebGPU defaults (128 and 256 MiB), so the
-  truck's SH binding is refused at attach with the documented RangeError, which scale-check asserts. Cause: the compute
-  tier reads a storage buffer through an R32UI word texture at most 4,096 words wide (`words` in
-  `packages/webgl2-compat/src/compute/runtime.ts`), 128 MiB at 8,192 rows. Next: four words a texel (RGBA32UI) in the
-  compute tier, then raise both adapter limits to what one data texture holds.
+- **Fixed (KB2604d, 2026-11-11): a degree-3 cloud of 1,692,538 splats did not attach on the WebGL2 layer**
+  (`@margoengine/splats` on `@margoengine/webgl2-compat`, perf history entry 103): the published truck at iteration
+  7,000, 325 MB of SH (16 coefficients per channel as float32, 192 bytes a splat). Natively it attaches since core asks
+  the adapter for its binding size (d9be88943f). The 3,000,000-splat case without SH was fixed earlier the same day
+  (the group's data texture grows wider than 2,048 texels). The layer was the wrong side: it advertised WebGPU's default
+  `maxStorageBufferBindingSize` and `maxBufferSize` (128 and 256 MiB), because the compute tier wrote a buffer through
+  one R32UI word texture of 4,096 x 8,192 words (128 MiB). The compute tier now draws a larger buffer into as many word
+  textures as it needs, each store landing in the one that holds its word, and both limits are what one data texture
+  of maxTextureDimension2D squared RGBA32UI texels holds (1 GiB at 8,192); a device gets them through `requiredLimits`, as core asks, and otherwise keeps WebGPU's defaults (before, a layer device took every adapter limit, unlike WebGPU, which the vfx compat scale check caught once the adapter offered more). Splats needed no change. Regression:
+  `packages/webgl2-compat/test/device.test.js` ("limits come from the context", "a device has the WebGPU default storage
+  binding and buffer sizes"), the `largeWords` case of
+  `packages/webgl2-compat/test/compute-browser.mjs` (a 160 MiB scatter target, stores on both sides of 128 MiB), and
+  `packages/splats/test/gpu/scale-check.mjs`, which now draws the truck natively and with `MARGO_COMPAT=1` (61.0% of the
+  frame on both). Found while fixing it: the layer's `createBuffer` does not check `maxBufferSize` (KBnew-compat-maxbuffer).
 - **Truck 7k prefix frame is slower than GaussianSplats3D 0.4.7** (`@margoengine/splats`, perf history entry 103):
   10.765 ms against 4.500 ms, one still frame of the 699,050 prefix at 979 x 546, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470).

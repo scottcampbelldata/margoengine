@@ -1893,7 +1893,7 @@ Mapping details:
 | Tier | Selection | Execution | Important limit |
 | --- | --- | --- | --- |
 | Fragment | Stores map each invocation to its own renderable texture texel and no buffer is written | Full-target draw, scissored per target/slice | Target must be renderable. |
-| Scatter | Bounded stores with no same-invocation read-after-write hazard | Instanced point draw per target; buffer words use R32UI textures | At most 1,024 stores per invocation per target. |
+| Scatter | Bounded stores with no same-invocation read-after-write hazard | Instanced point draw per target; buffer words use R32UI textures of 4,096 x 8,192 words, as many as the buffer needs (one draw each; KB2604d, 2026-11-11) | At most 1,024 stores per invocation per target. A storage binding reaches 16 x maxTextureDimension2D squared bytes (1 GiB at 8,192), the layer's `maxStorageBufferBindingSize` and `maxBufferSize` since KB2604d; evidence `compute-browser.mjs` `largeWords` (160 MiB target) and the splats truck in `scale-check.mjs` on the layer. |
 | CPU | Atomics, workgroup memory, barriers, unbounded store loops, hazards, unsupported formats, or f16 uniform cases | Typed IR emitted as JavaScript; one invocation at a time, generators across barriers, f32 rounded with `Math.fround` | Under a CSP without `unsafe-eval` the same JavaScript runs on an interpreter (`compute/interpret.ts`), 13 to 41 times slower; cannot read cube, multisampled, or external textures; GPU-written inputs can cause synchronous stalls. |
 | Package alternate path | Planned for large atomic, sorting, or GPU-driven workloads | Feature-specific implementation | No recorded shader required it at the snapshot. |
 

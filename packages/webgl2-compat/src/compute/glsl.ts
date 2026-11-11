@@ -6,7 +6,9 @@
 // Uniforms the device sets per draw:
 // - `_cn` (uvec4): num_workgroups in xyz; w is the z slice the fragment tier draws.
 // - `_ct` (ivec4, scatter tier): the target's width and height in texels (a buffer's word texture: words), z the
-//   layer drawn, w the binding's first word (buffers).
+//   layer drawn, w the binding's first word counted from the word texture's first word (buffers: a buffer past one
+//   word texture is drawn into several, each holding the words from its own first word on; a store outside the one
+//   drawn is left to the draw of its own texture).
 // - `_zd<group>_<binding>` (ivec4): a storage texture's level size and layer count (textureDimensions and
 //   textureNumLayers read it, so a texture being drawn into is never bound for sampling as well).
 import { fault } from '../../../shared/errors.js';
@@ -329,7 +331,7 @@ class ComputeEmitter extends StageEmitter {
       'uniform highp ivec4 _ct;',
       'flat out highp uvec4 _sv;',
       'int _sel; int _cnt = 0; bool _hit = false; ivec2 _at; uvec4 _val;',
-      'void _sw(int a, uint w) { if (_cnt == _sel) { _hit = true; _at = ivec2(a % _ct.x, a / _ct.x); _val = uvec4(w, 0u, 0u, 0u); } _cnt++; }',
+      'void _sw(int a, uint w) { if (_cnt == _sel && a >= 0 && a < _ct.x * _ct.y) { _hit = true; _at = ivec2(a % _ct.x, a / _ct.x); _val = uvec4(w, 0u, 0u, 0u); } _cnt++; }',
       'void _sx(ivec3 p, uvec4 v) { if (_cnt == _sel && p.z == _ct.z && all(greaterThanEqual(p.xy, ivec2(0))) && all(lessThan(p.xy, _ct.xy))) { _hit = true; _at = p.xy; _val = v; } _cnt++; }',
     );
     body.push(

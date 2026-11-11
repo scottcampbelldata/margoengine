@@ -1,8 +1,9 @@
 // Real-GPU scale check for splats: a cloud at the per-cloud limit (3,000,000, no SH; 360 MB of storage in one bind
 // group, refused by the WebGL2 layer before 2026-11-11), one at the degree-3 SH bound of a default device (699,050:
 // 16 coefficients x 12 B in one 128 MiB storage binding) and the published truck at iteration 7,000 (1,692,538 of
-// degree 3, 325 MB of SH, which needs the adapter's binding size: drawn natively, refused at attach on the WebGL2
-// layer) draw with no WebGPU validation error and cover the frame. Wall time per frame is printed for the speed phase
+// degree 3, 325 MB of SH, which needs the adapter's binding size; refused at attach on the WebGL2 layer until KB2604d
+// raised the layer's binding and buffer sizes to what its data and word textures hold) draw with no WebGPU validation
+// error and cover the frame, natively and on the layer. Wall time per frame is printed for the speed phase
 // (diagnostic only).
 // Takes a GPU slot itself. From the repository root after building packages, natively and with MARGO_COMPAT=1:
 //   node packages/splats/test/gpu/scale-check.mjs
@@ -29,15 +30,6 @@ try {
       ['699,050 splats, SH degree 3', 699_050, 16],
       ['1,692,538 splats, SH degree 3', 1_692_538, 16],
     ]) {
-      if (compat && count * sh * 12 > 134_217_728) {
-        // The WebGL2 layer holds one storage binding to 128 MiB (docs/limits.md), so the truck's 325 MB of SH is
-        // refused at attach with the documented error rather than failing inside the layer.
-        const refused = await page.evaluate(([n, k]) => window.check.run(n, k).then(() => '', (e) => `${e.name}: ${e.message}`), [count, sh]);
-        console.log(`${label} (compat): refused at attach as documented`);
-        assert.equal(refused, 'RangeError: Splat attributes exceed device storage limits; use fewer splats.', label);
-        assert.deepEqual(await page.evaluate(() => window.check.errors), [], label);
-        continue;
-      }
       const r = await page.evaluate(([n, k]) => window.check.run(n, k), [count, sh]);
       const shot = await decodePNG(await page.locator('#a').screenshot());
       let lit = 0;

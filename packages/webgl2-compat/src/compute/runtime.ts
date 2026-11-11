@@ -55,14 +55,26 @@ interface CPUBuilt extends ComputeBuilt {
   readonly kernel: CPUKernel;
 }
 
-/** A buffer's word texture (R32UI, `width` words per row) and the RGBA32UI rows texture it is copied back through. */
-interface Words {
+/**
+ * One R32UI word texture of a buffer (`width` words per row, `height` rows), holding the buffer's words from `base`
+ * on, and the RGBA32UI rows texture it is copied back through.
+ */
+interface WordChunk {
   readonly texture: CompatTexture;
-  readonly width: number;
+  readonly base: number;
+  readonly words: number;
   readonly height: number;
-  version: number;
   rows: WebGLTexture | null;
   fbo: WebGLFramebuffer | null;
+}
+/**
+ * A buffer's word textures: one while the buffer's words fit `width` x maxTextureDimension2D (128 MiB at 4,096 x
+ * 8,192), more past that, so a writable storage binding up to maxStorageBufferBindingSize has room (KB2604d).
+ */
+interface Words {
+  readonly width: number;
+  readonly chunks: readonly WordChunk[];
+  version: number;
   destroy(): void;
 }
 
@@ -264,27 +276,33 @@ class Runtime implements ComputeRuntime {
       // A buffer: drawn as words into its word texture.
       const { bound, dynamic } = this.bound(groups, d.target.group, d.target.binding);
       const b = bound as Extract<Bound, { kind: 'buffer' }>;
-      const ws = this.words(r, b.buffer);
-      r.beginPass({
-        colors: [
-          {
-            view: ws.texture.createView(),
-            depthSlice: 0,
-            clearValue: [0, 0, 0, 0],
-            loadOp: 'load',
-            storeOp: 'store',
-          },
-        ],
-      });
-      r.setPipeline(d.pipeline);
-      bind();
-      d.pipeline.onDraw = () => {
-        gl.uniform4ui(d.cn, nx, ny, nz, 0);
-        gl.uniform4i(d.ct, ws.width, ws.height, 0, (b.offset + dynamic) >> 2);
-        dims();
-      };
-      r.draw(nx * ny * nz * wx * wy * wz, d.target.stores, 0, 0);
-      r.endPass();
+      const ws = this.words(r, b.buffer),
+        first = (b.offset + dynamic) >> 2,
+        end = first + Math.ceil(b.size / 4);
+      // One draw per word texture the binding reaches; each keeps the stores that fall in it.
+      for (const c of ws.chunks) {
+        if (c.base >= end || c.base + c.words <= first) continue;
+        r.beginPass({
+          colors: [
+            {
+              view: c.texture.createView(),
+              depthSlice: 0,
+              clearValue: [0, 0, 0, 0],
+              loadOp: 'load',
+              storeOp: 'store',
+            },
+          ],
+        });
+        r.setPipeline(d.pipeline);
+        bind();
+        d.pipeline.onDraw = () => {
+          gl.uniform4ui(d.cn, nx, ny, nz, 0);
+          gl.uniform4i(d.ct, ws.width, c.height, 0, first - c.base);
+          dims();
+        };
+        r.draw(nx * ny * nz * wx * wy * wz, d.target.stores, 0, 0);
+        r.endPass();
+      }
       if (!words.some((x) => x.buffer === b.buffer)) words.push({ buffer: b.buffer, words: ws });
     }
     // Only now do buffers change: every draw above read the memory as it was before the dispatch.
@@ -328,7 +346,7 @@ class Runtime implements ComputeRuntime {
     return new CompatBindGroup(this.device, { layout: group.layout, entries } as never);
   }
 
-  /** The word texture of a buffer, brought up to date with the buffer (on the GPU). */
+  /** The word textures of a buffer, brought up to date with the buffer (on the GPU). */
   private words(_r: Replayer, buffer: CompatBuffer): Words {
     const gl = this.gl,
       device = this.device;
@@ -336,49 +354,64 @@ class Runtime implements ComputeRuntime {
     let ws = buffer.computeState as Words | null;
     const count = Math.max(1, Math.ceil(buffer.size / 16) * 4);
     if (!ws) {
-      const width = Math.min(WORDS_WIDTH, device.limits.maxTextureDimension2D),
-        height = Math.ceil(count / width);
-      const texture = new CompatTexture(device, {
-        size: [width, height],
-        format: 'r32uint',
-        usage: 0x14,
-        label: `${buffer.label} words`,
-      });
+      const most = device.limits.maxTextureDimension2D,
+        width = Math.min(WORDS_WIDTH, most),
+        room = width * most,
+        chunks: WordChunk[] = [];
+      for (let base = 0; base < count; base += room) {
+        const words = Math.min(room, count - base),
+          height = Math.ceil(words / width);
+        chunks.push({
+          texture: new CompatTexture(device, {
+            size: [width, height],
+            format: 'r32uint',
+            usage: 0x14,
+            label: chunks.length ? `${buffer.label} words ${chunks.length}` : `${buffer.label} words`,
+          }),
+          base,
+          words,
+          height,
+          rows: null,
+          fbo: null,
+        });
+      }
       const created: Words = {
-        texture,
         width,
-        height,
+        chunks,
         version: -1,
-        rows: null,
-        fbo: null,
         destroy: () => {
-          texture.destroy();
-          if (created.rows) {
-            device.state.forgetTexture(created.rows);
-            gl.deleteTexture(created.rows);
+          for (const c of chunks) {
+            c.texture.destroy();
+            if (c.rows) {
+              device.state.forgetTexture(c.rows);
+              gl.deleteTexture(c.rows);
+            }
+            if (c.fbo) gl.deleteFramebuffer(c.fbo);
           }
-          if (created.fbo) gl.deleteFramebuffer(created.fbo);
         },
       };
       buffer.computeState = ws = created;
     }
     if (ws.version !== buffer.version && buffer.gl) {
-      device.state.scratch(gl.TEXTURE_2D, ws.texture.texture);
       gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, buffer.gl);
-      const full = Math.floor(count / ws.width),
-        rest = count - full * ws.width;
-      if (full) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, ws.width, full, gl.RED_INTEGER, gl.UNSIGNED_INT, 0);
-      if (rest)
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, full, rest, 1, gl.RED_INTEGER, gl.UNSIGNED_INT, full * ws.width * 4);
+      for (const c of ws.chunks) {
+        device.state.scratch(gl.TEXTURE_2D, c.texture.texture);
+        const full = Math.floor(c.words / ws.width),
+          rest = c.words - full * ws.width,
+          from = c.base * 4;
+        if (full) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, ws.width, full, gl.RED_INTEGER, gl.UNSIGNED_INT, from);
+        if (rest)
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, full, rest, 1, gl.RED_INTEGER, gl.UNSIGNED_INT, from + full * ws.width * 4);
+        c.texture.initialized = true;
+      }
       gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
-      ws.texture.initialized = true;
       ws.version = buffer.version;
     }
     return ws;
   }
 
   /**
-   * Copies a word texture back into its buffer on the GPU: four words per RGBA32UI texel through a draw, then
+   * Copies a buffer's word textures back into it on the GPU: four words per RGBA32UI texel through a draw, then
    * readPixels into the buffer as a pixel-pack buffer.
    */
   private copyBack(r: Replayer, buffer: CompatBuffer, ws: Words): void {
@@ -386,32 +419,35 @@ class Runtime implements ComputeRuntime {
       state = this.device.state;
     if (!buffer.gl) return;
     const w4 = ws.width / 4;
-    if (!ws.rows) {
-      ws.rows = this.device.objects.own(buffer, gl.createTexture() as WebGLTexture);
-      state.scratch(gl.TEXTURE_2D, ws.rows);
-      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w4, ws.height);
-      ws.fbo = this.device.objects.own(buffer, gl.createFramebuffer() as WebGLFramebuffer);
-      state.bindDrawFramebuffer(ws.fbo);
-      gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ws.rows, 0);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-    }
     const h = r.helper(
       'words',
       'uniform highp usampler2D t;\nout highp uvec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy); int x = p.x * 4; c = uvec4(texelFetch(t, ivec2(x, p.y), 0).x, texelFetch(t, ivec2(x + 1, p.y), 0).x, texelFetch(t, ivec2(x + 2, p.y), 0).x, texelFetch(t, ivec2(x + 3, p.y), 0).x); }',
     );
-    state.bindDrawFramebuffer(ws.fbo);
-    r.helperState(h, w4, ws.height);
-    state.unit(0, gl.TEXTURE_2D, ws.texture.texture, this.device.loadSampler);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    const texels = Math.ceil(buffer.size / 16),
-      full = Math.floor(texels / w4),
-      rest = texels - full * w4;
-    state.bindReadFramebuffer(ws.fbo);
-    gl.readBuffer(gl.COLOR_ATTACHMENT0);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer.gl);
-    if (full) gl.readPixels(0, 0, w4, full, gl.RGBA_INTEGER, gl.UNSIGNED_INT, 0);
-    if (rest) gl.readPixels(0, full, rest, 1, gl.RGBA_INTEGER, gl.UNSIGNED_INT, full * w4 * 16);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    for (const c of ws.chunks) {
+      if (!c.rows) {
+        c.rows = this.device.objects.own(buffer, gl.createTexture() as WebGLTexture);
+        state.scratch(gl.TEXTURE_2D, c.rows);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w4, c.height);
+        c.fbo = this.device.objects.own(buffer, gl.createFramebuffer() as WebGLFramebuffer);
+        state.bindDrawFramebuffer(c.fbo);
+        gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, c.rows, 0);
+        gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+      }
+      state.bindDrawFramebuffer(c.fbo);
+      r.helperState(h, w4, c.height);
+      state.unit(0, gl.TEXTURE_2D, c.texture.texture, this.device.loadSampler);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      const texels = c.words / 4,
+        full = Math.floor(texels / w4),
+        rest = texels - full * w4,
+        to = c.base * 4;
+      state.bindReadFramebuffer(c.fbo);
+      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer.gl);
+      if (full) gl.readPixels(0, 0, w4, full, gl.RGBA_INTEGER, gl.UNSIGNED_INT, to);
+      if (rest) gl.readPixels(0, full, rest, 1, gl.RGBA_INTEGER, gl.UNSIGNED_INT, to + full * w4 * 16);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
     state.bindReadFramebuffer(null);
     this.changed(buffer);
     ws.version = buffer.version;
