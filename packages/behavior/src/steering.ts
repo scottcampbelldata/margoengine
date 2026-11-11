@@ -244,7 +244,8 @@ export function avoidObstacles(
     lx = 0,
     ly = 0,
     lz = 0,
-    clearance = 0;
+    clearance = 0,
+    combined = 1;
   for (const obstacle of obstacles) {
     vector(obstacle?.position, 'Obstacle position');
     const r = positive(obstacle.radius, 'Obstacle radius', true) + radius,
@@ -261,6 +262,7 @@ export function avoidObstacles(
     if (off >= r || along >= nearest) continue;
     nearest = along;
     clearance = r - off;
+    combined = r;
     if (off > 1e-9) {
       lx = -ax / off;
       ly = -ay / off;
@@ -274,8 +276,11 @@ export function avoidObstacles(
     }
   }
   if (nearest === Number.POSITIVE_INFINITY) return out;
+  // Buckland 2005 (Programming Game AI by Example, ch. 3 "Obstacle Avoidance"): the lateral force grows with the
+  // overlap of the obstacle's radius past the path's axis (r - off, here as a fraction of r) and with nearness along
+  // the detection box (1 + (length - along) / length). Speeds stand in for his unscaled world units (KB6027b).
   const urgency = 1 + (reach - Math.max(0, nearest)) / reach,
-    magnitude = Math.max(max, 1e-6) * urgency * Math.min(1, clearance / Math.max(radius, 1e-6) + 0.5);
+    magnitude = Math.max(max, 1e-6) * urgency * clearance / combined;
   return set(out, lx * magnitude, ly * magnitude, lz * magnitude);
 }
 
@@ -373,6 +378,32 @@ function pointAt(
   return [last[0], last[1], last[2]];
 }
 
+/**
+ * The direction `a` moves away from a neighbour at exactly its position (KB6027a). Reynolds 1987's 1/d push gives none
+ * at d = 0, so: away along the velocity difference when the two move differently, else (identical states, nothing to
+ * tell them apart but their order) to the right of the shared heading on the ground plane (+x when it is vertical or
+ * still) for the one first in order and the opposite way for the other. The pair always gets opposite pushes, and a
+ * reordering of identical boids gives the same set of boids.
+ */
+function apart(
+  avx: number, avy: number, avz: number, bvx: number, bvy: number, bvz: number, first: boolean, out: number[],
+): void {
+  const dx = avx - bvx,
+    dy = avy - bvy,
+    dz = avz - bvz,
+    d = Math.hypot(dx, dy, dz);
+  if (d > 1e-12) {
+    out[0] += dx / d;
+    out[1] += dy / d;
+    out[2] += dz / d;
+    return;
+  }
+  const planar = Math.hypot(avx, avz),
+    sign = first ? 1 : -1;
+  out[0] += sign * (planar > 1e-12 ? -avz / planar : 1);
+  out[2] += sign * (planar > 1e-12 ? avx / planar : 0);
+}
+
 /** Push away from neighbours nearer than `radius`, harder the nearer they are. `agent` itself is skipped. */
 export function separation(
   agent: SteeringAgent,
@@ -386,21 +417,47 @@ export function separation(
   let sx = 0,
     sy = 0,
     sz = 0,
-    count = 0;
+    count = 0,
+    seenSelf = false;
+  // Neighbours at the agent's own position: their 1/d push is unbounded, so they alone set the direction.
+  const same = [0, 0, 0];
+  let coincident = 0,
+    before = 0;
   for (const other of neighbors) {
-    if (other === agent) continue;
+    if (other === agent) {
+      seenSelf = true;
+      continue;
+    }
     const q = other.position,
       dx = p[0] - q[0],
       dy = p[1] - q[1],
       dz = p[2] - q[2],
       d = Math.hypot(dx, dy, dz);
-    if (d >= radius || d === 0) continue;
+    if (d === 0) {
+      const v = agent.velocity,
+        w = other.velocity;
+      if (v[0] !== w[0] || v[1] !== w[1] || v[2] !== w[2] || seenSelf) {
+        // After the agent in `neighbors`, an identical twin is second, so the agent takes the first side.
+        apart(v[0], v[1], v[2], w[0], w[1], w[2], true, same);
+        coincident++;
+      } else before++;
+      continue;
+    }
+    if (d >= radius) continue;
     // 1/d falloff: the unit offset divided by the distance.
     sx += dx / (d * d);
     sy += dy / (d * d);
     sz += dz / (d * d);
     count++;
   }
+  // Identical twins listed before the agent take the first side, so the agent goes the other way; with the agent
+  // absent from `neighbors` there is no order to break the tie, and they give no push.
+  if (seenSelf)
+    for (let i = 0; i < before; i++, coincident++) {
+      const v = agent.velocity;
+      apart(v[0], v[1], v[2], v[0], v[1], v[2], false, same);
+    }
+  if (coincident && (same[0] || same[1] || same[2])) return toward(agent, same[0], same[1], same[2], max, out);
   if (!count) return set(out, 0, 0, 0);
   return toward(agent, sx, sy, sz, max, out);
 }
@@ -623,6 +680,7 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
     cell.push(i);
   }
   const forces = new Float64Array(count * 3),
+    same = [0, 0, 0],
     r2 = radius * radius,
     s2 = separationRadius * separationRadius;
   const steer = (dx: number, dy: number, dz: number, i: number): [number, number, number] => {
@@ -644,7 +702,9 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
       mx = 0,
       my = 0,
       mz = 0,
-      n = 0;
+      n = 0,
+      nz = 0;
+    same[0] = same[1] = same[2] = 0;
     for (let dx = -1; dx <= 1; dx++)
       for (let dy = -1; dy <= 1; dy++)
         for (let dz = -1; dz <= 1; dz++) {
@@ -665,7 +725,10 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
               mz += z[j];
               n++;
             }
-            if (d2 < s2 && d2 > 0) {
+            if (d2 === 0) {
+              apart(vx[i], vy[i], vz[i], vx[j], vy[j], vz[j], i < j, same);
+              nz++;
+            } else if (d2 < s2) {
               sx += ox / d2;
               sy += oy / d2;
               sz += oz / d2;
@@ -673,6 +736,13 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
             }
           }
         }
+    // A boid at another's exact position: that unbounded 1/d push alone sets the separation direction (KB6027a).
+    if (nz && (same[0] || same[1] || same[2])) {
+      sx = same[0];
+      sy = same[1];
+      sz = same[2];
+      ns = nz;
+    }
     if (!n && !ns) continue;
     const s = ns ? steer(sx, sy, sz, i) : [0, 0, 0],
       a = n ? steer(ax, ay, az, i) : [0, 0, 0],

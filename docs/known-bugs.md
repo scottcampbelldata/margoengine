@@ -6481,7 +6481,7 @@ cost to the next stamp over the same cell; a second undo call does nothing. `flo
 `radius` dropped every neighbour beyond `radius` before the separation test, so boids 2.5 apart with radius 2 and
 separationRadius 3 never pushed apart; the grid cell is now the larger radius and each rule tests its own.
 
-Open: `flock` and `separation` skip a neighbour at distance 0, so two boids spawned on the same point with the same
+Fixed 2026-11-11 (KB6027a, KB6027b, sweep L6): a neighbour at distance 0 now pushes along the velocity difference, or for identical states to opposite sides of the heading in row order (flock) or list order (separation); `avoidObstacles` drops the 0.5 constant and scales by the overlap fraction (r - off) / r and Buckland 2005's nearness multiplier (packages/behavior/README.md). Regression: packages/behavior/tests/steering.test.js ('coincident boids part', 'obstacle avoidance push follows Buckland 2005'). Original entry: `flock` and `separation` skipped a neighbour at distance 0, so two boids spawned on the same point with the same
 velocity never part (repro: `flock({x:[0,0], y:[0,0], z:[0,0], vx:[1,1], vy:[0,0], vz:[0,0]}, 2)` for any number of
 steps keeps x[0] === x[1]); Reynolds 1987 gives no direction for a zero offset, and any fixed choice breaks the
 row-order independence `flock` promises. `avoidObstacles` scales its push by `1 + (reach - along) / reach` and

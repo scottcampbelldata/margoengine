@@ -285,3 +285,40 @@ test('fuzz: malformed agents and targets throw TypeError or RangeError, never Na
       }
   }
 });
+
+test('coincident boids part: flock and separation push a pair at one point opposite ways (KB6027a)', () => {
+  // Same point, same velocity: before the fix both stayed on one point for every step.
+  const twins = { x: [0, 0], y: [0, 0], z: [0, 0], vx: [1, 1], vy: [0, 0], vz: [0, 0] };
+  for (let step = 0; step < 30; step++) flock(twins, 2, {}, 1 / 30);
+  assert.ok(Math.abs(twins.z[0] - twins.z[1]) > 0.1, `twins parted (${twins.z[0]} vs ${twins.z[1]})`);
+  assert.ok(Math.abs(twins.z[0] + twins.z[1]) < 1e-9, 'symmetrically, to either side of the heading');
+  // Reordered rows give the same set of boids.
+  const swapped = { x: [0, 0], y: [0, 0], z: [0, 0], vx: [1, 1], vy: [0, 0], vz: [0, 0] };
+  for (let step = 0; step < 30; step++) flock(swapped, 2, {}, 1 / 30);
+  assert.deepEqual([...swapped.z].sort(), [...twins.z].sort());
+  // Different velocities at one point part along the velocity difference, whatever the order.
+  const a = agent([0, 0, 0], [1, 0, 0]),
+    b = agent([0, 0, 0], [0, 0, 1]);
+  const pa = separation(a, [b], 2),
+    pb = separation(b, [a], 2);
+  assert.ok(pa[0] > 0 && pa[2] < 0 && pb[0] < 0 && pb[2] > 0, `${pa} / ${pb}`);
+  // Identical states: the order in the shared list breaks the tie; with the agent absent there is no order, no push.
+  const c = agent([0, 0, 0], [1, 0, 0]),
+    d = agent([0, 0, 0], [1, 0, 0]);
+  const pc = separation(c, [c, d], 2),
+    pd = separation(d, [c, d], 2);
+  assert.ok(pc[2] !== 0 && Math.sign(pc[2]) === -Math.sign(pd[2]), `${pc} / ${pd}`);
+  assert.deepEqual(separation(c, [d], 2), [0, 0, 0]);
+});
+
+test('obstacle avoidance push follows Buckland 2005: zero at a grazing path, largest dead ahead and near (KB6027b)', () => {
+  const a = agent([0, 0, 0], [2, 0, 0]),
+    push = (z, x = 1.5) => Math.hypot(...avoidObstacles(a, [{ position: [x, 0, z], radius: 0.5 }], { radius: 0.3 }));
+  // Overlap fraction (r - off) / r with r = 0.8: grazing (off just under r) pushes almost nothing.
+  assert.ok(push(0.7999) < 1e-3, `grazing push ${push(0.7999)}`);
+  assert.ok(push(0.6) < push(0.2), 'more overlap, more push');
+  assert.ok(push(0.2, 1) > push(0.2, 1.8), 'nearer along the path, more push');
+  // Dead ahead at the agent: urgency 2 and overlap 1, so twice the agent's maximum speed.
+  const s = a.maxSpeed ?? 2;
+  assert.ok(Math.abs(push(0, 0) - 2 * Math.max(s, 1e-6)) < 1e-9, `${push(0, 0)}`);
+});

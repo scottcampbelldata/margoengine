@@ -171,6 +171,13 @@ Each writes a force into `out` and returns it. `Steering` blends forces by weigh
 higher group precedence whenever it acts (so obstacle avoidance at priority 1 overrides the flock), clamping to
 `maxForce`. `integrate(agent, force, delta)` applies it, clamped to `maxSpeed`. Units are world units and seconds.
 
+`avoidObstacles` pushes sideways as Buckland (Programming Game AI by Example, 2005, ch. 3) describes: in proportion
+to how far the obstacle's radius (plus the agent's) reaches past the path's axis, and harder the nearer it is along the
+path, up to twice the agent's speed for an obstacle dead ahead at the agent. A neighbour at exactly the agent's
+position (where Reynolds' 1/d push has no direction) pushes along the velocity difference, or, for two boids in the
+same state, to opposite sides of the heading in row order (`flock`) or in the order of the `neighbors` list
+(`separation`, which gives no push when the agent is not in that list).
+
 `flock(arrays, count, options, delta)` steps a whole flock stored as structure-of-arrays, with a uniform grid for
 neighbours. ECS component fields fit as they are:
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15128489,
+  "total": 15129089,
   "history": [
     {
       "date": "2026-10-24",
@@ -8591,6 +8591,12 @@
       "commit": "938e738f94",
       "reason": "KB6250c: LensFlare gains a point-light position and up to 16 configurable elements (16 with at most 15 textured, per-layout pipeline, element storage buffer), the point-light flare with your own images that the web rivals give. Canonical built-entry gzip before/after: @margoengine/post/lens-flare 6829->7673 B, ceiling 7016->7929. A separate elements entry would repeat the occlusion compute pass, the sun/point projection and the stack wiring (most of the entry) and make the sun and point flares two effects to stack; core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "688f3ffca9",
+      "reason": "KB6027a/b: coincident boids part along the velocity difference or by order; Buckland obstacle push (behavior/steering 3827 to 3871 B measured)",
+      "grew": 2
     }
   ],
   "items": {
@@ -8634,7 +8640,7 @@
     "@margoengine/audio/sprites": 1764,
     "@margoengine/audio/voices": 2373,
     "@margoengine/audio/zones": 1395,
-    "@margoengine/behavior": 8858,
+    "@margoengine/behavior": 9158,
     "@margoengine/behavior/context": 1658,
     "@margoengine/behavior/eqs": 2221,
     "@margoengine/behavior/flowfield": 2656,
@@ -8644,7 +8650,7 @@
     "@margoengine/behavior/inspect": 1858,
     "@margoengine/behavior/perception": 3773,
     "@margoengine/behavior/smart-objects": 2029,
-    "@margoengine/behavior/steering": 3827,
+    "@margoengine/behavior/steering": 4127,
     "@margoengine/behavior/subtrees": 5463,
     "@margoengine/behavior/text": 4007,
     "@margoengine/behavior/triggers": 1862,
