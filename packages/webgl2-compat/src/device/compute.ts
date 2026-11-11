@@ -13,6 +13,7 @@ import {
   type CompatPipelineLayout,
   type CompatShaderModule,
   type LayoutEntry,
+  type Uses,
 } from './resources.js';
 import type { Replayer } from './render.js';
 
@@ -161,8 +162,7 @@ export class CompatComputePipeline {
           ] as const)
             counts.set(limit, (counts.get(limit) ?? 0) + slots);
       }
-    if (this.layouts.length > device.limits.maxBindGroups)
-      counts.set('maxBindGroups', this.layouts.length);
+    if (this.layouts.length > device.limits.maxBindGroups) counts.set('maxBindGroups', this.layouts.length);
     for (const [limit, count] of counts)
       if (count > device.limits[limit]) {
         this.failure = `createComputePipeline: ${count} bindings exceed ${limit} (${device.limits[limit]}); use fewer bindings or request a supported higher device limit`;
@@ -206,6 +206,8 @@ export class CompatComputePassEncoder {
     private readonly ops: ((r: Replayer) => void)[],
     private readonly device: CompatDevice,
     public label: string,
+    /** The command buffer's list of what it uses. */
+    private readonly uses: Uses = [],
   ) {}
 
   setPipeline(pipeline: CompatComputePipeline): void {
@@ -222,11 +224,13 @@ export class CompatComputePassEncoder {
     const dynamic = offsets instanceof Uint32Array ? list.slice(start, start + (length ?? list.length - start)) : list;
     // An invalid group (its error was reported at createBindGroup) binds nothing, so the dispatch is skipped.
     this.groups[index] = group && !group.invalid ? { group, offsets: dynamic } : null;
+    if (group) this.uses.push(group.uses);
   }
   dispatchWorkgroups(x: number, y = 1, z = 1): void {
     this.record(() => [x, y, z]);
   }
   dispatchWorkgroupsIndirect(buffer: CompatBuffer, offset: number): void {
+    this.uses.push(buffer);
     this.record((r) => [...new Uint32Array(r.indirect(buffer, offset, 12))]);
   }
   private record(count: (r: Replayer) => number[]): void {

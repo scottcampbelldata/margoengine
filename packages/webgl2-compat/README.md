@@ -157,6 +157,9 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   renderbuffer the driver cannot allocate (WebGL2's `GL_OUT_OF_MEMORY`, read once after each allocation) is reported as
   an `out-of-memory` error, a `GPUOutOfMemoryError` (`CompatOutOfMemoryError`), to its error scope or else as
   `uncapturederror`, as WebGPU reports a failed allocation; any other GL error the layer leaves is an `internal` one.
+  Work that uses a destroyed buffer, texture or query set is a validation error and makes no GL call (a failed submit
+  runs none of its command buffers); `uncapturederror` is a `GPUUncapturedErrorEvent` dispatched in a task of its own,
+  and `install()` names the layer's `GPUError` and `GPUUncapturedErrorEvent` with the other interfaces.
   `device.destroy()` frees the
   context and, as in WebGPU, leaves the last frame on the canvas (one copy into a 2D context of the page). Texture views GL has no view
   for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a

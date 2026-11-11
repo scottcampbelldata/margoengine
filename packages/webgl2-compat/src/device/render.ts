@@ -20,6 +20,8 @@ import {
   type CompatTextureView,
   type LayoutEntry,
   type TextureStorage,
+  type Usable,
+  type Uses,
 } from './resources.js';
 
 type Op = (r: Replayer) => void;
@@ -647,6 +649,8 @@ export class CompatCommandBuffer {
     /** True when it holds compute passes (their runtime loads before it replays). */
     readonly compute = false,
     readonly readback = false,
+    /** The buffers, textures and query sets its commands use: submit refuses it when one is destroyed. */
+    readonly uses: Uses = [],
   ) {}
 }
 
@@ -663,6 +667,10 @@ export class CompatQuerySet {
   /** Queries replaced by a newer use, deleted once no resolve still waits for them. */
   private readonly waiting = new Map<WebGLQuery, number>();
   destroyed = false;
+  /** destroy() was called (see Usable). */
+  get released(): boolean {
+    return this.destroyed;
+  }
 
   constructor(
     private readonly device: CompatDevice,
@@ -727,6 +735,7 @@ export class CompatQuerySet {
 /** A GPUCommandEncoder. */
 export class CompatCommandEncoder {
   private readonly ops: Op[] = [];
+  private readonly uses: Uses = [];
   private finished = false;
   private compute = false;
   private readback = false;
@@ -766,14 +775,20 @@ export class CompatCommandEncoder {
         : undefined,
       queries: (d.occlusionQuerySet as unknown as CompatQuerySet | undefined) ?? undefined,
     };
+    for (const a of pass.colors) {
+      if (a) this.uses.push(a.view.texture);
+      if (a?.resolveTarget) this.uses.push(a.resolveTarget.texture);
+    }
+    if (pass.depth) this.uses.push(pass.depth.view.texture);
+    if (pass.queries) this.uses.push(pass.queries);
     this.ops.push((r) => r.beginPass(pass));
-    return new CompatRenderPassEncoder(this.ops, d.label ?? '');
+    return new CompatRenderPassEncoder(this.ops, d.label ?? '', this.uses);
   }
 
   beginComputePass(d: GPUComputePassDescriptor = {}): CompatComputePassEncoder {
     if (d.timestampWrites) throw this.device.unsupported('timestamp queries');
     this.compute = true;
-    return new CompatComputePassEncoder(this.ops, this.device, d.label ?? '');
+    return new CompatComputePassEncoder(this.ops, this.device, d.label ?? '', this.uses);
   }
 
   copyBufferToBuffer(
@@ -788,25 +803,30 @@ export class CompatCommandEncoder {
       typeof a === 'number'
         ? [a, b as CompatBuffer, c as number, d ?? src.size - a]
         : [0, a, 0, (b as number | undefined) ?? src.size];
+    this.uses.push(src, dst);
     this.ops.push((r) => r.copyBuffer(src, srcOffset, dst, dstOffset, size));
   }
   copyBufferToTexture(source: GPUTexelCopyBufferInfo, destination: GPUTexelCopyTextureInfo, size: GPUExtent3D): void {
     const s = { ...source },
       d = { ...destination };
+    this.uses.push(s.buffer as unknown as Usable, d.texture as unknown as Usable);
     this.ops.push((r) => r.copyBufferToTexture(s as never, d as never, size));
   }
   copyTextureToBuffer(source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyBufferInfo, size: GPUExtent3D): void {
     const s = { ...source },
       d = { ...destination };
+    this.uses.push(s.texture as unknown as Usable, d.buffer as unknown as Usable);
     this.readback = true;
     this.ops.push((r) => r.device.readback?.copyTextureToBuffer(r, s as never, d as never, extent(size)));
   }
   copyTextureToTexture(source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyTextureInfo, size: GPUExtent3D): void {
     const s = { ...source },
       d = { ...destination };
+    this.uses.push(s.texture as unknown as Usable, d.texture as unknown as Usable);
     this.ops.push((r) => r.copyTextureToTexture(s as never, d as never, extent(size)));
   }
   clearBuffer(buffer: CompatBuffer, offset = 0, size?: number): void {
+    this.uses.push(buffer);
     this.ops.push(() => buffer.write(offset, new Uint8Array(size ?? buffer.size - offset)));
   }
   resolveQuerySet(
@@ -822,6 +842,7 @@ export class CompatCommandEncoder {
       );
       return;
     }
+    this.uses.push(querySet, destination);
     this.ops.push((r) => r.resolveQueries(querySet, firstQuery, queryCount, destination, destinationOffset));
   }
   pushDebugGroup(): void {}
@@ -831,7 +852,7 @@ export class CompatCommandEncoder {
   finish(descriptor: GPUCommandBufferDescriptor = {}): CompatCommandBuffer {
     if (this.finished) this.device.validationError('finish() was already called on this command encoder');
     this.finished = true;
-    return new CompatCommandBuffer(this.ops, descriptor.label ?? this.label, this.compute, this.readback);
+    return new CompatCommandBuffer(this.ops, descriptor.label ?? this.label, this.compute, this.readback, this.uses);
   }
 }
 
@@ -843,6 +864,8 @@ class DrawRecorder {
   constructor(
     protected readonly ops: Op[],
     public label: string,
+    /** The command buffer's (or bundle's) list of what it uses. */
+    protected readonly uses: Uses,
   ) {}
   setPipeline(pipeline: CompatRenderPipeline): void {
     this.ops.push((r) => r.setPipeline(pipeline));
@@ -856,12 +879,15 @@ class DrawRecorder {
   ): void {
     const list = offsets ? [...(offsets as Iterable<number>)] : [];
     const dynamic = offsets instanceof Uint32Array ? list.slice(start, start + (length ?? list.length - start)) : list;
+    if (group) this.uses.push(group.uses);
     this.ops.push((r) => r.setBindGroup(index, group, dynamic));
   }
   setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset = 0, size?: number): void {
+    if (buffer) this.uses.push(buffer);
     this.ops.push((r) => r.setVertexBuffer(slot, buffer, offset, size));
   }
   setIndexBuffer(buffer: CompatBuffer, format: GPUIndexFormat, offset = 0, size?: number): void {
+    this.uses.push(buffer);
     this.ops.push((r) => r.setIndexBuffer(buffer, format, offset, size));
   }
   draw(vertexCount: number, instanceCount = 1, firstVertex = 0, firstInstance = 0): void {
@@ -871,12 +897,14 @@ class DrawRecorder {
     this.ops.push((r) => r.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance));
   }
   drawIndirect(buffer: CompatBuffer, offset: number): void {
+    this.uses.push(buffer);
     this.ops.push((r) => {
       const a = new Uint32Array(r.indirect(buffer, offset, 16));
       r.draw(a[0], a[1], a[2], a[3]);
     });
   }
   drawIndexedIndirect(buffer: CompatBuffer, offset: number): void {
+    this.uses.push(buffer);
     this.ops.push((r) => {
       const bytes = r.indirect(buffer, offset, 20),
         u = new Uint32Array(bytes),
@@ -913,6 +941,7 @@ export class CompatRenderPassEncoder extends DrawRecorder {
   /** Runs the bundles' draws; the pass's pipeline, bind groups and buffers are reset before and after, as in WebGPU. */
   executeBundles(bundles: Iterable<CompatRenderBundle>): void {
     const list = [...bundles];
+    for (const b of list) this.uses.push(b.uses);
     this.ops.push((r) => r.executeBundles(list));
   }
   end(): void {
@@ -925,6 +954,8 @@ export class CompatRenderBundle {
   constructor(
     readonly ops: readonly Op[],
     public label: string,
+    /** What its draws use, flattened so a pass that executes it adds one entry. */
+    readonly uses: readonly Usable[] = [],
   ) {}
 }
 
@@ -935,12 +966,12 @@ export class CompatRenderBundleEncoder extends DrawRecorder {
     private readonly device: CompatDevice,
     readonly descriptor: GPURenderBundleEncoderDescriptor,
   ) {
-    super([], descriptor.label ?? '');
+    super([], descriptor.label ?? '', []);
   }
   finish(descriptor: GPURenderBundleDescriptor = {}): CompatRenderBundle {
     if (this.finished) this.device.validationError('finish() was already called on this render bundle encoder');
     this.finished = true;
-    return new CompatRenderBundle(this.ops, descriptor.label ?? this.label);
+    return new CompatRenderBundle(this.ops, descriptor.label ?? this.label, this.uses.flat());
   }
 }
 
@@ -1318,7 +1349,9 @@ export class Replayer {
       return this.viewSub(v, slice);
     };
     const standIns = desc.colors.map((c): [Sub, Sub] | null =>
-      c && desc.depth && c.view.texture.dimension === '3d' ? [prepare(c.view, c.depthSlice), this.standIn(c.view)] : null,
+      c && desc.depth && c.view.texture.dimension === '3d'
+        ? [prepare(c.view, c.depthSlice), this.standIn(c.view)]
+        : null,
     );
     const colors = desc.colors.map((c, i) => {
       if (!c) return null;

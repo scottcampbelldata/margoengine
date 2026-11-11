@@ -36,6 +36,25 @@ let nextId = 1;
 const id = (): number => nextId++;
 
 /**
+ * A buffer, texture or query set that commands and queue writes use. WebGPU refuses work on one from the moment its
+ * destroy() is called (`released`), though the layer frees its GL objects only after the work queued before it.
+ */
+export interface Usable {
+  readonly released: boolean;
+  readonly label: string;
+}
+/** What a command buffer uses: resources, and the lists its bind groups and render bundles share (one push each). */
+export type Uses = (Usable | readonly Usable[])[];
+/** The first destroyed resource in `uses`, else null. */
+export function destroyedUse(uses: Uses): Usable | null {
+  for (const u of uses)
+    if (Array.isArray(u)) {
+      for (const v of u as readonly Usable[]) if (v.released) return v;
+    } else if ((u as Usable).released) return u as Usable;
+  return null;
+}
+
+/**
  * A write to a buffer that waits for the GPU: a texture readback (a pixel buffer behind a fence, which may be forced
  * at the cost of a stall), occlusion query results (never forced: WebGL2 makes them available only in a later task),
  * or a write queued behind one of those so that writes land in submission order.
@@ -75,6 +94,8 @@ export class CompatBuffer {
   private data: { texture: WebGLTexture; shift: number; version: number } | null = null;
   /** @internal GPU objects the compute runtime keeps for this buffer (its word texture), freed with it. */
   computeState: { destroy(): void } | null = null;
+  /** destroy() was called (see Usable); `destroyed` follows once its GL objects are freed. */
+  released = false;
   destroyed = false;
 
   constructor(
@@ -111,7 +132,9 @@ export class CompatBuffer {
     const staging = (usage & ~(BufferUsage.MAP_WRITE | BufferUsage.COPY_SRC)) === 0;
     const own = <T>(o: T) => device.objects.own(this, o);
     this.gl =
-      !staging && usage & gpuUses && usage & ~(BufferUsage.INDEX | BufferUsage.COPY_DST) ? own(gl.createBuffer()) : null;
+      !staging && usage & gpuUses && usage & ~(BufferUsage.INDEX | BufferUsage.COPY_DST)
+        ? own(gl.createBuffer())
+        : null;
     if (this.gl) {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
       gl.bufferData(gl.COPY_WRITE_BUFFER, glSize, gl.DYNAMIC_DRAW);
@@ -339,6 +362,7 @@ export class CompatBuffer {
   }
 
   destroy(): void {
+    this.released = true;
     if (this.destroyed || this.device.queue.afterWaiting(() => this.destroy())) return;
     this.destroyed = true;
     const gl = this.device.gl;
@@ -437,6 +461,8 @@ export class CompatTexture {
   stale = false;
   /** False until written: a load of an unwritten texture reads zeros, as WebGPU requires. */
   initialized = false;
+  /** destroy() was called (see Usable); `destroyed` follows once its GL objects are freed. */
+  released = false;
   destroyed = false;
   /** Framebuffer keys that attach this texture, deleted with it. */
   readonly framebuffers = new Set<string>();
@@ -692,6 +718,7 @@ export class CompatTexture {
   }
 
   destroy(): void {
+    this.released = true;
     if (this.destroyed || this.device.queue.afterWaiting(() => this.destroy())) return;
     this.destroyed = true;
     const gl = this.device.gl;
@@ -979,6 +1006,8 @@ export class CompatBindGroup {
   readonly entries = new Map<number, Bound>();
   /** Why the group is invalid (reported when it was created), else null; a pass treats an invalid group as unset. */
   readonly invalid: string | null = null;
+  /** The buffers and textures it binds (an external texture's copy belongs to the device, so it is not listed). */
+  readonly uses: Usable[] = [];
   /** The shared data texture of the group's storage bindings without a dynamic offset (see storageTexture()). */
   private shared: {
     texture: WebGLTexture;
@@ -1014,6 +1043,9 @@ export class CompatBindGroup {
         throw new TypeError(
           `Bind group entry ${e.binding} is not a resource of this device; pass a buffer binding, sampler, texture view or external texture made by it`,
         );
+      const bound = this.entries.get(e.binding) as Bound;
+      if (bound.kind === 'buffer') this.uses.push(bound.buffer);
+      else if (bound.kind === 'view' && !(r instanceof CompatExternalTexture)) this.uses.push(bound.view.texture);
     }
     // WebGPU's createBindGroup rules for buffers: the range lies inside the buffer and covers the layout's minimum
     // binding size. Without them a too-small buffer reached the CPU tier, which read past its end (a RangeError).

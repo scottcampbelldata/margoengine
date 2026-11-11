@@ -20,6 +20,9 @@ import {
   CompatSampler,
   CompatShaderModule,
   CompatTexture,
+  destroyedUse,
+  type Usable,
+  type Uses,
 } from './resources.js';
 import {
   CompatCommandEncoder,
@@ -247,26 +250,42 @@ export class CompatAdapter {
 
 type ErrorFilter = 'validation' | 'out-of-memory' | 'internal';
 type CompatError = CompatValidationError | CompatOutOfMemoryError | CompatInternalError;
+/** The base of the layer's error objects (GPUError's shape: `message`); install() names it GPUError. */
+export class CompatGPUError extends Error {}
 /** The error object of a validation error (GPUValidationError's shape: `message`). */
-export class CompatValidationError extends Error {
+export class CompatValidationError extends CompatGPUError {
   constructor(message: string) {
     super(message);
     this.name = 'GPUValidationError';
   }
 }
 /** The error object of an allocation the driver could not make (GPUOutOfMemoryError's shape). */
-export class CompatOutOfMemoryError extends Error {
+export class CompatOutOfMemoryError extends CompatGPUError {
   constructor(message: string) {
     super(message);
     this.name = 'GPUOutOfMemoryError';
   }
 }
 /** The error object of an internal error (GPUInternalError's shape), with a MargoError code. */
-export class CompatInternalError extends Error {
+export class CompatInternalError extends CompatGPUError {
   readonly code = 'failed';
   constructor(message: string) {
     super(message);
     this.name = 'GPUInternalError';
+  }
+}
+
+/**
+ * The event of an error no scope caught (GPUUncapturedErrorEvent's shape); install() names it GPUUncapturedErrorEvent,
+ * so WebGPU code that makes one with the layer's GPUOutOfMemoryError (or another) works as on a browser device.
+ */
+export class CompatUncapturedErrorEvent extends Event {
+  readonly error: CompatGPUError;
+  constructor(type: string, init: EventInit & { error: CompatGPUError }) {
+    if (!(init?.error instanceof CompatGPUError))
+      throw new TypeError('GPUUncapturedErrorEvent needs an error: pass { error } with a GPUError of this device');
+    super(type, init);
+    this.error = init.error;
   }
 }
 
@@ -455,11 +474,16 @@ export class CompatDevice extends EventTarget {
         this.scopes[i].error ??= error;
         return;
       }
-    const event = Object.assign(new Event('uncapturederror', { cancelable: true }), { error });
-    this.dispatchEvent(event);
-    this.onuncapturederror?.(event);
-    // As browsers do: an uncaptured error nobody prevented shows in the console, so dropped work is never silent.
-    if (!event.defaultPrevented) console.warn(`WebGL2 compatibility: uncaptured ${error.name}: ${error.message}`);
+    // As WebGPU does, in a task of its own, never inside the call that failed, and not once the device is gone: so a
+    // failed allocation's error, raised first, reaches listeners before the errors of later calls that used the object.
+    setTimeout(() => {
+      if (this.destroyed) return;
+      const event = new CompatUncapturedErrorEvent('uncapturederror', { cancelable: true, error });
+      this.dispatchEvent(event);
+      this.onuncapturederror?.(event);
+      // As browsers do: an uncaptured error nobody prevented shows in the console, so dropped work is never silent.
+      if (!event.defaultPrevented) console.warn(`WebGL2 compatibility: uncaptured ${error.name}: ${error.message}`);
+    }, 0);
   }
 
   // ---------------------------------------------------------------- lifetime
@@ -516,18 +540,24 @@ export class CompatDevice extends EventTarget {
    * rest). The device deletes every object it makes itself, never leaving one to the browser's garbage collector:
    * after destroy() the two counts match.
    */
-  get glObjects(): { readonly created: Readonly<Record<string, number>>; readonly deleted: Readonly<Record<string, number>> } {
+  get glObjects(): {
+    readonly created: Readonly<Record<string, number>>;
+    readonly deleted: Readonly<Record<string, number>>;
+  } {
     return this.objects;
   }
 
-  /** Resolves when the GPU has finished every command submitted so far. */
+  /**
+   * Resolves when the GPU has finished every command submitted so far, always in a later task, as WebGPU resolves it
+   * (also on a destroyed device): a page that waits for it in a loop then still lets timers and the restore run.
+   */
   idle(): Promise<void> {
-    if (this.destroyed) return Promise.resolve();
+    if (this.destroyed) return nextGPUTask();
     const waiting = this.queue.waiting;
     if (waiting) return waiting.then(() => this.idle());
     const gl = this.gl,
       sync = fence(gl);
-    if (!sync) return Promise.resolve();
+    if (!sync) return nextGPUTask();
     return new Promise((resolve) => {
       const poll = () => {
         if (this.destroyed || gl.isContextLost()) {
@@ -778,17 +808,39 @@ export class CompatQueue {
     if (loaded) for (const op of backlog) op();
   }
 
+  /**
+   * False, after a validation error, when `uses` holds a destroyed buffer, texture or query set: WebGPU refuses such
+   * work without running any of it, and the WebGL2 calls it would make on the deleted objects would leave GL errors that
+   * the next allocation's check reads as its own.
+   */
+  private usable(what: string, uses: Uses): boolean {
+    const gone = destroyedUse(uses);
+    if (gone) this.device.validationError(`${what} uses '${gone.label}', which is destroyed`);
+    return !gone;
+  }
+  private live(what: string, resource: Usable): boolean {
+    return this.usable(what, [resource]);
+  }
+
   submit(
     buffers: Iterable<{
       ops: readonly ((r: Replayer) => void)[];
       used?: boolean;
       compute?: boolean;
       readback?: boolean;
+      label?: string;
+      uses?: Uses;
     }>,
   ): void {
     const d = this.device;
     if (d.destroyed) return;
-    const list: { ops: readonly ((r: Replayer) => void)[]; compute?: boolean; readback?: boolean }[] = [];
+    const list: {
+      ops: readonly ((r: Replayer) => void)[];
+      compute?: boolean;
+      readback?: boolean;
+      label?: string;
+      uses?: Uses;
+    }[] = [];
     for (const cb of buffers) {
       if (cb.used) {
         d.validationError('A command buffer can be submitted once');
@@ -797,6 +849,8 @@ export class CompatQueue {
       cb.used = true;
       list.push(cb);
     }
+    // A command buffer that uses a destroyed resource fails the whole submit (WebGPU: every command buffer is spent).
+    if (!list.every((cb) => !cb.uses || this.usable(`submit: command buffer '${cb.label ?? ''}'`, cb.uses))) return;
     // What the commands need loads first; everything the queue gets meanwhile runs after, in order.
     if (!d.computeRuntime && list.some((cb) => cb.compute)) this.hold(d.loadCompute());
     if (!d.readback && list.some((cb) => cb.readback)) this.hold(d.loadReadback());
@@ -822,7 +876,7 @@ export class CompatQueue {
     dataOffset = 0,
     size?: number,
   ): void {
-    if (this.device.destroyed) return;
+    if (this.device.destroyed || !this.live('writeBuffer', buffer)) return;
     const view = ArrayBuffer.isView(data) ? data : null;
     const unit =
       view && 'BYTES_PER_ELEMENT' in view ? (view as unknown as { BYTES_PER_ELEMENT: number }).BYTES_PER_ELEMENT : 1;
@@ -849,7 +903,8 @@ export class CompatQueue {
     layout: GPUTexelCopyBufferLayout,
     size: GPUExtent3D,
   ): void {
-    if (this.device.destroyed) return;
+    const texture = destination.texture as unknown as CompatTexture;
+    if (this.device.destroyed || !this.live('writeTexture', texture)) return;
     const view = ArrayBuffer.isView(data) ? data : new Uint8Array(data as ArrayBuffer);
     let bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
     if (this.backlog) bytes = bytes.slice();
@@ -862,7 +917,9 @@ export class CompatQueue {
     destination: GPUCopyExternalImageDestInfo,
     size: GPUExtent3D,
   ): void {
-    if (this.device.destroyed) return;
+    const texture = destination.texture as unknown as CompatTexture,
+      what = 'copyExternalImageToTexture';
+    if (this.device.destroyed || !this.live(what, texture)) return;
     this.inOrder(() => copyExternalImage(this.device, source, destination as never, size));
   }
 

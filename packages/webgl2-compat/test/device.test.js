@@ -15,6 +15,9 @@ import {
   isCompatDevice,
 } from '../dist/device.js';
 
+/** One task: the layer dispatches uncapturederror in a task of its own, as WebGPU does. */
+const task = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 /** A stand-in context: just what webgl2Capabilities reads. */
 function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = {}) {
   const enums = Object.fromEntries(COMPAT_LIMITS.map((name, i) => [name, 0x1000 + i]));
@@ -374,6 +377,63 @@ test('install() names the layer classes as the WebGPU interfaces while installed
   }
 });
 
+// Bug (KB-C34c, restore fault sweep on the layer): install() named the layer's GPUOutOfMemoryError but left the
+// browser's GPUUncapturedErrorEvent and GPUError, so `new GPUUncapturedErrorEvent('uncapturederror', { error })` with
+// the layer's error threw a TypeError ("Failed to convert value to 'GPUError'") and the error was never dispatched, and
+// the layer's own events were plain Events. Both interfaces are now the layer's while it is installed.
+test('install() names GPUError and GPUUncapturedErrorEvent too, and the device dispatches that event', async () => {
+  const { installCompat, uninstallCompat, CompatGPUError, CompatUncapturedErrorEvent } = await import(
+    '../dist/device.js'
+  );
+  const names = ['navigator', 'OffscreenCanvas', 'GPUError', 'GPUOutOfMemoryError', 'GPUUncapturedErrorEvent'];
+  const saved = names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
+  class NativeError {}
+  class NativeEvent extends Event {
+    constructor(type, init) {
+      if (!(init?.error instanceof NativeError)) throw new TypeError("Failed to convert value to 'GPUError'");
+      super(type, init);
+    }
+  }
+  Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'GPUError', { value: NativeError, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'GPUUncapturedErrorEvent', {
+    value: NativeEvent,
+    configurable: true,
+    writable: true,
+  });
+  globalThis.OffscreenCanvas = class {
+    getContext() {
+      return fakeContext();
+    }
+  };
+  try {
+    assert.equal((await installCompat()).installed, true);
+    assert.equal(globalThis.GPUError, CompatGPUError);
+    assert.equal(globalThis.GPUUncapturedErrorEvent, CompatUncapturedErrorEvent);
+    const error = new GPUOutOfMemoryError('refused');
+    assert.ok(error instanceof GPUError);
+    const event = new GPUUncapturedErrorEvent('uncapturederror', { error });
+    assert.equal(event.error, error);
+    assert.throws(() => new GPUUncapturedErrorEvent('uncapturederror', {}), TypeError);
+    // The device's own uncaptured errors arrive as that event.
+    const gl = new Proxy(fakeContext(), { get: (context, key) => (key in context ? context[key] : () => ({})) });
+    const device = await (await createCompatGPU({ createContext: () => gl }).requestAdapter()).requestDevice();
+    let heard;
+    device.addEventListener('uncapturederror', (e) => (e.preventDefault(), (heard = e)));
+    device.queue.writeBuffer(device.createBuffer({ size: 4, usage: 8 }), 0, new Uint8Array(3));
+    assert.equal(heard, undefined, 'dispatched in a task of its own, never inside the call');
+    await task();
+    assert.ok(heard instanceof GPUUncapturedErrorEvent);
+    assert.ok(heard.error instanceof GPUError);
+    device.destroy();
+  } finally {
+    uninstallCompat();
+    for (const [name, own] of saved)
+      if (own) Object.defineProperty(globalThis, name, own);
+      else delete globalThis[name];
+  }
+});
+
 // Bug (the compute lab's sort came back unsorted with nothing in the console): an uncaptured error nobody prevented
 // was dropped silently; browsers show it in the console, and so does the layer now.
 test('an uncaptured error shows in the console unless a listener prevents it, as in browsers', async () => {
@@ -386,6 +446,7 @@ test('an uncaptured error shows in the console unless a listener prevents it, as
   console.warn = (message) => warned.push(message);
   try {
     device.internalError('over the work budget');
+    await task();
     assert.deepEqual(warned, ['WebGL2 compatibility: uncaptured GPUInternalError: over the work budget']);
     const seen = [];
     device.addEventListener('uncapturederror', (event) => {
@@ -393,6 +454,7 @@ test('an uncaptured error shows in the console unless a listener prevents it, as
       event.preventDefault();
     });
     device.validationError('handled');
+    await task();
     assert.deepEqual(seen, ['handled']);
     assert.equal(warned.length, 1, 'a prevented error is not shown');
   } finally {
@@ -822,6 +884,7 @@ test('an allocation the driver refuses is an out-of-memory error, to its scope o
   device.addEventListener('uncapturederror', (event) => (event.preventDefault(), uncaptured.push(event.error)));
   errors.push(0x0505);
   device.createTexture({ label: 'big', size: [4096, 4096], format: 'rgba8unorm', usage: 0x4 });
+  await task();
   assert.equal(uncaptured.length, 1);
   assert.equal(uncaptured[0].name, 'GPUOutOfMemoryError');
   assert.match(uncaptured[0].message, /texture 'big'/);

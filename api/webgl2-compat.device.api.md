@@ -88,6 +88,7 @@ export class CompatBindGroup {
     readonly layout: CompatBindGroupLayout;
     readonly entries: Map<number, Bound>;
     readonly invalid: string | null;
+    readonly uses: Usable[];
     constructor(device: CompatDevice, descriptor: GPUBindGroupDescriptor);
     storageTexture(): {
         texture: WebGLTexture;
@@ -123,6 +124,7 @@ export class CompatBuffer {
     computeState: {
         destroy(): void;
     } | null;
+    released: boolean;
     destroyed: boolean;
     constructor(device: CompatDevice, descriptor: GPUBufferDescriptor);
     write(offset: number, bytes: Uint8Array): void;
@@ -158,9 +160,11 @@ export class CompatCommandBuffer {
     label: string;
     readonly compute: boolean;
     readonly readback: boolean;
+    readonly uses: Uses;
     used: boolean;
     constructor(ops: readonly Op[], label: string,
-    compute?: boolean, readback?: boolean);
+    compute?: boolean, readback?: boolean,
+    uses?: Uses);
 }
 
 export class CompatCommandEncoder {
@@ -284,18 +288,21 @@ export class CompatGPU {
     getPreferredCanvasFormat(): GPUTextureFormat;
 }
 
+export class CompatGPUError extends Error {
+}
+
 export interface CompatGPUOptions {
     readonly minimumTier?: CompatTier;
     readonly createContext?: (attributes: WebGLContextAttributes) => WebGL2RenderingContext | null;
     readonly cpuWorkBudget?: number;
 }
 
-export class CompatInternalError extends Error {
+export class CompatInternalError extends CompatGPUError {
     readonly code = "failed";
     constructor(message: string);
 }
 
-export class CompatOutOfMemoryError extends Error {
+export class CompatOutOfMemoryError extends CompatGPUError {
     constructor(message: string);
 }
 
@@ -311,6 +318,7 @@ export class CompatQuerySet {
     readonly count: number;
     readonly queries: (WebGLQuery | null)[];
     destroyed: boolean;
+    get released(): boolean;
     constructor(device: CompatDevice, descriptor: GPUQuerySetDescriptor);
     begin(i: number): WebGLQuery;
     hold(queries: readonly (WebGLQuery | null)[]): void;
@@ -330,6 +338,8 @@ export class CompatQueue {
         used?: boolean;
         compute?: boolean;
         readback?: boolean;
+        label?: string;
+        uses?: Uses;
     }>): void;
     writeBuffer(buffer: CompatBuffer, offset: number, data: BufferSource | SharedArrayBuffer, dataOffset?: number, size?: number): void;
     writeTexture(destination: GPUTexelCopyTextureInfo, data: BufferSource | SharedArrayBuffer, layout: GPUTexelCopyBufferLayout, size: GPUExtent3D): void;
@@ -340,7 +350,9 @@ export class CompatQueue {
 export class CompatRenderBundle {
     readonly ops: readonly Op[];
     label: string;
-    constructor(ops: readonly Op[], label: string);
+    readonly uses: readonly Usable[];
+    constructor(ops: readonly Op[], label: string,
+    uses?: readonly Usable[]);
 }
 
 export class CompatRenderBundleEncoder extends DrawRecorder {
@@ -433,6 +445,7 @@ export class CompatTexture {
     readonly resolved: WebGLTexture | null;
     stale: boolean;
     initialized: boolean;
+    released: boolean;
     destroyed: boolean;
     readonly framebuffers: Set<string>;
     readonly layers: number;
@@ -463,7 +476,14 @@ export class CompatTextureView {
     constructor(texture: CompatTexture, d: GPUTextureViewDescriptor);
 }
 
-export class CompatValidationError extends Error {
+export class CompatUncapturedErrorEvent extends Event {
+    readonly error: CompatGPUError;
+    constructor(type: string, init: EventInit & {
+        error: CompatGPUError;
+    });
+}
+
+export class CompatValidationError extends CompatGPUError {
     constructor(message: string);
 }
 
@@ -1016,7 +1036,8 @@ interface ColorAttachment {
 
 class CompatComputePassEncoder {
     label: string;
-    constructor(ops: ((r: Replayer) => void)[], device: CompatDevice, label: string);
+    constructor(ops: ((r: Replayer) => void)[], device: CompatDevice, label: string,
+    uses?: Uses);
     setPipeline(pipeline: CompatComputePipeline): void;
     setBindGroup(index: number, group: CompatBindGroup | null, offsets?: Iterable<number> | Uint32Array, start?: number, length?: number): void;
     dispatchWorkgroups(x: number, y?: number, z?: number): void;
@@ -1080,7 +1101,9 @@ interface Copy {
 class DrawRecorder {
     protected readonly ops: Op[];
     label: string;
-    constructor(ops: Op[], label: string);
+    protected readonly uses: Uses;
+    constructor(ops: Op[], label: string,
+    uses: Uses);
     setPipeline(pipeline: CompatRenderPipeline): void;
     setBindGroup(index: number, group: CompatBindGroup | null, offsets?: Iterable<number> | Uint32Array, start?: number, length?: number): void;
     setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset?: number, size?: number): void;
@@ -1489,6 +1512,13 @@ interface UniformSlot {
     readonly binding: number;
     size: number;
 }
+
+interface Usable {
+    readonly released: boolean;
+    readonly label: string;
+}
+
+type Uses = (Usable | readonly Usable[])[];
 
 interface WebGL2Capabilities {
     readonly tier: CompatTier;

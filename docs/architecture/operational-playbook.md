@@ -2468,7 +2468,7 @@ view, a one-cascade map included, is made with `textureBindingViewDimension: '2d
 `tests/deep-core-allocation-failure.test.js` (out-of-memory reported once, device rebuilt, next frame draws; validation still
 throws), `scripts/restore-fault-sweep.mjs` (every allocation a restore makes, core's and each package's, failed once in a real
 browser: reported once, no frame throws, the next frame draws the scene, then a clean restore gives the same resources and
-picture). Missing: a true driver out-of-memory (the sweep injects the WebGPU-shaped failure).
+picture). Missing: a true driver out-of-memory (the sweep injects the WebGPU-shaped failure). On the WebGL2 layer (KB-C34c) work that uses a destroyed buffer, texture or query set is a validation error with no GL call (a failed submit runs none of its command buffers), so no GL error from a deleted object reaches the next allocation's `getError` check; `uncapturederror` is a `GPUUncapturedErrorEvent` dispatched in a task of its own, and `onSubmittedWorkDone` resolves in a later task even on a destroyed device. Evidence: `packages/webgl2-compat/test/destroyed-use.test.js` and the sweep under `MARGO_COMPAT=1`.
 
 Configuring the canvas is the one step of a restore with no way back, so it is the last step that can fail (2026-11-07):
 `GPURenderer.create` skips it for a restore, and `rebootDevice` calls `GPURenderer.configure` after every batch is rebuilt. A failed restore

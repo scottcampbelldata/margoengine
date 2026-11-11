@@ -10,9 +10,11 @@ import {
   CompatDevice,
   CompatGPU,
   type CompatGPUOptions,
+  CompatGPUError,
   CompatInternalError,
   CompatOutOfMemoryError,
   CompatQueue,
+  CompatUncapturedErrorEvent,
   CompatValidationError,
 } from './device/device.js';
 import { CompatComputePassEncoder, CompatComputePipeline } from './device/compute.js';
@@ -41,8 +43,10 @@ import {
 export type * from './wgsl.js';
 export { COMPAT_VENDOR, CompatAdapter, CompatCanvasContext, CompatDevice, CompatGPU, type CompatGPUOptions };
 export {
+  CompatGPUError,
   CompatInternalError,
   CompatOutOfMemoryError,
+  CompatUncapturedErrorEvent,
   CompatValidationError,
   CompatQueue,
   CPU_WORK_BUDGET,
@@ -136,9 +140,11 @@ const INTERFACES: Record<string, unknown> = {
   GPURenderBundle: CompatRenderBundle,
   GPUQuerySet: CompatQuerySet,
   GPUCanvasContext: CompatCanvasContext,
+  GPUError: CompatGPUError,
   GPUValidationError: CompatValidationError,
   GPUInternalError: CompatInternalError,
   GPUOutOfMemoryError: CompatOutOfMemoryError,
+  GPUUncapturedErrorEvent: CompatUncapturedErrorEvent,
 };
 
 type Restore = () => void;
