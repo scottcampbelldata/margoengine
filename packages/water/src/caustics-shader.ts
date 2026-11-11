@@ -93,36 +93,43 @@ struct Flux { @location(0) red:vec4f,@location(1) green:vec4f,@location(2) blue:
 
 // A conservative total-flux bound keeps every additive half-float component
 // representable. No radiance is clipped; the projector restores the same scale.
+// Three kernels with no workgroup memory or barrier (one store per invocation, a
+// bounded loop of reads), so the WebGL2 layer runs them on the GPU instead of
+// interpreting the wave function in JavaScript: per-triangle weights, 512 chunk
+// sums, then the scale.
+export const causticPartials = 512;
 export function causticRange(state: QueryState): string {
   const count = state.segments * state.segments * 2;
-  const groups = Math.ceil(count / 64);
+  const chunk = Math.ceil(count / causticPartials);
   return (
     causticBeams(state, '').split('struct Beam')[0] +
     `
 @group(1) @binding(2) var<storage,read_write> range:array<f32>;
-var<workgroup> sums:array<f32,64>;
-@compute @workgroup_size(64) fn measure(@builtin(global_invocation_id) id:vec3u,@builtin(local_invocation_index) lane:u32,@builtin(workgroup_id) group:vec3u){
+@group(1) @binding(3) var<storage,read_write> weights:array<f32>;
+@group(1) @binding(4) var<storage,read_write> partials:array<f32>;
+@compute @workgroup_size(64) fn measure(@builtin(global_invocation_id) id:vec3u){
+ if(id.x>=${count}u){return;}
  var weight=0.0;
- if(id.x<${count}u){
-  let a=causticSample(id.x*3u);let b=causticSample(id.x*3u+1u);let c=causticSample(id.x*3u+2u);
-  let eta=1.0/caustic[21].x;let light=caustic[12].xyz;
-  let na=normalize(a.normal);let nb=normalize(b.normal);let nc=normalize(c.normal);
-  let ra=refract(-light,na,eta);let rb=refract(-light,nb,eta);let rc=refract(-light,nc,eta);
-  let direction=(ra+rb+rc)/3.0;
-  let texel=2.0*caustic[12].w/caustic[21].y;
-  if(light.y>0.0&&min(dot(na,light),min(dot(nb,light),dot(nc,light)))>0.0&&max(ra.y,max(rb.y,rc.y))<0.0&&!drySample(a.base)&&!drySample(b.base)&&!drySample(c.base)){
-   weight=abs(dot(cross(b.position-a.position,c.position-a.position),light))/(texel*texel*max(0.000001,-direction.y));
-  }
+ let a=causticSample(id.x*3u);let b=causticSample(id.x*3u+1u);let c=causticSample(id.x*3u+2u);
+ let eta=1.0/caustic[21].x;let light=caustic[12].xyz;
+ let na=normalize(a.normal);let nb=normalize(b.normal);let nc=normalize(c.normal);
+ let ra=refract(-light,na,eta);let rb=refract(-light,nb,eta);let rc=refract(-light,nc,eta);
+ let direction=(ra+rb+rc)/3.0;
+ let texel=2.0*caustic[12].w/caustic[21].y;
+ if(light.y>0.0&&min(dot(na,light),min(dot(nb,light),dot(nc,light)))>0.0&&max(ra.y,max(rb.y,rc.y))<0.0&&!drySample(a.base)&&!drySample(b.base)&&!drySample(c.base)){
+  weight=abs(dot(cross(b.position-a.position,c.position-a.position),light))/(texel*texel*max(0.000001,-direction.y));
  }
- sums[lane]=weight;workgroupBarrier();
- for(var stride=32u;stride>0u;stride/=2u){if(lane<stride){sums[lane]+=sums[lane+stride];}workgroupBarrier();}
- if(lane==0u){range[group.x]=sums[0];}
+ weights[id.x]=weight;
 }
-@compute @workgroup_size(64) fn reduce(@builtin(local_invocation_index) lane:u32){
- var sum=0.0;for(var i=lane;i<${groups}u;i+=64u){sum+=range[i];}
- sums[lane]=sum;workgroupBarrier();
- for(var stride=32u;stride>0u;stride/=2u){if(lane<stride){sums[lane]+=sums[lane+stride];}workgroupBarrier();}
- if(lane==0u){range[0]=max(1.0,sums[0]/32752.0);}
+@compute @workgroup_size(64) fn chunks(@builtin(global_invocation_id) id:vec3u){
+ if(id.x>=${causticPartials}u){return;}
+ var sum=0.0;
+ for(var i=0u;i<${chunk}u;i++){let j=id.x*${chunk}u+i;if(j<${count}u){sum+=weights[j];}}
+ partials[id.x]=sum;
+}
+@compute @workgroup_size(1) fn reduce(){
+ var sum=0.0;for(var i=0u;i<${causticPartials}u;i++){sum+=partials[i];}
+ range[0]=max(1.0,sum/32752.0);
 }`
   );
 }

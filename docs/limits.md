@@ -6893,3 +6893,29 @@ LensDrops passes its existing 0.0001 absolute CPU/GPU bound over 4400 ordinary a
 ### Stage viewer GPU check readiness (2026-11-10)
 
 The viewer check's captures wait for pipeline and submitted-work readiness, including the environment device after a restore; capture equality stays exact. No elapsed-time bound is claimed.
+
+## Water caustics: limits, scale and the WebGL2 range fix (2026-11-10)
+
+`@margoengine/water/caustics`: `size` 0.1..100,000 m (default 100), `resolution` 32..2048 (default 256, power of two),
+`layers` 2..32 (default 12), `heightRange` finite, `refractiveIndex` 1..2 (1.333), `intensity` 0..100 (1), absorption per
+metre [0.38, 0.1, 0.045], `color` [1, 1, 1]. The surface is Water or FFTOcean (Water `segments` up to 512). There is no
+dispersion option: every channel refracts at one index. The rivals have no real-time caustics to match (three.js,
+Babylon.js, PlayCanvas; community demos project a normal-map texture). A per-channel
+split needs three beam footprints, so three times the beam work, and is not built without a demand for it.
+Entry size 9,140 B min+gzip under its 9,230 B ceiling (was 9,042 B before the range change below); core plus stage unchanged.
+
+Work and measured numbers (`node packages/water/test/caustics-scale.browser.mjs`, RTX A6000, busy machine, diagnostic only):
+flux maps `3 * resolution^2 * layers * 8` B, beam triangle instances `2 * segments^2 * layers`.
+
+| case | segments / map / layers | beam triangles | flux maps | native GPU | WebGL2 layer wall |
+| --- | --- | --- | --- | --- | --- |
+| default | 128 / 256 / 12 | 393,216 | 18 MiB | 0.52 ms | 19 to 23 ms (water alone 12 ms) |
+| medium | 256 / 1024 / 16 | 2,097,152 | 384 MiB | 3.3 ms | 26 ms |
+| limit | 512 / 2048 / 32 | 16,777,216 | 3,072 MiB | 21 ms | 49 to 58 ms |
+
+The limit case needs 3 GiB of GPU memory and misses a 60 fps budget; it is a validated upper bound, not a recommendation.
+Bug found and fixed here: the per-frame range (scale) pass used a 64-lane workgroup reduction, which the WebGL2 layer runs
+in JavaScript, so the default size cost 214 ms a frame there (0.5 ms native). The pass is now three kernels with no
+workgroup memory or barrier (per-triangle weights, 512 chunk sums, the scale), which the layer runs on the GPU: 19 ms a
+frame at the default size, the same energy errors (relative error 4.76e-6 and 1.49e-4 on both backends). Regression:
+`packages/water/test/caustics-scale.browser.mjs` fails when any range kernel plans onto the `cpu` tier.

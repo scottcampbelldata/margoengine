@@ -12,7 +12,7 @@ import type { FFTOcean } from './fft.js';
 import { queryStates, type QueryState } from './query-state.js';
 import { surfacePass } from './surface-pass.js';
 import { SurfaceCapture } from './surface-capture.js';
-import { causticBeams, causticCopy, causticProject, causticRange } from './caustics-shader.js';
+import { causticBeams, causticCopy, causticPartials, causticProject, causticRange } from './caustics-shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -69,6 +69,9 @@ export class Caustics implements EnginePlugin {
   private maps: GPUTexture[] = [];
   private beam?: GPURenderPipeline;
   private range?: GPUBuffer;
+  private weights?: GPUBuffer;
+  private partials?: GPUBuffer;
+  private chunks?: GPUComputePipeline;
   private measure?: GPUComputePipeline;
   private reduce?: GPUComputePipeline;
   private project?: GPURenderPipeline;
@@ -206,16 +209,16 @@ export class Caustics implements EnginePlugin {
     this.token = state.token;
     this.beamShadow = shadow;
     this.beamShader = state.shader;
-    this.range?.destroy();
-    this.range = c.device.createBuffer({
-      size: Math.ceil((state.segments ** 2 * 2) / 64) * 4,
-      usage: GPUBufferUsage.STORAGE,
-    });
+    for (const buffer of [this.range, this.weights, this.partials]) buffer?.destroy();
+    this.range = c.device.createBuffer({ size: 4, usage: GPUBufferUsage.STORAGE });
+    this.weights = c.device.createBuffer({ size: state.segments ** 2 * 8, usage: GPUBufferUsage.STORAGE });
+    this.partials = c.device.createBuffer({ size: causticPartials * 4, usage: GPUBufferUsage.STORAGE });
     const range = c.device.createShaderModule({ code: causticRange(state) });
     this.measure = c.device.createComputePipeline({
       layout: 'auto',
       compute: { module: range, entryPoint: 'measure' },
     });
+    this.chunks = c.device.createComputePipeline({ layout: 'auto', compute: { module: range, entryPoint: 'chunks' } });
     this.reduce = c.device.createComputePipeline({ layout: 'auto', compute: { module: range, entryPoint: 'reduce' } });
   }
   private illuminate(c: Context): boolean {
@@ -281,17 +284,37 @@ export class Caustics implements EnginePlugin {
     );
     measure.setBindGroup(
       1,
-      c.device.createBindGroup({ layout: this.measure!.getBindGroupLayout(1), entries: settings }),
+      c.device.createBindGroup({
+        layout: this.measure!.getBindGroupLayout(1),
+        entries: [...settings.filter((e) => e.binding !== 2), { binding: 3, resource: { buffer: this.weights! } }],
+      }),
     );
     measure.dispatchWorkgroups(Math.ceil((state.segments ** 2 * 2) / 64));
     measure.end();
+    const chunks = c.encoder.beginComputePass();
+    chunks.setPipeline(this.chunks!);
+    chunks.setBindGroup(
+      1,
+      c.device.createBindGroup({
+        layout: this.chunks!.getBindGroupLayout(1),
+        entries: [
+          { binding: 3, resource: { buffer: this.weights! } },
+          { binding: 4, resource: { buffer: this.partials! } },
+        ],
+      }),
+    );
+    chunks.dispatchWorkgroups(causticPartials / 64);
+    chunks.end();
     const reduce = c.encoder.beginComputePass();
     reduce.setPipeline(this.reduce!);
     reduce.setBindGroup(
       1,
       c.device.createBindGroup({
         layout: this.reduce!.getBindGroupLayout(1),
-        entries: [{ binding: 2, resource: { buffer: this.range! } }],
+        entries: [
+          { binding: 2, resource: { buffer: this.range! } },
+          { binding: 4, resource: { buffer: this.partials! } },
+        ],
       }),
     );
     reduce.dispatchWorkgroups(1);
@@ -394,9 +417,9 @@ export class Caustics implements EnginePlugin {
     this.capture.dispose();
     this.uniform?.destroy();
     this.coordinates?.destroy();
-    this.range?.destroy();
-    this.range = undefined;
-    this.measure = this.reduce = undefined;
+    for (const buffer of [this.range, this.weights, this.partials]) buffer?.destroy();
+    this.range = this.weights = this.partials = undefined;
+    this.measure = this.chunks = this.reduce = undefined;
     this.uniform = this.coordinates = this.token = undefined;
     this.sampler = this.beam = this.project = undefined;
     this.projectKey = '';

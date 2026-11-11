@@ -341,6 +341,34 @@ CPU and read with the same bilinear sample by the surface shader, `WaveQuery` he
 Where bodies overlap the later one covers the earlier. The Water grid stays centred on the world origin: size it to
 cover `bodies.bounds`. Islands (holes), per-body foam and flow, and a grid that follows the bodies are not done yet.
 
+## Caustics
+
+`@margoengine/water/caustics` lights opaque submerged geometry (a seabed, rocks, hulls, any receiver the camera sees below
+the surface) with the light that the live waves refract. Every wave triangle is refracted by Snell's law along the
+directional light, projected onto horizontal depth slices and added as conserved flux, so crests focus into bright
+filaments and troughs spread out, and the pattern moves with the surface. Light is absorbed per metre in red, green
+and blue, the surface entry and the receiver can be shadowed with a `Shadows`, and dry pixels get nothing. It runs before
+the water draw, on `Water` and `FFTOcean`, on WebGPU and the WebGL2 layer.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Water } from '@margoengine/water';
+import { Caustics } from '@margoengine/water/caustics';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const water = Water.attach(engine, { size: [64, 64], segments: 128, height: 0 });
+// A 64 m square of seabed down to 8 m below the surface, a 256 x 256 map in 12 depth slices.
+const caustics = Caustics.attach(engine, { surface: water, size: 64, heightRange: [-8, 0] });
+engine.render({ delta: 1 / 60 });
+```
+
+Defaults: `size` 100 m, `heightRange` [-20, 0], `resolution` 256 (a power of two, 32..2048), `layers` 12 (2..32),
+`intensity` 1, `absorption` [0.38, 0.1, 0.045] per metre, `color` [1, 1, 1], `refractiveIndex` 1.333.
+Set `enabled: false` for the unlit scene. The flux maps cost `3 * resolution^2 * layers * 8` bytes (18 MiB at the
+defaults, 3 GiB at 2048 and 32 layers), and every depth slice draws two triangles per surface cell, so raise
+`resolution` and `layers` together with the surface `segments` only as far as the frame budget allows
+(measured numbers in [limits](../../docs/limits.md)). There is no per-channel dispersion: every colour refracts at the
+same index. Method and sources: [caustics record](../../docs/water-caustics.md).
+
 ## Wave subsurface scattering
 
 `@margoengine/water/scatter` makes thin crests glow when the viewer looks toward one of the Water's directional

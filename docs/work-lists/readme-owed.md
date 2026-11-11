@@ -290,7 +290,6 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 - @margoengine/stats: document /panels attach and custom samples, four metric sources, defaults, units/averages/peaks, GPU pass names and async cadence, memory scope, null gaps, borrowed versus owned Stats and disposal. DONE (stats-readme-phase)
 - margoengine: document /stats/panels alias.
-| @margoengine/water | Optional caustics entry, source-ready scheduling, receiver projection, shadows, limits and lifecycle | Batch 234 caustics |
 | margoengine | water/caustics optional facade | Batch 234 caustics |
 
 - @margoengine/worker (batch 257 job 4): document Firefox WebGL2 worker evidence, browser-matrix and strict browser selection, default-profile WebGPU gaps and the distinction between Windows WebKit fallback and unproved native Safari.

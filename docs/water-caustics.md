@@ -1,5 +1,14 @@
 # Batch 234 caustics
 
+Verification, 2026-11-10 (lague plan 5): all caustics tests pass on native WebGPU and the WebGL2 layer (projector 7 cases,
+energy 3 cases, scene, source-ready scheduling, preview). Seabed, raised boxes (any opaque receiver), animation with the surface,
+shadows and per-channel absorption are each covered by an oracle; see the preview capture of the NOAA-driven sea. Sources the
+implementation follows: Wyman and Davis (2006) beam flux and Barczak and Olano (2007) separate occlusion, both read in full
+below; Guardado and Sanchez-Crespo (2004) is background only (its overhead-light projection is what Margo replaces with explicit
+refraction); Shah, Konttinen and Pattanaik, "Caustics Mapping: An Image-Space Technique for Real-Time Caustics", IEEE TVCG 13(2),
+2007, is background for the splat-into-a-map idea, which Margo does with finite beams instead of points. Clean room: no source of
+any of these papers' companion code was read. The range pass now runs as three barrier-free kernels (see limits, "Water caustics").
+
 The optional `@margoengine/water/caustics` entry provides refracted surface
 flux, world-space receiver projection, RGB absorption and entry/receiver shadows.
 The final full rebuild with main version guard measures 9004 B min+gzip,

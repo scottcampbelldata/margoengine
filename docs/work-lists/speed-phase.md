@@ -500,3 +500,12 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   the 1,000,000 default natively and 30 fps at the 100,000 light preset on the WebGL2 layer. Busy-machine diagnostic
   2026-11-10: native GPU 1.77 ms; WebGL2 layer 107 ms wall, a speed bug to diagnose (likely the compute emulation
   path at 8,192 workgroups) before release.
+
+### Water caustics at scale (lague plan 5, 2026-11-10)
+
+`node packages/water/test/caustics-scale.browser.mjs`, native and `MARGO_COMPAT=1`. Cases: default (Water 128 segments, map
+256, 12 layers: 393,216 beam triangle instances, 18 MiB), medium (256 / 1024 / 16), limit (512 / 2048 / 32: 16.8 million, 3 GiB).
+Targets on the RTX A6000: default and medium 60 fps (16.7 ms) natively and on the WebGL2 layer; limit natively under 33 ms.
+Mid laptop iGPU (Radeon 680M): default 60 fps natively, 30 fps on the WebGL2 layer. Busy-machine diagnostic: native GPU
+0.52, 3.3 and 21 ms; WebGL2 wall 19 to 23, 26 and 49 to 58 ms (default is 8 to 11 ms over water alone). The WebGL2 default
+was 214 ms before the range kernels left the JavaScript compute tier. The WebGL2 limit case misses 33 ms and is rerun on the quiet machine.

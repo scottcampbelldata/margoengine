@@ -90,7 +90,9 @@ fn oceanAt(base:vec2f)->SurfaceSample {
         const e = d.createCommandEncoder();
         if (!control) {
           const module = d.createShaderModule({ code: causticRange({ kind: 'fft', segments: 1, shader }) });
-          for (const entryPoint of ['measure', 'reduce']) {
+          const weights = d.createBuffer({ size: 16, usage: 128 });
+          const partials = d.createBuffer({ size: 512 * 4, usage: 128 });
+          for (const entryPoint of ['measure', 'chunks', 'reduce']) {
             const pipeline = d.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } });
             const pass = e.beginComputePass();
             pass.setPipeline(pipeline);
@@ -110,12 +112,20 @@ fn oceanAt(base:vec2f)->SurfaceSample {
                   entryPoint === 'measure'
                     ? [
                         { binding: 0, resource: { buffer: uniform } },
-                        { binding: 2, resource: { buffer: range } },
+                        { binding: 3, resource: { buffer: weights } },
                       ]
-                    : [{ binding: 2, resource: { buffer: range } }],
+                    : entryPoint === 'chunks'
+                      ? [
+                          { binding: 3, resource: { buffer: weights } },
+                          { binding: 4, resource: { buffer: partials } },
+                        ]
+                      : [
+                          { binding: 2, resource: { buffer: range } },
+                          { binding: 4, resource: { buffer: partials } },
+                        ],
               }),
             );
-            pass.dispatchWorkgroups(1);
+            pass.dispatchWorkgroups(entryPoint === 'chunks' ? 8 : 1);
             pass.end();
           }
         }
