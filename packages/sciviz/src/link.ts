@@ -271,7 +271,8 @@ export class SelectionStore extends EventTarget {
   dispose(): void {
     this.#disposed = true;
     this.#brushes.clear();
-    this.#selected.clear();
+    // A delivered change event reads its rows lazily from the set it was given: replace, never clear, that set.
+    this.#selected = new Set();
     this.#past = [];
     this.#future = [];
   }

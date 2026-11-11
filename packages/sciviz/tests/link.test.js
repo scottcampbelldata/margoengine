@@ -109,3 +109,14 @@ test('invalid rows cannot change state; typed keys, bounded history and cancella
   assert.throws(() => new SelectionStore([NaN]), TypeError);
   assert.throws(() => new SelectionStore(keys, { resolve: 'wrong' }), RangeError);
 });
+
+test('a change event keeps its rows after the store is disposed (KB5588d)', () => {
+  for (const open of [false, true]) {
+    const store = new SelectionStore(['a', 'b', 'c'], open ? { universe: 'open' } : {});
+    let detail;
+    store.addEventListener('change', (event) => (detail = event.detail));
+    store.select(['a', 'b']);
+    store.dispose();
+    assert.deepEqual([...detail.rowIds].sort(), ['a', 'b'], open ? 'open store' : 'fixed store');
+  }
+});
