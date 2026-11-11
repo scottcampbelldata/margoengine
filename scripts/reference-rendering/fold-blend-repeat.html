@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Raw API folded blend repeat</title></head><body><script>
+// KB5700f standalone reproducer: no engine, no translator, no textures, no time uniforms, nothing loaded. One procedural
+// height field (a 128 x 128 grid of hills, z = 0.35 sin(5x) cos(4y)) seen from a low camera, so its slopes fold over
+// each other on screen and many pixels are covered more than once by the same draw. One draw per frame into a cleared
+// 4x multisampled rgba8unorm target, resolved and read back. Cases: blended alpha 0.85 with no depth write (the
+// failing one), the same at alpha 1 with blending off and depth write on, and the same blend on the flattened grid
+// (z = 0: one coverage per pixel). Every frame of a case must match its first frame byte for byte.
+// Open it in a browser and call `await repeatFold({api:'webgpu'|'webgl2', frames:24})`, or run fold-blend-repeat.mjs.
+const size=512,grid=128;let power='high-performance';
+function mesh(flat){
+ const v=[],idx=[];
+ for(let j=0;j<=grid;j++)for(let i=0;i<=grid;i++){
+  const x=i/grid*2-1,y=j/grid*2-1,z=flat?0:0.35*Math.sin(5*x)*Math.cos(4*y);
+  // normal of the height field, flat shading term packed in the 4th component
+  const nx=flat?0:-0.35*5*Math.cos(5*x)*Math.cos(4*y),ny=flat?0:0.35*4*Math.sin(5*x)*Math.sin(4*y),l=Math.hypot(nx,ny,1);
+  v.push(x,y,z,0.25+0.75*Math.abs((nx*0.3+ny*0.5+0.8)/l));
+ }
+ for(let j=0;j<grid;j++)for(let i=0;i<grid;i++){const a=j*(grid+1)+i,b=a+1,c=a+grid+1,d=c+1;idx.push(a,b,d,a,d,c);}
+ return{vertices:new Float32Array(v),indices:new Uint32Array(idx)};
+}
+// Perspective camera at (0,-2.6,0.9) looking at the origin, z up; column-major; depth 0..1 (WebGPU convention).
+function camera(){
+ const eye=[0,-2.6,0.9],f=[0,2.6,-0.9],fl=Math.hypot(...f),fw=f.map(c=>c/fl);
+ const up=[0,0,1],s=[fw[1]*up[2]-fw[2]*up[1],fw[2]*up[0]-fw[0]*up[2],fw[0]*up[1]-fw[1]*up[0]],sl=Math.hypot(...s),sw=s.map(c=>c/sl);
+ const u=[sw[1]*fw[2]-sw[2]*fw[1],sw[2]*fw[0]-sw[0]*fw[2],sw[0]*fw[1]-sw[1]*fw[0]];
+ const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+ const view=[sw[0],u[0],-fw[0],0,sw[1],u[1],-fw[1],0,sw[2],u[2],-fw[2],0,-dot(sw,eye),-dot(u,eye),dot(fw,eye),1];
+ const t=1/Math.tan(Math.PI*45/360),n=0.1,far=20,proj=[t,0,0,0,0,t,0,0,0,0,far/(n-far),-1,0,0,n*far/(n-far),0];
+ const m=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++){let x=0;for(let k=0;k<4;k++)x+=proj[k*4+r]*view[c*4+k];m[c*4+r]=x;}
+ return m;
+}
+const CASES={folded:{flat:false,alpha:0.85},opaque:{flat:false,alpha:1},flat:{flat:true,alpha:0.85}};
+async function webgpu(c){
+ const adapter=await navigator.gpu.requestAdapter({powerPreference:power});if(!adapter)throw Error('WebGPU adapter unavailable');
+ const device=await adapter.requestDevice();device.pushErrorScope('validation');
+ const renderer=Object.fromEntries(['vendor','architecture','device','description'].map(k=>[k,adapter.info[k]]));
+ const {vertices,indices}=mesh(c.flat),blend=c.alpha<1;
+ const uniform=device.createBuffer({size:80,usage:72});device.queue.writeBuffer(uniform,0,camera());device.queue.writeBuffer(uniform,64,new Float32Array([c.alpha,0,0,0]));
+ const vertex=device.createBuffer({size:vertices.byteLength,usage:40});device.queue.writeBuffer(vertex,0,vertices);
+ const index=device.createBuffer({size:indices.byteLength,usage:24});device.queue.writeBuffer(index,0,indices);
+ const module=device.createShaderModule({code:`
+ struct U{m:mat4x4f,a:vec4f};@group(0) @binding(0) var<uniform> u:U;
+ struct O{@builtin(position) p:vec4f,@location(0) s:f32,@location(1) h:f32};
+ @vertex fn vs(@location(0) v:vec4f)->O{var o:O;o.p=u.m*vec4f(v.xyz,1);o.s=v.w;o.h=v.z;return o;}
+ @fragment fn fs(i:O)->@location(0) vec4f{return vec4f(vec3f(0.2,0.5+i.h,0.9-i.h)*i.s,u.a.x);}`});
+ const pipeline=await device.createRenderPipelineAsync({layout:'auto',
+  vertex:{module,entryPoint:'vs',buffers:[{arrayStride:16,attributes:[{shaderLocation:0,offset:0,format:'float32x4'}]}]},
+  fragment:{module,entryPoint:'fs',targets:[{format:'rgba8unorm',...(blend&&{blend:{color:{srcFactor:'src-alpha',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}})}]},
+  primitive:{topology:'triangle-list',cullMode:'none'},
+  depthStencil:{format:'depth32float',depthWriteEnabled:!blend,depthCompare:'less'},multisample:{count:4}});
+ const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}}]});
+ const output=device.createTexture({size:[size,size],format:'rgba8unorm',usage:17}),
+  ms=device.createTexture({size:[size,size],format:'rgba8unorm',usage:16,sampleCount:4}),
+  depth=device.createTexture({size:[size,size],format:'depth32float',usage:16,sampleCount:4}),
+  buffer=device.createBuffer({size:size*size*4,usage:9});
+ return{renderer,async read(){
+  const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({
+   colorAttachments:[{view:ms.createView(),resolveTarget:output.createView(),loadOp:'clear',storeOp:'discard',clearValue:[0.1,0.1,0.1,1]}],
+   depthStencilAttachment:{view:depth.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'discard'}});
+  pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.setVertexBuffer(0,vertex);pass.setIndexBuffer(index,'uint32');pass.drawIndexed(indices.length);pass.end();
+  encoder.copyTextureToBuffer({texture:output},{buffer,bytesPerRow:size*4},[size,size]);device.queue.submit([encoder.finish()]);
+  await buffer.mapAsync(1);const bytes=new Uint8Array(buffer.getMappedRange()).slice();buffer.unmap();return bytes;
+ },async close(){const error=await device.popErrorScope();device.destroy();if(error)throw Error(error.message);}};
+}
+function webgl2(c){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=size;
+ const gl=canvas.getContext('webgl2',{antialias:false,powerPreference:power});if(!gl)throw Error('WebGL2 unavailable');
+ const debug=gl.getExtension('WEBGL_debug_renderer_info'),renderer=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);
+ const {vertices,indices}=mesh(c.flat),blend=c.alpha<1,program=gl.createProgram();
+ for(const [type,source] of [[gl.VERTEX_SHADER,`#version 300 es
+  precision highp float;layout(location=0) in vec4 v;uniform mat4 m;out float s;out float h;
+  void main(){vec4 p=m*vec4(v.xyz,1.0);gl_Position=vec4(p.x,p.y,p.z*2.0-p.w,p.w);s=v.w;h=v.z;}`],[gl.FRAGMENT_SHADER,`#version 300 es
+  precision highp float;in float s;in float h;uniform float a;out vec4 color;void main(){color=vec4(vec3(0.2,0.5+h,0.9-h)*s,a);}`]]){
+  const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));gl.attachShader(program,shader);
+ }
+ gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+ gl.uniformMatrix4fv(gl.getUniformLocation(program,'m'),false,camera());gl.uniform1f(gl.getUniformLocation(program,'a'),c.alpha);
+ const vao=gl.createVertexArray();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,vertices,gl.STATIC_DRAW);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,4,gl.FLOAT,false,16,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indices,gl.STATIC_DRAW);
+ const rb=(format)=>{const r=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,r);gl.renderbufferStorageMultisample(gl.RENDERBUFFER,4,format,size,size);return r;};
+ const msFb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,msFb);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,rb(gl.RGBA8));gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,rb(gl.DEPTH_COMPONENT32F));
+ const outFb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,outFb);const out=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,out);gl.renderbufferStorage(gl.RENDERBUFFER,gl.RGBA8,size,size);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.RENDERBUFFER,out);
+ const bytes=new Uint8Array(size*size*4);
+ return{renderer,async read(){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,msFb);gl.viewport(0,0,size,size);gl.clearColor(0.1,0.1,0.1,1);gl.clearDepth(1);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.depthMask(!blend);gl.disable(gl.CULL_FACE);
+  if(blend){gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);}else gl.disable(gl.BLEND);
+  gl.drawElements(gl.TRIANGLES,indices.length,gl.UNSIGNED_INT,0);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER,msFb);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,outFb);gl.blitFramebuffer(0,0,size,size,0,0,size,size,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,outFb);gl.readPixels(0,0,size,size,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return bytes.slice();
+ },async close(){const e=gl.getError();gl.getExtension('WEBGL_lose_context')?.loseContext();if(e)throw Error('GL error '+e);}};
+}
+// Per case: how many of frames-1 repeats differ from the first frame, the most bytes one differs in, the largest byte
+// difference, and how many pixels of the first frame were drawn over more than once (folded) is reported by the caller.
+window.repeatFold=async({api='webgpu',frames=24,cases=Object.keys(CASES),powerPreference='high-performance'}={})=>{power=powerPreference;
+ const out={api,size,frames,cases:{}};
+ for(const name of cases){
+  const ctx=api==='webgpu'?await webgpu(CASES[name]):webgl2(CASES[name]);out.renderer=ctx.renderer;
+  const first=await ctx.read();let differing=0,mostBytes=0,largest=0;
+  for(let f=1;f<frames;f++){
+   const b=await ctx.read();let n=0;
+   for(let i=0;i<b.length;i++)if(b[i]!==first[i]){n++;largest=Math.max(largest,Math.abs(b[i]-first[i]));}
+   if(n){differing++;mostBytes=Math.max(mostBytes,n);}
+  }
+  let drawn=0;for(let i=0;i<first.length;i+=4)if(first[i]!==first[0]||first[i+1]!==first[1]||first[i+2]!==first[2])drawn++;
+  await ctx.close();out.cases[name]={differing,of:frames-1,mostBytes,largest,drawnPixels:drawn};
+ }
+ return out;
+};
+</script></body></html>

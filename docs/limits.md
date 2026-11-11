@@ -7173,3 +7173,16 @@ worst difference; the multi-brick checks keep their hardware bound of 2. Roundin
 8-bit grid moved the picture by 2 and 3 only, so the hardware also rounds elsewhere (likely in its half-float filtering
 arithmetic); the full-step model is the one that bounds it. The filter mode is a pipeline constant that tests set; it
 is not an option, and the normal path builds with the hardware branch only.
+
+## Repeatable pictures of folded translucent surfaces on NVIDIA (KB5700f, 2026-11-11)
+
+A translucent surface (any opacity below 1, blended, no depth write) that covers a pixel more than once in its one
+draw, such as a sciviz `figure.surface` whose hills fold over each other on screen, is not byte-repeatable on NVIDIA
+GPUs at the default 4x MSAA: on the RTX A6000 two unchanged captures differ by one level in a few dozen bytes, on
+WebGPU (D3D12) and on the WebGL2 layer (ANGLE D3D11) alike. A raw-API page with no Margo code shows the same
+(`scripts/reference-rendering/fold-blend-repeat.html`: 23 of 23 repeats differ, up to 62 and 86 bytes), while an AMD
+RDNA 2 iGPU on the same PC and an Apple M6 (Metal) repeat it exactly; the upstream draft is
+docs/upstream-reports/KB5700f/report.md. Opaque surfaces and translucent surfaces that cover each pixel once repeat
+exactly everywhere (`packages/sciviz/tests/surface-repeat-browser.mjs`, WebGPU and the WebGL2 layer). For byte-exact
+captures of a folded translucent surface on NVIDIA, draw it at opacity 1 or capture at one sample (`exactSize`); the
+sciviz look (no depth pre-pass, no forced OIT) is unchanged.

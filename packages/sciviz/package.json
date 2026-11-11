@@ -411,6 +411,7 @@
     "test:browser:multivolume": "node scripts/browser-root.mjs tests/multivolume-browser.mjs",
     "test:browser:monitor": "node scripts/browser-root.mjs tests/monitor-browser.mjs",
     "test:browser:geo-time": "node scripts/browser-root.mjs tests/geo-time-browser.mjs",
+    "test:browser:surface-repeat": "node scripts/browser-root.mjs tests/surface-repeat-browser.mjs",
     "limits": "node scripts/browser-root.mjs tests/limits-browser.mjs",
     "test:browser:limits": "node scripts/browser-root.mjs tests/limits-browser.mjs && node scripts/browser-root.mjs tests/limits-browser.mjs --backend=webgl2 --output=test-results/sciviz-limits-webgl2.json",
     "test:browser:export-media": "node scripts/browser-root.mjs tests/export-media-browser.mjs",
