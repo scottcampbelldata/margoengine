@@ -392,6 +392,22 @@ const liveFloats = 18;
  */
 let stamps = 0;
 const changeStamp = (): number => ++stamps;
+// The textures with a GPU copy on each device, told once when it is lost. Made outside any texture's scope, so the
+// reaction holds only the device and this set, which a texture leaves on dispose: one reaction per texture and device
+// kept every disposed texture alive as long as the device (docs/known-bugs.md).
+const lostTextures = new WeakMap<GPUDevice, Set<Texture>>();
+function watchTextureLost(device: GPUDevice, texture: Texture): void {
+  let set = lostTextures.get(device);
+  if (!set) {
+    const watching = (set = new Set());
+    lostTextures.set(device, watching);
+    void device.lost?.then(() => {
+      for (const t of watching) t['slots'].delete(device);
+      watching.clear();
+    });
+  }
+  set.add(texture);
+}
 /** A shareable texture. GPU copies are made lazily per device; video sources re-upload whenever `currentTime` changes, other sources on `update()`. */
 export class Texture {
   private version = 0;
@@ -633,7 +649,8 @@ export class Texture {
    */
   dispose(): void {
     this.stamp = changeStamp();
-    for (const slot of this.slots.values()) {
+    for (const [device, slot] of this.slots) {
+      lostTextures.get(device)?.delete(this);
       if (slot.transcoded) for (const texture of slot.transcoded.values()) texture.destroy();
       else slot.texture?.destroy();
       slot.p3?.destroy();
@@ -667,7 +684,7 @@ export class Texture {
         samplerMips: mips,
       };
       this.slots.set(device, slot);
-      device.lost?.then(() => this.slots.delete(device));
+      watchTextureLost(device, this);
     }
     if (slot.samplerVersion !== this.samplerVersion || slot.samplerMips !== mips) {
       slot.sampler = this.sampler(device, mips);
@@ -894,7 +911,7 @@ export class Texture {
         samplerMips: mips,
       };
       this.slots.set(device, slot);
-      device.lost?.then(() => this.slots.delete(device));
+      watchTextureLost(device, this);
     }
     // Rebuilt lazily: after a sampler option changed, or once the GPU copy's mip chain changed with `update()`.
     const mips = slot.mips ?? o.mipmaps ?? !video;
@@ -1757,6 +1774,8 @@ type MapState = {
   envData?: Float32Array;
   displacement?: { buffer: GPUBuffer; view: GPUTextureView; sampler: GPUSampler };
   castMask?: CastMask;
+  /** The uniforms watched for their device's loss, by field (`watchUniformLost`). */
+  lost?: Map<UniformField, LostUniform>;
 };
 /** gltf-pro `PBRMaterial.castMask`, kept and refilled per material and owner: read for every caster, every pass. */
 type CastMask = {
@@ -1796,15 +1815,47 @@ function retainMaps(m: Material, engine: Engine): () => void {
     state.surface?.destroy();
     state.env?.destroy();
     state.clip?.destroy();
+    unwatchUniforms(state);
     mapStates.get(m)?.delete(engine);
   };
+}
+type UniformField = 'buffer' | 'features' | 'surface' | 'env' | 'clip';
+type LostUniform = { state: MapState; field: UniformField; buffer: GPUBuffer; device: GPUDevice };
+// The material uniforms on each device, destroyed once when it is lost. One reaction per device over this set, which a
+// material's state leaves when its last mesh goes or it is disposed: one reaction per uniform kept every released
+// state and its buffers alive as long as the device (docs/known-bugs.md).
+const lostUniforms = new WeakMap<GPUDevice, Set<LostUniform>>();
+function watchUniformLost(state: MapState, field: UniformField, device: GPUDevice, buffer: GPUBuffer): void {
+  let set = lostUniforms.get(device);
+  if (!set) {
+    const watching = (set = new Set());
+    lostUniforms.set(device, watching);
+    void device.lost?.then(() => {
+      for (const u of watching)
+        if (u.state[u.field] === u.buffer) {
+          u.buffer.destroy();
+          u.state[u.field] = undefined;
+        }
+      watching.clear();
+    });
+  }
+  const old = state.lost?.get(field);
+  if (old) lostUniforms.get(old.device)?.delete(old);
+  const entry = { state, field, buffer, device };
+  set.add(entry);
+  (state.lost ??= new Map()).set(field, entry);
+}
+/** The state's uniforms go: none is watched for a device loss any more. */
+function unwatchUniforms(state: MapState): void {
+  for (const u of state.lost?.values() ?? []) lostUniforms.get(u.device)?.delete(u);
+  state.lost?.clear();
 }
 function materialBuffer(
   m: Material,
   device: GPUDevice,
   owner: object,
   size: number,
-  field: 'buffer' | 'features' | 'surface' | 'env' | 'clip' = 'buffer',
+  field: UniformField = 'buffer',
 ): GPUBuffer {
   const state = mapState(m, owner);
   if (state.device !== device || !state[field]) {
@@ -1816,12 +1867,7 @@ function materialBuffer(
       size,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
-    device.lost?.then(() => {
-      if (state[field] === buffer) {
-        buffer.destroy();
-        state[field] = undefined;
-      }
-    });
+    watchUniformLost(state, field, device, buffer);
   }
   return state[field];
 }
@@ -3439,6 +3485,7 @@ export class Material {
         state.surface?.destroy();
         state.env?.destroy();
         state.clip?.destroy();
+        unwatchUniforms(state);
         states!.delete(owner);
       }
   }

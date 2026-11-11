@@ -49,23 +49,6 @@
   heavy memory load; nothing in the failing check navigates. Next: record the renderer's exit reason and memory when
   the context goes, so a repeat names the cause.
 
-### Per-object `device.lost` reactions keep disposed objects alive in several packages (found with the path tracer stall, 2026-11-11, open)
-
-- **Repro:** make and dispose an object below many times on one live device, then collect garbage: the disposed objects
-  stay reachable from the device's `lost` promise (a heap snapshot shows the path `GPUDevice.lost` -> PromiseReaction ->
-  closure context -> the object). `VoxelPathTracer` had the same defect and grew a test page to 4.7 GB of JavaScript heap
-  over 204 renders until it stalled; it now watches loss once per device (`packages/voxel-pathtracer/src/tracer.ts`,
-  test "a disposed tracer is collected while its device lives").
-- **Cause:** a reaction on `device.lost` cannot be removed, so a closure made per object (and the closure context it
-  shares with the object's other closures, which often holds `this`) lives as long as the device. Candidates read but not
-  yet measured: `packages/materials/src/built-material.ts` (per material and device, lines near 670, 897 and 1819),
-  `packages/toon/src/hatch-models.ts` (per model and device), `packages/xr/src/index.ts` (per XR),
-  `packages/inspector/src/textures.ts`, `packages/biomes/src/gpu-placement-flow-transport.ts` (per transport).
-  `packages/biomes/src/gpu.ts`, `packages/shader/src/compute.ts` and `packages/shared/frame-resources.js` already keep
-  one reaction per device.
-- **Fix to build:** one reaction per device over a set the objects leave on dispose (as biomes, shader and the path
-  tracer do), each with a collection test like the path tracer's.
-
 ### Path tracer analytic furnace read low twice on the WebGL2 layer under a concurrent GPU load page (2026-11-10, open, not reproduced)
 
 - **Repro (not reproduced since):** `analytic` of `packages/voxel-pathtracer/tests/browser-check.mjs` on ANGLE Vulkan
@@ -260,6 +243,23 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Chromium (`chromiumExecutablePath`) by their real paths. Headless Chromium, Edge, Chrome, WebKit and an executable named
   by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
   headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
+
+### Fixed 2026-11-11: per-object `device.lost` reactions kept disposed objects alive as long as their device
+
+- **Repro:** make and dispose an object below many times on one live device, then collect garbage: the disposed objects
+  stayed reachable from the device's `lost` promise (a heap snapshot shows `GPUDevice.lost` -> PromiseReaction ->
+  closure context -> the object). `VoxelPathTracer` grew a test page to 4.7 GB of JavaScript heap over 204 renders
+  until it stalled.
+- **Cause:** a reaction on `device.lost` cannot be removed, so a closure made per object (and the closure context it
+  shares with the object's other closures, which often holds `this`) lived as long as the device.
+- **Fix:** one reaction per device over a set the objects leave on dispose, each with a test that fails on the old
+  build: the path tracer (`packages/voxel-pathtracer/tests/tracer.test.js`), `@margoengine/inspector` texture capture
+  (`test/textures.test.js`), `@margoengine/toon` model hatching (`test/hatch-models.test.js`), `@margoengine/xr`
+  (`tests/xr.test.js`), the `@margoengine/biomes` placement and flow session (`tests/gpu-placement-flow.test.js`),
+  `@margoengine/materials` texture copies and material uniforms (`test/device-lost.test.js`) and the
+  `@margoengine/react` separate roughness map (`test/roughness-feature.test.js`). `packages/biomes/src/gpu.ts`,
+  `packages/shader/src/compute.ts`, `packages/shared/frame-resources.js` and `packages/environment/src/environment.ts`
+  already kept one reaction per device; `@margoengine/procedural` bakes hold only a `WeakRef` to their controller.
 
 ### Fixed 2026-11-11: README examples stalled behind the previous example's shader compiles in a shared browser
 

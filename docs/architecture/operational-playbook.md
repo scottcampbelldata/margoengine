@@ -2363,7 +2363,11 @@ Core treats `device.lost` and relevant frame-time DOM exceptions as loss. Recove
 promise, creates a new adapter/device/renderer with the same features and samples, re-adds every geometry batch from
 CPU copies, configures the canvas for the new device, swaps renderers, rearms the watcher, and calls every plugin's restore hook in its scene. CPU-side Wasm
 transforms and instance arrays survive. Frames skip rendering during recovery, and accessing geometry buffers reports
-a restore-specific coded error. The WebGL2 compatibility device feeds its context loss through the same path.
+a restore-specific coded error. The WebGL2 compatibility device feeds its context loss through the same path. Packages watch
+`device.lost` once per device, never once per object: a reaction on a promise cannot be removed, so a closure per object
+kept every disposed object alive as long as its device (the path tracer reached 4.7 GB of heap). Each package keeps a
+`WeakMap<GPUDevice, Set<...>>` its objects leave on dispose, made outside any object's scope, and a collection test
+(`WeakRef` plus forced GC) proves a disposed object goes while the device lives (docs/known-bugs.md, 2026-11-11).
 
 Tests destroy devices and GPU processes during lifecycle checks, compare every visual demo before and after loss,
 exercise scenes and multi-view water, restore compatibility devices, and include restore events in proof stories.
