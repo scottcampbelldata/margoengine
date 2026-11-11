@@ -130,6 +130,9 @@ keeps the size its `resolution` and `maxLights` set, so call it again when the c
 `castShadow: true` are shadowed by the `LocalShadows` attached to the same lights: the same casters (`local.add`: core
 meshes, glTF-pro models, materials and instanced meshes, `{dynamic: true}` for skinned ones), `bias` and `normalBias`,
 and the same depth map array, after the point and spot layers. No binding is added.
+`LocalShadows` `maxLights` (1 to 16, default 4) sets how many point and spot lights get maps, in list order; further
+`castShadow` point and spot lights stay unshadowed. The integrated maps (`ClusteredOptions.shadows`, below) take 1 to 32
+and reject a list with more shadowed lights instead.
 
 ```ts
 import {Clustered} from 'margoengine/clustered';
@@ -434,7 +437,7 @@ material slot. TAA, sky and terrain's existing bindings remain available.
 
 Fragment lookup removes camera projection jitter before selecting the unjittered compute cluster. This keeps TAA from dropping small lights at fractional tile boundaries; the uniform's previously unused depth.zw fields carry the screen offset, without a dependency on TAA.
 
-Each cluster reserves 1,024 indices, preventing silent truncation when many lights overlap. The default grid uses 13.5 MiB for indices. An optional `grid:[x,y,z]` is checked against storage limits at attachment. `lightLists` exposes GPU counts/indices for diagnostics or custom forward materials; ordinary rendering needs no readback. `clusteredSampling(group)` exports WGSL for custom materials. Frame rate depends on light overlap, materials, resolution and hardware; no locked FPS is promised.
+Each cluster reserves 1,024 indices. With the default `maxLights` (1,024) every light that reaches a cluster is listed, so nothing is ever dropped. With `maxLights` above 1,024, a cluster reached by more than 1,024 lights lists the first 1,024 of them in `setLights` order and shades only those (it never writes into the next cluster's list; the GPU check `scripts/clustered-shadow-gpu-check.js` pins it with 1,100 lamps over one point); put the lights that must always show first. The default grid uses 13.5 MiB for indices. An optional `grid:[x,y,z]` is checked against storage limits at attachment. `lightLists` exposes GPU counts/indices for diagnostics or custom forward materials; ordinary rendering needs no readback. `clusteredSampling(group)` exports WGSL for custom materials. Frame rate depends on light overlap, materials, resolution and hardware; no locked FPS is promised.
 
 Custom code reproducing `ClusterFrame` must include the trailing `intensity:vec4f`
 at byte 112, making the uniform 128 bytes. Its X component is the radiance scale.
