@@ -273,6 +273,23 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   tracer and the WebGL2 layer pass. Regression: `tests/run-readme-examples.test.js` (two tests that fail on the old
   runner).
 
+### Fixed 2026-11-11: every `onSubmittedWorkDone()` on the WebGL2 layer took about 270 ms when no frame was shown
+
+- **Repro:** `npm run check:owners -- --packages=materials` on ANGLE Direct3D 11 (Chrome 157, RTX A6000): the native
+  leg passed its 44 cases, the WebGL2-layer leg stopped at its 180 s limit (`OWNER_GPU_TIMEOUT`), the same on main's
+  own materials code. Timed per case it was no hang and no shader compile: every case took 2.8, 5.5 or 7.7 s whatever
+  the fixture, one step of about 0.28 s per wait after a render, and 44 cases need about 230 s.
+- **Cause:** the owner check renders into its own texture and waits with `onSubmittedWorkDone()`, which the layer
+  answers with a fence and `gl.flush()`. On Direct3D 11 that fence reported signaled only after about 17 polls (about
+  270 ms) on a context that showed no frame; raw WebGL2 with no layer does the same, also for a fence with no work
+  before it. A frame shown on a page canvas, or any command after the fence (a 4-byte buffer copy, a pixel-buffer
+  `readPixels`), makes it signal on the next poll.
+- **Fix:** the device's fence (`fence()` in `packages/webgl2-compat/src/device/tasks.ts`) sends a 4-byte copy between
+  two buffers of its own after the fence, before the flush. The fence then signals on the first poll (7 of 7), and the
+  materials owner check passes on both legs in 26 s together. No limit changed. Regressions:
+  `packages/webgl2-compat/test/task-polling.test.js` ("a device fence is followed by a command of its own ...") and
+  `packages/webgl2-compat/test/idle-fence-browser.mjs` in `test:gpu` (18 fence checks before, 1 after).
+
 ### Fixed 2026-11-11: the path tracer's transparent render never compiled on Direct3D 11 (WebGL2 layer)
 
 - **Repro:** `transparent` of `packages/voxel-pathtracer/tests/browser-check.mjs` with `MARGO_COMPAT=1` on ANGLE

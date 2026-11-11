@@ -43,6 +43,10 @@ test('serial fence waits yield tasks without nested timers; pending work and los
       SYNC_GPU_COMMANDS_COMPLETE: 1,
       TIMEOUT_EXPIRED: 2,
       fenceSync: () => ({}),
+      createBuffer: () => ({}),
+      bindBuffer() {},
+      bufferData() {},
+      copyBufferSubData() {},
       flush: () => flushed++,
       isContextLost: () => false,
       clientWaitSync: () => (++checks % 3 ? 2 : 3),
@@ -64,6 +68,40 @@ test('serial fence waits yield tasks without nested timers; pending work and los
   device.destroyed = true;
   await device.idle();
   assert.equal(deleted, 33);
+});
+
+// Regression (2026-11-11, Chrome 157 on ANGLE Direct3D 11, RTX A6000): a fence followed only by gl.flush() on a
+// context that shows no frame stayed unsignaled for about 270 ms (17 polls), so every onSubmittedWorkDone() after work
+// drawn into textures cost that much, and the materials owner/lifetime check ran past its 180 s limit on the layer.
+// A command after the fence makes it observable on the next poll: the device sends a 4-byte buffer copy after it.
+test('a device fence is followed by a command of its own before the flush, with probe buffers made once', async (t) => {
+  installScheduler(t);
+  const calls = [];
+  let made = 0;
+  const gl = {
+    SYNC_GPU_COMMANDS_COMPLETE: 1,
+    TIMEOUT_EXPIRED: 2,
+    COPY_READ_BUFFER: 3,
+    COPY_WRITE_BUFFER: 4,
+    STATIC_DRAW: 5,
+    fenceSync: () => (calls.push('fence'), {}),
+    createBuffer: () => ({ id: ++made }),
+    bindBuffer: () => {},
+    bufferData: () => {},
+    copyBufferSubData: (read, write, from, to, size) => calls.push(`copy ${read} ${write} ${from} ${to} ${size}`),
+    flush: () => calls.push('flush'),
+    isContextLost: () => false,
+    clientWaitSync: () => 3,
+    deleteSync: () => {},
+  };
+  const device = { destroyed: false, queue: {}, gl };
+  device.idle = CompatDevice.prototype.idle.bind(device);
+  for (let i = 0; i < 3; i++) await device.idle();
+  assert.deepEqual(calls, Array(3).fill(['fence', 'copy 3 4 0 0 4', 'flush']).flat());
+  assert.equal(made, 2, 'the two probe buffers belong to the context, made on its first fence');
+  const lost = { ...gl, fenceSync: () => null, copyBufferSubData: () => assert.fail('no probe without a fence') };
+  const gone = { destroyed: false, queue: {}, gl: lost };
+  await CompatDevice.prototype.idle.call(gone);
 });
 
 test('map readiness also yields a port task, checks every pending result and rejects loss', async (t) => {
@@ -158,6 +196,10 @@ test('the scheduler fallback yields an idle interval and does not leave Node mes
       SYNC_GPU_COMMANDS_COMPLETE: 1,
       TIMEOUT_EXPIRED: 2,
       fenceSync: () => ({}),
+      createBuffer: () => ({}),
+      bindBuffer() {},
+      bufferData() {},
+      copyBufferSubData() {},
       flush() {},
       isContextLost: () => false,
       clientWaitSync: () => (++polls < 3 ? 2 : 3),

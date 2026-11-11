@@ -7,7 +7,7 @@ import { fault } from '../../../shared/errors.js';
 import { webgl2Capabilities, type WebGL2Capabilities, type CompatTier } from '../index.js';
 import type { TierFormats } from '../tiers.js';
 import { extensions, type Extensions, GLObjects, GLState } from './gl.js';
-import { nextGPUTask } from './tasks.js';
+import { fence, nextGPUTask } from './tasks.js';
 import { ExternalCopies } from './externals.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
@@ -511,8 +511,7 @@ export class CompatDevice extends EventTarget {
     const waiting = this.queue.waiting;
     if (waiting) return waiting.then(() => this.idle());
     const gl = this.gl,
-      sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    gl.flush();
+      sync = fence(gl);
     if (!sync) return Promise.resolve();
     return new Promise((resolve) => {
       const poll = () => {

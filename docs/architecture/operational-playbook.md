@@ -1746,6 +1746,15 @@ silently install itself and changes no globals at import time.
 
 ### 3.2 WebGL2 compatibility architecture
 
+**Fences need a command after them (2026-11-11).** Chrome on ANGLE's Direct3D 11 back end reported a fence followed
+only by `gl.flush()` signaled after about 17 polls (about 270 ms) on a context that showed no frame (raw WebGL2 too),
+so `onSubmittedWorkDone()` after work drawn into textures cost that much each time. The device's fence (`fence()` in
+`device/tasks.ts`) sends a 4-byte copy between two buffers of its own after the fence; it then signals on the first
+poll. Evidence: `packages/webgl2-compat/test/idle-fence-browser.mjs` (18 fence checks before, 1 after, a work count)
+and the materials owner/lifetime check (WebGL2 leg past its 180 s limit before, both legs 26 s after). Missing: ANGLE
+Vulkan, Metal and non-NVIDIA drivers were not probed for the lag; the copy is sent on all of them (one 4-byte copy per
+wait).
+
 **3D slices drawn beside depth (2026-11-10, batch 271 job 1).** ANGLE's Direct3D 11 back end drops every draw into a
 slice of a 3D texture when the framebuffer also attaches depth or stencil (complete framebuffer, clears land, no GL error;
 measured in raw WebGL2 on the RTX A6000: 8 of 30 probe rows fail, all of them 3D with depth). The layer's render pass
