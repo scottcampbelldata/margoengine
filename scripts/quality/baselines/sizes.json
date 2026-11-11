@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15131279,
+  "total": 15131954,
   "history": [
     {
       "date": "2026-10-24",
@@ -8615,6 +8615,12 @@
       "commit": "6ffff14e09",
       "reason": "xr/layers 3942 to 4353 B measured: Firefox video sources copy through a canvas (shared/copy-external.js); a lazy import would add a request on the first video frame",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "d906060770",
+      "reason": "KB5580a: TAAUpscale WebGL2 coverage-depth resolve route; the shared upscale chunk 12739 to 13204 B raw, 4676 to 4870 B gzip -9 measured, upscale-velocity entry 19145 B over its 19045 ceiling; a lazy chunk would add a request on every WebGL2 attach for one shader edit",
+      "grew": 1
     }
   ],
   "items": {
@@ -9681,7 +9687,7 @@
     "@margoengine/taa": 15106,
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 7880,
-    "@margoengine/taa/upscale-velocity": 19045,
+    "@margoengine/taa/upscale-velocity": 19720,
     "@margoengine/terrain": 14424,
     "@margoengine/terrain/blend": 3676,
     "@margoengine/terrain/deform": 5488,

@@ -3164,6 +3164,15 @@ packages/webgl2-compat/test/tier-packages-browser.mjs). The shared tier check to
 `@margoengine/taa/upscale` from 7,384 to 7,624 B gzip and the root from 14,686 to
 14,927 B.
 
+TAAUpscale with a 4x capture on the WebGL2 layer (`@margoengine/taa/upscale`, 2026-11-11,
+KB5580a) reads each depth texel as the nearest of the texel and its four neighbours.
+WebGL2 shaders cannot read single samples (GLSL ES 3.00 has no multisample sampler), so
+the layer's resolved depth is one sample where native WebGPU keeps the nearest of the
+four. The neighbourhood is wider than a pixel's own coverage, so silhouettes reject
+history over one more low-resolution texel than natively. Measured in
+packages/taa/test/upscale-browser.mjs: 31.96 dB on the layer against 31.76 natively
+and 30.90 before. Native reads are unchanged.
+
 Tracked follow-up **T273-COVERAGE** (batch 273, after the 26 full-tier compat
 failures): remaining post effects and standalone Tonemap, DOF, transitions,
 animation, BVH, cameras, clustered, compute, creative, environment, geometry,

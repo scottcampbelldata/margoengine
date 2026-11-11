@@ -196,6 +196,11 @@ below one 8-bit level, and on the LDR tier 90 percent of pixels came out more th
 attach and after a device restore with `MargoError` code `unsupported` (`TAA history`) before allocating anything; a
 restore that refuses also removes the effect from its scene.
 
+With a 4x capture on the WebGL2 layer, `TAAUpscale` reads each depth texel as the nearest of the texel and its four
+neighbours. WebGL2 shaders cannot read single samples, so the layer's resolved depth is one sample where native WebGPU
+keeps the nearest of four; the neighbours put silhouette texels back on the object. The test scene accumulates 31.96 dB
+on the layer against 31.76 dB natively (30.90 before). Native WebGPU reads are unchanged.
+
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
 
 TAA and TAAUpscale keep the source camera on their transient raster-camera wrappers. The optional

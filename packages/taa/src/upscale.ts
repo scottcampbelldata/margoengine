@@ -17,7 +17,7 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { SceneTarget } from '../../shared/msaa.js';
-import { requireCompatTier } from '../../shared/compat.js';
+import { compatTier, requireCompatTier } from '../../shared/compat.js';
 import { halton } from './jitter.js';
 import { color, fullscreen } from './shader.js';
 import { sharpenCode } from './cas.js';
@@ -85,6 +85,25 @@ fn old(at:vec2f,top:vec2i)->vec3f {
  }
  textureStore(output,p,vec4f(max(result,vec3f(0)),1));textureStore(outputDepth,p,vec4f(near));
 }`;
+
+/**
+ * The resolve on the WebGL2 layer with a 4x capture. WebGL2 shaders cannot read single samples, so the layer's 1x depth
+ * is the one sample its depth resolve keeps, where the WebGPU route keeps the nearest of the four (shared/msaa.js). At
+ * a silhouette the one sample often misses the object, the 3x3 nearest depth then changes with the jitter from frame
+ * to frame, and history is rejected there: 30.90 dB against 31.76 natively in test/upscale-browser.mjs. Each depth read
+ * here takes the nearest of the texel and its four neighbours, which holds every surface that can cover part of the
+ * texel (as DOF's compatibility route, packages/dof/src/compat.ts). Native reads are unchanged.
+ */
+const coverageDepth = (code: string): string => {
+  const read = 'textureLoad(depth,q,0)';
+  if (!code.includes(read)) throw new MargoError('unsupported', 'TAAUpscale on WebGL2 needs its own resolve shader');
+  return code
+    .replaceAll(read, 'coverage(q,top)')
+    .replace(
+      '@compute',
+      `fn coverage(q:vec2i,top:vec2i)->f32 {var d=${read};for(var k=0;k<4;k++){let o=select(vec2i(0,k*2-1),vec2i(k*2-5,0),k>1);d=max(d,textureLoad(depth,clamp(q+o,vec2i(0),top),0));}return d;}\n@compute`,
+    );
+};
 
 const spatial = `${uniforms}${color}
 @group(0) @binding(1) var scene:texture_2d<f32>;
@@ -321,7 +340,10 @@ export class TAAUpscale implements EnginePlugin {
             layout: 'auto',
             compute: { module: device.createShaderModule({ code }), entryPoint: 'main', constants: { manualSRGB } },
           });
-      this.resolvePipeline = compute(this.resolveCode(resolve));
+      const code = this.resolveCode(resolve);
+      this.resolvePipeline = compute(
+        compatTier(device) === 'webgl2' && (c.descriptor.multisample?.count ?? 4) === 4 ? coverageDepth(code) : code,
+      );
       this.spatialPipeline = compute(spatial);
       const module = device.createShaderModule({ code: present });
       this.presentKey = '';

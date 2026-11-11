@@ -7,6 +7,7 @@ import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
 const release = await acquire({ owner: 'taa-upscale' });
 const timer = setTimeout(() => {
@@ -29,6 +30,7 @@ try {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
+  if (compatRun()) await page.addInitScript(compatShim);
   await page.goto('http://127.0.0.1:5345/packages/taa/test/upscale-browser.html');
   await page.evaluate(async () => {
     const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
