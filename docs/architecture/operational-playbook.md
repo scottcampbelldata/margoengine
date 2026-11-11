@@ -701,6 +701,19 @@ Scott's OK; this change adds none. Approved uses are logged and retain the hold
 cap. Incorrect
 exclusive requests still fail the independent timing-purpose check.
 
+Classifying a command as timing (KB-L3b-bench, 2026-11-11): an npm script named
+`bench*` and any script under `bench/`, `benchmarks/` or `*-benchmarks/` counts
+as speed work unless the script declares itself a correctness check on a whole
+line in its first 40 lines: `// gpu-lock: correctness` (never times anything) or
+`// gpu-lock: correctness with --no-timing` (correctness only when the command
+passes `--no-timing`). A declared script runs in a shared slot during the build
+phase; an undeclared or unreadable one stays exclusive and is refused while
+`scripts/speed-phase.json` defers speed work. Declared today:
+`post-effects-gpu.mjs`, and with `--no-timing` `volumetric-gpu.mjs`,
+`ssr-gpu.mjs`, `ssr-models-gpu.mjs` (all in `examples/package-benchmarks/`).
+Before this, every script in that folder was refused, so their correctness checks
+could not run at all. Test: `tests/gpu-lock-bench-correctness.test.js`.
+
 The named `npm run test:speed` suite retains the budgets in
 `scripts/speed/budgets.mjs`, speed test registrations and standalone drivers,
 listed in [the release inventory](../work-lists/speed-phase.md). Mixed CPU files

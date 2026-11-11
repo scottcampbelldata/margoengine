@@ -1,5 +1,6 @@
 // Real-GPU checks of post's newer effects against closed forms (post-effects.html). Run after npm run build:packages,
 // holding the GPU lock:  node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/post-effects-gpu.mjs [--only=gtao]
+// gpu-lock: correctness
 // Each section writes examples/package-benchmarks/results/<section>-gpu.json; frames go to test-results/post-*.png.
 //
 // gtao: GTAO's occlusion of the ambient light (linear: the frame with GTAO over the frame with it disabled, direct light

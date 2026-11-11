@@ -1,5 +1,6 @@
 // Real-GPU check of VolumetricFog (`@margoengine/environment/volumetric`). Run on AC power, holding the GPU lock, after
 // npm run build:packages:  node examples/package-benchmarks/volumetric-gpu.mjs [--no-timing]
+// gpu-lock: correctness with --no-timing
 // At 4x and 1x MSAA (Tonemap capture, 1280x720, volumetric.html):
 // 1. Light shafts: the wall left of the slit (rays cross the sunlit shaft) against the wall right of it (rays stay in
 //    the wall's shadow), slit open vs plugged; perspective and orthographic.

@@ -279,15 +279,33 @@ function spawnLimited(command, { timeoutMs, env }) {
 }
 
 const BENCH_SCRIPT = /(^|[\\/])(bench|[\w-]*benchmarks)[\\/].*\.[cm]?[jt]s$|(^|[\\/])bench[\w.-]*\.[cm]?[jt]s$/i;
+// A script's own header line that declares it never times anything (`correctness`), or only when run with
+// --no-timing (`correctness with --no-timing`). It must be a whole line among the first 40 lines of the file.
+const CORRECTNESS_LINE = /^\/\/ gpu-lock: correctness( with --no-timing)?\s*$/m;
+
+/** What the script at `file` declares: 'always', 'no-timing' (correctness only under --no-timing) or undefined. */
+export function declaredCorrectness(file) {
+  const path = resolve(file);
+  if (!existsSync(path) || !statSync(path).isFile()) return undefined;
+  const match = readFileSync(path, 'utf8').split(/\r?\n/, 40).join('\n').match(CORRECTNESS_LINE);
+  return match ? (match[1] ? 'no-timing' : 'always') : undefined;
+}
+
 /**
  * Whether a command measures speed and so needs the GPU to itself: an npm script named bench*, or a script under
- * bench/, benchmarks/ or *-benchmarks/, or named bench*.mjs. `words` is the command (program and arguments).
+ * bench/, benchmarks/ or *-benchmarks/, or named bench*.mjs, unless that script declares itself a correctness check
+ * (`// gpu-lock: correctness` in its header, or `// gpu-lock: correctness with --no-timing` and the command passes
+ * --no-timing). A script without the line, or one that cannot be read, counts as speed work. `words` is the command
+ * (program and arguments).
  */
 export function measuresSpeed(words, lifecycle = process.env.npm_lifecycle_event) {
   if (/^bench/.test(lifecycle ?? '')) return true;
-  return words.some(
-    (word, i) => BENCH_SCRIPT.test(word) || (/^bench/.test(word) && /^(run|run-script)$/.test(words[i - 1] ?? '')),
-  );
+  return words.some((word, i) => {
+    if (/^bench/.test(word) && /^(run|run-script)$/.test(words[i - 1] ?? '')) return true;
+    if (!BENCH_SCRIPT.test(word)) return false;
+    const declared = declaredCorrectness(word);
+    return !(declared === 'always' || (declared === 'no-timing' && words.includes('--no-timing')));
+  });
 }
 
 /** The number of shared slots: MARGO_GPU_SLOTS, default 5 (Scott 2026-11-10: at 3 slots the RTX A6000 used 5.8 of 48 GB, 36% load, 104 of 300 W). */
@@ -308,7 +326,7 @@ export function resolveMode(requested) {
   if (requested !== undefined && requested !== 'shared' && requested !== 'exclusive')
     throw new TypeError(`gpu-lock: mode must be "shared" or "exclusive", got "${requested}"`);
   if (requested === 'exclusive' || /^(1|true|yes)$/i.test(process.env.MARGO_GPU_EXCLUSIVE ?? '')) return 'exclusive';
-  if (requested === undefined && measuresSpeed(process.argv.slice(1, 2))) return 'exclusive';
+  if (requested === undefined && measuresSpeed(process.argv.slice(1))) return 'exclusive';
   return isGpuLock ? (requested ?? 'shared') : 'exclusive';
 }
 
@@ -358,7 +376,7 @@ export function validateRequest({ owner, mode, maxMinutes, command, timing, audi
   const approval = !speedEnabled() ? exclusiveApproval(command) : undefined;
   if (
     !measuresSpeed(command.split(/\s+/)) &&
-    !measuresSpeed(process.argv.slice(1, 2)) &&
+    !measuresSpeed(process.argv.slice(1)) &&
     !(typeof timing === 'string' && timing.trim()) &&
     !approval
   )

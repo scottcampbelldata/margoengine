@@ -1,5 +1,6 @@
 // Real-GPU check and cost of SSR (@margoengine/post/ssr). Run on AC power, holding the GPU lock, after npm run build:packages:
 //   node examples/package-benchmarks/ssr-gpu.mjs [--rounds=3] [--frames=90] [--no-timing] [--diagnostic]
+// gpu-lock: correctness with --no-timing
 // Correctness (ssr.html): each scene is rendered with SSR on and off in the same PostStack pipeline.
 // 1. Mirror floor (roughness 0), perspective 4x/1x and orthographic: the red box appears in the floor exactly inside the
 //    projected planar-mirror bounds and at the mirrored centre; the floor's IBL specular is replaced, not added (green
