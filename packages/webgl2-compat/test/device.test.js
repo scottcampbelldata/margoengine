@@ -622,3 +622,47 @@ test('explicit render layouts must declare every statically used resource with s
     device.destroy();
   }
 });
+
+test('pipelines whose WGSL differs only in binding numbers share a GL program but each keep their own binding table', async () => {
+  // WebKit sweep: terrain modules with the holes texture at binding 6 and at binding 8 translate to the same GLSL. The
+  // second pipeline took the first's cached binding table and drew with nothing bound at binding 6.
+  const { device } = await offsetDevice(false);
+  try {
+    const code = (holes, frame) => `
+@group(0) @binding(${frame}) var<uniform> frame:vec4f;
+@group(0) @binding(${holes}) var holes:texture_2d<f32>;
+@vertex fn v()->@builtin(position) vec4f {return frame;}
+@fragment fn f()->@location(0) vec4f {return textureLoad(holes,vec2i(0),0)+frame;}`;
+    const pipelines = [
+      [6, 0],
+      [8, 0],
+      [6, 2],
+    ].map(([holes, frame]) => {
+      const module = device.createShaderModule({ code: code(holes, frame) });
+      return device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'v' },
+        fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+      });
+    });
+    const table = (p) => ({
+      textures: p.textures.map((t) => t.binding),
+      uniforms: p.uniforms.map((u) => u.binding),
+    });
+    assert.deepEqual(pipelines.map(table), [
+      { textures: [6], uniforms: [0] },
+      { textures: [8], uniforms: [0] },
+      { textures: [6], uniforms: [2] },
+    ]);
+    // The same WGSL again still reuses its program.
+    const again = device.createShaderModule({ code: code(8, 0) }),
+      reused = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module: again, entryPoint: 'v' },
+        fragment: { module: again, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+      });
+    assert.equal(reused.program, pipelines[1].program);
+  } finally {
+    device.destroy();
+  }
+});

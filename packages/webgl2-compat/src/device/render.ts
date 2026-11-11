@@ -467,8 +467,12 @@ export class CompatRenderPipeline {
       }
     }
     device.programs.translateMs += performance.now() - started;
-    // One GL program per GLSL and vertex layout: a pipeline made again reuses it (most recently used last).
-    const key = `${this.glsl.vertex.source}\n//\n${this.glsl.fragment.source}\n//\n${JSON.stringify(this.attributes)}`,
+    // One GL program per GLSL, binding table and vertex layout: a pipeline made again reuses it (most recently used
+    // last). GLSL names its uniforms and samplers by order, so WGSL that differs only in @group or @binding numbers
+    // gives the same GLSL; the binding table is in the key so each keeps the bindings it declared.
+    const { vertex, fragment } = this.glsl,
+      table = JSON.stringify([vertex, fragment].map((s) => [s.uniforms, s.textures, s.storage])),
+      key = `${vertex.source}\n//\n${fragment.source}\n//\n${table}\n//\n${JSON.stringify(this.attributes)}`,
       cached = device.linked.get(key),
       e = cached ?? new LinkedProgram(device, this.glsl, this.attributes);
     device.linked.delete(key);
