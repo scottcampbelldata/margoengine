@@ -45,7 +45,7 @@ test('a document the tab has left settles no more GPU promises until it is shown
       // A page shown with persisted false is a fresh load, not this document again: nothing is released.
       dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }));
     });
-    // wall-clock: an empty queue's onSubmittedWorkDone settles within milliseconds; half a second is far past it.
+    // fixed-wait: proves an absence (a held promise); an empty queue's onSubmittedWorkDone settles within milliseconds.
     await new Promise((resolve) => setTimeout(resolve, 500));
     assert.equal(await page.evaluate(() => window.state), 'waiting', 'a GPU promise settled in a document the tab left');
     await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));

@@ -34,7 +34,7 @@ test('a page keeps its execution context when a module it loaded is rewritten on
     page.on('framenavigated', (frame) => frame === page.mainFrame() && navigations++);
     // A rebuild of a served file, as `npm run build` of a package writes its dist while a suite's page has it loaded.
     writeFileSync(join(dir, 'mod.js'), 'window.loads = (window.loads ?? 0) + 1; // rebuilt\n');
-    // wall-clock: chokidar reports a change within about 100 ms here; 3 s is far past any reload it would cause.
+    // fixed-wait: proves an absence (no reload); chokidar reports a change within about 100 ms, 3 s is far past it.
     await new Promise((resolve) => setTimeout(resolve, 3000));
     assert.equal(navigations, 0, 'the page was reloaded');
     assert.equal(await page.evaluate(() => window.loads), 1);
