@@ -514,7 +514,8 @@ test('Particles validate their count and require WebGPU', async () => {
     const larger = new GPUParticles({ count: 100001 });
     assert.equal(larger.count, 100001);
     larger.dispose();
-    assert.throws(() => new GPUParticles({ count: 1000001 }), /options/);
+    // The VFX constructor's bound since cef4b052c: 65,535 workgroups of 256 slots (attach then bounds it by the device).
+    assert.throws(() => new GPUParticles({ count: 65_535 * 256 + 1 }), /options/);
     assert.throws(() => engine.use(new GPUParticles({ count: 10 })), /WebGPU/);
   } finally {
     engine.dispose();
