@@ -144,10 +144,15 @@ export const entries = [
     id: 'gpu-lost',
     title: 'GPU lost or a GPU validation error',
     kind: 'family',
-    messages: ['GPU lost: <reason>', 'GPU lost 4 times; reload the page', '<WebGPU validation message>'],
+    messages: [
+      'GPU lost: <reason>',
+      'GPU lost 4 times; reload the page',
+      'GPU out of memory: <reason>',
+      '<WebGPU validation message>',
+    ],
     cause:
-      'The browser lost the GPU device (driver reset, tab in the background too long, GPU process crash), or WebGPU reported an uncaptured validation error.',
-    fix: 'Core recreates the device itself; recreate textures your code owns (view `target`s) in `onDeviceRestored`. Core restores at most 3 times in a row: a fourth loss before 120 frames have drawn since the last one reports `failed` once and asks for no new device, so reload the page. A validation error names the GPU object at fault: fix the call that created it.',
+      'The browser lost the GPU device (driver reset, tab in the background too long, GPU process crash), or WebGPU reported an uncaptured validation error, or a GPU allocation made outside an error scope ran out of memory.',
+    fix: 'Core recreates the device itself; recreate textures your code owns (view `target`s) in `onDeviceRestored`. Core restores at most 3 times in a row: a fourth loss before 120 frames have drawn since the last one reports `failed` once and asks for no new device, so reload the page. A validation error names the GPU object at fault: fix the call that created it. An out-of-memory error is reported once and core rebuilds the device as after a loss; if it repeats, ask for smaller textures, buffers or instance counts.',
   },
   {
     id: 'reentrancy',

@@ -2411,8 +2411,18 @@ the new ones exist. It always allocates on the renderer in use, so during a rest
 restore that fails leaves it in place with every geometry held), and inside `onDeviceRestored` the new one. Restore hooks and scene
 disposal run to the end and rethrow the first error. A full instance collection clears `collected` first, so one that throws repeats.
 Evidence: `tests/deep-core-allocation-failure.test.js` on a fake device; on a real one, the lifecycle scenario that sets geometry on a
-destroyed device and in the hook. Missing: `createBuffer` does not throw on a real out-of-memory, it reports later through
-`uncapturederror`, so no check exercises a true GPU out-of-memory and core does not roll one back. It surfaces as a `gpu-lost` error.
+destroyed device and in the hook. `createBuffer` does not throw on a real out-of-memory: WebGPU reports it later, to the
+innermost `out-of-memory` error scope, else as `uncapturederror` after frames have used the unusable object (2026-11-11,
+KB6434). An out-of-memory `uncapturederror` reaches core's listener only from an allocation made outside a scope; core then
+reports it once through `engine.onError` (coded `failed`, help `gpu-lost`) and destroys the device, so the frames do nothing
+until the ordinary restore rebuilds every batch and plugin; later errors from the same device are not reported again. Other
+uncaptured errors (validation) still fail every frame with the coded fault. Optional packages scope their own allocations
+(`packages/shared/error-scope.js` `scoped`) and leave them unused until the device confirms them, so a failure there stays in
+the package: `CulledMeshes` draws the affected meshes unculled until the next restore. Evidence:
+`tests/deep-core-allocation-failure.test.js` (out-of-memory reported once, device rebuilt, next frame draws; validation still
+throws), `scripts/restore-fault-sweep.mjs` (every allocation a restore makes, core's and each package's, failed once in a real
+browser: reported once, no frame throws, the next frame draws the scene, then a clean restore gives the same resources and
+picture). Missing: a true driver out-of-memory (the sweep injects the WebGPU-shaped failure).
 
 Configuring the canvas is the one step of a restore with no way back, so it is the last step that can fail (2026-11-07):
 `GPURenderer.create` skips it for a restore, and `rebootDevice` calls `GPURenderer.configure` after every batch is rebuilt. A failed restore

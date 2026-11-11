@@ -538,8 +538,9 @@ export class Engine {
     this.watchDevice();
   }
   private watchDevice(): void {
-    this.renderer.onLost = () => {
+    this.renderer.onLost = (error, memory?: boolean) => {
       if (this.disposed || this.disposing) return;
+      if (memory) this.onError(error);
       this.good = 0;
       if (++this.reboots < 4) void this.rebootDevice().catch((error) => this.onError(error));
       else if (this.reboots === 4) this.onError(fault('failed', 'GPU lost 4 times; reload the page', 'gpu-lost'));

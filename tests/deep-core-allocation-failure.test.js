@@ -27,8 +27,10 @@ const fakeContext = () => {
   return context;
 };
 
-function makeGpu() {
+/** `losable`: destroy() loses the device (its `lost` promise resolves) and `gpu.fire(error)` raises `uncapturederror`. */
+function makeGpu({ losable = false } = {}) {
   const gpu = { live: new Set(), draws: [], throwOn: 0, limits: { maxBufferSize: ROOMY }, context: fakeContext() };
+  let lose = () => {};
   const bound = (buffer) => assert.ok(gpu.live.has(buffer), 'a draw binds a destroyed buffer');
   const pass = {
     setPipeline() {},
@@ -41,13 +43,18 @@ function makeGpu() {
     end() {},
   };
   const device = {
-    lost: new Promise(() => {}),
+    lost: new Promise((resolve) => {
+      if (losable) lose = resolve;
+    }),
     features: new Set(),
     limits: gpu.limits,
-    addEventListener() {},
+    addEventListener(type, listener) {
+      if (type === 'uncapturederror') gpu.fire = (error) => listener({ error });
+    },
     destroyed: false,
     destroy() {
       device.destroyed = true;
+      lose({ reason: 'destroyed', message: 'destroyed' });
     },
     createShaderModule: () => ({}),
     createRenderPipelineAsync: async () => pipeline,
@@ -570,6 +577,53 @@ test('Scene.dispose finishes when a plugin throws, and the error reaches the cal
     assert.equal(scene.meshes.size, 0);
     assert.equal(engine.meshes.size, 0);
     assertNothingHeld(gpu);
+  } finally {
+    engine.dispose();
+  }
+});
+
+// KB6434a: an allocation made outside an error scope that fails out of memory reaches `uncapturederror` after frames
+// have used the object. Core used to keep that as a fault every later frame threw (engine.start() stopped its loop)
+// until something else restored the device. It now reports the failure once and rebuilds the device.
+test('an out-of-memory uncaptured error is reported once and the device is rebuilt; frames go on', async () => {
+  globalThis.GPUOutOfMemoryError ??= class GPUOutOfMemoryError extends Error {};
+  const gpu = makeGpu({ losable: true }),
+    next = makeGpu(),
+    engine = new Engine(canvas(gpu.context), await TransformStore.create(16), gpu.renderer, undefined, null),
+    errors = [];
+  engine.onError = (error) => errors.push(error);
+  try {
+    engine.createMesh().setGeometry(triangle());
+    assert.deepEqual(draw(engine, gpu), [1]);
+    await rebooting(
+      async () => next.renderer,
+      async () => {
+        gpu.fire(new GPUOutOfMemoryError('Injected createBuffer failure'));
+        // Errors that frames using the failed object raise after it are not reported again.
+        gpu.fire(new GPUOutOfMemoryError('a second failure'));
+        assert.deepEqual(draw(engine, gpu), [], 'no frame throws or draws on the failed device');
+        // The loss starts core's own restore; nothing else calls rebootDevice.
+        for (let i = 0; i < 50 && engine.gpu !== next.device; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+    );
+    assert.equal(gpu.device.destroyed, true, 'the failed device is destroyed');
+    assert.equal(errors.length, 1, 'reported once');
+    assert.match(String(errors[0].message), /out of memory: Injected createBuffer failure/);
+    assert.equal(engine.gpu, next.device, 'the engine moved to a new device');
+    assert.deepEqual(draw(engine, next), [1], 'the next frame draws the mesh');
+    assert.equal(errors.length, 1);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('an uncaptured validation error still stops the frames with a coded fault', async () => {
+  const gpu = makeGpu({ losable: true }),
+    engine = new Engine(canvas(gpu.context), await TransformStore.create(16), gpu.renderer, undefined, null);
+  try {
+    gpu.fire(Object.assign(new Error('Invalid bind group'), { name: 'GPUValidationError' }));
+    assert.throws(() => engine.render({ culling: false }), /Invalid bind group/);
+    assert.equal(gpu.device.destroyed, false, 'a validation error does not rebuild the device');
   } finally {
     engine.dispose();
   }

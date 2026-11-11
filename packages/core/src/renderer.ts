@@ -257,7 +257,8 @@ const settle = <T>(
   });
 
 export class GPURenderer implements Renderer {
-  onLost?: (error: Error) => void;
+  /** `memory`: the loss is core's own rebuild after an allocation failed out of memory, to be reported once. */
+  onLost?: (error: Error, memory?: boolean) => void;
   get target(): RenderTarget {
     return {
       format: this.format,
@@ -298,6 +299,7 @@ export class GPURenderer implements Renderer {
   private readonly bindings: GPUBindGroupEntry[] = [];
   private frameId = 0;
   private lost?: Error;
+  private memory?: Error;
   private deviceLost = false;
   private readonly resources = new Map<
     Geometry,
@@ -435,10 +437,17 @@ export class GPURenderer implements Renderer {
     });
     device.lost.then((info) => {
       this.deviceLost = true;
-      if (!this.disposed) this.onLost?.(fault('failed', `GPU lost: ${info.message}`, 'gpu-lost'));
+      if (!this.disposed) this.onLost?.(this.memory ?? fault('failed', `GPU lost: ${info.message}`, 'gpu-lost'), !!this.memory);
     });
-    device.addEventListener('uncapturederror', (event) => {
-      this.lost = fault('failed', event.error.message, 'gpu-lost');
+    device.addEventListener('uncapturederror', ({ error }) => {
+      // An allocation made outside an error scope failed (KB6434a): the object is unusable and every frame that uses
+      // it fails, so the device is rebuilt as after a loss, and the failure is reported once.
+      if (this.memory) return;
+      if (error instanceof GPUOutOfMemoryError) {
+        this.memory = fault('failed', `GPU out of memory: ${error.message}`, 'gpu-lost');
+        this.deviceLost = true;
+        device.destroy();
+      } else this.lost = fault('failed', error.message, 'gpu-lost');
     });
   }
 
