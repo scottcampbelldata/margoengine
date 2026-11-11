@@ -372,3 +372,17 @@ test('the shoulder caps and the arm shells do not cross each other, on either ar
     assert.equal(crossings(upper[side], fore[side]), 0, `${side} upper arm shell crosses the forearm shell`);
   }
 });
+
+// The bellows entering the shoulder cap is meant to; build_robot.py's crossing_report checks the charcoal parts by name.
+test('the copper piston shafts, washers and joints stay outside the enamel arm shells, on either arm (KB1914)', () => {
+  const cream = 'Boulder / porcelain enamel';
+  for (const bone of ['UpperArm', 'Forearm', 'RightUpperArm', 'RightForearm']) {
+    const shell = triangles(cream, bone);
+    assert.ok(shell.length > 100, `${bone} shell triangles: ${shell.length}`);
+    for (const material of ['Boulder / copper joints']) {
+      const parts = triangles(material, bone);
+      assert.ok(parts.length > 0, `${bone} ${material} triangles`);
+      assert.equal(crossings(parts, shell), 0, `${bone}: ${material} shows through the arm shell`);
+    }
+  }
+});

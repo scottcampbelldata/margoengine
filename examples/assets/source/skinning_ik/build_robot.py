@@ -488,15 +488,21 @@ def author_upper(arm,cream,teal,dark,copper,visor,eye,shoulder,elbow,wrist,rshou
             a,b=Vector(pts[i]),Vector(pts[i+1])
             d=b-a
             t0,t1=(max(.30,(cap_reach+.008)/d.length),.72) if i==0 else (.27,.70)
-            skin(shaped_armor(prefix+" sculpted enamel arm shell "+str(i),a+d*t0,a+d*t1,.078 if i==0 else .063,.056 if i==0 else .052,cream,ARM_SHELL_ENDS,False,48),arm,bones[i])
-            offset=Vector((0,0,.06))
-            skin(rod(prefix+" exposed arm piston barrel",a+d*.17+offset,a+d*.46+offset,.017,dark),arm,bones[i])
-            skin(rod(prefix+" polished arm piston shaft",a+d*.44+offset,a+d*.77+offset,.008,copper),arm,bones[i])
+            r0=.078 if i==0 else .063
+            skin(shaped_armor(prefix+" sculpted enamel arm shell "+str(i),a+d*t0,a+d*t1,r0,.056 if i==0 else .052,cream,ARM_SHELL_ENDS,False,48),arm,bones[i])
+            # The piston runs outside the shell, square to the bone and clear of its widest ring (barrel radius .017 plus a 6 mm gap), so it never
+            # shows through the enamel (crossing_report checks it).
+            up=Vector((0,0,1))
+            offset=(up-d.normalized()*up.dot(d.normalized())).normalized()*(r0+.023)
+            skin(rod(prefix+" exposed arm piston barrel",a+d*.28+offset,a+d*.50+offset,.017,dark),arm,bones[i])
+            skin(rod(prefix+" polished arm piston shaft",a+d*.48+offset,a+d*.72+offset,.008,copper),arm,bones[i])
         skin(ellipsoid(prefix+" curved porcelain shoulder cap",cap,size,cream,64),arm,bones[0])
         skin(sphere(prefix+" elbow copper hinge",pts[1],.058,copper,48),arm,bones[1])
         skin(sphere(prefix+" wrist bearing",pts[2],.048,copper),arm,bones[2])
         pole=(Vector(pts[1])-Vector(pts[0])).cross(Vector(pts[2])-Vector(pts[1])).normalized()
-        for point,radius,bone in [(Vector(pts[0]),.080,bones[0]),(Vector(pts[1]),.059,bones[1])]:
+        # The elbow shows its bearing; the shoulder's sits under the cap, which covers that joint (an axle and washers
+        # there only poked through the dome, crossing_report checks it).
+        for point,radius,bone in [(Vector(pts[1]),.059,bones[1])]:
             skin(rod(prefix+" exposed bearing axle",point-pole*.07,point+pole*.07,radius*.52,dark),arm,bone)
             for side in (-1,1):
                 skin(rod(prefix+" copper bearing washer",point+pole*side*.065,point+pole*side*.079,radius,copper),arm,bone)
@@ -955,7 +961,8 @@ def join_assemblies(scene,arm,label):
 # Pairs of parts that must never cross: a plate on its shell, a cap beside the arm shell, the arm tube inside its shells.
 # Crossing triangles show as torn, jagged edges in a close view, so the build stops instead of exporting them.
 NO_CROSSING=[("raised teal chest plate","torso shell"),("raised teal shin plate","tapered porcelain calf"),
-    ("shoulder cap","arm shell"),("arm shell 0","arm shell 1"),("arm continuous","arm shell")]
+    ("shoulder cap","arm shell"),("arm shell 0","arm shell 1"),("arm continuous","arm shell"),
+    ("arm piston","arm shell"),("arm piston","shoulder cap"),("arm piston","elbow copper hinge"),("arm piston","arm continuous"),("arm piston","bearing"),("bearing washer","shoulder cap"),("bearing hub","shoulder cap"),("bearing axle","shoulder cap"),("elbow copper hinge","arm shell"),("wrist bearing","arm shell"),("bearing washer","arm shell"),("bearing hub","arm shell"),("bearing axle","arm shell")]
 
 
 def crossing_report(scene):

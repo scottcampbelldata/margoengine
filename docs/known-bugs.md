@@ -2177,17 +2177,18 @@ Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinish
 
 ## Boulder demo
 
-### The robot's arm shows a copper piston through its shell at close range
+### Fixed 2026-11-11 (bug sweep L6b, KB1914): the robot's arm showed a copper piston through its shell at close range
 
-- **What:** in the Boulder demo, from the nearest orbit distance (1.2 m), a copper rod shows through the upper arm shell
-  and the shell has a jagged edge near the elbow. It does not show from the default view, and it does not affect the
-  collision results, which use the link hulls.
-- **Repro:** `npm run build:boulder`, then `node scripts/test-boulder-browser.mjs --shots=<dir> --closeups`, and open
-  `boulder-high-close-right.png` and `boulder-high-close-left.png`.
-- **Cause, not yet confirmed:** the piston, washers and hubs in `examples/assets/source/skinning_ik/build_robot.py` are
-  not in its `NO_CROSSING` list, so the crossing check in that script does not see them.
-- **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
-  then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
+- **Cause, confirmed:** the arm pistons ran along the bone at 6 cm from it, inside the enamel shell's 6.7 cm (upper) and
+  5.4 cm (fore) ring on that side, so barrel and shaft crossed the shell wall (273 triangle overlaps in Blender's BVH),
+  and the shoulder's axle, washers and hub poked through the shoulder cap (739). None of these parts were in
+  `NO_CROSSING` in `examples/assets/source/skinning_ik/build_robot.py`, so its crossing check never saw them.
+- **Fix:** the pistons sit outside the shell, square to the bone and clear of its widest ring by 6 mm, between the
+  joints (0.28 to 0.72 of the bone); the shoulder keeps no bearing under its cap (the elbow keeps its own). `NO_CROSSING`
+  now checks pistons, bearings and hinges against the shells, cap, bellows and each other; all report 0. The GLB was
+  rebuilt with Blender 5.3 and `scripts/build-boulder-assets.mjs` (561,088 B, Khronos validator 0 errors, 0 warnings).
+- **Regression:** tests/boulder-robot.test.js ("the copper piston shafts, washers and joints stay outside the enamel arm
+  shells"): 280 crossings on the old file, 0 now.
 
 ### Boulder draws differently on the WebGL2 layer, and visual:compat has no entry for it
 
