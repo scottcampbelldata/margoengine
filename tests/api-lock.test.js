@@ -144,6 +144,21 @@ test('watch warns and passes; locked updates reject breaks and accept additions;
   assert.equal(assessChange(lock, [], 'unlisted', 'unlisted', addition).fail, true);
 });
 
+test('api:check fails on exports or members added without api:update, even in a watched package', () => {
+  const watchedEntry = '@margoengine/example';
+  for (const [a, b] of [
+    ['', 'export function added(): void;'],
+    ['export interface X { a: number; }', 'export interface X { a: number; b: string; }'],
+  ]) {
+    const changes = compare(a, b);
+    assert.equal(assessChange(lock, [], watchedEntry, watchedEntry, changes).fail, true, `${a} -> ${b}`);
+    assert.equal(assessChange(lock, [], watchedEntry, watchedEntry, changes, true).fail, false, 'api:update still passes');
+  }
+  // Relaxations and breaks of a watched package keep warning only.
+  const relaxation = compare('export function f(x: number): void;', 'export function f(x: number, y?: number): void;');
+  assert.equal(assessChange(lock, [], watchedEntry, watchedEntry, relaxation).fail, false);
+});
+
 test('Day 0 locks core/stage, watches every other report package, and keeps TSDoc baseline at zero', () => {
   const actual = readLock(root);
   assert.deepEqual(actual.locked, ['@margoengine/core', '@margoengine/stage']);

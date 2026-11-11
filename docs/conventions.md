@@ -209,7 +209,8 @@ Current internal directories are shared TypeScript, the Rust-only kernel crate a
 containing licence/notice files. The latter two are explicit inventory exceptions, not user-facing JS packages.
 
 Day 0 locks every existing and future entry of core and stage. Every other reported package is in `watch`,
-the conservative fallback to the private tracker. Watch diffs print `would fail:` and pass compatibility;
+the conservative fallback to the private tracker. Watch diffs print `would fail:` and pass compatibility,
+except an export or member added without `npm run api:update`, which fails `api:check` like any unrecorded change;
 coverage failures still fail. After one green local CI run and no lane report of trouble, the coordinator
 can promote watch packages to locked, recording their date and batch in `ticked`. Day 1 is separate work.
 

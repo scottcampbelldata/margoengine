@@ -411,7 +411,7 @@ for (const file of selection) {
     current?.pkg.name ?? (entry.startsWith('@') ? entry.split('/').slice(0, 2).join('/') : entry.split('/')[0]);
   const changes = classify(old ?? emptyReport, text ?? emptyReport);
   const decision = assessChange(lock, breaks, packageName, entry, changes, update);
-  if (lock.watch.includes(packageName)) watchedFiles.add(file);
+  if (lock.watch.includes(packageName) && !(decision.fail && !update)) watchedFiles.add(file);
   if (decision.lines.length) console.log(decision.lines.join('\n'));
   if (decision.fail && update) lockProblems.push(...decision.lines);
 }
