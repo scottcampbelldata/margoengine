@@ -14,6 +14,7 @@ import { fault, rangeError } from '../../shared/errors.js';
 import { group } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { compositeShader, filterShader, spriteShader } from './liquid-shaders.js';
+import type { Whitewater } from './liquid-whitewater.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -35,6 +36,64 @@ export interface ParticleSource {
   stride?: number;
   /** Floats before the first centre, integer >= 0. Default 0. */
   offset?: number;
+  /**
+   * Particle velocities in world units per second, needed by whitewater: a Float32Array (uploaded with the centres) or
+   * a STORAGE GPUBuffer or GpuArray. Particle i's velocity is the three floats at `velocityOffset + i * stride`; pass the
+   * positions' own array with an offset for an interleaved layout. Default none.
+   */
+  velocities?: Float32Array | GPUBuffer | { readonly buffer: GPUBuffer };
+  /** Floats before the first velocity, integer >= 0. Default 0. */
+  velocityOffset?: number;
+}
+
+/**
+ * Spray, foam and air bubbles generated from the particles' velocities (Ihmsen et al. 2012); needs
+ * `particles.velocities`. The pool advances one `timeStep` per `update()`, so call it once per simulation step. Ranges
+ * are pairs [min, max] of the paper's clamping function, min < max.
+ */
+export interface WhitewaterOptions {
+  /** False keeps the pool but stops stepping and drawing it. Default true. */
+  enabled?: boolean;
+  /** Diffuse particles kept at once, integer 1..4,194,304; the oldest are replaced first. Default 65,536. */
+  maxParticles?: number;
+  /** Seconds per `update()`, 0..1. Default 1 / 60. */
+  timeStep?: number;
+  /** Influence radius h of the fluid, 0.0001..1000. Default 4 * radius (two particle spacings at spacing 2r). */
+  support?: number;
+  /** Trapped-air range of the scaled velocity difference, m/s. Default [5, 20] (the paper's). */
+  trappedAir?: readonly [number, number];
+  /** Wave-crest range of the curvature. Default [2, 8] (the paper's). */
+  waveCrest?: readonly [number, number];
+  /** Kinetic-energy range, joules. Default [5, 50] (the paper's). */
+  kineticEnergy?: readonly [number, number];
+  /** Diffuse particles per second one particle makes at full trapped-air potential, 0..100000. Default 100. */
+  trappedAirRate?: number;
+  /** Diffuse particles per second one particle makes at full wave-crest potential, 0..100000. Default 100. */
+  waveCrestRate?: number;
+  /** Mass of one fluid particle in kg, > 0. Default 1000 * (2 * radius)^3 (a water cube one spacing wide). */
+  particleMass?: number;
+  /** Foam lifetime range in seconds, set from the emission potential; 0..1000. Default [2, 6]. */
+  lifetime?: readonly [number, number];
+  /** Buoyancy k_b of bubbles, 0..100. Default 2. */
+  buoyancy?: number;
+  /** Drag k_d of bubbles toward the fluid velocity, 0..1. Default 0.8. */
+  drag?: number;
+  /** Gravity in m/s^2, finite. Default [0, -9.81, 0]. */
+  gravity?: readonly [number, number, number];
+  /** Fewer fluid neighbours than this makes spray, integer 0..1000. Default 6 (the paper's). */
+  sprayNeighbours?: number;
+  /** More fluid neighbours than this makes a bubble, integer 0..1000. Default 20 (the paper's). */
+  bubbleNeighbours?: number;
+  /** A particle is at the surface when its weighted mean neighbour direction is this long, 0..1. Default 0.25. */
+  surfaceThreshold?: number;
+  /** Sprite radius in world units, 0..100 (at least one pixel is drawn). Default 0.25 * radius. */
+  radius?: number;
+  /** Linear albedo of the diffuse material, each 0..10. Default [1, 1, 1]. */
+  color?: readonly [number, number, number];
+  /** Opacity of one sprite at its centre, 0..1. Default 0.7. */
+  opacity?: number;
+  /** Integer seed of the random sampling, 0..2^32 - 1. Default 0. */
+  seed?: number;
 }
 
 /** Options of {@link ParticleLiquid}; the object is kept and read every frame except `particles`. */
@@ -71,6 +130,8 @@ export interface ParticleLiquidOptions {
   skyZenith?: readonly [number, number, number];
   /** False passes the scene through and draws no particles. Default true. */
   enabled?: boolean;
+  /** Spray, foam and bubbles; needs `particles.velocities`. Default none. */
+  whitewater?: WhitewaterOptions;
 }
 
 /** GPU work of the last frame, for tests and budgets. */
@@ -85,6 +146,8 @@ export interface LiquidFrameStats {
   particles: number;
   /** Bind groups created (0 on a steady frame). */
   groups: number;
+  /** Whitewater sprites drawn (the pool size while whitewater runs, else 0). */
+  whitewater: number;
 }
 
 const range = (name: string, value: unknown, min: number, max: number, integer = false) => {
@@ -136,7 +199,10 @@ export class ParticleLiquid implements EnginePlugin {
   private targets: GPUTexture[] = [];
   private readonly values = new Float32Array(80);
   private readonly workspace = new Float64Array(52);
-  private readonly stats: LiquidFrameStats = { passes: 0, draws: 0, bytes: 0, particles: 0, groups: 0 };
+  private readonly stats: LiquidFrameStats = { passes: 0, draws: 0, bytes: 0, particles: 0, groups: 0, whitewater: 0 };
+  private foam?: Whitewater;
+  private loading?: Promise<void>;
+  private stepDue = true;
 
   constructor(readonly options: ParticleLiquidOptions) {
     this.validate();
@@ -177,6 +243,19 @@ export class ParticleLiquid implements EnginePlugin {
       this.count = count;
     }
     this.dirty = true;
+    this.stepDue = true;
+  }
+
+  /**
+   * Live whitewater particles by type, read back from the GPU pool (waits for the whitewater code to load).
+   * @throws MargoError `'state'` without whitewater or before the first frame; the signal's reason when aborted.
+   */
+  async readWhitewater(signal?: AbortSignal): Promise<{ spray: number; foam: number; bubbles: number }> {
+    signal?.throwIfAborted();
+    await this.loading;
+    if (!this.foam)
+      throw fault('state', 'ParticleLiquid has no whitewater yet; set options.whitewater and draw a frame');
+    return this.foam.read(signal);
   }
 
   private countOf(s: ParticleSource): number {
@@ -184,6 +263,9 @@ export class ParticleLiquid implements EnginePlugin {
       throw fault('state', 'ParticleLiquid particles need positions: a Float32Array, a GPUBuffer or a GpuArray');
     range('particles.stride', s.stride, 3, 64, true);
     range('particles.offset', s.offset, 0, 2 ** 31, true);
+    range('particles.velocityOffset', s.velocityOffset, 0, 2 ** 31, true);
+    if (s.velocities !== undefined && (!s.velocities || typeof s.velocities !== 'object'))
+      throw fault('state', 'ParticleLiquid particles.velocities must be a Float32Array, a GPUBuffer or a GpuArray');
     const stride = s.stride ?? 3,
       offset = s.offset ?? 0;
     if (s.positions instanceof Float32Array) {
@@ -237,6 +319,57 @@ export class ParticleLiquid implements EnginePlugin {
       throw fault('state', 'ParticleLiquid enabled must be true or false');
     if (o.environment !== undefined && typeof o.environment !== 'function')
       throw fault('state', 'ParticleLiquid environment must be a function returning a sampleable sky texture');
+    const w = o.whitewater;
+    if (w === undefined) return;
+    if (!w || typeof w !== 'object') throw fault('state', 'ParticleLiquid whitewater must be an options object');
+    if (!o.particles.velocities)
+      throw fault(
+        'state',
+        'ParticleLiquid whitewater needs particles.velocities, for example { positions, velocities }',
+      );
+    const big = 1e9;
+    for (const [name, min, max, integer] of [
+      ['maxParticles', 1, MAX_LIQUID_PARTICLES, true],
+      ['timeStep', 0, 1, false],
+      ['support', 0.0001, 1000, false],
+      ['trappedAirRate', 0, 100000, false],
+      ['waveCrestRate', 0, 100000, false],
+      ['particleMass', 1e-12, big, false],
+      ['buoyancy', 0, 100, false],
+      ['drag', 0, 1, false],
+      ['sprayNeighbours', 0, 1000, true],
+      ['bubbleNeighbours', 0, 1000, true],
+      ['surfaceThreshold', 0, 1, false],
+      ['radius', 0, 100, false],
+      ['opacity', 0, 1, false],
+      ['seed', 0, 2 ** 32 - 1, true],
+    ] as const)
+      range(`whitewater.${name}`, w[name], min, max, integer);
+    for (const name of ['trappedAir', 'waveCrest', 'kineticEnergy', 'lifetime'] as const) {
+      const v = w[name];
+      if (
+        v !== undefined &&
+        (typeof v !== 'object' ||
+          v.length !== 2 ||
+          !(v[0] >= 0) ||
+          !(v[1] <= big) ||
+          !(v[0] < v[1] || (name === 'lifetime' && v[0] === v[1])))
+      )
+        throw rangeError(`ParticleLiquid whitewater.${name} needs [min, max] with 0 <= min < max`, 'geometry');
+    }
+    for (const [name, lo, hi] of [
+      ['gravity', -big, big],
+      ['color', 0, 10],
+    ] as const) {
+      const v = w[name];
+      if (
+        v !== undefined &&
+        (typeof v !== 'object' || v.length !== 3 || [0, 1, 2].some((i) => !(v[i]! >= lo && v[i]! <= hi)))
+      )
+        throw rangeError(`ParticleLiquid whitewater.${name} needs three finite values in ${lo}..${hi}`, 'geometry');
+    }
+    if (w.enabled !== undefined && typeof w.enabled !== 'boolean')
+      throw fault('state', 'ParticleLiquid whitewater.enabled must be true or false');
   }
 
   private joinStack(host: StackHost): StackStage {
@@ -331,6 +464,8 @@ export class ParticleLiquid implements EnginePlugin {
     this.final = undefined;
     this.bound[0] = [];
     this.bound[1] = [];
+    this.foam?.destroy();
+    this.foam = this.loading = undefined;
   }
 
   private resize(c: Context, scale: number): void {
@@ -418,7 +553,7 @@ export class ParticleLiquid implements EnginePlugin {
       dl = Math.hypot(d[0], d[1], d[2]) || 1;
     v.set([d[0] / dl, d[1] / dl, d[2] / dl, o.shininess ?? 2000], 60);
     v.set([light.radiance[0] * d[3], light.radiance[1] * d[3], light.radiance[2] * d[3], 0], 64);
-    v.set([light.ambient[0], light.ambient[1], light.ambient[2], 0], 68);
+    v.set([light.ambient[0], light.ambient[1], light.ambient[2], this.foamOn ? 1 : 0], 68);
     v.set([...(o.skyHorizon ?? [0.38, 0.53, 0.67]), this.environment ? 1 : 0], 72);
     v.set([...(o.skyZenith ?? [0.045, 0.16, 0.34]), scale], 76);
     c.device.queue.writeBuffer(this.uniform!, 0, v);
@@ -426,6 +561,7 @@ export class ParticleLiquid implements EnginePlugin {
   }
 
   private environment?: GPUTexture;
+  private foamOn = false;
   private groups: GPUBindGroup[] = [];
   private views: GPUTextureView[] = [];
   private final?: GPUBindGroup;
@@ -446,7 +582,7 @@ export class ParticleLiquid implements EnginePlugin {
     const o = this.options,
       device = c.device,
       s = this.stats;
-    s.passes = s.draws = s.bytes = s.particles = s.groups = 0;
+    s.passes = s.draws = s.bytes = s.particles = s.groups = s.whitewater = 0;
     const environment = (this.environment = o.environment?.());
     if (
       environment &&
@@ -460,6 +596,15 @@ export class ParticleLiquid implements EnginePlugin {
     this.resize(c, scale);
     const live = o.enabled !== false && this.count > 0;
     const buffer = live ? this.positions(c) : undefined;
+    const ww = o.whitewater;
+    const wanted = live && ww !== undefined && ww.enabled !== false;
+    if (wanted && !this.foam && !this.loading) {
+      const engine = this.engine;
+      this.loading = import('./liquid-whitewater.js').then((m) => {
+        if (this.engine === engine && !this.disposed) this.foam = new m.Whitewater(device);
+      });
+    }
+    this.foamOn = wanted && this.foam !== undefined;
     this.write(c, scale);
     const [raw, ping, pong, thick, attachment] = this.targets as [
       GPUTexture,
@@ -544,6 +689,27 @@ export class ParticleLiquid implements EnginePlugin {
       s.passes += 5;
       s.draws += 5;
       s.particles = this.count;
+      const foam = this.foam;
+      if (this.foamOn && foam) {
+        foam.record(
+          c,
+          ww!,
+          o.radius ?? 0.05,
+          this.source,
+          this.count,
+          this.uniform!,
+          buffer!,
+          depthTexture,
+          ping,
+          this.stepDue,
+        );
+        this.stepDue = false;
+        s.passes += foam.passes;
+        s.draws += foam.draws;
+        s.groups += foam.groupsMade;
+        s.bytes += foam.bytes;
+        s.whitewater = foam.pool;
+      }
     }
     // 4 and 5. Normals and the composite over the scene.
     const key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}`;
@@ -562,7 +728,8 @@ export class ParticleLiquid implements EnginePlugin {
       colorAttachments: [{ view: output.view, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
     });
     pass.setPipeline(pipeline);
-    if (this.cached(1, [pipeline, input, ping, thick, environment]))
+    const layer = (this.foamOn && this.foam?.layer) || thick;
+    if (this.cached(1, [pipeline, input, ping, thick, environment, layer]))
       this.final = group(device, pipeline, [
         { buffer: this.uniform! },
         input,
@@ -570,6 +737,7 @@ export class ParticleLiquid implements EnginePlugin {
         thick.createView(),
         this.sampler!,
         (environment ?? thick).createView(),
+        layer.createView(),
       ]);
     pass.setBindGroup(0, this.final!);
     applyView(pass, c);

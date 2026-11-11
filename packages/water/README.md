@@ -401,6 +401,45 @@ resolution), `shininess` 2000, the sky gradient of Water (`skyHorizon`, `skyZeni
 320-byte uniform write and no new bind group; `frameStats` reports them. The liquid writes no scene depth. Method,
 sources and measured numbers: [liquid record](../../docs/water-liquid.md).
 
+### Whitewater
+
+Give the particles their velocities and set `whitewater`, and the liquid makes spray, foam and air bubbles where it
+traps air or breaks at a crest, scaled by kinetic energy (Ihmsen et al. 2012). Each `update()` advances the whitewater
+one `timeStep`, so call it once per solver step; frames without one only draw it.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { ParticleLiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// Two blocks of 4,096 particles 5 cm apart meeting at 4 m/s; your solver rewrites both arrays each step.
+const positions = new Float32Array(8192 * 3);
+const velocities = new Float32Array(8192 * 3);
+for (let i = 0; i < 8192; i++) {
+  const side = i < 4096 ? -1 : 1,
+    j = i % 4096;
+  positions.set([side * 0.45 + (j % 16) * 0.05 - 0.375, Math.floor(j / 256) * 0.05, (Math.floor(j / 16) % 16) * 0.05], i * 3);
+  velocities.set([-side * 4, 0, 0], i * 3);
+}
+const liquid = ParticleLiquid.attach(engine, {
+  particles: { positions, velocities },
+  radius: 0.025,
+  whitewater: { kineticEnergy: [0.5, 5] },
+});
+liquid.update(); // after each solver step
+engine.render({ delta: 1 / 60 });
+console.log(await liquid.readWhitewater()); // { spray, foam, bubbles }
+```
+
+`particles.velocities` follows the positions' layout (same `stride`; `velocityOffset` for an interleaved array). The
+defaults are the paper's: trapped-air range `trappedAir` [5, 20] m/s, `waveCrest` [2, 8], `kineticEnergy` [5, 50] J with
+`particleMass` 1000 * (2 * radius)^3 kg (a water cube one spacing wide; small scenes need a lower energy range, as
+above), fewer than `sprayNeighbours` 6 fluid neighbours makes spray, more than `bubbleNeighbours` 20 a bubble, and
+`support` (the fluid's influence radius h) is 4 * radius. Also: `trappedAirRate` and `waveCrestRate` 100 particles per
+second at full potential, `maxParticles` 65,536 (the oldest are replaced first), `timeStep` 1 / 60 s, foam `lifetime`
+[2, 6] s, bubble `buoyancy` 2 and `drag` 0.8, `gravity` [0, -9.81, 0], sprite `radius` 0.25 * radius, `color` [1, 1, 1],
+`opacity` 0.7, `seed` 0 and `surfaceThreshold` 0.25. Everything runs as render passes on the GPU, on WebGPU and the
+WebGL2 layer alike, and the same seed gives the same whitewater on both. The code loads on first use.
+
 ## Wave subsurface scattering
 
 `@margoengine/water/scatter` makes thin crests glow when the viewer looks toward one of the Water's directional

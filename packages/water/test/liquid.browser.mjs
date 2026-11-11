@@ -405,7 +405,7 @@ try {
   assert.ok(result.shell.closeShare > 0.995, `GPU vs oracle within 1e-4: ${result.shell.closeShare}`);
   // Shell: filtered depth against the analytic outer sphere, mean error under 1% of the radius.
   assert.ok(result.shell.meanError < 0.01, `shell mean depth error ${result.shell.meanError}`);
-  assert.deepEqual(result.shellStats.steady, { passes: 6, draws: 6, bytes: 320, particles: 20000, groups: 0 });
+  assert.deepEqual(result.shellStats.steady, { passes: 6, draws: 6, bytes: 320, particles: 20000, groups: 0, whitewater: 0 });
   assert.equal(result.shellStats.first.bytes, 320 + 240000);
   // Thickness through the centre equals the exact chord (r16float: 11 significant bits).
   assert.ok(
@@ -422,7 +422,7 @@ try {
   assert.equal(result.gap.pulledForward, 0, 'background pulled toward the drop');
   assert.equal(result.gap.dropOut, 0, 'drop depth moved more than 3 mu');
   assert.equal(result.capacity.validation, undefined);
-  assert.deepEqual(result.capacity.steady, { passes: 6, draws: 6, bytes: 320, particles: 1000000, groups: 0 });
+  assert.deepEqual(result.capacity.steady, { passes: 6, draws: 6, bytes: 320, particles: 1000000, groups: 0, whitewater: 0 });
   assert.equal(result.capacity.first.bytes, 320 + 12000000);
   await mkdir('test-results', { recursive: true });
   await writeFile(

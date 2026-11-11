@@ -12,6 +12,7 @@ export interface LiquidFrameStats {
     bytes: number;
     particles: number;
     groups: number;
+    whitewater: number;
 }
 
 export const MAX_LIQUID_PARTICLES = 4194304;
@@ -24,6 +25,11 @@ export class ParticleLiquid implements EnginePlugin {
     get frameStats(): Readonly<LiquidFrameStats>;
     get particleCount(): number;
     update(particles?: ParticleSource): void;
+    readWhitewater(signal?: AbortSignal): Promise<{
+        spray: number;
+        foam: number;
+        bubbles: number;
+    }>;
     setup(engine: Engine): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -47,6 +53,7 @@ export interface ParticleLiquidOptions {
     skyHorizon?: readonly [number, number, number];
     skyZenith?: readonly [number, number, number];
     enabled?: boolean;
+    whitewater?: WhitewaterOptions;
 }
 
 export interface ParticleSource {
@@ -56,5 +63,33 @@ export interface ParticleSource {
     count?: number;
     stride?: number;
     offset?: number;
+    velocities?: Float32Array | GPUBuffer | {
+        readonly buffer: GPUBuffer;
+    };
+    velocityOffset?: number;
+}
+
+export interface WhitewaterOptions {
+    enabled?: boolean;
+    maxParticles?: number;
+    timeStep?: number;
+    support?: number;
+    trappedAir?: readonly [number, number];
+    waveCrest?: readonly [number, number];
+    kineticEnergy?: readonly [number, number];
+    trappedAirRate?: number;
+    waveCrestRate?: number;
+    particleMass?: number;
+    lifetime?: readonly [number, number];
+    buoyancy?: number;
+    drag?: number;
+    gravity?: readonly [number, number, number];
+    sprayNeighbours?: number;
+    bubbleNeighbours?: number;
+    surfaceThreshold?: number;
+    radius?: number;
+    color?: readonly [number, number, number];
+    opacity?: number;
+    seed?: number;
 }
 ```

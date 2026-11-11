@@ -9,7 +9,7 @@
 // r16float, so the WebGL2 compatibility layer runs each one as an ordinary draw.
 
 /** Shared uniform block. Offsets in floats are listed in liquid.ts. */
-const block = `
+export const liquidBlock = `
 struct U {
  viewProj:mat4x4f,inverse:mat4x4f,
  eye:vec4f,forward:vec4f,viewport:vec4f,particles:vec4f,kernel:vec4f,
@@ -23,7 +23,7 @@ fn rayAt(px:vec2f)->vec3f {return normalize(unproject(ndc(px),1.0)-u.eye.xyz);}
 `;
 
 /** Sphere sprites: pass 1 writes the nearest eye depth, pass 3 adds the chord through each sphere. */
-export const spriteShader = `${block}
+export const spriteShader = `${liquidBlock}
 @group(0) @binding(1) var<storage,read> points:array<f32>;
 @group(0) @binding(2) var scene:texture_depth_2d;
 struct Sprite {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) @interpolate(flat) center:vec3f}
@@ -76,7 +76,7 @@ struct Depth {@location(0) depth:vec4f,@builtin(frag_depth) z:f32}
  * paper's z grows toward the eye, so z_j > z_i + delta reads d_i - d_j > delta. One pass filters along `dirs.xy` with a
  * kernel of 3 sigma_i pixels (eq. 5); `dirs.z` 1 runs the 5 x 5 two-dimensional clean-up pass instead.
  */
-export const filterShader = `${block}
+export const filterShader = `${liquidBlock}
 @group(0) @binding(1) var source:texture_2d<f32>;
 @group(0) @binding(2) var<uniform> dirs:vec4f;
 struct Vertex {@builtin(position) position:vec4f}
@@ -126,12 +126,13 @@ fn pair(s:Range,di:f32,dj:f32,dk:f32,g:f32)->Range {
 `;
 
 /** Normals, refraction, absorption, Fresnel reflection and the sun's highlight over the scene colour. */
-export const compositeShader = (encode: boolean, display: string) => `${block}${encode ? display : ''}
+export const compositeShader = (encode: boolean, display: string) => `${liquidBlock}${encode ? display : ''}
 @group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var depth:texture_2d<f32>;
 @group(0) @binding(3) var thick:texture_2d<f32>;
 @group(0) @binding(4) var linear:sampler;
 @group(0) @binding(5) var environment:texture_2d<f32>;
+@group(0) @binding(6) var whitewater:texture_2d<f32>;
 struct Vertex {@builtin(position) position:vec4f}
 @vertex fn vertex(@builtin(vertex_index) index:u32)->Vertex {
  return Vertex(vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[index],0,1));
@@ -158,13 +159,17 @@ fn fresnel(c:f32,n:f32)->f32 {
  let s=max(0.0,1.0-c*c)/(n*n);if(s>=1.0){return 1.0;}
  let t=sqrt(1.0-s);let a=(c-n*t)/(c+n*t);let b=(n*c-t)/(n*c+t);return 0.5*(a*a+b*b);
 }
+// The premultiplied whitewater layer over the liquid (ambient.w 1 when whitewater is drawn).
+fn foamOver(rgb:vec3f,p:vec2i)->vec3f {
+ if(u.ambient.w<0.5){return rgb;}let l=textureLoad(whitewater,p,0);return rgb*(1.0-l.a)+l.rgb;
+}
 fn sceneAt(px:vec2f)->vec3f {
  let low=u.viewport.xy;let high=low+u.viewport.zw-vec2f(1);
  return textureLoad(scene,vec2i(clamp(px,low,high)),0).rgb;
 }
 @fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {
  let p=vec2i(at.xy);let now=textureLoad(scene,p,0);let d=eyeDepth(p);
- if(u.tint.w<0.5||d<=0.0){return vec4f(${encode ? 'toDisplay(now.rgb)' : 'now.rgb'},now.a);}
+ if(u.tint.w<0.5||d<=0.0){let bare=foamOver(now.rgb,p);return vec4f(${encode ? 'toDisplay(bare)' : 'bare'},now.a);}
  let c=surface(p,d);let view=normalize(u.eye.xyz-c);
  var n=cross(side(p,d,c,vec2i(1,0)),side(p,d,c,vec2i(0,1)));
  n=select(view,normalize(n),dot(n,n)>0.0);n=select(n,-n,dot(n,view)<0.0);
@@ -178,7 +183,7 @@ fn sceneAt(px:vec2f)->vec3f {
  let reflected=sky(reflect(-view,n));
  let h=normalize(u.light.xyz+view);
  let highlight=u.radiance.rgb*f*pow(max(dot(n,h),0.0),u.light.w)*(u.light.w+8.0)/25.13274123*max(dot(n,u.light.xyz),0.0);
- let rgb=mix(transmitted,reflected,f)+highlight;
+ let rgb=foamOver(mix(transmitted,reflected,f)+highlight,p);
  return vec4f(${encode ? 'toDisplay(rgb)' : 'rgb'},now.a);
 }
 `;

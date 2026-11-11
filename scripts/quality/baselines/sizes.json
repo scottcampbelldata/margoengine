@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15056607,
+  "total": 15063798,
   "history": [
     {
       "date": "2026-10-24",
@@ -8423,6 +8423,12 @@
       "commit": "2ae51098ac",
       "reason": "gltf-pro parts: primitives of any size load as parts (pack.ts + parts.ts bundled where packing is: about 0.1 to 1 KB gzip per entry); a lazy split would add a chunk and a round trip to every load that packs geometry for under 1 KB",
       "grew": 7
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "0a562e5bb1",
+      "reason": "water/liquid whitewater (Ihmsen et al. 2012): eager entry 7,965 to 8,941 B gzip (whitewater option validation, readWhitewater, the composite's whitewater layer); the GPU step loads as its own 7,248 B lazy chunk only when options.whitewater is set: seven render-pass programs (bucket grid, normals, potentials, count pyramid, ring head, pool step, sprites), WGSL text that a split would only duplicate",
+      "grew": 1
     }
   ],
   "items": {
@@ -9708,7 +9714,7 @@
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/flow": 3158,
-    "@margoengine/water/liquid": 8221,
+    "@margoengine/water/liquid": 15412,
     "@margoengine/water/query": 4719,
     "@margoengine/water/rain": 2811,
     "@margoengine/water/reflector": 2660,
