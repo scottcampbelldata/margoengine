@@ -474,3 +474,51 @@ test('percent-encoded binary data: URI feature images decode to their exact byte
   await features.prepareImage({ model, context: {} }, { texture: { index: 0 } });
   assert.equal(features.images.get(model).get(0).data[0], 7);
 });
+
+// A primitive over gltf-pro's maxPartVertices loads as parts whose local vertices name their source vertex through
+// part.vertexMap; feature IDs are per source vertex, so a hit on a part resolves the same feature as on the whole.
+test('a split primitive: every face of every part resolves the feature of the same face unsplit', async () => {
+  const whole = fixture(),
+    wholeFeatures = TileFeatures.attach(whole.engine);
+  await wholeFeatures.decorate(whole.context);
+  const faces = whole.primitive.indices.length / 3,
+    expected = Array.from({ length: faces }, (_, face) => wholeFeatures.resolve(pick(whole, face))?.id);
+  wholeFeatures.dispose();
+  assert.ok(new Set(expected).size > 1, `the sample has several features: ${expected}`);
+  const f = fixture(),
+    source = f.primitive,
+    parts = [0, 1].map((parity, index) => {
+      const local = new Map(),
+        map = [],
+        indices = [];
+      for (let face = parity; face < faces; face += 2)
+        for (let k = 0; k < 3; k++) {
+          const v = source.indices[face * 3 + k];
+          if (!local.has(v)) local.set(v, local.size);
+          indices.push(local.get(v));
+          map[local.get(v)] = v;
+        }
+      // Local order reversed, so a local index never equals its source index by accident.
+      const n = map.length,
+        reversed = indices.map((v) => n - 1 - v),
+        vertexMap = Uint32Array.from(map.reverse()),
+        vertices = new Float32Array(n * 20);
+      vertexMap.forEach((v, i) => vertices.set(source.vertices.subarray(v * 20, v * 20 + 20), i * 20));
+      return {
+        vertices,
+        indices: Uint32Array.from(reversed),
+        definition: source.definition,
+        material: source.material,
+        part: { index, count: 2, vertexMap },
+      };
+    });
+  f.model.primitives = parts;
+  const features = TileFeatures.attach(f.engine);
+  await features.decorate(f.context);
+  for (const [p, part] of parts.entries())
+    for (let local = 0; local < part.indices.length / 3; local++) {
+      const hit = { model: f.model, primitive: part, faceIndex: local, barycoord: [0.8, 0.1, 0.1] };
+      assert.equal(features.resolve(hit)?.id, expected[p + local * 2], `part ${p} face ${local}`);
+    }
+  features.dispose();
+});
