@@ -1,25 +1,25 @@
 {
  "proof": "post-stack",
- "ref": "9c9479d3c",
- "revision": "9c9479d3c0a4937b5cf969918e07857df58f9b34",
- "capturedAt": "1bafe1b017a1202e2ddde67014473a3e73d499e3",
+ "ref": "a738d815b",
+ "revision": "a738d815bb8878d1acecc1f2da6c79b06265f0c5",
+ "capturedAt": "a738d815bb8878d1acecc1f2da6c79b06265f0c5",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "9c9479d3c descends from eaddd64": false,
+  "a738d815b descends from eaddd64": false,
   "5b1fe66^ descends from eaddd64": false,
   "creative PostProcessing 1x: 5b1fe66^ -> 3319317 identical calls": 1813,
   "creative PostProcessing 4x: 5b1fe66^ -> 3319317 identical calls": 1840
  },
  "outputs": {
-  "post Bloom 1x": "57c54a793b91e5753a12bcba72b254abf6d216749ac36e81e29b0cec6ec954b1",
-  "post Bloom 4x": "7f0de8279853bfc0fe14766158197d11c47aee89577c8fdb4a3b5ec38b1beaba",
+  "post Bloom 1x": "5954d5bbf687711ce472d8f7f11b05061d1ebcfb93dc798deebedc39bfc447eb",
+  "post Bloom 4x": "0572b5e6b4729ba95651d8906ac3e02b48b3cfbeacc21d0638b4fc950a8583a4",
   "post SSAO 1x": "47ca23af3026ef37150d4d6da90af5cc7f22d40f5277e75eda0e43565572dc0f",
   "post SSAO 4x": "54fbb876d73399300ed4e571a7733ecb1c5f6bc6d66229447662843dc7bf9b9e",
   "dof DOF 1x": "664162f8ce2ce06e80da1fd2b788c85db07303c9d37dfb1cb06810c06b73d47d",
   "dof DOF 4x": "0b684c451c590a07232ad3e40f2177e450bcc540fe0bf5607ed6ea717ffc9549",
-  "tonemap Tonemap 1x": "58a6922905ae0653989cbe06f559bc069b07a19e704c5e94f4c5cd0ee6061da3",
-  "tonemap Tonemap 4x": "002f7375c0c1e1c8c2edaee57378e2baad1587027a0c92ac42d6d693d40cd0cf",
-  "DOF -> Tonemap 1x": "e19aa65a99dc47bcf698f16aa27ae33ad1c0e6fd27be47c82089d34dc6b39ecc",
-  "DOF -> Tonemap 4x": "b277b5dcfebe097c7a0fbf2eedc110a8242d205239e20c7d267e41c10d3b5cfc"
+  "tonemap Tonemap 1x": "37a1bd97042983f5c3587fab10075c71958015b8625cd207abe789b79039e74c",
+  "tonemap Tonemap 4x": "67391b228f4017e096e277abf60a6314393cf769d1e1b38492ee5b95d761be29",
+  "DOF -> Tonemap 1x": "b5ce1256edd3e33e86f901bf74aa50060f251d766b2c26a3af545aaa265b31b5",
+  "DOF -> Tonemap 4x": "8ba23b5189af2fa4e5bb72590b423c9894669d712bad11928ffb69d7a4476c5a"
  }
 }
