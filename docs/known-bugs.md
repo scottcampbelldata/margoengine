@@ -3525,12 +3525,28 @@ The previously open non-default-scene disposal defect was fixed separately in 18
 
 GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=iridescence, each with and without --compat, reproduce the complete-scene measured budgets. Full residual causes are not isolated. Anisotropy retains all strength/roughness rows and labels. Iridescence retains all 346 primitives in its three-dimensional material/film-IOR/thickness grid; this direct-light camera contains overlapping spheres and sparse highlights, with no IBL. Margo uses its shared anisotropic GGX and thin-film implementation; the figures alone do not attribute the loss to a particular formula. Silhouette, tone-map and filtering differences remain included, and no small shader fix is claimed without an isolating regression.
 
-Lane G current-main repro: anisotropy native absolute/square 819210/29848296
-exceed 819207/29848293, with RGB 132 to 133 at archived pixel (152,408);
-compatibility passes. Iridescence native absolute 454342 exceeds 454341,
-with five changed components against its archived picture. Compatibility
-iridescence has 64210 foreground pixels against 64280. Frozen budgets remain
-unchanged and these are not the sciviz/dispersion ANGLE exemption.
+Bisected 2026-11-11 (RTX A6000, Edge, native WebGPU; each step built with build:packages and run once through the GPU
+lock with only the failing case). Four batch 160 cases fail on main; every budget was reproduced exactly at the
+commit that froze it, so the browser and driver did not move them. No commit found is a renderer defect, so nothing
+was reverted and no budget changed; whether to keep these results is Scott's ruling.
+- da12bd07e1 (core uploads the light direction normalized once on the CPU in float64): iridescence 454,341 to
+  454,342, anisotropy 819,207 to 819,210, clearcoat 1,321,922 to 1,321,923 absolute (the Lane G figures above). One
+  float32 rounding of the direction moves a few pixels one code.
+- 65098f33fe (area-filter mips; BLEND base colour maps weighted by alpha): iridescence to 613,669 (budget 454,341),
+  anisotropy to 819,417. The IridescenceMetallicSpheres guides texture is 2048 x 2048 BLEND: 3,975,856 texels are
+  alpha 0 with white RGB, 114,010 are opaque black lines. A plain average greys the lines down the chain by mixing in
+  invisible white; the weighted chain keeps them black, which is what a premultiplied box filter of the displayed
+  texture gives. All 2,558 changed pixels got darker, towards the filtered texture and away from the Sample Viewer,
+  whose minified lines show the plain average. Anisotropy: 179 label pixels (OPAQUE, plain chain) one or two codes
+  brighter, exact texel loads in place of one hardware bilinear fetch.
+- 401c2e032b (native glass composited in linear light): transmission absolute error falls from 1,763,456 to
+  1,590,805 on main, but foreground coverage is 67,046 against 67,050. Margo now draws black where the Sample Viewer
+  is black (15 pixels behind the red glass that used to read up to 222,89,53 are 0), and 11 new nonblack pixels
+  appear, so the union shrinks by 4.
+Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
+scripts/reference-rendering/run.mjs --case=<iridescence|anisotropy|clearcoat|transmission>` at the commit and its
+parent after `npm run build:packages`. Frozen budgets remain unchanged and these are not the sciviz/dispersion ANGLE
+exemption.
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 
