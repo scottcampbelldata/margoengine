@@ -20,10 +20,26 @@ import {
   summaryLines,
 } from '../scripts/gpu-package-tests.mjs';
 import { coolDown, fileTemperature, hottestZone, thermalSource, toCelsius } from '../scripts/support/heat.mjs';
-import { machineProfile, PROFILES_FILE, readProfiles } from '../scripts/support/machine-profile.mjs';
+import {
+  describeProfile,
+  displayAdapters,
+  machineProfile,
+  PROFILES_FILE,
+  readProfiles,
+} from '../scripts/support/machine-profile.mjs';
 import { runLimited } from '../scripts/support/run-limited.mjs';
 
 const root = join(import.meta.dirname, '..');
+// Hardware facts as machineProfile reads them (DXGI adapter names on Windows), for the machines the profiles name.
+const DEV_PC = { platform: 'win32', arch: 'x64', gpus: ['NVIDIA RTX A6000', 'AMD Radeon(TM) Graphics'] },
+  BEELINK = { platform: 'win32', arch: 'x64', gpus: ['AMD Radeon(TM) Graphics'] },
+  MAC = {
+    platform: 'darwin',
+    arch: 'arm64',
+    gpus: () => {
+      throw new Error('a Mac is matched by platform and architecture; its GPUs are never read');
+    },
+  };
 const heatProfile = (heat = {}) => ({
   name: 'test-hot',
   description: 'a test profile',
@@ -289,8 +305,8 @@ test('the laptop profile loads, has a heat watch and excludes nothing', () => {
   assert.deepEqual(profile.exclude, {});
 });
 
-test('the default profile runs every planned test as one step, exactly as before', () => {
-  const profile = machineProfile({}, PROFILES_FILE, { platform: 'win32', arch: 'x64' }),
+test('the dev PC (RTX A6000 beside the 9950X iGPU) names no profile and still runs every planned test as one step', () => {
+  const profile = machineProfile({}, PROFILES_FILE, DEV_PC),
     tests = plan(),
     steps = planSteps(tests, profile);
   assert.equal(profile.name, 'workstation');
@@ -400,8 +416,8 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
 
 // Bug (M6 Mac mini, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile
 // "workstation", described as the maintainer's RTX A6000 PC. An unnamed run now takes the profile matching its platform.
-test('an Apple silicon Mac gets its own profile, not the workstation; a name still wins, other hosts keep the default', () => {
-  const mac = machineProfile({}, PROFILES_FILE, { platform: 'darwin', arch: 'arm64' });
+test('an Apple silicon Mac gets its own profile, not the workstation; a name still wins; no other host falls back to one', () => {
+  const mac = machineProfile({}, PROFILES_FILE, MAC);
   assert.equal(mac.name, 'apple-silicon');
   assert.doesNotMatch(mac.description, /A6000/);
   assert.match(mac.description, /Mac/);
@@ -413,15 +429,19 @@ test('an Apple silicon Mac gets its own profile, not the workstation; a name sti
   });
   assert.equal(named.name, 'laptop');
   for (const host of [
-    { platform: 'win32', arch: 'x64' },
-    { platform: 'linux', arch: 'x64' },
-    { platform: 'darwin', arch: 'x64' },
+    { platform: 'win32', arch: 'x64', gpus: [] },
+    { platform: 'linux', arch: 'x64', gpus: [] },
+    { platform: 'darwin', arch: 'x64', gpus: [] },
   ])
-    assert.equal(machineProfile({}, PROFILES_FILE, host).name, 'workstation', `${host.platform} ${host.arch}`);
+    assert.throws(
+      () => machineProfile({}, PROFILES_FILE, host),
+      (error) => error.code === 'MACHINE_PROFILE_UNRESOLVED',
+      `${host.platform} ${host.arch}`,
+    );
   const dir = mkdtempSync(join(tmpdir(), 'profiles-')),
     file = join(dir, 'p.json');
   try {
-    writeFileSync(file, JSON.stringify({ default: 'a', profiles: { a: { match: { platform: 'darwin' } } } }));
+    writeFileSync(file, JSON.stringify({ profiles: { a: { match: { platform: 'darwin' } } } }));
     assert.throws(
       () => readProfiles(file),
       (error) => error.code === 'MACHINE_PROFILES_INVALID' && /match\.arch/.test(error.message),
@@ -448,7 +468,6 @@ test('profiles are chosen by name, are checked, and hold no machine names or hom
     writeFileSync(
       file,
       JSON.stringify({
-        default: 'a',
         profiles: {
           a: { heat: { stopC: 70, resumeC: 75, maxWaitMin: 5, maxResumesPerStep: 1, pollS: 5 } },
         },
@@ -461,4 +480,119 @@ test('profiles are chosen by name, are checked, and hold no machine names or hom
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Bug (Beelink, Radeon 680M, 2026-11-09 and 2026-11-10): lane scripts that did not set MARGO_MACHINE_PROFILE ran as the
+// file's default "workstation" (no heat watch, nothing excluded), so the voxel path tracer this machine's profile bans
+// ran and the machine crashed twice (bugcheck 0x133). Unnamed runs are now matched by hardware, and there is no
+// fallback profile. Each of these fails on the old code: it chose "workstation" for every Windows x64 host.
+test('the Beelink names no profile and is the mini PC: heat watch on, the voxel path tracer excluded', () => {
+  const profile = machineProfile({}, PROFILES_FILE, BEELINK);
+  assert.equal(profile.name, 'mini-pc');
+  assert.ok(profile.heat && profile.heat.stopC === 88);
+  assert.equal(profile.split, true);
+  assert.match(profile.exclude['voxel-pathtracer'], /froze this machine/);
+  const steps = planSteps(
+    plan().filter((t) => t.dir === 'voxel-pathtracer'),
+    profile,
+  );
+  assert.ok(steps.length > 0);
+  for (const s of steps) assert.match(s.excluded, /^excluded by profile mini-pc: /, s.label);
+  assert.match(
+    describeProfile(profile),
+    /^machine profile mini-pc .*chosen by hardware match \(win32 x64, AMD Radeon\(TM\) Graphics\)$/,
+  );
+});
+
+test('the dev PC is the workstation and the Mac is apple-silicon with no variable set', () => {
+  const dev = machineProfile({}, PROFILES_FILE, DEV_PC);
+  assert.equal(dev.name, 'workstation');
+  assert.equal(dev.heat, null);
+  assert.deepEqual(dev.exclude, {});
+  assert.equal(machineProfile({}, PROFILES_FILE, MAC).name, 'apple-silicon');
+  // A name wins without reading the GPUs.
+  const named = machineProfile({ MARGO_MACHINE_PROFILE: 'mini-pc' }, PROFILES_FILE, { ...DEV_PC, gpus: MAC.gpus });
+  assert.equal(named.name, 'mini-pc');
+  assert.match(describeProfile(named), /chosen by MARGO_MACHINE_PROFILE$/);
+});
+
+test('unknown hardware with no profile named stops before any GPU work, listing the profiles and the variable', () => {
+  for (const host of [
+    { platform: 'win32', arch: 'x64', gpus: ['Intel(R) Arc(TM) Graphics'] },
+    { platform: 'win32', arch: 'x64', gpus: [] },
+    { platform: 'win32', arch: 'arm64', gpus: ['Qualcomm(R) Adreno(TM) X1-85 GPU'] },
+    { platform: 'linux', arch: 'x64', gpus: [] },
+  ])
+    assert.throws(
+      () => machineProfile({}, PROFILES_FILE, host),
+      (error) =>
+        error.code === 'MACHINE_PROFILE_UNRESOLVED' &&
+        /no profile matches this machine/.test(error.message) &&
+        /Stopped before any GPU work/.test(error.message) &&
+        /MARGO_MACHINE_PROFILE=mini-pc/.test(error.message) &&
+        ['workstation', 'apple-silicon', 'mini-pc', 'laptop', 'thermal-limited'].every((n) =>
+          error.message.includes(`\n  ${n}: `),
+        ),
+      `${host.platform} ${host.arch} ${host.gpus}`,
+    );
+  // A failed adapter lookup is no match, never the workstation.
+  assert.throws(
+    () =>
+      machineProfile({}, PROFILES_FILE, {
+        platform: 'win32',
+        arch: 'x64',
+        gpus: () => {
+          throw new Error('CreateDXGIFactory1 hr=80004005');
+        },
+      }),
+    (error) => error.code === 'MACHINE_PROFILE_UNRESOLVED' && /lookup failed \(CreateDXGIFactory1/.test(error.message),
+  );
+});
+
+test('two matching profiles stop the run; a default profile or a bad GPU pattern is refused', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'profiles-')),
+    file = join(dir, 'p.json'),
+    write = (data) => writeFileSync(file, JSON.stringify(data));
+  try {
+    write({
+      profiles: {
+        a: { match: { platform: 'win32', arch: 'x64', gpu: ['Radeon'] } },
+        b: { match: { platform: 'win32', arch: 'x64' } },
+      },
+    });
+    assert.throws(
+      () => machineProfile({}, file, BEELINK),
+      (error) =>
+        error.code === 'MACHINE_PROFILE_UNRESOLVED' &&
+        /several profiles match this machine \(a, b\)/.test(error.message),
+    );
+    write({ default: 'a', profiles: { a: {} } });
+    assert.throws(
+      () => readProfiles(file),
+      (error) => error.code === 'MACHINE_PROFILES_INVALID' && /remove "default"/.test(error.message),
+    );
+    write({ profiles: { a: { match: { platform: 'win32', arch: 'x64', gpu: ['(Radeon'] } } } });
+    assert.throws(
+      () => readProfiles(file),
+      (error) => error.code === 'MACHINE_PROFILES_INVALID' && /match\.gpu pattern/.test(error.message),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  assert.equal('default' in JSON.parse(readFileSync(PROFILES_FILE, 'utf8')), false);
+});
+
+test('display adapters: hardware names once each on Windows, never looked up elsewhere', () => {
+  const list = () => [
+    { name: 'AMD Radeon(TM) Graphics', software: false },
+    { name: 'AMD Radeon(TM) Graphics', software: false },
+    { name: 'Microsoft Basic Render Driver', software: true },
+  ];
+  assert.deepEqual(displayAdapters('win32', list), ['AMD Radeon(TM) Graphics']);
+  assert.deepEqual(
+    displayAdapters('darwin', () => {
+      throw new Error('looked up');
+    }),
+    [],
+  );
 });

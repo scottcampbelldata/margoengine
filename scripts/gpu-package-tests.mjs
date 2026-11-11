@@ -23,7 +23,9 @@ import { deferSpeed, reportSpeedPhase, speedEnabled } from './support/speed-phas
 // step again, then goes on. Each pause is reported as PAUSED FOR HEAT with the step, the peak, stop and resume
 // temperatures and the time waited; a wait that runs out, or a step that keeps reaching the stop, is PAUSED FOR HEAT:
 // NOT RESUMED with the reason. A run with no failure but a heat stop it did not resume from exits 75 (the heat guard's
-// code), never 1. The default profile has no heat watch and runs every test as one step, as before.
+// code), never 1. The workstation profile has no heat watch and runs every test as one step, as before. With
+// MARGO_MACHINE_PROFILE unset the profile is matched by hardware (scripts/support/machine-profile.mjs); a machine no
+// profile matches stops here before any GPU work, never falls back to one.
 // Side by side (--parallel or MARGO_CHECK_PARALLEL=1; --serial or MARGO_CHECK_SERIAL=1 and every heat or split profile
 // run one at a time): the same tests under scripts/support/parallel-run.mjs, longest first, each holding its own shared
 // slot, none beside another with the same fixed port or output (scripts/support/suite-resources.mjs), each with its log

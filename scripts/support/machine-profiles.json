@@ -1,9 +1,9 @@
 {
-  "$comment": "Which GPU tests a machine can run and how it guards its temperature. Choose one with MARGO_MACHINE_PROFILE=<name>; unset means the first profile whose `match` names this platform and CPU architecture (Node process.platform and process.arch), else `default`. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/check-merge.mjs. `heat` null means no heat watch. `split` runs heavy suites as short steps. `exclude` records packages this hardware must not run and why.",
-  "default": "workstation",
+  "$comment": "Which GPU tests a machine can run and how it guards its temperature. Choose one with MARGO_MACHINE_PROFILE=<name>. Unset, exactly one profile's `match` must fit this machine: `platform` and `arch` (Node process.platform and process.arch) and, when given, `gpu` (some hardware display adapter name matches one of these patterns) and `withoutGpu` (no adapter name matches any of them); adapter names come from DXGI on Windows, read before any GPU work. No match, or several, stops the run before any GPU test with a message listing these profiles. There is no fallback profile: one ran the mini PC as the workstation (no heat watch, and the path tracer its profile excludes) and it crashed twice. No machine names or paths here. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/check-merge.mjs. `heat` null means no heat watch. `split` runs heavy suites as short steps. `exclude` records packages this hardware must not run and why.",
   "profiles": {
     "workstation": {
-      "description": "a desktop with a discrete GPU and active cooling, the maintainer's RTX A6000 PC; every test runs as one step",
+      "description": "a desktop with a discrete GPU and active cooling, the maintainer's RTX A6000 PC; every test runs as one step; chosen on Windows x64 with an NVIDIA display adapter when no profile is named",
+      "match": { "platform": "win32", "arch": "x64", "gpu": ["^NVIDIA "] },
       "heat": null,
       "split": false,
       "exclude": {}
@@ -16,7 +16,13 @@
       "exclude": {}
     },
     "mini-pc": {
-      "description": "a small Windows PC with an AMD iGPU; its elevated temperature logger feeds MARGO_THERMAL_FILE",
+      "description": "a small Windows PC with an AMD iGPU; its elevated temperature logger feeds MARGO_THERMAL_FILE; chosen on Windows x64 with the integrated AMD Radeon(TM) Graphics and no NVIDIA adapter when no profile is named",
+      "match": {
+        "platform": "win32",
+        "arch": "x64",
+        "gpu": ["^AMD Radeon\\(TM\\) Graphics$"],
+        "withoutGpu": ["^NVIDIA "]
+      },
       "heat": { "stopC": 88, "resumeC": 75, "maxWaitMin": 30, "maxResumesPerStep": 2, "pollS": 5 },
       "split": true,
       "exclude": {
