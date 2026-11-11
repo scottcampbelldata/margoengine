@@ -338,7 +338,7 @@ const doc: GLTFDocument = {
 const model = parseGLTF(engine, doc, [new Uint8Array(data.buffer)], [], {materials: extendedMaterials});
 engine.render();
 
-const device = engine.gpu!, format: GPUTextureFormat = 'rgba8unorm', size = [256, 256] as const;
+const device = engine.gpu!, format: GPUTextureFormat = 'rgba8unorm', size: [number, number] = [256, 256];
 const color = device.createTexture({size, format,
   usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING});
 const depth = device.createTexture({size, format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT});
