@@ -339,3 +339,71 @@ test('whitewater adds its passes only on update(), loads lazily and keeps a stea
   liquid.dispose();
   await assert.rejects(() => liquid.readWhitewater(), { code: 'state' });
 });
+
+test('the narrow-band oracle follows Algorithm 1 of Oliveira and Paiva on solid voxel blocks', async () => {
+  const { layeredNeighborhood, voxelBlock } = await import('./liquid-band-reference.js');
+  // 8 x 8 x 8 voxels of 8 particles: layer 1 is the outer shell (8^3 - 6^3); its voxels hold n_min = 8, so the next
+  // shell is layer 2 (6^3 - 4^3); the 4^3 core is left out.
+  const v = 0.2,
+    eight = voxelBlock(8, 2, v);
+  const a = layeredNeighborhood(eight, [-v, -v, -v], v, [11, 11, 11]);
+  assert.deepEqual(a, { voxels: 512, layer1: 296, layer2: 152, band: 448 * 8, particles: 4096 });
+  // 27 particles a voxel: no deficiency, so the band is layer 1 only.
+  const b = layeredNeighborhood(voxelBlock(8, 3, v), [-v, -v, -v], v, [11, 11, 11]);
+  assert.deepEqual(b, { voxels: 512, layer1: 296, layer2: 0, band: 296 * 27, particles: 13824 });
+});
+
+test('the narrow band rebuilds only on update(), loads lazily and draws voxel thickness instead of particle chords', async () => {
+  const { device, encoder } = fakeDevice();
+  const modules = [];
+  const plain = device.createShaderModule;
+  device.createShaderModule = (d) => (modules.push(d.code), plain(d));
+  assert.throws(() => new ParticleLiquid({ particles: { positions }, narrowBand: 1 }), { code: 'state' });
+  assert.throws(() => new ParticleLiquid({ particles: { positions }, bandVoxel: 0 }), RangeError);
+  const liquid = new ParticleLiquid({ particles: { positions: new Float32Array(3000) }, narrowBand: true });
+  const host = { depthTexture: { createView: () => ({}) } };
+  liquid.stage = liquid.joinStack(host);
+  liquid.setup({
+    gpu: device,
+    sceneOf: () => undefined,
+    lighting: { direction: [0, 1, 0, 1], radiance: [1, 1, 1], ambient: [0, 0, 0] },
+  });
+  frame(liquid, device, encoder, host);
+  assert.equal(liquid.frameStats.passes, 6);
+  await liquid.bandLoading;
+  device.log.draws = [];
+  frame(liquid, device, encoder, host);
+  // Side 32: bounds, 4 reductions (16, 8, 4, 2), the grid, counts, two label passes; then the liquid's six.
+  assert.equal(liquid.frameStats.passes, 6 + 9);
+  assert.deepEqual(device.log.draws.slice(-6), [
+    [6, 1000],
+    [3, 1],
+    [3, 1],
+    [3, 1],
+    [6, 4096],
+    [3, 1],
+  ]);
+  Object.assign(device.log, { groups: 0, buffers: 0, textures: 0 });
+  frame(liquid, device, encoder, host);
+  assert.deepEqual(
+    { passes: liquid.frameStats.passes, groups: liquid.frameStats.groups, bytes: liquid.frameStats.bytes, log: [device.log.groups, device.log.buffers, device.log.textures] },
+    { passes: 6, groups: 0, bytes: 320, log: [0, 0, 0] },
+    'a frame without update() reuses the band',
+  );
+  liquid.update();
+  frame(liquid, device, encoder, host);
+  assert.equal(liquid.frameStats.passes, 15);
+  assert.equal(liquid.frameStats.groups, 0);
+  const { checkWGSL } = await import('../../webgl2-compat/dist/wgsl.js');
+  const { translateStage } = await import('../../webgl2-compat/dist/glsl.js');
+  const own = modules.filter((code) => code.includes('struct Band'));
+  assert.equal(own.length, 8, 'bounds, reduce, grid, counts, two labels, band sprites, voxel balls');
+  for (const code of own) {
+    assert.ok(!/@compute|atomic|workgroup/.test(code));
+    checkWGSL(code);
+    const vertex = code.includes('fn sprite(') ? 'sprite' : 'vertex';
+    translateStage({ source: code, entryPoint: vertex }, 'vertex', { points: code.includes('offset:vec3f}') });
+    translateStage({ source: code, entryPoint: vertex === 'sprite' ? 'depth' : 'fragment' }, 'fragment');
+  }
+  liquid.dispose();
+});

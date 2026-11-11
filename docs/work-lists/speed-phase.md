@@ -579,6 +579,10 @@ Checked 2026-11-11 (Rust port R22): the shell test is in (`planet-craters.ts`, b
 in this pass, so it stays on this list for the quiet phase.
 
 
+### Particle liquid narrow band (lague plan 1 job 3, 2026-11-11)
+
+`node scripts/gpu-lock.mjs run --owner=<you> --max=20 -- node packages/water/test/liquid-band.browser.mjs` (and with MARGO_COMPAT=1): 262,144 particles in a 64^3 lattice at 1920 x 1080, with and without narrowBand. Work (asserted): a steady frame is the same 6 passes either way; the band draws 67,032 depth sprites of 262,144. Busy-machine diagnostic: steady 2.4 against 1.2 ms native, 3.8 against 3.1 ms on the WebGL2 layer; update frames 3.9 against 3.9 and 5.0 against 7.0 ms. Target: decide the narrowBand default from timestamp queries on the quiet A6000 and the mid laptop iGPU.
+
 ### Particle liquid whitewater (lague plan 1 job 2, 2026-11-11)
 
 `node scripts/gpu-lock.mjs run --owner=<you> --max=20 -- node packages/water/test/liquid-whitewater.browser.mjs` (and with MARGO_COMPAT=1): a swirling 64-wide jittered lattice block at 65,536 and 262,144 fluid particles with a pool of the same size. Work per frame (asserted): without update() one sprite pass, one draw and 160 more uniform bytes; a step adds 8 + 1 + 1 + log2(side) + 3 passes and no bind group. Target: 60+ fps with whitewater; the step under 4 ms GPU at 65,536 fluid particles and a 65,536 pool on the A6000 and the mid laptop iGPU. Busy-machine diagnostic 2026-11-11, wall per stepped frame at 256 x 192 including the GPU wait: 3.8 ms (65,536) and 9.0 ms (262,144) native, 6.9 and 12.0 ms on the WebGL2 layer; a frame without a step 2.6 and 2.3 ms. Time it with timestamp queries on the quiet machine; measure whether the update pass at a full 262,144 pool stays inside the frame on the iGPU.

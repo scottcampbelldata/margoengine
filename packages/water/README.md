@@ -440,6 +440,29 @@ second at full potential, `maxParticles` 65,536 (the oldest are replaced first),
 `opacity` 0.7, `seed` 0 and `surfaceThreshold` 0.25. Everything runs as render passes on the GPU, on WebGPU and the
 WebGL2 layer alike, and the same seed gives the same whitewater on both. The code loads on first use.
 
+### Narrow band
+
+Set `narrowBand` and only the particles near the surface go into the depth pass; the thickness comes from one ball per
+voxel instead of one per particle (Oliveira and Paiva 2022). The surface looks the same, and a steady frame draws fewer
+sprites. The band is rebuilt on each `update()`.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { ParticleLiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 32 x 32 x 32 block of particles 5 cm apart; the core of the block is left out of the depth pass.
+const positions = new Float32Array(32768 * 3);
+for (let i = 0; i < 32768; i++) positions.set([(i % 32) * 0.05, (Math.floor(i / 32) % 32) * 0.05, Math.floor(i / 1024) * 0.05], i * 3);
+const liquid = ParticleLiquid.attach(engine, { particles: { positions }, radius: 0.025, narrowBand: true });
+engine.render({ delta: 1 / 60 }); // starts loading the band code
+await liquid.ready();
+engine.render({ delta: 1 / 60 }); // builds the band and draws with it
+console.log(await liquid.readNarrowBand()); // { voxels, layer1, layer2, particles, band, ... }
+```
+
+`bandVoxel` sets the voxel size, the paper's 2h (default 4 * radius, two particle spacings); it grows by 1.25 until the
+grid fits the band's atlas. Default `narrowBand` false. The code loads on first use; `ready()` resolves when it has.
+
 ## Wave subsurface scattering
 
 `@margoengine/water/scatter` makes thin crests glow when the viewer looks toward one of the Water's directional

@@ -25,6 +25,18 @@ export class ParticleLiquid implements EnginePlugin {
     get frameStats(): Readonly<LiquidFrameStats>;
     get particleCount(): number;
     update(particles?: ParticleSource): void;
+    readNarrowBand(signal?: AbortSignal): Promise<{
+        origin: number[];
+        voxel: number;
+        dims: number[];
+        perRow: number;
+        voxels: number;
+        layer1: number;
+        layer2: number;
+        particles: number;
+        band: number;
+    }>;
+    ready(signal?: AbortSignal): Promise<void>;
     readWhitewater(signal?: AbortSignal): Promise<{
         spray: number;
         foam: number;
@@ -54,6 +66,8 @@ export interface ParticleLiquidOptions {
     skyZenith?: readonly [number, number, number];
     enabled?: boolean;
     whitewater?: WhitewaterOptions;
+    narrowBand?: boolean;
+    bandVoxel?: number;
 }
 
 export interface ParticleSource {

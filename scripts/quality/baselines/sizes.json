@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15064600,
+  "total": 15068091,
   "history": [
     {
       "date": "2026-10-24",
@@ -8435,6 +8435,12 @@
       "commit": "f9971708a9",
       "reason": "environment/blend 4687 to 4743 B: restore failures are reported once and a rebuild on a lost device is skipped (src/restore-report.ts, shared by five plugins); a lazy chunk for 56 B would cost a request. culling/sort 14464 to 14518 B came with 64fe5a31be, whose record was not updated",
       "grew": 2
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "162884eb2d",
+      "reason": "water/liquid gains the lazy narrow band chunk (Oliveira and Paiva 2022) and its loader; only narrowBand users load the chunk",
+      "grew": 1
     }
   ],
   "items": {
@@ -9720,7 +9726,7 @@
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/flow": 3158,
-    "@margoengine/water/liquid": 15412,
+    "@margoengine/water/liquid": 18903,
     "@margoengine/water/query": 4719,
     "@margoengine/water/rain": 2811,
     "@margoengine/water/reflector": 2660,

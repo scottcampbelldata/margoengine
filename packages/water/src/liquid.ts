@@ -15,10 +15,13 @@ import { group } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { compositeShader, filterShader, spriteShader } from './liquid-shaders.js';
 import type { Whitewater } from './liquid-whitewater.js';
+import type { NarrowBand } from './liquid-band.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+
+const ADD = { srcFactor: 'one', dstFactor: 'one', operation: 'add' } as const;
 
 /** Most particles one ParticleLiquid draws. */
 export const MAX_LIQUID_PARTICLES = 4_194_304;
@@ -132,6 +135,13 @@ export interface ParticleLiquidOptions {
   enabled?: boolean;
   /** Spray, foam and bubbles; needs `particles.velocities`. Default none. */
   whitewater?: WhitewaterOptions;
+  /**
+   * Draw only the particles near the surface into the depth pass and take the thickness from voxels (Oliveira and
+   * Paiva 2022); rebuilt on each `update()`. Default false.
+   */
+  narrowBand?: boolean;
+  /** Voxel size of the narrow band (the paper's 2h), 0.0001..1000. Default 4 * radius (two particle spacings). */
+  bandVoxel?: number;
 }
 
 /** GPU work of the last frame, for tests and budgets. */
@@ -203,6 +213,9 @@ export class ParticleLiquid implements EnginePlugin {
   private foam?: Whitewater;
   private loading?: Promise<void>;
   private stepDue = true;
+  private band?: NarrowBand;
+  private bandLoading?: Promise<void>;
+  private bandDue = true;
 
   constructor(readonly options: ParticleLiquidOptions) {
     this.validate();
@@ -244,6 +257,30 @@ export class ParticleLiquid implements EnginePlugin {
     }
     this.dirty = true;
     this.stepDue = true;
+    this.bandDue = true;
+  }
+
+  /**
+   * The narrow band of the last update read back: grid origin, voxel size and dims, full voxels, voxels in layers 1 and
+   * 2, particles counted into voxels and particles in the band.
+   * @throws MargoError `'state'` without `narrowBand` or before its first frame; the signal's reason when aborted.
+   */
+  async readNarrowBand(signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    await this.bandLoading;
+    if (!this.band?.atlas)
+      throw fault('state', 'ParticleLiquid has no narrow band yet; set narrowBand, draw a frame, await ready() and draw another');
+    return this.band.read(signal);
+  }
+
+  /**
+   * Resolves when the code of every optional part in use (whitewater, the narrow band) has loaded; the first frame
+   * starts loading it and the next frame after this resolves draws with it.
+   */
+  async ready(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await Promise.all([this.loading, this.bandLoading]);
+    signal?.throwIfAborted();
   }
 
   /**
@@ -298,6 +335,9 @@ export class ParticleLiquid implements EnginePlugin {
     range('filterClamp', o.filterClamp, 0, o.filterRange ?? 10 * (o.radius ?? 0.05));
     range('thicknessScale', o.thicknessScale, 0, 1000);
     range('shininess', o.shininess, 1, 100000);
+    range('bandVoxel', o.bandVoxel, 0.0001, 1000);
+    if (o.narrowBand !== undefined && typeof o.narrowBand !== 'boolean')
+      throw fault('state', 'ParticleLiquid narrowBand must be true or false');
     if (o.resolutionScale !== undefined && o.resolutionScale !== 1 && o.resolutionScale !== 0.5)
       throw rangeError('ParticleLiquid resolutionScale must be 1 or 0.5', 'geometry');
     for (const [name, max] of [
@@ -407,7 +447,7 @@ export class ParticleLiquid implements EnginePlugin {
       fragment: { module: sprite, entryPoint: 'depth', targets: [{ format: 'r32float' }] },
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
     });
-    const add = { srcFactor: 'one', dstFactor: 'one', operation: 'add' } as const;
+    const add = ADD;
     this.thicknessPipeline = device.createRenderPipeline({
       layout: 'auto',
       vertex: { module: sprite, entryPoint: 'sprite' },
@@ -466,6 +506,9 @@ export class ParticleLiquid implements EnginePlugin {
     this.bound[1] = [];
     this.foam?.destroy();
     this.foam = this.loading = undefined;
+    this.band?.destroy();
+    this.band = this.bandLoading = undefined;
+    this.bandDue = true;
   }
 
   private resize(c: Context, scale: number): void {
@@ -605,6 +648,33 @@ export class ParticleLiquid implements EnginePlugin {
       });
     }
     this.foamOn = wanted && this.foam !== undefined;
+    if (live && o.narrowBand && !this.band && !this.bandLoading) {
+      const engine = this.engine,
+        depth = this.depthPipeline!,
+        thickness = this.thicknessPipeline!;
+      this.bandLoading = import('./liquid-band.js').then((m) => {
+        if (this.engine !== engine || this.disposed) return;
+        // The band's sprites and voxel balls draw into the same targets as the liquid's own pipelines.
+        const like = (base: GPURenderPipeline, vertex: string, fragment: string) => (code: string) => {
+          const module = device.createShaderModule({ code });
+          const blend = base === thickness;
+          return device.createRenderPipeline({
+            layout: 'auto',
+            vertex: { module, entryPoint: vertex },
+            fragment: {
+              module,
+              entryPoint: fragment,
+              targets: [blend ? { format: 'r16float', blend: { color: ADD, alpha: ADD } } : { format: 'r32float' }],
+            },
+            ...(blend
+              ? {}
+              : { depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' } }),
+          });
+        };
+        this.band = new m.NarrowBand(device, like(depth, 'sprite', 'depth'), like(thickness, 'vertex', 'fragment'));
+      });
+    }
+    const band = live && o.narrowBand && this.band ? this.band : undefined;
     this.write(c, scale);
     const [raw, ping, pong, thick, attachment] = this.targets as [
       GPUTexture,
@@ -641,6 +711,23 @@ export class ParticleLiquid implements EnginePlugin {
         GPUBindGroup,
       ];
       const [vRaw, vPing, vPong, vThick, vAttachment] = this.views as GPUTextureView[];
+      if (band) {
+        band.record(
+          c,
+          this.count,
+          o.bandVoxel ?? 4 * (o.radius ?? 0.05),
+          o.radius ?? 0.05,
+          this.uniform!,
+          buffer!,
+          depthTexture,
+          this.bandDue,
+        );
+        this.bandDue = false;
+        s.passes += band.passes;
+        s.draws += band.passes;
+        s.groups += band.groupsMade;
+        s.bytes += band.bytes;
+      }
       // 1. Nearest sphere depth, tested against the opaque scene.
       let pass = c.encoder.beginRenderPass({
         colorAttachments: [{ view: vRaw!, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
@@ -651,10 +738,13 @@ export class ParticleLiquid implements EnginePlugin {
           depthClearValue: 0,
         },
       });
-      pass.setPipeline(this.depthPipeline!);
-      pass.setBindGroup(0, g0);
       applyView(pass, c);
-      pass.draw(6, this.count);
+      if (band) band.drawDepth(pass, this.count);
+      else {
+        pass.setPipeline(this.depthPipeline!);
+        pass.setBindGroup(0, g0);
+        pass.draw(6, this.count);
+      }
       pass.end();
       // 2. Narrow-range filter: horizontal, vertical, then the 5 x 5 clean-up.
       for (const [to, bind] of [
@@ -675,8 +765,6 @@ export class ParticleLiquid implements EnginePlugin {
       pass = c.encoder.beginRenderPass({
         colorAttachments: [{ view: vThick!, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
       });
-      pass.setPipeline(this.thicknessPipeline!);
-      pass.setBindGroup(0, g1);
       const [x, y, w, h] = c.view?.viewport ?? [0, 0, c.width, c.height];
       const x0 = Math.floor(x * scale),
         y0 = Math.floor(y * scale),
@@ -684,7 +772,12 @@ export class ParticleLiquid implements EnginePlugin {
         y1 = Math.min(thick.height, Math.ceil((y + h) * scale));
       pass.setViewport(x * scale, y * scale, w * scale, h * scale, 0, 1);
       pass.setScissorRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
-      pass.draw(6, this.count);
+      if (band) band.drawThickness(pass);
+      else {
+        pass.setPipeline(this.thicknessPipeline!);
+        pass.setBindGroup(0, g1);
+        pass.draw(6, this.count);
+      }
       pass.end();
       s.passes += 5;
       s.draws += 5;
