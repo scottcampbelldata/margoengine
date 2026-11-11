@@ -3,7 +3,8 @@
 // there). Maglev boxes every fractional number it passes to a call it does not inline (Number.isFinite included) and
 // allocates a function's closure context on each call. Prints JSON { bytes: [heap bytes per call, five windows] }.
 // Cases: invert (invertMatrixStable of a camera-like matrix), cascades (cascadeSplits + fitCascades of four cascades),
-// copyDepth (the three depth copies a post-processed 4x frame makes through SceneTarget, on a stand-in device).
+// copyDepth (the three depth copies a post-processed 4x frame makes through SceneTarget, on a stand-in device),
+// uploadRows (core's upload of 10,000 changed instance rows, every dirty-row word full, on a stand-in queue).
 // MARGO_PROBE_ROOT points it at another checkout (to measure a commit before a fix).
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -61,6 +62,18 @@ if (name === 'invert') {
     target.copyDepth(encoder, view, 1);
     target.copyDepth(encoder, view, 1);
     target.copyDepth(encoder, original, 4, 'depth24plus');
+  };
+} else if (name === 'uploadRows') {
+  const { uploadRows } = await load('packages/core/dist/extension.js');
+  const count = 10_000,
+    queue = { writeBuffer() {} },
+    buffer = {},
+    batch = { instances: new Float32Array(count * 24), rows: new Uint32Array((count + 31) >> 5), count, dirty: 0 };
+  call = () => {
+    // Every row moved, as in the browser check's instanced scene: each word is 0xffffffff, outside V8's small integers.
+    batch.rows.fill(-1);
+    batch.dirty = count;
+    uploadRows(queue, buffer, batch);
   };
 } else throw new TypeError(`Unknown case ${name}`);
 

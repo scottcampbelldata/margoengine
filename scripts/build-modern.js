@@ -285,7 +285,9 @@ for (const name of packages) {
 // Strict ceiling one byte above it.
 // 2026-11-10, Scott's approved core scale change 4 (backbuffer cap from the device's maxTextureDimension2D): core
 // 22,063 -> 22,083 B (+20 B). Strict ceiling one byte above it.
-const CORE_ONLY_CEILING = 22_126;
+// 2026-11-11, Scott's approved bug-sweep core rows: KB0378 (uploadRows reads the dirty-row words 16 bits at a time, so
+// no tier boxes a full word): core 22,125 -> 22,145 B (+20 B). Strict ceiling one byte above it.
+const CORE_ONLY_CEILING = 22_146;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();

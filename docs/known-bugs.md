@@ -413,17 +413,32 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 - **Open:** needs Scott's ruling. The bound is not loosened here. Options: an f32 reference (the model above) with a
   bound from WGSL's accuracy rules, or a bound derived from the f32 analysis.
 
-### Radeon 680M machine: the instanced frame allocates 4,048 B, over its 292 B floor (list 5 R6 row 15, 2026-11-10, open, core)
+### Fixed 2026-11-11: the instanced frame allocated 4,048 B, over its 292 B floor (list 5 R6 row 15, Radeon 680M, then RTX A6000)
 
-- **What:** `npm run test:frame-alloc:browser` on the Beelink: `instanced` (10,000 moving instanced boxes) median
-  4,048 B a frame in three runs (floor 292 B, set on the RTX A6000 machine); the other four scenes pass.
-- **Repro:** `node scripts/frame-alloc-browser.mjs --scenes=instanced,basic --profile --no-check`: 3,750 B a frame in
-  core's `uploadRows` (`packages/core/src/renderer.ts`), the walk over the batch's dirty-row words. 10,000 rows are
-  313 words, and 313 x 12 B (one V8 heap number) is 3,756 B: every word, all bits set (4294967295, outside V8's small
-  integer range), is boxed once a frame, as it is when the function runs below V8's optimizing tier.
-- **Cause:** not proven past the profile. The reading is that `uploadRows` does not reach (or falls out of) the tier
-  that keeps a uint32 unboxed on this machine. Core is frozen for this lane: needs Scott (a core change, for example
-  reading the word as a signed 32-bit value, which the floor check would then confirm).
+- **What:** `npm run test:frame-alloc:browser`, `instanced` (10,000 moving instanced boxes): median 4,048 B a frame
+  against its 292 B floor, first on the Beelink (Radeon 680M), then on the RTX A6000 desktop with Edge 157.
+- **Cause:** core's `uploadRows` (`packages/core/src/renderer.ts`) read each dirty-row word from the `Uint32Array`. A
+  word with every row marked is 4294967295, outside V8's small integers (31 bits with pointer compression), so every
+  tier that keeps the value tagged (the interpreter, the baseline, Maglev's loop) made a 12 B heap number of it: 312 full
+  words, 3,744 B a frame. At the baseline tier (`--max-opt=1`) the walk allocated 15,024 B a call.
+- **Fix (Scott's 2026-11-11 core ruling):** `uploadRows` reads the words 16 bits at a time through a `Uint16Array` view of
+  the same buffer, made once per words array (little-endian halves, as every buffer core writes); a half is always a
+  small integer. The same runs reach `writeBuffer`. Core 22,125 B to 22,145 B gzip, core + stage 24,726 B to 24,743 B.
+  The instanced frame now reads 304 B (three runs, Edge 157, RTX A6000); the 12 B left is not in `uploadRows` (next
+  entry).
+- **Regression:** `tests/frame-alloc.test.js` ("uploading 10,000 changed rows allocates nothing in the baseline and middle
+  tiers", probe `tests/support/tier-alloc-probe.mjs uploadRows`): 15,024 B a call before, 0 after; the existing
+  `tests/core-instance-cache.test.js` run merges keep the same writes.
+
+### Open: Edge 157 frames allocate 12 to 20 B over the instanced and shadowed floors (RTX A6000, 2026-11-11)
+
+- **What:** `node scripts/frame-alloc-browser.mjs` at the KB0378 fix, msedge 157.0.4341.42 headless, RTX A6000: instanced
+  304 B (floor 292 B, three runs), shadowed 880 B (floor 860 B); basic 328 B, post 1,476 B and dynamic 376 B pass. The
+  floors were set on Edge 156.
+- **Cause:** not isolated. `--profile` lists one more 12 B heap number a frame in core's `Engine.update` (minified `C`)
+  in the instanced scene; it was in the profile before the KB0378 fix too, hidden by the 15-row listing. The floors are
+  never raised: the fix is to find the boxed value (a fractional number passed to a call V8 does not inline is the
+  usual one) and remove it.
 
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 

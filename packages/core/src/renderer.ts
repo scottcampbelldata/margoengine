@@ -65,6 +65,8 @@ export interface Batch {
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
   claimed?: boolean;
 }
+/** A dirty-row words array (`Batch.rows`) with the 16-bit view of it that `uploadRows` reads, made once. */
+type Halves = Uint32Array & { h?: Uint16Array };
 /** Writes rows [start, stop) of `instances` (clamped to `end` floats), when any are left. */
 const send = (queue: GPUQueue, buffer: GPUBuffer, instances: Float32Array, start: number, stop: number, end: number) => {
   start *= 24;
@@ -82,27 +84,32 @@ export function uploadRows(queue: GPUQueue, buffer: GPUBuffer, batch: Batch, all
   if (all || !rows || !(batch.dirty! >= 0)) {
     send(queue, buffer, instances, 0, end, end);
     rows?.fill(0);
-  } else if (batch.dirty)
-    // Runs of set bits, merged across words, in row order: no sort and nothing allocated.
-    for (let word = 0, start = 0, stop = 0; word <= rows.length; word++) {
-      let bits = rows[word];
-      if (word === rows.length) send(queue, buffer, instances, start, stop, end);
+  } else if (batch.dirty) {
+    // Runs of set bits, merged across words, in row order: no sort and nothing allocated. The marks are read 16 bits at
+    // a time, through a view of the words made once (little-endian halves, as every buffer core writes): a uint32 word
+    // with bit 30 or 31 set is not a small integer, so a JIT tier that keeps it tagged boxed it, 12 B a word a frame
+    // (4,048 B for 10,000 moving rows); a half always is one.
+    const marks = ((rows as Halves).h ??= new Uint16Array(rows.buffer, rows.byteOffset, rows.length * 2));
+    for (let half = 0, start = 0, stop = 0; half <= marks.length; half++) {
+      let bits = marks[half];
+      if (half === marks.length) send(queue, buffer, instances, start, stop, end);
       else if (bits) {
-        rows[word] = 0;
+        marks[half] = 0;
         while (bits) {
           const low = 31 - Math.clz32(bits & -bits),
-            gap = ~(bits >>> low),
-            top = low + (gap ? 31 - Math.clz32(gap & -gap) : 32),
-            row = word * 32 + low;
+            gap = ~(bits >> low),
+            top = low + 31 - Math.clz32(gap & -gap),
+            row = half * 16 + low;
           if (row !== stop) {
             send(queue, buffer, instances, start, stop, end);
             start = row;
           }
-          stop = word * 32 + top;
-          bits = top > 31 ? 0 : (bits >>> top) << top;
+          stop = half * 16 + top;
+          bits = (bits >> top) << top;
         }
       }
     }
+  }
   batch.dirty = 0;
 }
 /**

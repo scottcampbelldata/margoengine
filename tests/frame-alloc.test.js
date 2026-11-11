@@ -63,14 +63,16 @@ const noTier = tier ? false : `${host} has no Maglev tier by default`;
 // The same probes with V8 stopped at Maglev (--max-opt=2), the tier a once-per-frame function runs in for its first
 // thousands of frames in a browser: it boxes fractional numbers passed to calls it does not inline, and allocates a
 // closure context on each call of a function whose locals an inner function captures.
-const tierProbe = (script, ...args) =>
+// `opt` is V8's highest tier: 1 the baseline (Sparkplug), 2 Maglev.
+const tierProbeAt = (opt, script, ...args) =>
   JSON.parse(
     execFileSync(
       process.execPath,
-      ['--expose-gc', ...HEAP, '--max-opt=2', fileURLToPath(new URL(`./support/${script}`, import.meta.url)), ...args],
+      ['--expose-gc', ...HEAP, `--max-opt=${opt}`, fileURLToPath(new URL(`./support/${script}`, import.meta.url)), ...args],
       { encoding: 'utf8', timeout: 240_000 },
     ),
   ).bytes;
+const tierProbe = (script, ...args) => tierProbeAt(2, script, ...args);
 
 // Regression (item 53.1): core's steady frame allocated 1,055 B on the CPU alone (Node, stand-in GPU): a regex literal
 // per resize, some() closures over the light, an array and every() in Camera.update, Math.hypot's argument arrays,
@@ -154,6 +156,18 @@ test('the three depth copies of a post-processed frame allocate nothing in the m
 }, () => {
   const bytes = median(tierProbe('tier-alloc-probe.mjs', 'copyDepth'));
   assert.ok(bytes < 1, `SceneTarget.copyDepth allocated ${bytes} B per frame at Maglev (${host})`);
+});
+
+// Regression (KB0378, 2026-11-11): the browser check's instanced scene (10,000 moving boxes) read 4,048 B a frame
+// against its 292 B floor, 3,744 B of it in core's uploadRows on the Radeon 680M machine and then on the RTX A6000 (Edge
+// 157). It read each dirty-row word from the Uint32Array: a full word is 4294967295, outside V8's small integers, so
+// every tier that keeps the value tagged (the interpreter, the baseline, Maglev's loop) boxed it, 12 B for each of the
+// 312 full words. It now reads the words through a Uint16Array view, made once per words array.
+test('uploading 10,000 changed rows allocates nothing in the baseline and middle tiers', { timeout: 300_000 }, () => {
+  for (const opt of noTier ? [1] : [1, 2]) {
+    const bytes = median(tierProbeAt(opt, 'tier-alloc-probe.mjs', 'uploadRows'));
+    assert.ok(bytes < 1, `uploadRows allocated ${bytes} B per call at --max-opt=${opt} (${host})`);
+  }
 });
 
 // Regression (frame-alloc check, 2026-10-30): one late frame deoptimized core's frame loop. Its clamp tested

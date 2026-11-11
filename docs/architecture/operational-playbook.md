@@ -1,3 +1,12 @@
+### Section 5 evidence: allocation-free changed-row uploads (2026-11-11)
+
+Core's `uploadRows` walks a batch's dirty-row words 16 bits at a time through a `Uint16Array` view, so no V8 tier boxes
+a full 32-bit word (4294967295 is outside the 31-bit small integers). Evidence: `tests/frame-alloc.test.js` runs 10,000
+changed rows at `--max-opt=1` and `--max-opt=2`: 15,024 B a call before, 0 after; the browser check's instanced scene
+went from 4,048 B to 304 B a frame (RTX A6000, Edge 157); `tests/core-instance-cache.test.js` keeps the same
+`writeBuffer` runs. Missing: the 680M machine rerun, and the 12 B the instanced scene still reads over its floor
+(docs/known-bugs.md, open).
+
 ### Section 5 evidence: directional shadows at any model scale (2026-11-11)
 
 `Shadows` no longer carries world-length defaults. Each receiver moves a quarter texel of its cascade along its normal
