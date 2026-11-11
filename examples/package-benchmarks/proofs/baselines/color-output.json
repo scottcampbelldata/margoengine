@@ -1,17 +1,17 @@
 {
  "proof": "color-output",
- "ref": "bc82057e40",
- "revision": "bc82057e40738c2fca4bf9aa09e36cf6229cc071",
- "capturedAt": "17c09bd77cab862107014301c825d11c24b6bf1e",
+ "ref": "049b4107ef",
+ "revision": "049b4107ef102359f1bdaa214de687004350ade0",
+ "capturedAt": "049b4107ef102359f1bdaa214de687004350ade0",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "bc82057e40 descends from eaddd64": false
+  "049b4107ef descends from eaddd64": false
  },
  "outputs": {
   "Tonemap alone 1x": "a19c07cbe31ebc663674c338f4f889d1d877d5651cf31f2b2eb49e7e1aad2099",
   "Tonemap alone 4x": "836d560e452e52d3f2e834908a22c4ecc5c19572df95832d480c5272576a5d15",
-  "DOF -> Tonemap 1x": "b6db0775445723d87d6971dd233f6afba6041863a3c9fc637d0ba1a1083caf24",
-  "DOF -> Tonemap 4x": "f0fff2dc69152c5fac74ed7bcecad74d80827199472175aae3dc4111fafafd3f",
+  "DOF -> Tonemap 1x": "2a53ab5d5ebd41a11a943fc4182fd6f5e9b90f50bbb298fad1d194aa240ef153",
+  "DOF -> Tonemap 4x": "3c1bcfe8b7b55578d17ea3990a54bbc53fb5820f5b96283ee187c4d78bebc923",
   "PostStack Bloom + Tonemap + FXAA 1x": "ce626f7236d6b374c3dc89cdd76ffb0941e784bfebef17f48dbcc01b1ae6ba01",
   "PostStack Bloom + Tonemap + FXAA 4x": "9ae9f46a2eb30bfad33948214a1d008c5a975e29edf55f82fb82b7a965151815",
   "TransparentCanvas 1x": "a67ee84382ad7db4980334f8fcf39852046bc811de9a41f2846f2717c81bcdad",

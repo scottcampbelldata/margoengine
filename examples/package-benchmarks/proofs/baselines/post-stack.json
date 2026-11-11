@@ -1,11 +1,11 @@
 {
  "proof": "post-stack",
- "ref": "bc82057e40",
- "revision": "bc82057e40738c2fca4bf9aa09e36cf6229cc071",
- "capturedAt": "17c09bd77cab862107014301c825d11c24b6bf1e",
+ "ref": "049b4107ef",
+ "revision": "049b4107ef102359f1bdaa214de687004350ade0",
+ "capturedAt": "049b4107ef102359f1bdaa214de687004350ade0",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "bc82057e40 descends from eaddd64": false,
+  "049b4107ef descends from eaddd64": false,
   "5b1fe66^ descends from eaddd64": false,
   "creative PostProcessing 1x: 5b1fe66^ -> 3319317 identical calls": 1813,
   "creative PostProcessing 4x: 5b1fe66^ -> 3319317 identical calls": 1840
@@ -15,11 +15,11 @@
   "post Bloom 4x": "d18a04968dd99fdbae2d82e673d5cb7e0a4d5d7580ea42080852f3b42e73de49",
   "post SSAO 1x": "7087af9d4dbb59e5437206f64ae783e8152a0e4dad925d8f4a0bb086a34c9b05",
   "post SSAO 4x": "e4bc4ecaeda60980629d2bea6f1c1be0afb52c7d3a4d69673ac6930f8ef99fe4",
-  "dof DOF 1x": "791fddd0463126e050e0546705deb53d20597d12d1a38438456341e648d9d6c8",
-  "dof DOF 4x": "e019a239f20e3c21f3052d0fa28bbc9093cc9308c3bf25ac5e7e2d2c8ccb577c",
+  "dof DOF 1x": "a29bf30548021e6b21769717144abc57cda4e5960879cb745c8fc81f9037a0ae",
+  "dof DOF 4x": "21cd2982e02cab021178111100e3398ffc37c4c2df6a05ae9e19ab2001c7d4fd",
   "tonemap Tonemap 1x": "1c7c21740fdd04bdd39843694e14e2fe7f25dad89900a42dadee39fdb9dd995a",
   "tonemap Tonemap 4x": "e49ade4701714870e59ae482d1f99a1118f960b0633af36e2ee14415e7535b6d",
-  "DOF -> Tonemap 1x": "f85c937ace782fdbf64b0215add35caf0965d50255109641d4644830d368cb56",
-  "DOF -> Tonemap 4x": "aa84c0568340bc983d12f57635015fdff57559a747cd3d8d9dbaccee5bee7fbf"
+  "DOF -> Tonemap 1x": "9fc3f6a5656899821a4f43cf3da9bfa9bb5716b68354e163d5072e420f2a47da",
+  "DOF -> Tonemap 4x": "cb6fd0fca5efff2bc2b27de932da11514031abd804e8e44d54892c3832cc53a9"
  }
 }
