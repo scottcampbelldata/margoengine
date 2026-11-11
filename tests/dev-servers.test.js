@@ -30,6 +30,16 @@ test('the root Vite config leaves the rival comparison pages out of the dependen
   }
 });
 
+// The scan also skips every top-level folder git ignores (test output, lane scratch and local-only folders). The names
+// come from git at load time, so the tracked config names none of the local-only ones (tests/no-private-paths.test.js).
+test('the root Vite config leaves every top-level git-ignored folder out of the dependency scan', async () => {
+  const { default: config, ignoredRootFolders } = await import('../vite.config.mjs'),
+    folders = ignoredRootFolders(),
+    { entries } = config.optimizeDeps;
+  assert.ok(folders.includes('node_modules/'), `git lists the ignored folders: ${folders}`);
+  for (const folder of folders) assert.ok(entries.includes(`!${folder}**`), `${folder} is excluded`);
+});
+
 // The probe behind check:dev-servers and the template check: a clean server passes; a warning line, a missing module
 // and a server that never answers each fail it.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
