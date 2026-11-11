@@ -67,6 +67,12 @@ for (const compat of [false, true]) {
         assert.ok(diff(after, before).max <= 2, 'background list and capture survive device restoration');
         records.push({ compat, samples: single ? 1 : 4, mode, identity, bend });
       }
+      // Odd-size scene copy: each mip level is the area filter of the one above (a 2x2 box from texel 2p dropped the
+      // last odd column and row and drifted by up to a texel across the level). worst is in units of the tolerance.
+      const mips = await page.evaluate(() => window.backgroundFixture.mips());
+      assert.ok(mips.spread > 0.05, `the odd-size scene has detail to filter: ${JSON.stringify(mips)}`);
+      assert.ok(mips.worst <= 1, `scene copy mips are the area filter of the level above: ${JSON.stringify(mips)}`);
+      records.push({ compat, samples: single ? 1 : 4, mips });
       assert.deepEqual(await page.evaluate(() => window.backgroundFixture.errors), []);
     }
     assert.deepEqual(errors, []);

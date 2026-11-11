@@ -16,6 +16,7 @@ import { sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { groupCode, alphaBlend } from '../../shared/pass.js';
+import { mipShader } from '../../shared/mipmaps.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -87,25 +88,17 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   return (1.0-s.metal)*s.tr*keep*s.base.rgb*transmittance*behind;
 }
 `;
-// Mip chain of the scene copy: level0 copies the resolved scene texel for texel; reduce writes each next level as
-// the mean of the 2x2 texels above it (an odd last row or column repeats its edge texel).
+// Copy of the scene: level0 copies the resolved scene texel for texel; every next level is the area filter of the one
+// above (shared/mipmaps.js: each source texel weighted by its overlap with the destination footprint, so an odd last
+// row or column keeps its share; a plain 2x2 box from texel 2p dropped it).
 const copy = /* wgsl */ `
 @group(0) @binding(0) var source:texture_2d<f32>;
-@group(0) @binding(1) var sourceSampler:sampler;
 @vertex fn vertex(@builtin(vertex_index) k:u32)->@builtin(position) vec4f {
   let corner=vec2f(f32((k<<1u)&2u),f32(k&2u));
   return vec4f(corner*2.0-1.0,0.0,1.0);
 }
 @fragment fn level0(@builtin(position) p:vec4f)->@location(0) vec4f {
   return textureLoad(source,vec2i(p.xy),0);
-}
-@fragment fn reduce(@builtin(position) p:vec4f)->@location(0) vec4f {
-  _=sourceSampler;
-  let last=vec2i(textureDimensions(source,0))-vec2i(1);
-  let o=vec2i(p.xy)*2;
-  let sum=textureLoad(source,min(o,last),0)+textureLoad(source,min(o+vec2i(1,0),last),0)+
-    textureLoad(source,min(o+vec2i(0,1),last),0)+textureLoad(source,min(o+vec2i(1,1),last),0);
-  return sum*0.25;
 }
 `;
 const over: GPUBlendState = alphaBlend;
@@ -249,15 +242,16 @@ export class Transmission implements EnginePlugin, PBRTransmission {
         'Transmission needs an HDR scene capture: attach a PostStack with an HDR or display effect (such as Tonemap or Bloom) first',
       );
     if (!this.pipelines) {
-      const module = device.createShaderModule({ code: copy }),
-        pipeline = (entryPoint: string) =>
-          device.createRenderPipeline({
-            label: 'transmission:copy',
-            layout: 'auto',
-            vertex: { module, entryPoint: 'vertex' },
-            fragment: { module, entryPoint, targets: [{ format: 'rgba16float' }] },
-          });
-      this.pipelines = { level0: pipeline('level0'), reduce: pipeline('reduce') };
+      const pipeline = (code: string, entryPoint: string) => {
+        const module = device.createShaderModule({ code });
+        return device.createRenderPipeline({
+          label: 'transmission:copy',
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint, targets: [{ format: 'rgba16float' }] },
+        });
+      };
+      this.pipelines = { level0: pipeline(copy, 'level0'), reduce: pipeline(mipShader(false), 'fragment') };
       this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     }
     if (this.texture?.width !== c.width || this.texture.height !== c.height) {
@@ -277,10 +271,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
       this.reduceGroups = this.levels.slice(0, -1).map((source) =>
         device.createBindGroup({
           layout: this.pipelines!.reduce.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: source },
-            { binding: 1, resource: this.sampler! },
-          ],
+          entries: [{ binding: 0, resource: source }],
         }),
       );
     }

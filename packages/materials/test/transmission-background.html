@@ -30,6 +30,33 @@ async render({mode='sorted',glass=true,ior=1,reverse=false,front=false,occluder=
  if(front){foreground=OIT.attach(engine);foreground.add(mesh(quad(1,-0.1,0.1),{color:[1,0,1],opacity:0.5,transparent:true,shading:'basic'}));}
  await frame();await frame();return true;
 },async restore(){const old=engine.gpu;await engine.rebootDevice();observe();await frame();return old!==engine.gpu;},
+// The scene copy's mip chain at an odd size (37 x 23): levels 0 to 2 read back as floats, each next level compared with
+// a float64 area filter of the level above (every source texel weighted by its overlap with the destination texel).
+async mips(){const c=engine.canvas;c.style.width='37px';c.style.height='23px';c.width=37;c.height=23;await this.render({ior:1.5});
+ const texture=owner.transmission.texture,device=engine.gpu,levels=3;
+ const dims=[...Array(levels)].map((_,l)=>[Math.max(1,texture.width>>l),Math.max(1,texture.height>>l)]);
+ const offsets=[0];for(const [w,h] of dims)offsets.push(offsets.at(-1)+w*h);
+ const module=device.createShaderModule({code:`@group(0) @binding(0) var t:texture_2d<f32>;
+@group(0) @binding(1) var<storage,read_write> o:array<vec4f>;
+@compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u){
+ var base=0u;for(var l=0u;l<id.z;l++){let d=textureDimensions(t,l);base+=d.x*d.y;}
+ let d=textureDimensions(t,id.z);if(id.x>=d.x||id.y>=d.y){return;}
+ o[base+id.y*d.x+id.x]=textureLoad(t,id.xy,id.z);}`});
+ const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+ const bytes=offsets.at(-1)*16,out=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),read=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:out}}]}));
+ pass.dispatchWorkgroups(dims[0][0],dims[0][1],levels);pass.end();encoder.copyBufferToBuffer(out,0,read,0,bytes);device.queue.submit([encoder.finish()]);
+ await read.mapAsync(GPUMapMode.READ);const all=new Float32Array(read.getMappedRange().slice(0));read.destroy();out.destroy();
+ let worst=0,spread=0;
+ for(let l=1;l<levels;l++){const [sw,sh]=dims[l-1],[dw,dh]=dims[l],src=all.subarray(offsets[l-1]*4),dst=all.subarray(offsets[l]*4);
+  for(let y=0;y<dh;y++)for(let x=0;x<dw;x++){const a=[x*sw/dw,y*sh/dh],b=[(x+1)*sw/dw,(y+1)*sh/dh],sum=[0,0,0,0];
+   for(let sy=Math.floor(a[1]);sy<Math.ceil(b[1]);sy++)for(let sx=Math.floor(a[0]);sx<Math.ceil(b[0]);sx++){
+    const w=(Math.min(b[0],sx+1)-Math.max(a[0],sx))*(Math.min(b[1],sy+1)-Math.max(a[1],sy));for(let c=0;c<4;c++)sum[c]+=w*src[(sy*sw+sx)*4+c];}
+   const area=(b[0]-a[0])*(b[1]-a[1]);
+   for(let c=0;c<3;c++){const want=sum[c]/area,got=dst[(y*dw+x)*4+c];worst=Math.max(worst,Math.abs(got-want)/(0.002+Math.abs(want)*0.002));spread=Math.max(spread,Math.abs(want-src[(Math.min(2*y,sh-1)*sw+Math.min(2*x,sw-1))*4+c]));}}}
+ c.style.width=c.style.height='';c.width=c.height=192;await frame();return {worst,spread,dims};
+},
 async resize(){engine.canvas.width=160;engine.canvas.height=160;await frame();},
 dispose(){clear();stack.dispose();engine.dispose();}
 };

@@ -335,7 +335,9 @@ for (const samples of [4, 1])
       ].sort(),
     );
     assert.ok(
-      of(log, 'group').some((e) => e[2].entries.length === 2 && e[2].entries[1].binding === 1),
+      // The frame group [0, 3, 1]: binding 1 is the volume buffer. (A 2-entry group with binding 1 matched the scene
+      // copy's old reduce groups, source and sampler, so this passed without looking at the volume.)
+      of(log, 'group').some((e) => e[2].entries.some((x) => x.binding === 1 && x.resource?.buffer)),
       'group 0 binds the volume',
     );
     assert.equal(

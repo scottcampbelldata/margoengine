@@ -9,7 +9,8 @@
 //   lend no colour to the edges of opaque ones (the dark fringes of a plain average; Castano, "Computing Alpha
 //   Mipmaps", 2010; Glassner's premultiplied-alpha filtering notes). A block with no alpha keeps its plain average.
 
-const mipShader = (weighted) => /* wgsl */ `
+/** WGSL of one area-filter step (entry points `vertex` and `fragment`, the level above at group 0 binding 0). */
+export const mipShader = (weighted) => /* wgsl */ `
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
   return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);
 }

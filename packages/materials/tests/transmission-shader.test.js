@@ -501,24 +501,20 @@ test('pass hook: blur grows with roughness, Beer uses margoVolume per world unit
   close(spread.samples[0].uv, plain.samples[0].uv, 0, 'green ray');
 });
 
-test('mip chain: level0 copies texel for texel, reduce averages each 2x2 block', () => {
+test('mip chain: level0 copies texel for texel, every next level is the shared area filter', () => {
   const source = readFileSync(new URL('../src/transmission-pass.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n'),
     copy = /const copy = \/\* wgsl \*\/ `([\s\S]*?)`;/.exec(source)[1];
-  assert.ok(
-    /@vertex fn vertex\(/.test(copy) && /@fragment fn level0\(/.test(copy) && /@fragment fn reduce\(/.test(copy),
-  );
-  const level0 = /fn level0[\s\S]*?\n\}/.exec(copy)[0];
-  assert.ok(!level0.includes('sourceSampler'), 'level0 binds only the source texture');
+  assert.ok(/@vertex fn vertex\(/.test(copy) && /@fragment fn level0\(/.test(copy));
+  // The reduction is shared/mipmaps.js's area filter (each source texel weighted by its overlap with the destination
+  // texel). The old 2x2 box from texel 2p dropped an odd last column and row; the GPU readback that compares each level
+  // with a float64 area filter at 37 x 23 is test/transmission-background-browser.mjs (npm run test:gpu:transmission-layers).
+  assert.match(source, /pipeline\(mipShader\(false\), 'fragment'\)/);
+  assert.ok(!/fn reduce\(/.test(copy), 'no private 2x2 box reduction');
   const value = ([x, y]) => [x, y, x * y, 1];
   const shader = wgslModule(copy.replace(/@vertex fn vertex[\s\S]*?\n\}\n/, ''), {
     source: 'level',
-    sourceSampler: 'sampler',
     textureDimensions: () => [5, 4],
     textureLoad: (_t, at) => value(at),
   });
   assert.deepEqual(shader.call('level0', [3.5, 2.5, 0, 1]), [3, 2, 6, 1]);
-  const mean = (...points) =>
-    points.map(value).reduce((s, c) => s.map((x, i) => x + c[i] / points.length), [0, 0, 0, 0]);
-  close(shader.call('reduce', [1.5, 0.5, 0, 1]), mean([2, 0], [3, 0], [2, 1], [3, 1]), 1e-6, 'inner block');
-  close(shader.call('reduce', [2.5, 1.5, 0, 1]), mean([4, 2], [4, 2], [4, 3], [4, 3]), 1e-6, 'odd edge repeats');
 });

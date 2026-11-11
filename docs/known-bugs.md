@@ -6293,3 +6293,17 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/restore-faul
   slices and calls `figure.render()`, which can change the size of the canvases it observes in the same frame. Not yet
   fixed; the fix is to schedule the re-render from the callback with `requestAnimationFrame` and add a test that counts
   observer errors.
+
+## Batch 132b audit: materials (fixed, 2026-11-11, lane N)
+
+- Fixed: `Transmission` (packages/materials/src/transmission-pass.ts) built its scene-copy mip chain with a 2x2 box
+  read from texel 2p of the level above. At an odd size the last column and row never reached a coarser level, and
+  each level drifted by up to a texel from its footprint; the comment claimed the odd edge repeated. Input: a 37 x 23
+  canvas with refracting glass (`npm run test:gpu:transmission-layers`). Wrong output: level 1 off a float64 area filter
+  of level 0 by 106 times the half-float tolerance (0.002 + 0.2%). Fix: the chain uses shared/mipmaps.js's area
+  filter (each source texel weighted by its overlap, as gltf-pro's mips since 65098f33f); worst error now 0.16 of the
+  tolerance on Metal WebGPU and MARGO_COMPAT=1. Rough glass near an odd-sized frame's right and bottom edges now
+  blurs the last column and row in.
+- Test that passed whatever the code did: test/physical.test.js asserted "group 0 binds the volume" by finding any
+  2-entry bind group whose second entry was binding 1; that matched the old reduce groups (source, sampler), not the
+  frame group [0, 3, 1] that holds the volume. It now looks for a buffer at binding 1.
