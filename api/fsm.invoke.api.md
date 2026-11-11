@@ -56,6 +56,7 @@ interface EventTransition<C, D = unknown> extends Omit<Transition<C>, 'guard'> {
 
 class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
     done: boolean;
+    get transitionDefinitions(): readonly FinalTransition<C, D>[];
     constructor(states: Readonly<Record<string, FinalState<C, D>>>, initial: string, context: C, transitions?: readonly FinalTransition<C, D>[]);
     plan(event: string, data?: D): (() => void) | null;
     send(event: string, data?: D): boolean;

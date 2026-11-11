@@ -10,7 +10,7 @@ export interface CatmullRomOptions extends CubicSplineOptions {
 export class CubicSpline extends Spline {
     readonly closed: boolean;
     constructor(points: readonly ArrayLike<number>[], options?: CubicSplineOptions);
-    tangent(t: number, output?: Float64Array | Float32Array): typeof output;
+    tangent(t: number, output?: Float64Array | Float32Array): Float64Array | Float32Array;
 }
 
 export interface CubicSplineOptions {
@@ -39,11 +39,11 @@ class Spline {
     readonly continuity: number;
     readonly bias: number;
     constructor(points: readonly ArrayLike<number>[], { kind, closed, tangents, divisions, tension, continuity, bias }?: SplineOptions);
-    at(t: number, output?: Float64Array | Float32Array): typeof output;
-    tangent(t: number, output?: Float64Array | Float32Array): typeof output;
+    at(t: number, output?: Float64Array | Float32Array): Float64Array | Float32Array;
+    tangent(t: number, output?: Float64Array | Float32Array): Float64Array | Float32Array;
     get length(): number;
     updateArcLengths(): void;
-    atDistance(distance: number, output?: Float64Array | Float32Array): typeof output;
+    atDistance(distance: number, output?: Float64Array | Float32Array): Float64Array | Float32Array;
 }
 
 interface SplineOptions {

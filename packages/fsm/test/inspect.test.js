@@ -6,6 +6,50 @@ import { EventMachine, EventTrace } from '../dist/events.js';
 import { StateMachine } from '../dist/index.js';
 import { ParallelRegions } from '../dist/parallel.js';
 import { MachineView } from '../dist/inspect.js';
+import { FinalMachine } from '../dist/final.js';
+
+test('disclosures retain current open state across transitions, filtering and same-named regions', () => {
+  const dom = new JSDOM('<body></body>');
+  const regions = new ParallelRegions(Object.fromEntries(['left', 'right'].map(name => [name, {
+    states: { idle: {}, run: {} }, initial: 'idle', transitions: [{ from: 'idle', to: 'run', event: 'go' }],
+  }])), {});
+  const m = new StateMachine({ p: regions.asState() }, 'p', {});
+  using view = new MachineView(m, { parent: dom.window.document.body, live: false });
+  const root = view.element.shadowRoot;
+  const row = name => root.querySelector(`[data-machine="root/p/${name}"] [data-state=idle]`);
+  row('left').open = true;
+  m.send('go'); view.refresh();
+  assert.equal(row('left').open, true);
+  assert.equal(row('right').open, false);
+  assert.equal(row('left').hasAttribute('aria-current'), false);
+  view.refresh('run'); view.refresh();
+  assert.equal(row('left').open, true);
+  // Read open synchronously, without waiting for HTML's queued toggle event.
+  row('left').open = false; view.refresh('idle');
+  assert.equal(row('left').open, false);
+  dom.window.close();
+});
+
+test('optional runtime topology shows authored always, delay and event triggers as text without calling guards', () => {
+  const dom = new JSDOM('<body></body>');
+  let calls = 0;
+  const m = new FinalMachine({ a: {}, b: {} }, 'a', {}, [
+    { from: 'a', to: 'b', always: true, guard: () => { calls++; return false; } },
+    { from: 'a', to: 'b', after: 2 },
+    { from: 'a', to: 'b', event: '<img src=x onerror=bad()>' },
+  ]);
+  const before = calls;
+  using view = new MachineView(m, { parent: dom.window.document.body, live: false });
+  const root = view.element.shadowRoot;
+  assert.equal(root.querySelector('[data-state=a] pre').textContent,
+    'always -> b\nafter 2s -> b\n<img src=x onerror=bad()> -> b');
+  assert.equal(root.querySelector('img'), null);
+  assert.equal(calls, before);
+  m.update(2); view.refresh();
+  assert.match(root.querySelector('[data-trace]').textContent, /after 2s/);
+  assert.equal(root.textContent.includes('\0fsm.'), false);
+  dom.window.close();
+});
 
 test('view mounts in the real inspector shadow tree, draws active hierarchy history and recent trace', () => {
   const dom = new JSDOM('<body></body>');

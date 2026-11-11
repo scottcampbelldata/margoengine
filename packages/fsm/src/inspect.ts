@@ -1,4 +1,5 @@
 import type { StateMachine } from './index.js';
+import type { FinalTransition } from './final.js';
 import { MachineTrace } from './trace.js';
 
 /** Where the live machine overlay is mounted and how it obtains trace records. */
@@ -31,6 +32,7 @@ export class MachineView<C> {
   private frame: number | undefined;
   private disposed = false;
   private signature = '';
+  private readonly disclosures = new Map<StateMachine<C>, Map<string, HTMLDetailsElement>>();
   /** Mount a view. If the machine is already traced, supply that trace to avoid taking its listener. */
   constructor(machine: StateMachine<C>, options: MachineViewOptions<C> = {}) {
     const { capacity = 32 } = options;
@@ -94,23 +96,37 @@ export class MachineView<C> {
     this.signature = signature;
     const doc = this.element.ownerDocument;
     const nodes: HTMLElement[] = [];
+    const present = new Set(configurations.map(c => c.machine));
+    for (const machine of this.disclosures.keys()) if (!present.has(machine)) this.disclosures.delete(machine);
     const heading = (text: string) => { const h = doc.createElement('h3'); h.textContent = text; nodes.push(h); };
     for (const { name, machine, path } of configurations) {
       heading(`${name}: ${path.join(' > ')}`);
       const tree = doc.createElement('div'); tree.dataset.machine = name;
+      let rows = this.disclosures.get(machine);
+      if (!rows) this.disclosures.set(machine, rows = new Map());
+      for (const state of rows.keys()) if (!Object.hasOwn(machine.states, state)) rows.delete(state);
+      const transitions = (machine as StateMachine<C> & {
+        readonly transitionDefinitions?: readonly FinalTransition<C>[];
+      }).transitionDefinitions ?? machine.transitions;
       for (const [state, spec] of Object.entries(machine.states)) {
         if (filter && !state.toLowerCase().includes(filter.toLowerCase())) continue;
-        const row = doc.createElement('details'); row.className = `state${path.includes(state) ? ' active' : ''}`;
+        let row = rows.get(state);
+        if (!row) {
+          row = doc.createElement('details');
+          row.append(doc.createElement('summary'), doc.createElement('pre'));
+          rows.set(state, row);
+        }
+        row.className = `state${path.includes(state) ? ' active' : ''}`;
         row.dataset.state = state;
         if (path.includes(state)) row.setAttribute('aria-current', 'true');
+        else row.removeAttribute('aria-current');
         let depth = 0;
         for (let at = spec.parent; at !== undefined; at = machine.states[at]?.parent) depth++;
         row.style.marginLeft = `${depth * 16}px`;
-        const label = doc.createElement('summary'); label.textContent = state;
-        const edges = doc.createElement('pre');
-        edges.textContent = machine.transitions.filter(t => t.from === state)
-          .map(t => `${t.event?.startsWith('\0') ? 'internal' : t.event ?? `after ${t.after}s`} -> ${t.to}`).join('\n') || 'No outgoing transitions';
-        row.append(label, edges); tree.append(row);
+        row.children[0].textContent = state;
+        row.children[1].textContent = transitions.filter(t => t.from === state)
+          .map(t => `${'always' in t && t.always ? 'always' : t.event?.startsWith('\0') ? 'internal' : t.event ?? `after ${t.after}s`} -> ${t.to}`).join('\n') || 'No outgoing transitions';
+        tree.append(row);
       }
       nodes.push(tree);
       const history = doc.createElement('pre'); history.dataset.history = name;
@@ -133,6 +149,7 @@ export class MachineView<C> {
     this.disposed = true;
     if (this.frame !== undefined) this.window?.cancelAnimationFrame(this.frame);
     this.detach(); this.owned?.dispose(); this.element.remove();
+    this.disclosures.clear();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }

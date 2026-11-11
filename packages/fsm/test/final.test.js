@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import { FinalMachine } from '../dist/final.js';
 import { EventTrace } from '../dist/events.js';
 
+test('public transition definitions retain authored triggers through timed and eventless microsteps', () => {
+  const transitions = [
+    { from: 'a', to: 'b', after: 1 },
+    { from: 'b', to: 'c', always: true },
+    { from: 'c', to: 'a', event: 'reset' },
+  ];
+  const m = new FinalMachine({ a: {}, b: {}, c: {} }, 'a', {}, transitions);
+  assert.deepEqual(m.transitionDefinitions, transitions);
+  const seen = [];
+  m.listener = () => seen.push(m.transitionDefinitions.map(({ event, after, always }) => ({ event, after, always })));
+  m.update(1);
+  assert.equal(m.state, 'c');
+  assert.deepEqual(seen, [0, 1].map(() => transitions.map(({ event, after, always }) => ({ event, after, always }))));
+  assert.deepEqual(m.transitionDefinitions, transitions);
+  assert.equal(m.send('reset'), true);
+});
+
 test('initial final child raises done on parent, then top-level final stops processing', () => {
   const m = new FinalMachine({ p: { initial: 'f' }, f: { parent: 'p', final: true }, end: { final: true } }, 'p', {},
     [{ from: 'p', to: 'end', event: 'done.state.p' }]);

@@ -227,6 +227,40 @@ console.log(trace.records); // [{machine: '', clock: 0, from: 'idle', to: 'windu
 - `MachineTrace` keeps the newest `capacity` changes, default 256, oldest first in `records`, for every machine down through parallel regions. `machine` says which, such as `alive/weapon`; `event` and `after` say what caused the change, both null for `goto`. `from` is null when regions start and `to` when they stop. `dispose()`, or `using`, stops it.
 - A machine has one `listener`, the hook a trace uses; set it yourself for your own debug overlay. A second trace on the same machine throws a `MargoError` with code `attached`.
 
+## Live inspection (`margoengine/fsm/inspect`)
+
+`MachineView` shows hierarchy, outgoing triggers, remembered history and recent transitions.
+Expanded state disclosures stay expanded through live refresh and filtering, independently
+for each parallel machine. `FinalMachine.transitionDefinitions` exposes the authored
+transitions in definition order, including `always`, `after` and event names; inspection
+does not evaluate guards. `InvokeMachine` inherits these descriptions.
+
+```ts
+import {FinalMachine} from 'margoengine/fsm/final';
+import {MachineView} from 'margoengine/fsm/inspect';
+
+const machine = new FinalMachine({idle: {}, waiting: {}, finished: {final: true}}, 'idle', {}, [
+  {from: 'idle', to: 'waiting', event: 'begin'},
+  {from: 'waiting', to: 'finished', after: 0.5}
+]);
+using view = new MachineView(machine, {parent: document.body, live: false});
+machine.send('begin');
+machine.update(0.5);
+view.refresh();
+console.log(machine.transitionDefinitions[1].after); // 0.5
+```
+
+Mounting defaults to `document.body`; `parent` takes precedence over `inspector: {element}`.
+An inspector's open shadow root is used when available. `live` defaults to true and
+refreshes on animation frames; false requires `refresh(filter?)`, where the default
+filter is empty and matches state names without case sensitivity. `capacity` defaults
+to 32 (1 to 10,000) recent trace entries. Supply `trace` to borrow an existing trace;
+otherwise the view owns a new `MachineTrace`, which needs the machine's free listener.
+`signal` defaults to none and abort disposes the view. `dispose()` and `using` remove
+the overlay and stop its frame callbacks, disposing only an owned trace. Trigger
+descriptions are available only when the optional final or invoke runtime is used;
+ordinary machines retain their event and delay labels.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/fsm

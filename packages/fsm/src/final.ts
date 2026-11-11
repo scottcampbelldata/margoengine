@@ -26,6 +26,8 @@ export class FinalMachine<C, D = unknown> extends EventMachine<C, D> {
   private steps = 0;
   /** True after a top-level final state is entered. It accepts no more events or updates. */
   done = false;
+  /** Authored transitions in definition order, with public event, after and always triggers for inspection. */
+  get transitionDefinitions(): readonly FinalTransition<C, D>[] { return this.definition; }
   /** Build and settle initial eventless transitions and completion events before returning. */
   constructor(states: Readonly<Record<string, FinalState<C, D>>>, initial: string, context: C,
     transitions: readonly FinalTransition<C, D>[] = []) {

@@ -98,7 +98,7 @@ Scott (2026-11-10): README phase is ON. Package changes include runnable README 
 
 | @margoengine/ui | Optional input: TextInput/TextArea/password, native bridge, selection, clipboard, IME, accessibility, defaults and disposal. | batch-258 job 1 |
 | margoengine | ui/input umbrella entry and native-editing attachment. | batch-258 job 1 |
-| @margoengine/fsm | inspect: MachineView mounting in Inspector shadow root or parent, existing trace ownership, refresh/live/capacity, filtering, AbortSignal and disposal | batch-250 job 4 |
+| @margoengine/fsm | inspect: MachineView mounting in Inspector shadow root or parent, existing trace ownership, refresh/live/capacity, filtering, AbortSignal and disposal | DONE (finish-later FSM inspection) |
 | margoengine | Generated fsm/inspect alias | batch-250 job 4 |
 
 | @margoengine/save | opfs: namespace/directory defaults, binary and empty saves, atomic close, cancellation boundary, key limit and cross-tab last-close-wins | batch-255 job 3 |
