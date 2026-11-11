@@ -45,7 +45,8 @@ sun.options.cascades = 2;        // live, the same way: fewer depth passes from 
 light is within about 8 degrees of vertical): `left`/`right` and `bottom`/`top` are its view extents around `position`,
 `near`/`far` distances in front of it. It replaces the cascades and `bounds` with one camera-independent map spread
 exactly over that box; casters and receivers outside it get no shadow. Give `bounds` or `frustum`, not both; switching
-between them, or back to cascades, is live too. With a non-square map or a `frustum`, light-space
+between them, or back to cascades, is live too. A `bounds` or `frustum` whose matrix would not be finite in float32
+throws a RangeError from the frame and keeps the last good matrix. With a non-square map or a `frustum`, light-space
 x and y map to texels at different scales, so receivers take a per-axis variant of the filter (receiver-plane slope and
 PCSS radii per axis); a square map without a frustum keeps the shaders above byte for byte. Cascades and `bounds` keep
 covering a square region, so a non-square map there just gives the two axes different texel sizes.

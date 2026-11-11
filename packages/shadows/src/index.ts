@@ -1343,7 +1343,8 @@ export class Shadows implements EnginePlugin {
       px = frustum ? centerX : Math.round(centerX / tx) * tx,
       py = frustum ? centerY : Math.round(centerY / ty) * ty,
       pz = centerZ,
-      m = this.matrices;
+      // Composed apart and checked before anything is published, so a rejected fit keeps the last good matrix.
+      m = (this.fitScratch ??= new Float32Array(16));
     if (!(radius > 0) || !(depth > 0))
       throw new RangeError('Shadow bounds points have no light-space extent; give points that span some volume.');
     m.fill(0);
@@ -1360,12 +1361,15 @@ export class Shadows implements EnginePlugin {
     m[13] = -py / ry;
     m[14] = 0.5 - pz / depth;
     m[15] = 1;
-    this.ranges.fill(depth);
     // Not Number.isFinite, which boxes each fractional value per frame (cascades.ts fitCascades).
     for (let i = 0; i < 16; i++)
       if (m[i] - m[i] !== 0)
         throw new RangeError('Shadow bounds matrix is not finite; check the bounds for extreme values.');
+    this.matrices.fill(0);
+    this.matrices.set(m);
+    this.ranges.fill(depth);
   }
+  private fitScratch?: Float32Array;
   private identity(object: object): number {
     let id = this.objectIds.get(object);
     if (id === undefined) this.objectIds.set(object, (id = ++this.objectSerial));

@@ -163,6 +163,30 @@ test('degenerate support points fail before rendering an invalid shadow matrix',
   }
 });
 
+test('a rejected bounds fit keeps the last good matrix and depth range', () => {
+  const gpu = mockGPU(),
+    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
+    shadows = new Shadows({ bounds, casterMargin: 0 }),
+    view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),
+    execute = passes(shadows);
+  shadows.setup(engine);
+  try {
+    view.begin(0);
+    execute(view.c);
+    const matrices = shadows.matrices.slice(),
+      ranges = shadows.ranges.slice();
+    assert.ok(matrices[0] !== 0);
+    // A box 1e-39 wide: x / extent passes float32's largest value.
+    shadows.options.bounds = { min: [0, 0, 0], max: [1e-39, 1e-39, 1e-39] };
+    view.begin(1);
+    assert.throws(() => execute(view.c), /not finite/);
+    assert.deepEqual(shadows.matrices, matrices, 'matrices unchanged');
+    assert.deepEqual(shadows.ranges, ranges, 'depth ranges unchanged');
+  } finally {
+    shadows.dispose();
+  }
+});
+
 test('a bounded glTF/custom scene uses one depth layer and stays fitted across camera orbit and light movement', () => {
   const gpu = mockGPU(),
     engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {} },
