@@ -1359,8 +1359,11 @@ recovery.
 
 Reported causes: TAA's transient matrix entered the still controller/history key; planar, image and colour draws omitted
 per-view state; scene capture and explicit surface/cube disposal selected the active default scene; ground contact
-projection had no HDR direction input; studio normalization overflowed for finite directions. The repairs and their
-focused regressions landed in 75dd1304df and 4e5dbdf049 (the batch 56 owner and tier integration gates), and the owner
+projection had no HDR direction input; studio normalization overflowed for finite directions. The repairs landed in
+853b9e74f6 (TAA still key; regression `packages/taa/test/temporal-camera.test.js`), 315eebeb39 (per-view state and the
+studio overflow; `packages/environment/tests/review56.test.js`, `review56-browser.mjs` and
+`tests/environment-staging-view-state.test.js`) and b04ae2dfe9 (owner-scene capture and disposal; `review56.test.js`);
+75dd1304df and 4e5dbdf049 record the batch 56 owner and tier integration gates that passed on them, and the owner
 class is gated by `check:owners` since f67185ba34. No core or stage feature was added.
 
 ### Closed 2026-11-09: ray-shadow cutouts (batch 49 job 1)
@@ -5431,7 +5434,7 @@ Batch 210 job 3: repaired default-loop zero-duration actions dropping one-key st
 
 Batch 243 job 2 historical compatibility timeout: the earlier renderImage call rejected at its unchanged 120000 ms AbortSignal, without per-case phase evidence. The rebased canonical native-then-compatibility suite and separate instrumented/cache-disabled compatibility diagnostics now pass every original case and bound. Cause remains unisolated; the shutdown fix was already in the failed checkpoint. Phase messages are retained for the next natural reproduction. No runtime repair or timing waiver is claimed; follow-up remains in private finish-later tracking under rule 22.
 
-Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects). Documented 2026-11-11 as a limit in `docs/limits.md` (Blender lightmap bake row) and in the Blender README: make the instances real before export for spatially distinct irradiance.
+Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects). Documented 2026-11-11 as a limit in `docs/limits.md` (Blender lightmap bake row) and in the Blender README: make the instances real before export for spatially distinct irradiance. Pinned 2026-11-11 by `tools/blender-addon/tests/blender_lightmap_instances.py` (run by `npm run modern:test:blender`): two collection instances of one plane bake once, as the source mesh.
 
 Fixed 2026-11-10: Batch 246 gate inventory finding. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
@@ -5505,6 +5508,7 @@ The former crossfade-only live composition gap is closed for all four built-ins,
 Fixed for this landing: compatibility render pipelines accepted explicit layouts missing statically used resources, and async validation also emitted uncaptured errors. render.ts now checks the reflected resource interface and routes async failure only to rejection. device.test.js and compute-limits.test.js retain the regressions. The global WGSL corpus also lacked labels shaders already on main; a scoped real-GPU recording refresh now covers it for the owning package CPU gate. Recorded labels shader ownership is identified by exact equality to packages/labels/src/gpu-shader.ts.
 Batch 213 landing correction: the job 2 local rebase helper took maxima for unrelated size ceilings, restoring eight older limits and six stale umbrella keys. Job 3 restores the incoming main limits and removes those stale keys; the helper now applies only the job delta to incoming main, with a three-way check. No runtime, test or tolerance was changed for this correction.
 - Fixed 2026-11-11: quality's scanners (clean-room, duplicates, tests floor) read repo files through readRepoFile, which skips a listed file removed before the read (the React `.subpaths-*` case was ignored earlier). Regression: tests/quality-inventory.test.js (scanners skip a removed file).
+- Fixed 2026-11-11 (f671ae5d85): `npm run quality -- --gate=sizes --update` shrank other lanes' size budgets from a stale dist (video/record 1,996 to 1,460 broke main's sizes gate; post/ssgi, post/ssr and sciviz/multivolume shrank too). Cause: the sizes gate measured dist files without asking whether they match the checked-out sources. The gate now names each item's owning package and reads the build stamps; an update keeps a stale package's recorded budget and refuses a first budget from a stale build. The four budgets were restored. Regression: tests/quality-gate.test.js (stale-build budgets kept; every sizes item has an owning package); docs/conventions.md, Quality gate.
 
 
 Batch 216 job 1: no open physical-lens defect found. Invalid constructor settings, live edits and tracked focus reject before camera/DOF output writes; physical-lens.test.js covers this contract.
@@ -5887,7 +5891,7 @@ Fixed batch 180 landing integration: the generated margoengine/sciviz/monitor al
 
 Batch 179 state capture: default MSAA transparent rendering is not self-bit-stable (Aeroflow repeated unchanged captures differed in 14 of 3042432 bytes by one level on this GPU); the same source scene varies while serialized resources, limits and camera are identical; the renderer cause remains to isolate. ExactSize round-trip proofs remain exact. Default-MSAA bit identity is retained for the rendering fix phase; no core change is made.
 
-Quality scanner race: running quality alongside React subpath tests can list then read a temporary .subpaths-* fixture after the test deletes it, yielding ENOENT in clean-room.js; run these gates sequentially until the scanner owns a stable file list. Found during batch 179, outside the state codec.
+Fixed 2026-11-11 (2413bb2901): quality scanner race. Running quality alongside React subpath tests could list then read a temporary .subpaths-* fixture after the test deleted it, yielding ENOENT in clean-room.js (found during batch 179, outside the state codec). The scanners now read through readRepoFile, which skips a listed file removed before the read, so the gates may run side by side. Regression: tests/quality-inventory.test.js (scanners skip a removed file).
 
 Fixed 2026-11-11 (KB5700h): batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t => [t*t, 0, 0]) sampled by a CPU-coloured line at t=0.123 was restored from a 256-entry Float32 table, with interpolation error versus the original closure. Loading now takes a `colormaps` option: a registered map (or a built-in) whose name, kind and saved table all match restores as itself, exact; any other map still rebuilds from the table. Regression: packages/sciviz/tests/color-scales.test.js (KB5700h case). Original note: Cause: executable closures cannot be serialized and the table matches GPU texture sampling, not arbitrary analytic CPU sampling. Preserve exact CPU colours or a registered declarative map definition in the fix phase.
 - Fixed 2026-11-11 (KB5700i): batch 178 job 3 media quality: a scatter cloud material set to world size drew its splats too small in short tiles of a perspective tiled capture (scatter.cloud.material.sizeUnits = 'world', tileSize below the image height). Cause: the points focal-length uniform (packages/points/src/frame.ts) took the tile height with the full-view fov, ignoring the cropped tile projection. It now derives pixels per world unit from the clip matrix (the y row without its share along the w row, over the w row length), as the orthographic branch already did, so cropped and off-axis projections keep their scale. Regressions: packages/points/tests/frame-scale.test.js; packages/sciviz/tests/export-media-browser.mjs (world-size splats, 64-pixel tiles against one 512-pixel tile: 0 of 1932 covered pixels differ on both backends, 1880 before).
@@ -6324,7 +6328,9 @@ the Hermite curve (exact on that path; equal to the old value at the snapshots t
 Documented 2026-11-11: the playout papers behind `net/delay` (Ramjee et al. 1994, Moon, Kurose and Towsley 1998) are
 cited with what Margo takes from them and what is its own in `docs/clean-room.md`; `WARM` (8 arrivals before the
 measurement replaces `initial`) and the 0.9995 slerp cut-over in `net/timeline` are recorded there as Margo's own
-numbers, not taken from the papers (the nlerp error at that cut-over is below 1e-6 rad).
+numbers, not taken from the papers (the nlerp error at that cut-over is below 1e-6 rad). Both are pinned (2026-11-11):
+`packages/net/test/delay.test.js` ("the initial delay is the floor for exactly 8 arrivals") and
+`packages/net/test/timeline.test.js` ("slerpInto blends near-parallel pairs"), each failing if its constant moves.
 
 ## Batch 132 audit: gltf (fixed)
 

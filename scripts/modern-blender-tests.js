@@ -108,6 +108,19 @@ if (process.env.MARGO_BLENDER) {
       fresh.errors[channel] <= fresh.bounds.linear,
       `Blender's fresh bake differs from the node maths in ${channel}: ${JSON.stringify(fresh)}`,
     );
+  // Lightmaps: collection instances share their source object's bake (the documented limit, KB5247c).
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_lightmap_instances.py",
+    ],
+    { stdio: "inherit" },
+  );
   // Lights and cameras: a fresh Blender export carries the committed fixture's tags and Blender's same numbers.
   execFileSync(
     process.env.MARGO_BLENDER,

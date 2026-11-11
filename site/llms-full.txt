@@ -4342,7 +4342,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | OpenVDB volumes (`@margoengine/loaders/vdb`, 2026-11-06) | By method: file versions 222 and later; `float`, `double`, `int32`, `int64`, `vec3s`, `vec3d`, `vec3i` and half grids; uncompressed, zlib and Blosc with LZ4. Other grids and frustum transforms are left out. NanoVDB is not read. Proved on OpenVDB's sample sphere, smoke and fire files, version 222, half floats and two grids in one file, and on a file OpenVDB 13 wrote, version 225, with Blosc, float, double and vector grids: active counts, boxes and sampled values equal what OpenVDB reads (LIM-202). `bool` and mask grids and point data go to `skipped`. | No published byte-level specification, so a file version past 225 may need a new look; the original opt-in files stay out of the repository. One pinned 861,072-byte CC-BY-4.0 version-223 sphere is now a required unit fixture for zero-length half-value blocks, compared with its embedded active-count/bounds metadata. | A left-out grid is named in `skipped`; a file with no grid offsets, another Blosc codec or an older version is refused with code `unsupported`. | Convert the grid to a supported type in the tool that wrote it. |
 | MaterialX and Lottie (`@margoengine/loaders/materialx`, `/lottie`, 2026-11-06) | By method: MaterialX converts four surface shaders and the nodes node materials can hold; emission, opacity, procedural nodes, `uvtiling`, includes and custom nodedefs do not convert; shader defaults match the published nodedefs, with `standard_surface` 1.0.0 taken by `version` or `nodedef`, and `realitykit_pbr_surfaceshader` shares the `UsdPreviewSurface` defaults with no published definition checked. Lottie leaves out masks, mattes, text, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners, star roundness, expressions and the clip of a precomposition to its size (LIM-205); group opacity multiplies down to each paint in place of compositing the group. Of 20 real files against lottie-web 5.12.2, 17 differ on under 1.5% of drawn pixels; adrock, bodymovin and navidad (up to 1.3%, 8.9%, 99.9%) use masks, merge paths, mattes or expressions. A layer's `st` and `sr` move only a precomposition's content: the spec text says all of its animated properties, but Bodymovin files and lottie-web read a layer's own keys in the time of its composition, and Margo follows the files. The MaterialX output has not been compared with a reference renderer. | Node materials are a closed set of nodes; a Lottie frame here is paths and images, and those features need a compositor. | MaterialX names each loss in `skipped`, and Lottie each feature in `unsupported`, except expressions. | Bake the feature in the authoring tool, or build the graph with `@margoengine/materials` by hand. |
 | Range cache (`@margoengine/cache/ranges`, 2026-11-07) | Proved in a real browser (Chromium and Edge, 2026-11-07): gltf-pro's own streaming code (`GLTFStream`) reads the real SheenChair.glb through `RangeCache.fetch` with the browser's IndexedDB, and its buffers equal the file cold, offline after a reload and when revalidated; the Node tests cover the rest on stand-ins. Not yet run in a service worker, and not timed. By method: blocks are 64 KiB by default; eviction is per file and reads every file's record (one per file, not per block) before each write; two requests in flight at once that share a block both fetch it. | Blocks let a streamed file be stored as it is read, without the whole file. | A cold request is widened to whole blocks, at most one block more on each side. A request needing a block never fetched fails offline. | Use `AssetCache` to store whole files; a smaller `block` widens requests less. |
-| Vary keys (`varyKeys` in `@margoengine/cache/vary`, 2026-11-07) | Proved on stand-ins: an in-memory IndexedDB and a stand-in server in Node; not yet run in a browser. By method: each URL and credential set remembers only the last `Vary` it saw; whether a request sends cookies is judged from its `credentials` mode and origin, as the cookies themselves cannot be read. | A page or worker cannot see cookies, and keeping one `Vary` per URL needs one record, not a list. | Without a `partition`, two users signed in with cookies on one browser profile share entries; after a server changes `Vary`, old entries wait for eviction. | Set `partition` to the signed-in user's id; `delete(url)` drops every entry of a URL. |
+| Vary keys (`varyKeys` in `@margoengine/cache/vary`, 2026-11-07) | Proved on stand-ins: an in-memory IndexedDB and a stand-in server in Node; not yet run in a browser. By method: each URL and credential set remembers only the last `Vary` it saw; whether a request sends cookies is judged from its `credentials` mode and origin, as the cookies themselves cannot be read. | A page or worker cannot see cookies, and keeping one `Vary` per URL needs one record, not a list. | Without a `partition`, two users signed in with cookies on one browser profile share entries; after a server changes `Vary`, old entries wait for eviction. The remembered `Vary` record leaves with the last entry that lists it (2026-11-11); entries stored before then do not list theirs, so those records stay until `delete(url)`. | Set `partition` to the signed-in user's id; `delete(url)` drops every entry of a URL. |
 | Eviction index (`evictionIndex` in `@margoengine/cache/eviction`, 2026-11-07) | Proved on a real browser's IndexedDB (Chromium and Edge, 2026-11-07), counting the records each write reads: 2,000 files, then 30 writes read 120 records with the index and 60,030 without; not timed. By method: the database moves to IndexedDB version 2, and an AssetCache without the index can no longer open it. | An index on last use is how IndexedDB walks records in order without reading them all; the totals live in two records updated in the same transaction. | Opening such a database without the index sends every request to the network. | Open it with `evictionIndex()` every time, or use a new `name`. |
 | Asset bundles (`AssetBundles` in `@margoengine/cache/bundles`, 2026-11-07) | Proved on stand-ins: an AssetCache over an in-memory IndexedDB and a stand-in server in Node; not yet run in a browser. By method: every file of a bundle is hashed once per session when loaded, so a load reads each file's bytes once more on the CPU; a file is stored under its URL plus `?v=<hash>`, so the server must serve that query. | Hashes make a file shared by bundles one stored copy and let a release change only what changed. | A first load each session spends CPU time hashing (SHA-256 in the browser's own crypto). | Leave a file out of the manifest to skip its check; it then caches by URL as plain AssetCache files do. |
 | Freshness from Expires and Age (`freshness` of `AssetCache` in `@margoengine/cache`, 2026-11-07) | Proved on stand-ins: an in-memory IndexedDB and a stand-in server in Node; not yet run in a browser. By method: no heuristic freshness from `Last-Modified` (RFC 9111 section 4.2.2), so a file with no `max-age` or `Expires` is revalidated each session; `s-maxage` is ignored, as for any private cache. | A heuristic lifetime would serve files the server never said were fresh. `Age` and `Date` are not CORS-safelisted, so cross-origin they count only when exposed. | Cross-origin without exposed `Age` and `Date`, a file is taken as new when it arrives. | Expose `Age` and `Date` (`Access-Control-Expose-Headers`), or send `max-age`; `freshness: 'max-age'` keeps the old rule. |
@@ -4713,8 +4713,11 @@ Classical instantaneous stationary-medium approximation with each radial Mach nu
 Default ContactShadows is a height-faded, fixed-Gaussian local contact cue. Under a radius-0.5 sphere,
 against ray-traced uniform-hemisphere visibility, exposed-ground darkness MAE is 0.048174, RMSE 0.074416,
 max 0.288788 (15,472 pixels, 4096 rays each; reference quadrature max error 0.001734). Defaults are retained:
-size 4, height 1, blur 0.06, opacity 0.6, resolution 256. No physical lighting or area-light parity is claimed;
-the measured picture loss remains open.
+size 4, height 1, blur 0.06, opacity 0.6, resolution 256. No physical lighting or area-light parity is claimed.
+Accepted difference (KB3193, 2026-11-11): the default darkens the ground under a caster by how near its underside
+is, a footprint cue by design (one pass, cacheable with `static`); a sphere's footprint lies under the sphere, so
+the exposed ground stays nearly white (mean darkness 0.000177 against 0.048351). Sky occlusion beside a caster is
+staging/accumulate-ambient: AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer (`packages/staging/test/sky-occlusion-browser.mjs`).
 
 
 The independent Cycles OIT reference (1024 samples, seed 168) gives Margo MAE 1.632960 versus Babylon
@@ -6586,8 +6589,26 @@ short-string conversion and exact raw name lookup. All 1,445 bounded crafted
 cases match the full oracle. Across all 1,613, 1,591 match and 22 trailing malformed
 groups differ; 168 can consume beyond the value plus terminal NUL in the oracle.
 The owned decoder zero-fills missing bytes rather than reading another
-allocation. This does not close malformed UTF8 equivalence or any replacement
-gate. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json).
+allocation. [All losses and hashes](whitepaper/results/batch-133-metadata-strings.json).
+
+Accepted difference (bug sweep L5b, 2026-11-11, E25): those 22 strings stay
+different on purpose. The oracle's last code point changes with the value's
+length while every stream byte after the value stays the same, so it reads its
+own memory past the string; no decoder can match it from the bitstream. Margo's
+result equals the oracle's own result for the same value with explicit zero
+bytes, in all 22 cases (draco-native-entry.test.js). Cost: a file whose
+metadata ends in a cut multibyte character gets a different last character
+than the prebuilt gave, which was never defined by the file.
+
+Historical predictor 3 (bug sweep L5b, 2026-11-11, E23/E24): versions 1.0 to
+1.2 texture-coordinate predictor 3 now decodes and matches the full oracle on
+258 crafted cases and 18,000 randomized comparisons, output and acceptance.
+Unobserved and therefore not claimed: quantized or integer-coded positions
+feeding predictor 3 (Margo uses their stored integer values) and orientation
+order across several triangles (Margo follows the portable predictor). The
+glTF flavor accepts these version 1 streams although the glTF prebuilt refuses
+every major version 1 file; this is a supported-feature superset. The Wasm grew
+from 122,842 to 127,592 bytes.
 
 Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
 for a destructured direction alias, matching core's unit-direction contract.
@@ -11416,8 +11437,11 @@ recovery.
 
 Reported causes: TAA's transient matrix entered the still controller/history key; planar, image and colour draws omitted
 per-view state; scene capture and explicit surface/cube disposal selected the active default scene; ground contact
-projection had no HDR direction input; studio normalization overflowed for finite directions. The repairs and their
-focused regressions landed in 75dd1304df and 4e5dbdf049 (the batch 56 owner and tier integration gates), and the owner
+projection had no HDR direction input; studio normalization overflowed for finite directions. The repairs landed in
+853b9e74f6 (TAA still key; regression `packages/taa/test/temporal-camera.test.js`), 315eebeb39 (per-view state and the
+studio overflow; `packages/environment/tests/review56.test.js`, `review56-browser.mjs` and
+`tests/environment-staging-view-state.test.js`) and b04ae2dfe9 (owner-scene capture and disposal; `review56.test.js`);
+75dd1304df and 4e5dbdf049 record the batch 56 owner and tier integration gates that passed on them, and the owner
 class is gated by `check:owners` since f67185ba34. No core or stage feature was added.
 
 ### Closed 2026-11-09: ray-shadow cutouts (batch 49 job 1)
@@ -12347,13 +12371,22 @@ Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cas
 Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6, macOS 27.2). Repro for each: on a Mac,
 `MARGO_BROWSER=chrome` or `MARGO_BROWSER=webkit` with the named script.
 
-- **`sky` `test:gpu`, Playwright WebKit only: full Sky and `sky/base` differ by one half-float step.** Up to 2 pixels a frame in `afterlight`, `meadow`, `preetham` and
+- **Fixed (2026-11-11, L4, KB2224a): `sky` `test:gpu`, Playwright WebKit only: full Sky and `sky/base` differ by one half-float step.** Up to 2 pixels a frame in `afterlight`, `meadow`, `preetham` and
   `preetham-clouds-fog`, the same on every run and at 1x and 4x. Cause proved (2026-11-06): Apple's compile under WebKit rounds by the shape of the code. The only trigger is the
   day model branch of the full Sky, `if(frame.settings.x<0.5){color=preetham(w,s);}else{...lookup...}`, of which each frame takes one side. With that branch alone patched out of
   the full module, keeping the side in use, all 12 runs (6 configurations, 1x and 4x) give 0 differing pixels. Moving `lookup` ahead of the branch, which is the same maths, moves
   the differing pixels instead of removing them. The night branch changes nothing. Chrome on the same M6 gives 0 with every one of these texts, so the values are right and only
   the rounding of one compile moves. Ruled out: a stale read, inputs, and an empty branch added to `sky/base` (folded away, same pixels). To close it, Sky would compile only the
   day model in use, and a model switch would recompile the sky, fog, reflection and lighting shaders with `reflectionTexture` kept: Scott's call. No tolerance was raised.
+  Fix (2026-11-11, Scott approved): Sky compiles only the day model in use (`compose` in `packages/sky/src/base.ts`); editing
+  `options.model` live recompiles the sky, fog, reflection and lighting shaders on the next frame, with `reflectionTexture` and
+  the lighting map, buffer and bindings kept, and binds the Bruneton tables only for the Bruneton model (auto layouts drop an
+  unread binding). Steady frames compile nothing; the recorded traces keep their command and resource counts. Mac mini M6,
+  macOS 27.2, Playwright WebKit, `browser-check.mjs`: origin/main still fails `afterlight 4x frame 1 scene vs narrow` (1 pixel,
+  0.0000153); with the fix all 12 runs (6 configurations, 4x and 1x) give 0 differing pixels, so the KB2224b baselines need no
+  re-record for this. Regression: `packages/sky/test/sky.test.js` "KB2224a" (fails on the old build: a model branch in every
+  shader). A first run in a freshly copied folder once failed `night-citadel 4x frame 0 scene vs control` (44,792 pixels) and
+  passed on the rerun; logged as a sweep row (harness, not sky).
 - **Fixed (2026-11-10, Mac lane H): `culling` `test:gpu`, Playwright WebKit and Chrome: parts and core meshes differ by 1 level with shadows on.** Chrome 156 on the same M6 shows it too (2026-11-07, `shadows frustum step 2`, 1 pixel). `parts-check.mjs`, `shadows frustum step 2`: 1 pixel reads 145 against 146;
   the close view has 2. Cause proved (2026-11-06): the two engines draw the same surface with two specializations of one shader. A shader patched by Shadows makes core draw single-sided
   meshes with its plain pipeline (`C` false, back faces discarded; the culled pipeline in `renderer.ts` serves only the unpatched shader), while CulledParts keeps its back-culled pipeline
@@ -12392,6 +12425,13 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   Upstream report (draft, nothing filed): `docs/upstream-reports/KB2224c/report.md`; no standalone repro exists yet (a plain clear page holds 60).
 
 ### Fixed 2026-11-11: three routes broke WebGPU compatibility-level rules (KB2272); surfels at 4x still refuse
+
+Follow-up (KBnew-skyfog-ldr, L4, 2026-11-11): the three 4x cases KB2272 added to the shared adapter scenes made
+`webgl2-compat test:gpu:tiers` fail at "sky fog 4x ldr: the package accepts this tier". Cause: the cases get their
+4x scene from PostStack's capture (the only 4x route), and PostStack refuses HDR stages on the LDR tier by design,
+so the tier check met the documented refusal it did not list. Sky, VolumetricFog and spray have no fault there.
+`tier-packages-browser.mjs` now lists the three 4x scenes as LDR refusals and still checks their message; they
+render at half-float. Regression: that check (failed on 16fbe3c86c, passes now). Docs: webgl2-compat README.
 
 - **Was:** with `allowCompatibilityAdapters`, `FogPass` in `@margoengine/sky`, the `VolumetricFog` composite in `@margoengine/environment` and the spray in `@margoengine/water` failed pipeline creation at 4x ("sample_index is not supported in compatibility mode").
 - **Fix:** each draws once per sample at the level, with the sample index as a constant and `multisample.mask` writing that sample alone (`perSample` in `packages/shared/msaa.js`, the route `SceneTarget.copyDepth` and eye-dome lighting already took). The full level keeps its single `sample_index` draw, so its work is unchanged. Regression: `packages/webgl2-compat/test/adapter-browser.mjs` cases `sky fog 4x`, `environment volumetric 4x`, `water spray 4x` (each threw on the old source) and the fogged-frame check.
@@ -13340,7 +13380,7 @@ The first Doppler verify found the limits index still at LIM-602 and the generat
 
 ### Batch 168 closing reference losses
 
-- **Default contact shadow misses broad ray-traced ground occlusion** (`@margoengine/staging`, perf history 111):
+- **Closed, accepted difference (KB3193, 2026-11-11): default contact shadow misses broad ray-traced ground occlusion** (`@margoengine/staging`, perf history 111):
   a radius-0.5 sphere touches ground under uniform hemispherical lighting. Across 15,472 visible ground pixels,
   normalized darkness MAE 0.048174, RMSE 0.074416, max 0.288788 against 4096 cosine rays per pixel.
   Reference quadrature differs from projected solid angle by at most 0.001734. Mean darkness is 0.000177
@@ -13351,6 +13391,11 @@ The first Doppler verify found the limits index still at LIM-602 and the generat
   Lane G's current-main correctness-only contact comparison retains all
   15,472 pixels and 4096 rays: MAE 0.04817386029045438, mean darkness
   0.00017742360646430213 against 0.048351283896918625. No shadow option changed.
+
+  Closed 2026-11-11 (L4): working as designed, not a defect. The pictured mean darkness matches the footprint
+  model (darkness 0.6 x (1 - underside height), Gaussian sigma 0.03: the brightest exposed pixel, 0.047, is the blur
+  tail one sigma outside a 0.3 edge). AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer, so Margo draws the broad occlusion through that entry. Pinned
+  by `packages/staging/test/sky-occlusion-browser.mjs` (MAE below one 8-bit step). Recorded in docs/limits.md.
 
 
 The batch 168 OIT image loss above is also confirmed against an independent Cycles path trace:
@@ -13735,6 +13780,16 @@ The same regression covers a second cause exposed by the physical-origin repair:
 selection at a negative grazing boundary can repeatedly select the previous medium when the query
 advance rounds away. The walk now selects the forward half-open interval for each direction. A
 one-pixel two-material emissive path produced about 0.997 instead of 3.5 without this correction.
+
+### KB3574: batch 160 environment native direct row 1 over its budget (open, awaiting Scott's ruling)
+
+`node scripts/reference-rendering/environment.mjs` (native) fails `absolute: 2294442 > measured 2294441` on main
+(d33be0d67c, RTX A6000). Cause: 40e6f183dc, the deliberate GGX importance-sampling fix (sinTheta from
+alpha sqrt(xi / d) instead of sqrt(1 - cos^2), Walter et al. 2007 eq. 35), which moves the split-sum LUT toward an
+f64 integration (worst cell error 1.17e-3 to 4.9e-4, pinned by `packages/environment/tests/environment-browser.js`).
+On current main, putting the two old lines back renders at 2,294,441 and passes; between the two renders 58 of
+262,144 pixels move by one 8-bit level (32 up, 27 down, 59 channels). The budget is not moved here; re-recording
+it at 2,294,442 needs Scott's yes. Compat rows are lower and pass.
 
 ### Batch 160 job 7: environment furnace picture loss (open)
 
@@ -14950,11 +15005,14 @@ whitepaper/results/batch-133-paired-checkpoint.json: full 365 and glTF 288 total
 losses on the 1,937/1,003 accepted-input sets. Profiling Margo's own named Wasm
 localizes remaining cost to mapping, reconstruction and traversal; the proven
 mapping work reduction did not establish overall speed parity. Reproduce with
-the pinned paired manifest and private batch 133 driver. Cold/RSS/startup coverage
-is partial. Historical predictor 3 and full historical KD/type/transform coverage,
-and invalid UTF8 public metadata conversion are not established; the published
-spec omits rules and no new inference is authorized in this landing run. Both
-prebuilts stay default while these gaps remain; no replacement pass is claimed.
+the pinned paired manifest and private batch 133 driver. Speed work is deferred
+by scripts/speed-phase.json; the item is listed in docs/work-lists/speed-phase.md.
+Cold/RSS/startup coverage is partial (fresh-process RSS losses below).
+Historical predictor 3 and invalid UTF8 metadata conversion were closed on
+2026-11-11 (bug sweep L5b, see the two entries below and above). Full
+historical KD/type/transform coverage beyond the crafted one-triangle layouts
+is not established. Both prebuilts stay default while the RSS and speed gaps
+remain; no replacement pass is claimed.
 
 ### Historical: batch 133 optional landing GPU acquisition (resume 9)
 
@@ -14968,22 +15026,20 @@ unrun. Reproduce/resume with the bounded resume9 GPU bundle after ownership
 changes; no lock bypass or blind retry was used. Nothing was pushed. The command
 results and log hashes are in whitepaper/results/batch-133-landing.json.
 
-### Open: batch 133 malformed metadata trailing groups
+### Fixed 2026-11-11: batch 133 malformed metadata trailing groups had no defined rule (bug sweep L5b, KB4798)
 
-The optional native decoder still differs from the full opaque prebuilt on 22
-of 1,613 crafted metadata strings. Its short public conversion can consume bytes
-beyond the value and terminal NUL. Repro held-8: value8a bf84 4456 d525 3cf2;
-opaque UTF16 ends d9c0 dc09, owned conversion ends d9c0 dc00. See the complete stream in
-[the 22 retained repros](whitepaper/results/batch-133-metadata-strings.json).
-The owned bridge zero-fills absent bytes and never reads another allocation.
-Root boundary: public-string conversion outside the bitstream, not metadata
-framing or raw preservation. All 1,445 in-bounds cases agree; 168 inputs exercise
-external padding, of which 146 happen to agree. No external-padding semantics
-have been proved, so default replacement and full UTF8 equivalence remain open.
-
-Lane G reran all 22 retained complete streams against the shipped native Wasm:
-all 22 still disagree with their frozen opaque string oracle. Raw metadata
-framing is unchanged; the public external-padding rule is still unproved.
+The optional native decoder differed from the full opaque prebuilt on 22 of
+1,613 crafted metadata strings whose last 2/3/4-byte group runs past the value
+and its terminal NUL. E25 ([clean-room.md](clean-room.md#bug-sweep-l5b-e23-to-e25-historical-predictor-3-bit-streams-and-past-value-strings-2026-11-11))
+settles the rule: with every stream byte after the value unchanged, the opaque
+binding's last code point changes with the value's length alone (held-8 at
+lengths 9 to 13 gives U+80009, U+8028B, U+80807, U+801C1, U+80040), so the
+bytes it reads come from its own memory, not the bitstream. No bitstream rule
+can reproduce them. Margo reads absent group bytes as zero, which equals the
+opaque decoder's own result for the same value carrying explicit zero bytes in
+all 22 cases. Regression: `packages/decoders/tests/draco-native-entry.test.js`
+("never read past the value"). The remaining difference is recorded in
+[limits.md](limits.md); no code change was needed.
 
 ### Fixed: glTF textured pass raw light alias
 
@@ -15012,6 +15068,17 @@ the full campaign or isolate physical pages/JIT/live allocations. An initial
 manifest used a missing relative input path and failed before sampling;
 the resolved-path run and setup failure are retained separately.
 
+Bug sweep L5b recheck, 2026-11-11 (Node 26.12, current Wasm, busy dev PC,
+diagnostic): with the same child harness (scripts/acceptance/draco-resource-child.mjs)
+the native decoder's peak RSS was below the full prebuilt on every local input
+tried: a 461-byte predictive mesh 76.2 against 77.9 MB (Liftoff-only 76.6
+against 78.3), ABeautifulGame first 88.0 against 89.2 MB and largest 102.3
+against 103.7 MB, two runs each. The recorded loss inputs (BrainStem glTF-Draco
+primitives, test-only grant) are not on this machine, so the loss is neither
+reproduced nor closed. Next: rerun scripts/acceptance/draco-resources.mjs on
+the pinned corpus; if the loss holds, compare per-stage RSS (after compile,
+instantiate, decode and result copy) to find the stage that grows.
+
 Fixed in the lane G sweep: the native descriptor rejected widths above 16,
 and quantization, KD minima and prediction scratch also assumed 16 components.
 The descriptor now accepts nonzero UI8 counts; budgeted component-sized vectors
@@ -15023,14 +15090,15 @@ all three parallelogram predictors beyond 16; draco-wide.test.js verifies the
 shipped Wasm and typed output. The old public binding's negative width255 count
 is still a separate parity difference, not reproduced by the owned UI8 API.
 
-Historical predictor3 is absent from integer.rs's supported-method set. The
-record contains12 accepted complete version1.0/1.1/1.2 streams, with distinct
-UV bytes and intact canaries; native returns code5. The old-format reconstruction
-rule remains to be established by further crafted public-API observations.
-
-Lane G reran all twelve embedded historical predictor3 streams on the shipped
-Wasm; every stream still returns code5. The width repair above does not close
-this independent reconstruction gap.
+Fixed 2026-11-11 (bug sweep L5b, KB4824b): historical texture-coordinate
+predictor 3 (versions 1.0 to 1.2) is now decoded. E23/E24 crafted black-box
+observations fix its float32 arithmetic, half-up rounding, orientation sense,
+coincident-neighbour and equal-value behaviour, the bit-stream state bound and
+exhausted refill, and the pre-2.0 wrap-span limit. The 12 retained streams and
+246 further crafted cases (237 accepted, 21 rejected) match the full opaque
+decoder byte for byte; 18,000 randomized comparisons on the final build agree
+on output and acceptance (12,437 accepted and 5,563 rejected by both). Regression: `packages/decoders/native/draco/tests/legacy_uv.rs`
+(fails before the fix with code 5 on the first retained stream).
 
 Fixed 2026-11-11: packageInputs in scripts/package-stamps.mjs now lists the Rust folders `native` and `kernel`, so an edit there changes the package's API freshness stamp (cargo `target` stays skipped). Regression: tests/package-stamps.test.js (changed Rust file test).
 
@@ -15090,7 +15158,9 @@ No open defect from the globe suite. Radial altitude, perspective/reference-elli
 Batch 251 job 1: no open defect found in reference expansion; missing registrations,
 cycles and bounded expansion reject during construction (subtrees.test.js).
 
-Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+Closed 2026-11-11 (KB4915, sweep L2): the cause was the capture read fixed by the batch 206 entry below (the rigged frame was read before the compatibility queue replayed its commands); on main 00ffed75f3, Edge 157, RTX A6000, `node scripts/modern-usdz-tests.js --compat` passed 3 of 3 runs and native WebGPU 1 of 1 with no GPU errors, and that three-pose check is its regression test. Original entry: Batch 171 outside scope: node scripts/modern-usdz-tests.js --compat fails RiggedFigure.usdz motion (moved false, repeats true, no GPU errors), while native WebGPU passes; narrowed to the USDZ skeleton/animation compatibility drawing path, exact owner unproved. Log test-results/sciviz-fixes/formats-dependent-usdz-true.log. Deferred under rule 21; main 896ebf844 requires GPU gates only for changed packages.
+
+Fixed 2026-11-11 (KB4915-fixture, sweep L2): `node scripts/modern-usdz-tests.js` failed with ENOENT when run on its own, because it read `test-results/usdz-textured.usdz`, which only a repo-root run of `packages/usdz/tests/usdz.test.js` wrote (a run inside packages/usdz wrote it under packages/usdz/test-results). Both now build the textured archive in memory from `packages/usdz/tests/preview-fixture.js` (`texturedFixture`), the file picker gets it as a buffer, and the script creates `test-results/` before writing its record. With no archive on disk, native WebGPU and `--compat` each passed 1 of 1. Regression: packages/usdz/tests/usdz.test.js ('the browser check builds its textured archive in memory').
 
 Lane G current-main repro update (2026-11-10): the unchanged RiggedFigure portion,
 isolated from the demo and other cases, now returns moved true, repeats true and
@@ -15442,7 +15512,7 @@ Batch 210 job 3: repaired default-loop zero-duration actions dropping one-key st
 
 Batch 243 job 2 historical compatibility timeout: the earlier renderImage call rejected at its unchanged 120000 ms AbortSignal, without per-case phase evidence. The rebased canonical native-then-compatibility suite and separate instrumented/cache-disabled compatibility diagnostics now pass every original case and bound. Cause remains unisolated; the shutdown fix was already in the failed checkpoint. Phase messages are retained for the next natural reproduction. No runtime repair or timing waiver is claimed; follow-up remains in private finish-later tracking under rule 22.
 
-Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects). Documented 2026-11-11 as a limit in `docs/limits.md` (Blender lightmap bake row) and in the Blender README: make the instances real before export for spatially distinct irradiance.
+Batch 207 lightmap build integration: Blender's curated bundle external list did not include the new owning lightmap/imported entry, so it duplicated the texture runtime. Fixed in the same job; regression lightmap.test.js checks the bare package import. Generated geometry instances are not independently baked (repro: collection instances under different shadows; cause: Cycles bake operates on original view-layer mesh objects). Documented 2026-11-11 as a limit in `docs/limits.md` (Blender lightmap bake row) and in the Blender README: make the instances real before export for spatially distinct irradiance. Pinned 2026-11-11 by `tools/blender-addon/tests/blender_lightmap_instances.py` (run by `npm run modern:test:blender`): two collection instances of one plane bake once, as the source mesh.
 
 Fixed 2026-11-10: Batch 246 gate inventory finding. GPU planner registrations and command ordering are repaired on main (d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
@@ -15516,6 +15586,7 @@ The former crossfade-only live composition gap is closed for all four built-ins,
 Fixed for this landing: compatibility render pipelines accepted explicit layouts missing statically used resources, and async validation also emitted uncaptured errors. render.ts now checks the reflected resource interface and routes async failure only to rejection. device.test.js and compute-limits.test.js retain the regressions. The global WGSL corpus also lacked labels shaders already on main; a scoped real-GPU recording refresh now covers it for the owning package CPU gate. Recorded labels shader ownership is identified by exact equality to packages/labels/src/gpu-shader.ts.
 Batch 213 landing correction: the job 2 local rebase helper took maxima for unrelated size ceilings, restoring eight older limits and six stale umbrella keys. Job 3 restores the incoming main limits and removes those stale keys; the helper now applies only the job delta to incoming main, with a three-way check. No runtime, test or tolerance was changed for this correction.
 - Fixed 2026-11-11: quality's scanners (clean-room, duplicates, tests floor) read repo files through readRepoFile, which skips a listed file removed before the read (the React `.subpaths-*` case was ignored earlier). Regression: tests/quality-inventory.test.js (scanners skip a removed file).
+- Fixed 2026-11-11 (f671ae5d85): `npm run quality -- --gate=sizes --update` shrank other lanes' size budgets from a stale dist (video/record 1,996 to 1,460 broke main's sizes gate; post/ssgi, post/ssr and sciviz/multivolume shrank too). Cause: the sizes gate measured dist files without asking whether they match the checked-out sources. The gate now names each item's owning package and reads the build stamps; an update keeps a stale package's recorded budget and refuses a first budget from a stale build. The four budgets were restored. Regression: tests/quality-gate.test.js (stale-build budgets kept; every sizes item has an owning package); docs/conventions.md, Quality gate.
 
 
 Batch 216 job 1: no open physical-lens defect found. Invalid constructor settings, live edits and tracked focus reject before camera/DOF output writes; physical-lens.test.js covers this contract.
@@ -15898,7 +15969,7 @@ Fixed batch 180 landing integration: the generated margoengine/sciviz/monitor al
 
 Batch 179 state capture: default MSAA transparent rendering is not self-bit-stable (Aeroflow repeated unchanged captures differed in 14 of 3042432 bytes by one level on this GPU); the same source scene varies while serialized resources, limits and camera are identical; the renderer cause remains to isolate. ExactSize round-trip proofs remain exact. Default-MSAA bit identity is retained for the rendering fix phase; no core change is made.
 
-Quality scanner race: running quality alongside React subpath tests can list then read a temporary .subpaths-* fixture after the test deletes it, yielding ENOENT in clean-room.js; run these gates sequentially until the scanner owns a stable file list. Found during batch 179, outside the state codec.
+Fixed 2026-11-11 (2413bb2901): quality scanner race. Running quality alongside React subpath tests could list then read a temporary .subpaths-* fixture after the test deleted it, yielding ENOENT in clean-room.js (found during batch 179, outside the state codec). The scanners now read through readRepoFile, which skips a listed file removed before the read, so the gates may run side by side. Regression: tests/quality-inventory.test.js (scanners skip a removed file).
 
 Fixed 2026-11-11 (KB5700h): batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t => [t*t, 0, 0]) sampled by a CPU-coloured line at t=0.123 was restored from a 256-entry Float32 table, with interpolation error versus the original closure. Loading now takes a `colormaps` option: a registered map (or a built-in) whose name, kind and saved table all match restores as itself, exact; any other map still rebuilds from the table. Regression: packages/sciviz/tests/color-scales.test.js (KB5700h case). Original note: Cause: executable closures cannot be serialized and the table matches GPU texture sampling, not arbitrary analytic CPU sampling. Preserve exact CPU colours or a registered declarative map definition in the fix phase.
 - Fixed 2026-11-11 (KB5700i): batch 178 job 3 media quality: a scatter cloud material set to world size drew its splats too small in short tiles of a perspective tiled capture (scatter.cloud.material.sizeUnits = 'world', tileSize below the image height). Cause: the points focal-length uniform (packages/points/src/frame.ts) took the tile height with the full-view fov, ignoring the cropped tile projection. It now derives pixels per world unit from the clip matrix (the y row without its share along the w row, over the w row length), as the orthographic branch already did, so cropped and off-axis projections keep their scale. Regressions: packages/points/tests/frame-scale.test.js; packages/sciviz/tests/export-media-browser.mjs (world-size splats, 64-pixel tiles against one 512-pixel tile: 0 of 1932 covered pixels differ on both backends, 1880 before).
@@ -16183,9 +16254,14 @@ and AssetBundles dropped a `Request` input's signal and headers; `throttle` left
   (RFC 9111 4.2.4 and 5.2.2.2 allow it only when disconnected); by design for offline play. Documented 2026-11-11 in
   `docs/limits.md` ("Stale copies on failure"); the cache README already states it.
 - Fixed, lane S (2026-11-10): RangeCache captures request start time for a miss and a 304 revalidation and passes it to the existing RFC 9111 freshness calculation. Age plus transit now consumes the correct lifetime. Two controlled-clock regressions in packages/cache/test/freshness.test.js fail on the parent and cover both partly consumed and entirely expired responses without real waits or speed assertions.
-- Slop: index.ts keeps its own copies of http.ts `transact` and the range parsing; `isEntry` and `defaultFetch` are
-  duplicated; Vary name records are never
-  evicted; 27 throws carry no help link.
+- Fixed, sweep L6 (2026-11-11, KB5974e): index.ts keeps its own copies of http.ts `transact` and the range parsing;
+  `isEntry` and `defaultFetch` were duplicated; Vary name records were never evicted; 27 throws carried no help link.
+  index.ts now uses http.ts `transact` and `byteRange`, `isEntry` lives in http.ts, LoadingManager uses
+  `defaultFetch`. Each entry lists the records `keys` wrote with it, and both eviction paths delete a record with the
+  last entry that lists it (default: a reference count over the batch; `evictionIndex`: a read of the URL's own keys).
+  Every throw goes through typeError, rangeError or fault with the `#cache` help entry. Regressions:
+  packages/cache/test/vary-evict.test.js (fails before: the names record outlived its entries), tests/errors-page.test.js
+  (now scans packages/cache/src).
 - Verified, lane S (2026-11-10): decoded.ts's max-age=3153600000 is not a 2^31-cap defect. RFC 9111 section 1.2.2 defines an overflow fallback rather than an absolute cap; this value and its millisecond deadline are exact safe JavaScript integers. The literal introduced in 4f7774957 is unchanged. The current freshUntil calculation returns an exact 3153600000000-ms lifetime with no wrap. Source: https://www.rfc-editor.org/rfc/rfc9111.html#section-1.2.2. This review does not certify arbitrarily large delta-seconds values.
 
 ### Fixed: webgl2-compat explicit-gradient footprint (materials stochastic tiling)
@@ -16330,7 +16406,9 @@ the Hermite curve (exact on that path; equal to the old value at the snapshots t
 Documented 2026-11-11: the playout papers behind `net/delay` (Ramjee et al. 1994, Moon, Kurose and Towsley 1998) are
 cited with what Margo takes from them and what is its own in `docs/clean-room.md`; `WARM` (8 arrivals before the
 measurement replaces `initial`) and the 0.9995 slerp cut-over in `net/timeline` are recorded there as Margo's own
-numbers, not taken from the papers (the nlerp error at that cut-over is below 1e-6 rad).
+numbers, not taken from the papers (the nlerp error at that cut-over is below 1e-6 rad). Both are pinned (2026-11-11):
+`packages/net/test/delay.test.js` ("the initial delay is the floor for exactly 8 arrivals") and
+`packages/net/test/timeline.test.js` ("slerpInto blends near-parallel pairs"), each failing if its constant moves.
 
 ## Batch 132 audit: gltf (fixed)
 

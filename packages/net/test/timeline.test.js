@@ -91,3 +91,30 @@ test('SnapshotBuffer stores its time in the row, on the shared ring', () => {
   assert.deepEqual([buffer.samples[0], buffer.samples[11]], [3, 2]);
   assert.equal(buffer.sample(0).position[0], 2);
 });
+
+// Pins the documented 0.9995 cut-over from slerp to a normalized blend (docs/clean-room.md, net/delay and
+// net/timeline constants; KB6124a): Margo's own number, chosen so the blend's angle error stays below 1e-6 rad.
+test('slerpInto blends near-parallel pairs (dot above 0.9995) linearly and slerps the rest', () => {
+  const pair = (dot) => {
+    const half = Math.acos(dot);
+    return new Float64Array([0, 0, 0, 1, 0, 0, Math.sin(half), Math.cos(half)]);
+  };
+  const nlerp = (data, u) => {
+    const v = [0, 1, 2, 3].map((i) => (1 - u) * data[i] + u * data[4 + i]),
+      length = Math.hypot(...v);
+    return v.map((x) => x / length);
+  };
+  const angle = (q) => 2 * Math.atan2(q[2], q[3]),
+    gap = (a, b) => Math.max(...[0, 1, 2, 3].map((i) => Math.abs(a[i] - b[i])));
+  const out = new Float64Array(4);
+  for (const dot of [0.9996, 0.99999]) {
+    const data = pair(dot);
+    slerpInto(out, 0, data, 0, 4, 0.3);
+    assert.ok(gap(out, nlerp(data, 0.3)) < 1e-15, `dot ${dot} takes the normalized blend`);
+    assert.ok(Math.abs(angle(out) - 0.3 * angle(data.subarray(4))) < 1e-6, `dot ${dot}: blend error under 1e-6 rad`);
+  }
+  const data = pair(0.9994);
+  slerpInto(out, 0, data, 0, 4, 0.3);
+  assert.ok(gap(out, nlerp(data, 0.3)) > 1e-12, 'dot 0.9994 slerps');
+  assert.ok(Math.abs(angle(out) - 0.3 * angle(data.subarray(4))) < 1e-12, 'slerp keeps the angle exactly');
+});

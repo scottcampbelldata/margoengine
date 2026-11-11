@@ -219,6 +219,21 @@ test('min, max, margin and a short cold start bound the delay', () => {
   assert.equal(cold.target, 0.15);
 });
 
+// Pins the documented warm-up constant (docs/clean-room.md, net/delay: `WARM`, 8 arrivals; KB6124a). Ramjee et al.
+// 1994 and Moon, Kurose and Towsley 1998 give no warm-up count; 8 is Margo's own number, so a change must be deliberate.
+test('the initial delay is the floor for exactly 8 arrivals, then the measured delay takes over', () => {
+  const clean = link({ transit: () => 0.01, seconds: 2 }),
+    delay = new AdaptiveDelay({ initial: 0.15 });
+  // The first snapshot only sets the clocks; arrivals 2 to 9 each give one measured gap.
+  for (const { sent, received } of clean.slice(0, 8)) delay.observe(sent, received);
+  assert.equal(delay.target, 0.15, 'seven measured gaps: still below the 8-arrival warm-up');
+  delay.observe(clean[8].sent, clean[8].received);
+  assert.ok(
+    Math.abs(delay.target - 0.05) < 1e-9,
+    `eighth measured gap: the clean link's one send interval, got ${delay.target}`,
+  );
+});
+
 test('options are checked', () => {
   for (const options of [
     { quantile: 0.2 },
