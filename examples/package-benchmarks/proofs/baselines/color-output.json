@@ -1,11 +1,11 @@
 {
  "proof": "color-output",
- "ref": "16e50097e",
- "revision": "16e50097ebe94909b9b364536b059d515ff20ed6",
- "capturedAt": "e3f5fb13e82ccb05e9986ca7ad3674cb86fd9e98",
+ "ref": "bc82057e40",
+ "revision": "bc82057e40738c2fca4bf9aa09e36cf6229cc071",
+ "capturedAt": "17c09bd77cab862107014301c825d11c24b6bf1e",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "16e50097e descends from eaddd64": false
+  "bc82057e40 descends from eaddd64": false
  },
  "outputs": {
   "Tonemap alone 1x": "a19c07cbe31ebc663674c338f4f889d1d877d5651cf31f2b2eb49e7e1aad2099",

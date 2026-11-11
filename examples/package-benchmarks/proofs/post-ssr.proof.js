@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('7c47a09', '3cf1453', '16e50097e'),
+const { ref, pin } = refs('7c47a09', '3cf1453', 'bc82057e40'),
   { wgsl } = await coreAt(pin),
   post = await versions('post', ref, undefined, pin);
 
