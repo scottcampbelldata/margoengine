@@ -3982,7 +3982,7 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
     levels = map.specularMips;
     sh = map.sh.irradiance;
     rotation += map.rotation;
-    intensity *= map.intensity;
+    intensity *= map.intensity * (map.radianceScale ?? 1);
   } else {
     const texture = 'view' in map ? map.texture : map;
     levels = texture.mipLevelCount;

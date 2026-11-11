@@ -54,38 +54,69 @@ export function floatToHalf(value: number): number {
 const HALF_MAX = 65504;
 
 /**
- * Converts RGBA float texels to binary16 for an rgba16float upload. Lighting data must be finite and
- * non-negative, so NaN and negatives become 0 and values above 65504 clamp to 65504 instead of infinity.
+ * Peak radiance the rgba16float environment textures store as it is: 60,000, below 65,504 so the bilinear and box
+ * filters, the prefilter and blend rounding stay finite. A brighter source is divided by peak / HALF_PEAK.
  */
-export function toHalfLighting(data: Float32Array, native = true): Uint16Array {
+export const HALF_PEAK = 60000;
+
+/**
+ * The factor a lighting image is divided by before rgba16float storage: max(1, peak / HALF_PEAK), where peak is
+ * the largest finite positive RGB value, rounded to float32 (alpha is not radiance). NaN, infinities and negatives carry no finite
+ * energy and are stored as 0, so they are left out of the peak.
+ */
+export function lightingScale(data: Float32Array): number {
+  let peak = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    if (v > peak && v < Infinity && (i & 3) !== 3) peak = v;
+  }
+  // An f32, so a baked file (which stores it as float32) reloads the same factor.
+  return peak > HALF_PEAK ? Math.fround(peak / HALF_PEAK) : 1;
+}
+
+/**
+ * Converts RGBA float texels to binary16 for an rgba16float upload. Lighting data must be finite and non-negative,
+ * so NaN, infinities and negatives become 0; RGB is divided by `scale` (lightingScale) and anything still above
+ * 65504 clamps to 65504 instead of infinity.
+ */
+export function toHalfLighting(data: Float32Array, native = true, scale = 1): Uint16Array {
   // The built-in Float16Array store rounds to nearest even like floatToHalf (same bits), about 3x faster than the
   // bit-twiddling loop (p-pmrem converted its 1024 x 512 HDR in 7.4 ms, half of Environment.create's time).
   const F16 = native
     ? (globalThis as { Float16Array?: new (length: number) => ArrayBufferView<ArrayBuffer> & { [i: number]: number } })
         .Float16Array
     : undefined;
+  // f32 first, so the Float16Array store and floatToHalf (which reads an f32) round the same value.
+  const inverse = 1 / scale;
   if (F16) {
     const half = new F16(data.length);
     for (let i = 0; i < data.length; i++) {
       const v = data[i];
-      half[i] = v > 0 ? (v < HALF_MAX ? v : HALF_MAX) : 0;
+      if (v > 0 && v < Infinity) {
+        const s = scale === 1 || (i & 3) === 3 ? v : Math.fround(v * inverse);
+        half[i] = s < HALF_MAX ? s : HALF_MAX;
+      } else half[i] = 0;
     }
     return new Uint16Array(half.buffer);
   }
   const out = new Uint16Array(data.length);
   for (let i = 0; i < data.length; i++) {
     const v = data[i];
-    out[i] = v > 0 ? floatToHalf(v < HALF_MAX ? v : HALF_MAX) : 0;
+    if (v > 0 && v < Infinity) {
+      const s = scale === 1 || (i & 3) === 3 ? v : Math.fround(v * inverse);
+      out[i] = floatToHalf(s < HALF_MAX ? s : HALF_MAX);
+    } else out[i] = 0;
   }
   return out;
 }
 
-/** Same sanitizing as toHalfLighting, kept in float32 for rgba32float uploads. */
-export function sanitizeLighting(data: Float32Array): Float32Array {
-  const out = new Float32Array(data.length);
+/** Same sanitizing and scale as toHalfLighting, kept in float32 for rgba32float uploads. */
+export function sanitizeLighting(data: Float32Array, scale = 1): Float32Array {
+  const out = new Float32Array(data.length),
+    inverse = 1 / scale;
   for (let i = 0; i < data.length; i++) {
     const v = data[i];
-    out[i] = v > 0 ? (v < 3.4e38 ? v : 3.4e38) : 0;
+    out[i] = v > 0 && v < Infinity ? (scale === 1 || (i & 3) === 3 ? v : v * inverse) : 0;
   }
   return out;
 }

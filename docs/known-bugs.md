@@ -141,6 +141,28 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   `packages/shadows/test/cutout-casters.test.js`. The directional shadow map lost nothing before the fix on this GPU
   (orthographic, no perspective division); it is checked anyway.
 
+### Fixed 2026-11-10: bright HDR sources overflowed half floats in Environment (Rust finding R2)
+
+- **What:** `Environment` stores its cube, prefiltered mips and equirect as rgba16float. On the float32-filterable path
+  the rgba32float equirect kept texels up to 3.4e38 and the cube store overflowed; on the half path texels clamped to
+  65,504, so an unclipped 1e6 sun lost 93 percent of its energy. Measured before the fix (RTX A6000): SH of a CubeFaces
+  sun 1.59 off an f64 projection of L0, an equirect sun's SH 1.26 off linear on the rgba32float path.
+- **Fix:** the brightest finite RGB texel above 60,000 sets `radianceScale` = peak / 60000; texels are divided by it
+  before upload and lighting multiplies it back (paramsBuffer w, irradianceAt, the background, EnvironmentBlend, baked
+  KTX2 version 2, materials envMap). Now 3.6e-7 and 1.9e-4. Regression: `packages/environment/tests/bright-browser.js`
+  and `packages/environment/tests/half-upload.test.js`.
+
+### EnvironmentBlend output can overflow half floats when unscaled sources' intensities sum above 1 (2026-11-10, open)
+
+- **What:** the blend output holds `(1 - t) * from.intensity * A + t * to.intensity * B` in rgba16float. Sources with
+  `radianceScale` above 1 are divided into range (the output takes the weighted sum of their scales), but two unscaled
+  sources keep scale 1, so a source with a peak above 32,752 and `intensity` 2 writes Inf.
+- **Repro:** an equirect with one texel of 50,000, `environment.intensity = 2`, `EnvironmentBlend.create(device, a, b,
+  { t: 1 })`; the output cube holds Inf at that texel.
+- **Cause and next step:** the blend does not know the sources' stored peaks. Record the stored peak per Environment
+  and divide the output by max(1, weighted peaks / 60000); the blend test that compares stored texels at intensity 2
+  then compares them times `radianceScale`.
+
 ### Fixed 2026-11-10: GGX importance samples collapsed onto the normal at low roughness
 
 - **What:** `importanceGGX` (`packages/environment/src/shader-common.ts`, used by the prefilter, the BRDF LUT and

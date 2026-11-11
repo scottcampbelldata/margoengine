@@ -161,6 +161,9 @@ test('standard envMap replaces the ambient light, also over a scene IBL, and bin
   assert.deepEqual(v.slice(2, 8), [5, 2, 1, 3, Math.fround(1 / 1.5), 1], 'mips, intensity, SH on, ratio');
   assert.deepEqual(v.slice(12, 15), [0, 1, 2]);
   assert.deepEqual(v.slice(44, 47), [24, 25, 26]);
+  // An Environment brighter than half floats stores radiance / radianceScale; the uniform multiplies it back.
+  material.envMap = { ...material.envMap, radianceScale: 16 };
+  assert.equal(envUniform(s.frame())[3], 0.5 * 4 * 16, 'intensity includes the radiance scale');
   material.envMap = null;
   const off = s.frame();
   assert.ok(

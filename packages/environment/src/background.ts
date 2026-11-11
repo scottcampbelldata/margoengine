@@ -226,7 +226,8 @@ export class EnvironmentBackground {
     f[18] = camera.position[2];
     f[19] = 1;
     const angle = environment.rotation + this.rotationValue;
-    f[20] = this.exposureValue;
+    // The textures hold radiance / radianceScale (a source brighter than half floats); exposure brings it back.
+    f[20] = this.exposureValue * environment.radianceScale;
     f[21] = Math.cos(angle);
     f[22] = Math.sin(angle);
     f[23] = environment.roughnessToLod(this.blurValue);

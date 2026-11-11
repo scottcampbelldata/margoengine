@@ -16,6 +16,17 @@ constant 0 is. MASK colour pipelines in gltf-pro (`exactAlphaShader`) and the `v
 the cutoff keeps all 77,822 grid pixels (40,257 cut before), 64 of 64 picks (56 before) and the same 7,974 shadow
 texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still interpolates in the plain path.
 
+### Section 5 evidence: bright environments fit half floats by a stored scale (2026-11-10)
+
+`Environment` divides every RGB texel by `radianceScale` = peak / 60000 when the brightest finite texel is above
+60,000, before the rgba16float (or rgba32float) upload; the equirect-to-cube resample, box mips, GGX prefilter and SH
+projection are linear, so lighting multiplies the factor back through `paramsBuffer` w and every consumer of the stored
+texels (background exposure, EnvironmentBlend weights, baked KTX2 metadata version 2, materials envMap) applies it.
+Non-finite and negative texels are stored as 0. Evidence: `packages/environment/tests/bright-browser.js` on the RTX
+A6000, WebGPU and WebGL2 compat: CubeFaces 1e6 sun SH within 3.6e-7 of an f64 projection (1.59 before), equirect sun
+SH linear within 1.9e-4 on both upload paths (1.26 before on rgba32float), every texel finite. Missing: other GPU
+vendors; a texel about 10^9 below the peak becomes a half subnormal.
+
 ### Section 5 evidence: stable GGX inverse CDF in the environment bakes (2026-11-10)
 
 `importanceGGX` takes cosTheta and sinTheta from d = (1 - xi) + alpha^2 xi, so the f32 lobe no longer collapses onto

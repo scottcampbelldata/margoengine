@@ -3,7 +3,7 @@
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { engineRuntime, type Engine } from '@margoengine/core/extension';
 import type { FloatImage } from './hdr.js';
-import { sanitizeLighting, toHalfLighting } from './half.js';
+import { lightingScale, sanitizeLighting, toHalfLighting } from './half.js';
 import { evaluateSH } from './sh.js';
 import * as wgsl from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -98,6 +98,8 @@ export interface Resources {
   params: GPUBuffer;
   radiance: Float32Array;
   irradiance: Float32Array;
+  /** Stored texels and SH are radiance / radianceScale (Environment.radianceScale). */
+  radianceScale: number;
 }
 
 /** One BRDF LUT, shared by every environment of a device with the same size and sample count, which are all it reads. */
@@ -328,6 +330,7 @@ async function build(
     sampler!: GPUSampler,
     readback!: GPUBuffer;
   let equirect: GPUTexture | undefined, equirectView: GPUTextureView | undefined, cubeView!: GPUTextureView;
+  let radianceScale = 1;
   const temporary: GPUBuffer[] = [];
   try {
     // Phase 1: upload and build the source cube with its mip chain.
@@ -374,10 +377,19 @@ async function build(
         );
       }
       readback = track(device.createBuffer({ size: 512, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }));
+      // A source brighter than half floats hold is divided into range here and multiplied back in lighting
+      // (paramsBuffer.w), so the rgba16float cube, prefilter and SH stay finite and keep its energy. A GPU cube is
+      // rgba16float already.
+      const image = isTexture(source) || isCube(source) ? undefined : fitEquirect(source, device.limits.maxTextureDimension2D);
+      radianceScale = image
+        ? lightingScale(image.data)
+        : isCube(source)
+          ? Math.max(...source.faces.map(lightingScale))
+          : 1;
       device.queue.writeBuffer(
         params,
         0,
-        new Float32Array([Math.cos(rotation), Math.sin(rotation), specularMips - 1, intensity]),
+        new Float32Array([Math.cos(rotation), Math.sin(rotation), specularMips - 1, intensity * radianceScale]),
       );
       const encoder = device.createCommandEncoder({ label: 'environment source cube' });
       if (isTexture(source))
@@ -390,12 +402,11 @@ async function build(
         for (let face = 0; face < 6; face++)
           device.queue.writeTexture(
             { texture: cube, origin: { x: 0, y: 0, z: face } },
-            toHalfLighting(source.faces[face]) as Uint16Array<ArrayBuffer>,
+            toHalfLighting(source.faces[face], true, radianceScale) as Uint16Array<ArrayBuffer>,
             { bytesPerRow: source.size * 8, rowsPerImage: source.size },
             [source.size, source.size, 1],
           );
-      } else {
-        const image = fitEquirect(source, device.limits.maxTextureDimension2D);
+      } else if (image) {
         const float32 = settings.float32 && device.features.has('float32-filterable');
         equirect = track(
           device.createTexture({
@@ -405,7 +416,9 @@ async function build(
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
           }),
         );
-        const texels = float32 ? sanitizeLighting(image.data) : toHalfLighting(image.data);
+        const texels = float32
+          ? sanitizeLighting(image.data, radianceScale)
+          : toHalfLighting(image.data, true, radianceScale);
         device.queue.writeTexture(
           { texture: equirect },
           texels as Float32Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
@@ -581,6 +594,7 @@ async function build(
     if (reuse) {
       reuse.radiance.set(radiance);
       reuse.irradiance.set(irradiance);
+      reuse.radianceScale = radianceScale;
       return reuse;
     }
     return {
@@ -598,6 +612,7 @@ async function build(
       params,
       radiance,
       irradiance,
+      radianceScale,
     };
   } catch (error) {
     for (const resource of created) resource.destroy();
@@ -752,11 +767,14 @@ export class Environment implements EnginePlugin {
   get shBuffer(): GPUBuffer {
     return this.live.sh;
   }
-  /** 16-byte uniform buffer vec4f(cos(rotation), sin(rotation), specularMips - 1, intensity). */
+  /** 16-byte uniform buffer vec4f(cos(rotation), sin(rotation), specularMips - 1, intensity x radianceScale). */
   get paramsBuffer(): GPUBuffer {
     return this.live.params;
   }
-  /** SH coefficients as 27 floats (9 coefficients x RGB): `radiance` is the plain projection, `irradiance` is diffuse ready (E / PI). */
+  /**
+   * SH coefficients as 27 floats (9 coefficients x RGB): `radiance` is the plain projection, `irradiance` is diffuse
+   * ready (E / PI). Like the textures they are in stored units: multiply by `radianceScale` for radiance.
+   */
   get sh(): { radiance: Float32Array; irradiance: Float32Array } {
     const r = this.live;
     return { radiance: r.radiance, irradiance: r.irradiance };
@@ -773,6 +791,22 @@ export class Environment implements EnginePlugin {
   get intensity(): number {
     return this.intensityValue;
   }
+  /**
+   * The factor every stored texel (cube, specular, equirect) and SH coefficient was divided by: 1, or peak / 60000
+   * for a source whose brightest finite texel is above 60,000 (a sun), so rgba16float holds it without overflowing.
+   * Lighting multiplies it back: `paramsBuffer` w is intensity x radianceScale and `irradianceAt` includes it. Code
+   * that reads the textures or `sh` itself multiplies by it too. Code that fills the textures by hand (a blend) sets
+   * the factor its texels were divided by; a finite number above 0, kept as a float32.
+   */
+  get radianceScale(): number {
+    return this.live.radianceScale;
+  }
+  set radianceScale(value: number) {
+    if (!(Number.isFinite(value) && value > 0))
+      throw new RangeError('Invalid radianceScale; pass a finite number above 0');
+    this.live.radianceScale = Math.fround(value);
+    this.writeParams();
+  }
   set intensity(value: number) {
     if (!Number.isFinite(value) || value < 0)
       throw new RangeError('Invalid intensity; pass a finite number of 0 or more');
@@ -786,7 +820,7 @@ export class Environment implements EnginePlugin {
     p[0] = Math.cos(this.rotationValue);
     p[1] = Math.sin(this.rotationValue);
     p[2] = this.settings.specularMips - 1;
-    p[3] = this.intensityValue;
+    p[3] = this.intensityValue * r.radianceScale;
     r.device.queue.writeBuffer(r.params, 0, p);
   }
 
@@ -797,12 +831,13 @@ export class Environment implements EnginePlugin {
   lodToRoughness(lod: number): number {
     return this.settings.specularMips > 1 ? Math.min(1, Math.max(0, lod / (this.settings.specularMips - 1))) : 0;
   }
-  /** Diffuse-ready irradiance / PI in world direction `normal` (rotation applied), times intensity. Multiply by albedo. */
+  /** Diffuse-ready irradiance / PI in world direction `normal` (rotation applied), times intensity and radianceScale. Multiply by albedo. */
   irradianceAt(normal: readonly [number, number, number]): [number, number, number] {
     const c = Math.cos(this.rotationValue),
       s = Math.sin(this.rotationValue),
       [x, y, z] = normal;
-    return evaluateSH(this.live.irradiance, [c * x - s * z, y, s * x + c * z]).map((v) => v * this.intensityValue) as [
+    const factor = this.intensityValue * this.live.radianceScale;
+    return evaluateSH(this.live.irradiance, [c * x - s * z, y, s * x + c * z]).map((v) => v * factor) as [
       number,
       number,
       number,

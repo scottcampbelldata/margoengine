@@ -45,6 +45,7 @@
     "test:probe-capture:browser": "npm run build && node scripts/test-browser.js --page=probe-capture",
     "test:fog-transparent:browser": "npm run build && node scripts/test-browser.js --page=volumetric-transparent",
     "test:reflection-shapes:browser": "npm run build && node scripts/test-browser.js --page=reflection-shapes",
+    "test:bright:browser": "npm run build && node scripts/test-browser.js --page=bright",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js && node scripts/env-mirror-gpu-check.js --compat && node packages/environment/tests/review56-browser.mjs && node packages/environment/tests/review56-browser.mjs --compat && node packages/environment/tests/capture-stability-browser.mjs && node packages/environment/tests/capture-stability-browser.mjs --compat",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },

@@ -280,8 +280,16 @@ export class EnvironmentBlend implements EnginePlugin {
     const state = this.stateFor(device);
     const a = this.fromValue,
       b = this.toValue,
-      wa = (1 - this.tValue) * a.intensity,
-      wb = this.tValue * b.intensity;
+      sa = a.radianceScale,
+      sb = b.radianceScale,
+      // A source divided into half-float range (a sun) holds a stored peak of 60,000 at most, so the output is
+      // divided by the weighted sum of the source scales and stays in range; otherwise the output is unscaled.
+      bound = sa > 1 || sb > 1 ? Math.max(1, (1 - this.tValue) * a.intensity * sa + this.tValue * b.intensity * sb) : 1;
+    this.environment.radianceScale = bound;
+    // The stored factor (a float32), so the texels and SH below are divided by exactly what lighting multiplies back.
+    const scale = this.environment.radianceScale,
+      wa = ((1 - this.tValue) * a.intensity * sa) / scale,
+      wb = (this.tValue * b.intensity * sb) / scale;
     const w = this.weightData;
     w.set([Math.cos(a.rotation), Math.sin(a.rotation), wa, 0, Math.cos(b.rotation), Math.sin(b.rotation), wb, 0]);
     device.queue.writeBuffer(state.weights, 0, w);

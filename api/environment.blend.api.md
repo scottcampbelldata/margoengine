@@ -78,6 +78,8 @@ class Environment implements EnginePlugin {
     get rotation(): number;
     set rotation(value: number);
     get intensity(): number;
+    get radianceScale(): number;
+    set radianceScale(value: number);
     set intensity(value: number);
     roughnessToLod(roughness: number): number;
     lodToRoughness(lod: number): number;
@@ -130,6 +132,7 @@ interface Resources {
     params: GPUBuffer;
     radiance: Float32Array;
     irradiance: Float32Array;
+    radianceScale: number;
 }
 
 interface Settings {

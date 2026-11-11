@@ -56,6 +56,20 @@ test('KTX2 baked IBL preserves every source/specular mip, LUT, SH and metadata b
   assert.deepEqual(copy, data);
 });
 
+test('a baked environment divided into half range keeps its radianceScale as metadata version 2 (R2)', () => {
+  const plain = encodePrefilteredIBL(make()),
+    scaled = encodePrefilteredIBL({ ...make(), radianceScale: 16.5 }),
+    unit = encodePrefilteredIBL({ ...make(), radianceScale: 1 });
+  assert.deepEqual(unit, plain, 'a scale of 1 writes the version 1 file byte for byte');
+  const kvLength = (bytes) => new DataView(bytes.buffer, bytes.byteOffset).getUint32(60, true);
+  assert.equal(kvLength(scaled), kvLength(plain) + 4, 'four bytes of scale in the metadata');
+  assert.deepEqual(parsePrefilteredIBL(scaled), { ...make(), radianceScale: 16.5 });
+  for (const radianceScale of [0, -1, NaN, Infinity])
+    assert.throws(() => encodePrefilteredIBL({ ...make(), radianceScale }), `scale ${radianceScale}`);
+  // Every truncated prefix of a version 2 file is refused too.
+  for (let n = 0; n < scaled.length; n += 7) assert.throws(() => parsePrefilteredIBL(scaled.subarray(0, n)));
+});
+
 test('KTX2 baked IBL round-trips every brdfSize Environment accepts, not only powers of two (R5)', () => {
   // Environment takes brdfSize as any integer 1..4096; a 100 x 100 LUT made savePrefilteredEnvironment throw.
   for (const edge of [1, 3, 48, 100]) {

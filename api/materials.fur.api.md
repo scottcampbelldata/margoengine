@@ -122,6 +122,7 @@ interface EnvironmentMap {
     };
     readonly rotation: number;
     readonly intensity: number;
+    readonly radianceScale?: number;
 }
 
 type Filter = 'linear' | 'nearest';

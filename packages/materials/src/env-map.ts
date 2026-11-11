@@ -19,6 +19,11 @@ export interface EnvironmentMap {
   readonly sh: { readonly irradiance: ArrayLike<number> };
   readonly rotation: number;
   readonly intensity: number;
+  /**
+   * The factor the cube and SH were divided by to fit half floats (a source brighter than 60,000), multiplied back
+   * here. Default 1 (an Environment always has it).
+   */
+  readonly radianceScale?: number;
 }
 /** How a Lambert, Phong or basic material mixes its colour with the reflection (`Material.combine`). */
 export type EnvCombine = 'multiply' | 'mix' | 'add';

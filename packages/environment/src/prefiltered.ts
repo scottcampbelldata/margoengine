@@ -40,6 +40,11 @@ export interface PrefilteredIBL {
   rotation: number;
   /** Nonnegative lighting multiplier. */
   intensity: number;
+  /**
+   * The factor the mips and SH were divided by to fit half floats (Environment.radianceScale), a finite number above
+   * 0. Default 1. A file with a scale other than 1 is written as metadata version 2, the scale after the cube mips.
+   */
+  radianceScale?: number;
 }
 
 /** Overrides and cancellation for loading a baked environment. */
@@ -74,7 +79,9 @@ function validate(data: PrefilteredIBL): number {
   if (!(data.brdf instanceof Uint32Array) || !lutEdge(Math.sqrt(data.brdf.length))) fail();
   // Six RGBA16F faces, including every source mip: 48 * (4 * size^2 - 1) / 3 bytes.
   // KTX2 counts the length word and padding in its u32 kvdByteLength, not only the payload.
-  const payloadLength = 240 + data.brdf.byteLength + 16 * (4 * data.size ** 2 - 1);
+  const scale = data.radianceScale ?? 1;
+  if (!(Number.isFinite(scale) && scale > 0)) fail();
+  const payloadLength = 240 + data.brdf.byteLength + 16 * (4 * data.size ** 2 - 1) + (scale === 1 ? 0 : 4);
   if (4 + align(key.length + payloadLength) > 0xffffffff)
     throw new RangeError('KTX2 metadata exceeds the 32-bit byte length limit; use a smaller source cube');
   for (const [edge, mips, full] of [
@@ -134,7 +141,10 @@ export function encodePrefilteredIBL(data: PrefilteredIBL): Uint8Array {
   d.setUint32(kvOffset, key.length + payloadLength, true);
   out.set(key, kvOffset + 4);
   let p = kvOffset + 4 + key.length;
-  [1, data.size, data.cube.length, Math.sqrt(data.brdf.length)].forEach((v, i) => d.setUint32(p + i * 4, v, true));
+  const scale = data.radianceScale ?? 1;
+  [scale === 1 ? 1 : 2, data.size, data.cube.length, Math.sqrt(data.brdf.length)].forEach((v, i) =>
+    d.setUint32(p + i * 4, v, true),
+  );
   d.setFloat32(p + 16, data.rotation, true);
   d.setFloat32(p + 20, data.intensity, true);
   p += 24;
@@ -147,6 +157,7 @@ export function encodePrefilteredIBL(data: PrefilteredIBL): Uint8Array {
     out.set(bytes(part), p);
     p += part.byteLength;
   }
+  if (scale !== 1) d.setFloat32(p, scale, true);
   for (let m = 0; m < count; m++) {
     const length = data.specular[m].byteLength;
     d.setBigUint64(80 + 24 * m, BigInt(offsets[m]), true);
@@ -209,7 +220,8 @@ export function parsePrefilteredIBL(input: ArrayBuffer | ArrayBufferView): Prefi
   const edge = mu(4),
     cubeCount = mu(8),
     brdfSize = mu(12);
-  if (mu(0) !== 1 || !power(edge) || edge < size || cubeCount !== Math.log2(edge) + 1 || !lutEdge(brdfSize)) fail();
+  const version = mu(0);
+  if ((version !== 1 && version !== 2) || !power(edge) || edge < size || cubeCount !== Math.log2(edge) + 1 || !lutEdge(brdfSize)) fail();
   const take = (offset: number, length: number): ArrayBuffer => {
     if (offset + length > meta!.length) fail();
     return meta!.slice(offset, offset + length).buffer;
@@ -225,7 +237,9 @@ export function parsePrefilteredIBL(input: ArrayBuffer | ArrayBufferView): Prefi
     cube.push(new Uint16Array(take(p, length)));
     p += length;
   }
-  if (p !== meta!.length) fail();
+  if (p + (version === 2 ? 4 : 0) !== meta!.length) fail();
+  const radianceScale = version === 2 ? md.getFloat32(p, true) : 1;
+  if (version === 2 && radianceScale === 1) fail();
   const specular: Uint16Array[] = [];
   const ranges: [number, number][] = [[0, kv + kl]];
   for (let m = 0; m < count; m++) {
@@ -253,6 +267,7 @@ export function parsePrefilteredIBL(input: ArrayBuffer | ArrayBufferView): Prefi
     irradiance,
     rotation: md.getFloat32(16, true),
     intensity: md.getFloat32(20, true),
+    ...(version === 2 ? { radianceScale } : {}),
   };
   validate(result);
   return result;
@@ -321,12 +336,18 @@ function upload(device: GPUDevice, data: PrefilteredIBL): Resources {
       lut: { buffer: brdf, users: 1, key: 'baked' },
       sh: buffer(shData, GPUBufferUsage.UNIFORM | GPUBufferUsage.STORAGE),
       params: buffer(
-        new Float32Array([Math.cos(data.rotation), Math.sin(data.rotation), data.specular.length - 1, data.intensity]),
+        new Float32Array([
+          Math.cos(data.rotation),
+          Math.sin(data.rotation),
+          data.specular.length - 1,
+          data.intensity * (data.radianceScale ?? 1),
+        ]),
         GPUBufferUsage.UNIFORM,
       ),
       sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }),
       radiance: data.radiance.slice(),
       irradiance: data.irradiance.slice(),
+      radianceScale: data.radianceScale ?? 1,
     };
   } catch (error) {
     for (const r of owned) r.destroy();
@@ -449,7 +470,8 @@ export async function savePrefilteredEnvironment(
   };
   // Snapshot scalars before asynchronous readbacks; no frame or loader work mutates this file's metadata later.
   const rotation = environment.rotation,
-    intensity = environment.intensity;
+    intensity = environment.intensity,
+    radianceScale = environment.radianceScale;
   const version = environment.version;
   const radiance = environment.sh.radiance.slice(),
     irradiance = environment.sh.irradiance.slice();
@@ -472,5 +494,6 @@ export async function savePrefilteredEnvironment(
     irradiance,
     rotation,
     intensity,
+    radianceScale,
   });
 }
