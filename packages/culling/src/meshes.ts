@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { loadCompatRoute } from '../../shared/compat.js';
+import { scoped } from '../../shared/error-scope.js';
 import type { CullShape } from './shape.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
@@ -63,6 +64,9 @@ interface Slot {
   group?: GPUBindGroup;
   data: Uint32Array;
   occluders?: Occluders;
+  /** The device confirmed the buffers; until then (and for good after a failure) the batch draws unculled. */
+  ready?: boolean;
+  failed?: boolean;
 }
 /** Occlusion's device resources, made by the first frame that uses it. */
 interface Occlusion {
@@ -105,6 +109,13 @@ export class CulledMeshes implements EnginePlugin {
     scatter: GPUComputePipeline;
   };
   private frameBuffer?: GPUBuffer;
+  // KB6434c: buffers wait for the device's confirmation before any use. A failure (the frame buffer, a slot, the
+  // occlusion set) is reported once and holds until the next device restore; the meshes draw unculled meanwhile.
+  private frameReady = false;
+  private frameFailed = false;
+  private occlusionPending = 0;
+  private occlusionFailed = false;
+  private occlusionTurn = 0;
   private readonly frame = new Float32Array(44);
   private readonly slots = new Map<Geometry, Slot>();
   private redirected: Batch[] = [];
@@ -204,10 +215,25 @@ export class CulledMeshes implements EnginePlugin {
           d.createComputePipeline({ layout: pipelineLayout, compute: { module, entryPoint } });
       return { layout, cull: entry('cull'), scan: entry('scan'), scatter: entry('scatter') };
     })();
-    this.frameBuffer ??= d.createBuffer({
-      size: this.frame.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    if (this.frameFailed) return;
+    if (!this.frameBuffer) {
+      const [buffer, check] = scoped(d, () =>
+        d.createBuffer({ size: this.frame.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+      );
+      this.frameBuffer = buffer;
+      this.frameReady = !check;
+      void check?.then((error) => {
+        if (this.frameBuffer !== buffer) return;
+        if (!error) this.frameReady = true;
+        else {
+          buffer.destroy();
+          this.frameBuffer = undefined;
+          this.frameFailed = true;
+          this.fail(error);
+        }
+      });
+    }
+    if (!this.frameReady) return;
     fillFrame(this.frame, c, engine.canvas, this.minRadius);
     this.shape?.prepare(c, this.occlusion && !!this.route);
     d.queue.writeBuffer(this.frameBuffer, 0, this.frame as Float32Array<ArrayBuffer>);
@@ -217,13 +243,15 @@ export class CulledMeshes implements EnginePlugin {
       active: Batch[] = [];
     for (const batch of batches) {
       if (!batch.count) continue;
-      this.slot(d, engine, batch);
       live.add(batch.geometry);
-      active.push(batch);
+      // A slot the device has not confirmed is left to core, which draws every instance.
+      if (this.slot(d, engine, batch)) active.push(batch);
     }
     // The depth prepass must see core's own shader unchanged; other frames cull like `occlusion: false`.
     const occluding =
-        this.occlusion && !route && active.length && exactShader(c.shader) ? this.occlude(c, active) : undefined,
+        this.occlusion && !route && active.length && exactShader(c.shader) && !this.occlusionFailed
+          ? this.occlude(c, active)
+          : undefined,
       pass = route ? undefined : c.encoder.beginComputePass();
     for (const batch of active) {
       const slot = this.slots.get(batch.geometry)!;
@@ -251,13 +279,51 @@ export class CulledMeshes implements EnginePlugin {
   }
   // Draws last frame's large kept instances depth-only with this frame's camera and builds the pyramid from them. A
   // stale list only changes which real geometry occludes: every occluder is an instance of this frame's batch.
-  private occlude(c: Context, batches: readonly Batch[]): Occlusion {
+  private occlude(c: Context, batches: readonly Batch[]): Occlusion | undefined {
     const d = c.device,
       engine = this.engine!,
-      samples = c.descriptor.multisample?.count ?? 1;
+      samples = c.descriptor.multisample?.count ?? 1,
+      // Every occlusion allocation is checked; frames cull without occlusion until all are confirmed.
+      checked = <T>(make: () => T): T => {
+        const [value, check] = scoped(d, make),
+          turn = this.occlusionTurn;
+        if (check) {
+          this.occlusionPending++;
+          void check.then((error) => {
+            if (turn !== this.occlusionTurn) return;
+            this.occlusionPending--;
+            if (!error) return;
+            this.dropOcclusion();
+            this.occlusionFailed = true;
+            this.fail(error);
+          });
+        }
+        return value;
+      };
     let o = this.occluding;
     if (o?.samples !== samples) {
       this.dropOcclusion();
+      o = checked(() => this.makeOcclusion(d, samples));
+    }
+    const pyramid = o.pyramid,
+      [width, height] = viewSize(c);
+    // Views of different sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
+    if (
+      c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height
+    ) {
+      const w = Math.max(width, c.view ? pyramid.width : 0),
+        h = Math.max(height, c.view ? pyramid.height : 0);
+      checked(() => pyramid.resize(w, h));
+    }
+    for (const batch of batches) {
+      const slot = this.slots.get(batch.geometry)!;
+      if (!slot.occluders) checked(() => this.occluderLists(d, slot));
+    }
+    if (this.occlusionPending) return undefined;
+    return this.drawOccluders(c, engine, o, batches, width, height);
+  }
+  private makeOcclusion(d: GPUDevice, samples: number): Occlusion {
+    {
       const module = d.createShaderModule({ code: computeShader(samples) }),
         own = d.createShaderModule({ code: this.shape?.shader(occludedShader, 'records[i].m') ?? occludedShader }),
         entry = (shader: GPUShaderModule, entryPoint: string) =>
@@ -266,7 +332,7 @@ export class CulledMeshes implements EnginePlugin {
         table = d.createBuffer({ size: 16 * 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       d.queue.writeBuffer(table, 0, levelTable() as Uint32Array<ArrayBuffer>);
       const stages = { depth0: entry(module, 'depth0'), reduce: entry(module, 'reduce') };
-      o = this.occluding = {
+      const o: Occlusion = (this.occluding = {
         samples,
         uniform,
         table,
@@ -274,15 +340,20 @@ export class CulledMeshes implements EnginePlugin {
         early: entry(own, 'early'),
         cull: entry(own, 'cull'),
         depth: occluderPipeline(d, samples, true),
-      };
+      });
+      return o;
     }
-    const pyramid = o.pyramid,
-      [width, height] = viewSize(c);
-    // Views of different sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
-    if (
-      c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height
-    )
-      pyramid.resize(Math.max(width, c.view ? pyramid.width : 0), Math.max(height, c.view ? pyramid.height : 0));
+  }
+  private drawOccluders(
+    c: Context,
+    engine: Engine,
+    o: Occlusion,
+    batches: readonly Batch[],
+    width: number,
+    height: number,
+  ): Occlusion {
+    const d = c.device,
+      pyramid = o.pyramid;
     pyramid.plan(width, height);
     const m = c.camera.matrix,
       floats = this.floats;
@@ -328,19 +399,7 @@ export class CulledMeshes implements EnginePlugin {
     const [, , , visible, local, groups] = slot.buffers,
       instance = slot.instance!,
       hiz = o.pyramid.buffer!;
-    let s = slot.occluders;
-    if (!s) {
-      const make = (size: number, usage: number) => {
-        const b = d.createBuffer({ size, usage: usage | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-        slot.buffers.push(b);
-        return b;
-      };
-      s = slot.occluders = {
-        args: make(20, GPUBufferUsage.INDIRECT),
-        list: make(slot.capacity * 4, GPUBufferUsage.VERTEX),
-        reset: new Uint32Array(5),
-      };
-    }
+    const s = slot.occluders!;
     s.reset[0] = slot.data[1];
     if (s.instance !== instance || s.hiz !== hiz) {
       const used = inUse(instance, slot),
@@ -367,7 +426,32 @@ export class CulledMeshes implements EnginePlugin {
     }
     return s;
   }
+  /** A slot's occluder list and its indirect arguments, made before any frame uses them (see `occlude`). */
+  private occluderLists(d: GPUDevice, slot: Slot): void {
+    const make = (size: number, usage: number) => {
+      const b = d.createBuffer({ size, usage: usage | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      slot.buffers.push(b);
+      return b;
+    };
+    slot.occluders = {
+      args: make(20, GPUBufferUsage.INDIRECT),
+      list: make(slot.capacity * 4, GPUBufferUsage.VERTEX),
+      reset: new Uint32Array(5),
+    };
+  }
+  /** Reports a GPU allocation the device refused, once per failure; what it was for stays off until a restore. */
+  private fail(error: GPUError): void {
+    if (!this.disposed)
+      this.engine?.onError(
+        new MargoError(
+          'failed',
+          `CulledMeshes could not make its GPU buffers (${error.message}); the meshes draw unculled until the next device restore; see https://margoengine.com/errors#gpu-lost`,
+        ),
+      );
+  }
   private dropOcclusion(): void {
+    this.occlusionTurn++;
+    this.occlusionPending = 0;
     const o = this.occluding;
     if (!o) return;
     o.pyramid.destroy();
@@ -377,10 +461,11 @@ export class CulledMeshes implements EnginePlugin {
     for (const slot of this.slots.values()) if (slot.occluders) slot.occluders.instance = undefined;
   }
   // Per-geometry storage, sized to the batch count (doubling) and rebound when core replaces its instance buffer.
-  private slot(d: GPUDevice, engine: Engine, batch: Batch): Slot {
+  private slot(d: GPUDevice, engine: Engine, batch: Batch): Slot | undefined {
     let slot = this.slots.get(batch.geometry);
     if (!slot)
       this.slots.set(batch.geometry, (slot = { capacity: 0, buffers: [], data: new Uint32Array(this.shape ? 16 : 8) }));
+    if (slot.failed) return undefined;
     const instance = engine.geometryBuffers(batch.geometry)!.instance;
     if (batch.count > slot.capacity) {
       // Every per-instance buffer, core's instance buffer included, is one storage binding of 96 B an instance.
@@ -399,14 +484,31 @@ export class CulledMeshes implements EnginePlugin {
       slot.buffers = [];
       slot.occluders = undefined;
       slot.capacity = n;
-      slot.uniform = make(slot.data.byteLength, GPUBufferUsage.UNIFORM);
-      slot.drawn = make(n * 96, S | GPUBufferUsage.VERTEX);
-      slot.args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
-      make(n * 4, S);
-      make(n * 4, S);
-      make(Math.ceil(n / 256) * 4, S);
+      const s = slot,
+        buffers = slot.buffers,
+        [, check] = scoped(d, () => {
+          s.uniform = make(s.data.byteLength, GPUBufferUsage.UNIFORM);
+          s.drawn = make(n * 96, S | GPUBufferUsage.VERTEX);
+          s.args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
+          make(n * 4, S);
+          make(n * 4, S);
+          make(Math.ceil(n / 256) * 4, S);
+        });
       slot.instance = undefined;
+      slot.ready = !check;
+      void check?.then((error) => {
+        // A later growth or a restore replaced these buffers: its own check decides.
+        if (s.buffers !== buffers || this.slots.get(batch.geometry) !== s) return;
+        if (!error) s.ready = true;
+        else {
+          for (const b of buffers) b.destroy();
+          s.buffers = [];
+          s.failed = true;
+          this.fail(error);
+        }
+      });
     }
+    if (!slot.ready) return undefined;
     if (slot.instance !== instance) {
       const [, , , visible, local, groups] = slot.buffers,
         r = (buffer: GPUBuffer): GPUBindingResource => ({ buffer });
@@ -446,6 +548,7 @@ export class CulledMeshes implements EnginePlugin {
     this.slots.clear();
     this.frameBuffer?.destroy();
     this.frameBuffer = this.pipelines = this.route = undefined;
+    this.frameReady = this.frameFailed = this.occlusionFailed = false;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

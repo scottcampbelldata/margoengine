@@ -7,8 +7,9 @@
 // must reach engine.onError or be thrown by engine.render (engine.start() hands that to onError); the clean restore
 // must report nothing; after it the live buffers and textures (created less destroyed) and the picture must equal the
 // first clean restore's, pixel for pixel. A package that keeps a failed resource, leaks the rest of a half-built set,
-// or loses state a restore should rebuild fails here, named by the call that broke it. Failures that stop the engine
-// until the next restore are counted per package, not refused (docs/known-bugs.md, "an allocation failure stops").
+// or loses state a restore should rebuild fails here, named by the call that broke it. Each failure must also be
+// reported exactly once, no frame may throw, and the frame after it must draw the scene (KB6434: an allocation
+// failure used to stop the engine until the next restore).
 //   node scripts/restore-fault-sweep.mjs [--only=shadows:createTexture:2]   (in a shared GPU slot; MARGO_COMPAT=1 for the WebGL2 layer)
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -68,7 +69,9 @@ await runSuite(
             return resource;
           };
         }
+        // A plan is for the one next device: a restore that the failure itself starts gets a clean device.
         handle = plan ? injectGPUFaults(device, plan) : handle;
+        plan = null;
         return device;
       };
       const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
@@ -158,6 +161,18 @@ await runSuite(
           image,
         };
       };
+      // Pixels that differ between two pictures; pixels the scene covers (differ from the background corner).
+      const differ = (a, b) => {
+          let n = 0;
+          for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) n++;
+          return n;
+        },
+        drawnPixels = (image) => {
+          let n = 0;
+          for (let i = 0; i < image.length; i += 4)
+            if (Math.abs(image[i] - image[0]) + Math.abs(image[i + 1] - image[1]) + Math.abs(image[i + 2] - image[2]) > 24) n++;
+          return n;
+        };
       await settle();
       calls = [];
       await restore(null);
@@ -176,20 +191,22 @@ await runSuite(
         errors.length = 0;
         handle = null;
         let thrown = await restore({ [call.method]: call.n, select: () => owner() === call.owner });
-        await settle().catch((error) => errors.push(`settle: ${error?.message ?? error}`));
+        const faulted = await settle().catch((error) => errors.push(`settle: ${error?.message ?? error}`));
+        // The frame after the failure renders: it throws nothing and draws the scene (with or without the failed
+        // package's part), never a blank canvas.
+        let next = null;
+        try {
+          next = shot();
+        } catch (error) {
+          thrown++;
+          errors.push(`frame: ${error?.message ?? error}`);
+        }
         const injected = handle?.injected.length ?? 0;
-        const reported = errors.slice(0, 3);
+        const reportedCount = errors.length,
+          reported = errors.slice(0, 3);
         errors.length = 0;
         thrown += await restore(null);
         const after = await state();
-        let differ = 0;
-        for (let i = 0; i < after.image.length; i += 4)
-          if (
-            after.image[i] !== base.image[i] ||
-            after.image[i + 1] !== base.image[i + 1] ||
-            after.image[i + 2] !== base.image[i + 2]
-          )
-            differ++;
         results.push({
           method: call.method,
           n: call.n,
@@ -197,17 +214,20 @@ await runSuite(
           label: call.label,
           injected,
           reported,
+          reportedCount,
           thrown,
+          drawn: next ? drawnPixels(next) : 0,
+          faultedDiffer: typeof faulted === 'object' ? differ(faulted, base.image) : -1,
           cleanErrors: errors.slice(0, 3),
           buffers: after.buffers,
           textures: after.textures,
           kinds: after.kinds.join(', ') === base.kinds.join(', ') ? undefined : after.kinds,
-          differ,
+          differ: differ(after.image, base.image),
         });
       }
       engine.dispose();
       return {
-        base: { buffers: base.buffers, textures: base.textures, kinds: base.kinds, calls: cases.length },
+        base: { buffers: base.buffers, textures: base.textures, kinds: base.kinds, calls: cases.length, drawn: drawnPixels(base.image) },
         results,
       };
     }, only);
@@ -220,18 +240,17 @@ await runSuite(
       const at = `${r.owner} ${r.method} ${r.n}${r.label ? ` (${r.label})` : ''}`;
       if (r.injected !== 1) failures.push(`${at}: the failure was not injected`);
       if (!r.reported.length) failures.push(`${at}: the failure was neither reported to engine.onError nor thrown by a frame`);
+      else if (r.reportedCount !== 1) failures.push(`${at}: reported ${r.reportedCount} times, not once: ${r.reported.join('; ')}`);
+      if (r.thrown) failures.push(`${at}: ${r.thrown} frames threw: the failure stopped the engine`);
+      if (r.drawn < base.drawn / 2) failures.push(`${at}: the frame after the failure drew ${r.drawn} scene pixels, base ${base.drawn}`);
       if (r.cleanErrors.length) failures.push(`${at}: the clean restore after it reported ${r.cleanErrors.join('; ')}`);
       if (r.buffers !== base.buffers || r.textures !== base.textures || r.kinds)
         failures.push(`${at}: ${r.buffers} buffers and ${r.textures} textures live after the clean restore, not ${base.buffers} and ${base.textures} ${JSON.stringify(r.kinds ?? '')}`);
       if (r.differ) failures.push(`${at}: the picture after the clean restore differs on ${r.differ} pixels`);
     }
     assert.deepEqual(failures, [], `restore fault sweep:\n${failures.join('\n')}`);
-    const stopped = {};
-    for (const r of results)
-      if (r.thrown || r.reported.some((e) => e.startsWith('settle: ')))
-        stopped[r.owner] = (stopped[r.owner] ?? 0) + 1;
     console.log(
-      `ok restore fault sweep: ${results.length} calls failed one at a time, each reported, then ${base.buffers} buffers, ${base.textures} textures and the same picture after a clean restore; failures that stopped the engine until that restore, per package: ${JSON.stringify(stopped)}`,
+      `ok restore fault sweep: ${results.length} calls failed one at a time, each reported once with every later frame drawn, then ${base.buffers} buffers, ${base.textures} textures and the same picture after a clean restore`,
     );
   },
   () => context.close(),
