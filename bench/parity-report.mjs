@@ -39,8 +39,19 @@ function runFile() {
   throw new Error('no parity run in benchmarks/runs; run npm run bench:parity first');
 }
 const file = runFile(),
-  run = JSON.parse(readFileSync(file, 'utf8')),
-  cases = run.suites.parity.cases,
+  run = JSON.parse(readFileSync(file, 'utf8'));
+// A run the bench marked invalid (the quiet gate skipped with --no-gate, a noisy case, non-default options) is
+// diagnostic only (docs/benchmarking.md, quiet speed-phase protocol step 6): it may be printed, never published. The
+// ledger keeps every scene's first result for good, so one diagnostic number let in would stay there. --partial
+// accepts a run of some cases (bench/cli.mjs marks any run off the defaults invalid for that alone), nothing else.
+const reasons = (run.invalid ?? []).filter((why) => !(o.partial && why.startsWith('official runs need the defaults')));
+if ((reasons.length || (run.valid !== true && !o.partial)) && !o.print) {
+  console.error(
+    `parity report: run ${run.id ?? file} is diagnostic (${(reasons.length ? reasons : ['not marked valid']).join('; ')}); it is not added to the ledger or the document (use --print to read it)`,
+  );
+  process.exit(1);
+}
+const cases = run.suites.parity.cases,
   engines = run.options.engines,
   threes = engines.filter((e) => e.startsWith('three'));
 

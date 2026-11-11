@@ -265,6 +265,9 @@ is diagnostic only.
    (AGENTS.md, paired A/B rule), with identical output checked on both sides.
 6. **Instrumented runs are diagnostic.** A run with a profiler attached, extra timestamp passes, debug counters, a
    debug build or `--no-gate` explains a number; it is never the number. Label it diagnostic wherever it is kept.
+   `bench/parity-report.mjs` enforces this for the whitepaper: a run the bench did not mark valid (`--no-gate`, a
+   noisy case, options other than the defaults, which only `--partial` lets through) exits 1 and writes neither the ledger nor the document; `--print`
+   still reads it ([bench-parity-diagnostic.test.js](../tests/bench-parity-diagnostic.test.js)).
 
 ## Choosing the browser
 
