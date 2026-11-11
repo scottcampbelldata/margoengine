@@ -464,7 +464,9 @@ console.log(left.length / 16, indices.length, boundsOf(new Float32Array([0, 0, 0
 | `cell` | from the spread and size | side of a grid cell in world units |
 
 - `pick(origin, direction, maxDistance?)` returns `{index, distance, point}` or `null`; `pickAll` lists every hit,
-  nearest first. Both faces of a triangle count, as for a blade or a leaf card.
+  nearest first. Both faces of a triangle count, as for a blade or a leaf card. A ray through a corner, an edge or a
+  box of zero size hits: hit or miss is decided on the box grown by 8 machine epsilons of its farthest corner from the
+  ray origin (as math's `Ray.intersectBox`), and the distance is the exact entry.
 - `near(center, radius)` returns the instance numbers whose world box comes within `radius`, nearest box first.
 - `remove(index)`, `restore(index)`, `removed(index)` and `active` track harvesting; `setTransform(index, matrix)`
   moves one instance. The grid is rebuilt on the next pick after any of these, in time linear in the instance count,

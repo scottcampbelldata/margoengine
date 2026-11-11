@@ -195,3 +195,25 @@ test('bad input throws with a link to the scatter help', () => {
   assert.throws(() => picker.remove(1), /index/);
   assert.throws(() => picker.setTransform(0, [1, 2, 3]), /16 floats/);
 });
+
+test('rays through a point box or a box corner hit it: the slab entries round apart by a step', () => {
+  // Rays from (-x, -y, -z) toward the origin for whole x, y, z from 1 to 8 (512 rays), the case that lost hits in
+  // math's Ray.intersectBox and OBB.intersectRay. The point box holds one instance at the origin, identity transform.
+  const identity = instanceTransforms([[0, 0, 0, 1, 0]]);
+  const point = new InstancePicker(identity, { bounds: { min: [0, 0, 0], max: [0, 0, 0] } });
+  const corner = new InstancePicker(identity, { bounds: { min: [0, 0, 0], max: [1, 1, 1] } });
+  const lost = [];
+  for (let x = 1; x <= 8; x++)
+    for (let y = 1; y <= 8; y++)
+      for (let z = 1; z <= 8; z++) {
+        const o = [-x, -y, -z];
+        if (point.pick(o, [x, y, z]) === null) lost.push(`point ${o}`);
+        if (corner.pick(o, [x, y, z])?.index !== 0) lost.push(`corner ${o}`);
+        const hit = point.pick(o, [x, y, z]);
+        if (hit) assert.ok(Math.abs(hit.distance - Math.hypot(x, y, z)) < 1e-9, `distance ${o}`);
+      }
+  assert.deepEqual(lost, []);
+  // Clear misses stay misses: a ray a hair of 1e-3 off the point, and one passing a unit box by a centimetre.
+  assert.equal(point.pick([-4, -4, -4 + 1e-3], [4, 4, 4]), null);
+  assert.equal(corner.pick([-1, 1.01, -1], [1, 0, 1]), null);
+});

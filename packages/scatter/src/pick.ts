@@ -267,7 +267,19 @@ export class InstancePicker {
       v[q + 6] * d[0] + v[q + 7] * d[1] + v[q + 8] * d[2],
     ];
     const b = this.#box;
+    // The three slab entry times of a point or corner hit round one step apart, so hit or miss is decided on the box
+    // grown by 8 machine epsilons of its farthest corner from the ray origin (as `Ray.intersectBox` in math); `tn`,
+    // the distance returned, stays the exact entry.
+    const pad =
+      8 *
+      Number.EPSILON *
+      Math.hypot(
+        Math.max(Math.abs(b[0] - lo[0]), Math.abs(b[3] - lo[0])),
+        Math.max(Math.abs(b[1] - lo[1]), Math.abs(b[4] - lo[1])),
+        Math.max(Math.abs(b[2] - lo[2]), Math.abs(b[5] - lo[2])),
+      );
     let tn = 0,
+      near = 0,
       tf = far;
     for (let k = 0; k < 3; k++) {
       if (ld[k] === 0) {
@@ -277,9 +289,11 @@ export class InstancePicker {
       let t0 = (b[k] - lo[k]) / ld[k],
         t1 = (b[k + 3] - lo[k]) / ld[k];
       if (t0 > t1) [t0, t1] = [t1, t0];
+      const slack = pad / Math.abs(ld[k]);
       if (t0 > tn) tn = t0;
-      if (t1 < tf) tf = t1;
-      if (tn > tf) return Infinity;
+      if (t0 - slack > near) near = t0 - slack;
+      if (t1 + slack < tf) tf = t1 + slack;
+      if (near > tf) return Infinity;
     }
     const tri = this.#tri;
     if (!tri) return tn;

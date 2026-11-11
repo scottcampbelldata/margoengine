@@ -1,15 +1,5 @@
 # Known bugs and unverified features
 
-### Scatter picking can lose a ray through an instance box corner (Rust finding R6, 2026-11-10, open)
-
-- **Repro:** the point-box rays of `packages/math/test/ray-box.test.js` (from (-x, -y, -z) toward the origin for whole
-  x, y, z from 1 to 8) against a scatter instance whose local box is a point or whose corner sits on the ray.
-- **Cause:** `packages/scatter/src/pick.ts` `#hit` runs its own slab test with no rounding allowance, the defect
-  `Ray.intersectBox` and `OBB.intersectRay` had; without triangles it returns the box hit itself, with triangles it
-  prunes before the triangle test. `voxel-edit/src/sparse.ts` `rayBox` is half open by design (voxel cells) and
-  `netcode/src/hitboxes.ts` uses `OBB.intersectRay`, which is fixed.
-- **Fix to build:** decide hit or miss on the box grown by 8 machine epsilons of its farthest corner, as math does.
-
 ### Terrain clipmaps and the virtual texture do not follow a FloatingOrigin (Rust finding U6, 2026-11-10, open)
 
 - **Repro:** attach `FloatingOrigin` (`@margoengine/cameras/origin`) to an engine with a `Terrain` whose `origin` is
