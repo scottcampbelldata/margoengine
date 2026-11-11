@@ -64,12 +64,16 @@ export function scan(buffer) {
 
 const allowed = (file) => LIST.allow.some((a) => a.path === file) || file === 'scripts/banned-terms.json';
 
-/** Scans every tracked file; returns `path:line: banned term <id>` messages. */
-export function scanRepo() {
-  const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, maxBuffer: 1 << 28 })
+const tracked = () =>
+  execFileSync('git', ['ls-files', '-z'], { cwd: root, maxBuffer: 1 << 28 })
     .toString()
     .split('\0')
     .filter(Boolean);
+
+/**
+ * Scans `files` (every tracked file by default), read through `read`; returns `path:line: banned term <id>` messages.
+ */
+export function scanRepo(read = (path) => readFileSync(path), files = tracked()) {
   const out = [];
   for (const file of files) {
     for (const id of new Set(hitsInPath(file)))
@@ -79,8 +83,12 @@ export function scanRepo() {
     if (termsAllowed && pathsAllowed) continue;
     let data;
     try {
-      data = readFileSync(resolve(root, file));
-    } catch {
+      data = read(resolve(root, file));
+    } catch (error) {
+      // A tracked file deleted in the working tree has nothing to scan. Any other read failure (a file another process
+      // holds open mid-write, EBUSY or EPERM on Windows) would skip a file unscanned, so it fails, naming the reason.
+      if (error?.code === 'ENOENT') continue;
+      out.push(`${file}: could not be read (${error?.code ?? error}); rerun once the process writing it has finished`);
       continue;
     }
     if (file.endsWith('.pdf')) {
@@ -104,11 +112,30 @@ export function scanRepo() {
   return out;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const problems = scanRepo();
-  if (problems.length) {
-    console.error(problems.join('\n'));
-    process.exit(1);
+/**
+ * Runs the check and returns its exit code. Every failure names its reason on both streams (KB-BT1: a gate once saw
+ * exit 1 and nothing else): the problems on stderr with a summary line on stdout and stderr, or the error that stopped
+ * the scan (git ls-files failing on a locked index, say). The exit code is set, never `process.exit`, so nothing
+ * written is cut off.
+ */
+export function main({ scanAll = scanRepo, log = console.log, error = console.error } = {}) {
+  let problems;
+  try {
+    problems = scanAll();
+  } catch (failure) {
+    const reason = `check:banned-terms could not finish the scan: ${failure?.stack ?? failure}`;
+    error(reason);
+    log(reason.split('\n')[0]);
+    return 1;
   }
-  console.log('banned terms: none in tracked files');
+  if (problems.length) {
+    const summary = `check:banned-terms: ${problems.length} problem(s) in tracked files`;
+    error(`${problems.join('\n')}\n${summary}`);
+    log(`${summary}; the list is on stderr`);
+    return 1;
+  }
+  log('banned terms: none in tracked files');
+  return 0;
 }
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main();

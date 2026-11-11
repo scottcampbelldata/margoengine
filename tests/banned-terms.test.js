@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { deflateSync } from 'node:zlib';
-import { hitsInLine, hitsInPath, scan, scanRepo } from '../scripts/check-banned-terms.mjs';
+import { hitsInLine, hitsInPath, main, scan, scanRepo } from '../scripts/check-banned-terms.mjs';
 import { pdfText } from '../scripts/pdf-text.mjs';
 
 const word = (...codes) => String.fromCharCode(...codes);
@@ -132,4 +132,39 @@ test('the name of the block game is reported alone, possessive, and inside a hyp
     assert.notDeepEqual(hitsInLine(`a line with ${text} in it`), [], text);
   assert.deepEqual(hitsInLine('a block-world game, a voxel-like grid, a mine-cart and a craft-fair'), []);
   assert.notDeepEqual(hitsInPath(`packages/voxel/${game}-notes.md`), []);
+});
+
+// KB-BT1 (2026-11-11): an L3b gate saw `check:banned-terms` exit 1 with no output, then pass on a rerun. Problems went
+// to stderr only, an error that stopped the scan had no line of the check's own, and a tracked file that could not be
+// read (another process writing it) was skipped unscanned. Every non-zero exit now names its reason on both streams.
+test('every failure of the check names its reason on stdout and stderr; an unreadable file fails, a deleted one is skipped', () => {
+  const run = (scanAll) => {
+    const log = [], error = [];
+    const code = main({ scanAll, log: (line) => log.push(line), error: (line) => error.push(line) });
+    return { code, log: log.join('\n'), error: error.join('\n') };
+  };
+  const clean = run(() => []);
+  assert.deepEqual([clean.code, clean.error], [0, '']);
+  assert.match(clean.log, /none in tracked files/);
+  const hits = run(() => ['a.md:3: banned term 0123; remove it']);
+  assert.equal(hits.code, 1);
+  assert.match(hits.error, /a\.md:3: banned term 0123/);
+  assert.match(hits.log, /1 problem\(s\)/);
+  const stopped = run(() => {
+    throw Object.assign(new Error('git ls-files: index.lock exists'), { code: 'EGIT' });
+  });
+  assert.equal(stopped.code, 1);
+  assert.match(stopped.log, /could not finish the scan: Error: git ls-files: index\.lock exists/);
+  assert.match(stopped.error, /could not finish the scan/);
+  const busy = Object.assign(new Error('resource busy or locked'), { code: 'EBUSY' }),
+    gone = Object.assign(new Error('no such file'), { code: 'ENOENT' });
+  const found = scanRepo(
+    (path) => {
+      if (/README\.md$/.test(path)) throw busy;
+      if (/LICENSE$/.test(path)) throw gone;
+      return readFileSync(path);
+    },
+    ['README.md', 'LICENSE', 'AGENTS.md'],
+  );
+  assert.deepEqual(found, ['README.md: could not be read (EBUSY); rerun once the process writing it has finished']);
 });
