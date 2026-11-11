@@ -22,6 +22,15 @@ supersampled reference is under 1/64 from 4 to 400 px, rotated and zoomed (worst
 to a mean of about 0.001. Proof: `packages/text/tests/vector.test.js` and `packages/text/scripts/test-vector-browser.js`.
 Missing: frame times (speed phase) and a run on a laptop iGPU.
 
+### Section 5 evidence: one allocation failed per restore (2026-11-11)
+
+`scripts/restore-fault-sweep.mjs` (Rust engine port R18) records every createBuffer, createTexture and mapAsync of a
+device restore with core meshes, culling, lod, shadows and environment attached, then fails each one in turn with
+`tests/support/gpu-faults.js` and follows it with a clean restore. RTX A6000, Edge 157: 40 calls on native WebGPU and
+42 on the WebGL2 layer, each failure reported, and after the clean restore 28 buffers, 7 (native) or 9 (layer)
+textures and the same picture every time. A failure in core, shadows or culling still stops the engine until that
+restore (docs/known-bugs.md, open). Standalone, run by hand in a shared GPU slot. Missing: gltf-pro models, other GPUs.
+
 ### Section 5 evidence: alpha-tested mip coverage (2026-11-10)
 
 `packages/shared/alpha-mips.js` builds the mips of `MASK` base colour maps (gltf-pro, gltf/textured) on the GPU: an

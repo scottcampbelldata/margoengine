@@ -4,6 +4,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import type { Environment } from './environment.js';
+import { reportRestore } from './restore-report.js';
 import type { RGBA8Image } from './ultrahdr.js';
 import { backgroundShader, imageBackground as imageBackgroundShader } from './shaders.js';
 import { invertMatrix } from '@margoengine/math/mat4';
@@ -144,7 +145,7 @@ export class EnvironmentBackground {
     this.engine = engine;
     const device = engineRuntime(engine).gpu;
     if (device && this.environment.device !== device && !this.environment.disposed)
-      this.environment.restore(device).catch((error) => engine.onError(error));
+      this.environment.restore(device).catch((error) => reportRestore(engine, error));
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -159,7 +160,7 @@ export class EnvironmentBackground {
     this.releaseState();
     const device = engineRuntime(engine).gpu;
     if (device && this.environment.device !== device && !this.environment.disposed)
-      this.environment.restore(device).catch((error) => engine.onError(error));
+      this.environment.restore(device).catch((error) => reportRestore(engine, error));
   }
   dispose(): void {
     if (this.disposed) return;

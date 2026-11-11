@@ -7,6 +7,7 @@ import { lightingScale, sanitizeLighting, toHalfLighting } from './half.js';
 import { evaluateSH } from './sh.js';
 import * as wgsl from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
+import { lostRebuild, reportRestore } from './restore-report.js';
 
 declare const GPUBufferUsage: {
   MAP_READ: number;
@@ -150,6 +151,15 @@ const isCube = (source: EnvironmentSource): source is CubeFaces => 'faces' in so
 const isTexture = (source: EnvironmentSource): source is CubeTextureSource => 'texture' in source;
 const isDevice = (target: GPUDevice | EngineKernel): target is GPUDevice =>
   typeof (target as GPUDevice).createTexture === 'function';
+
+/** Devices whose lost promise has settled, among those an environment rebuilt on. */
+const lostDevices = new WeakSet<GPUDevice>(),
+  watched = new WeakSet<GPUDevice>();
+function watchLost(device: GPUDevice): void {
+  if (watched.has(device)) return;
+  watched.add(device);
+  device.lost?.then(() => lostDevices.add(device));
+}
 
 function deviceOf(target: GPUDevice | EngineKernel): GPUDevice {
   if (isDevice(target)) return target;
@@ -894,11 +904,15 @@ export class Environment implements EnginePlugin {
         this.writeParams();
         for (const listener of this.listeners) listener(this);
       },
-      (error) => {
+      async (error) => {
         if (this.restoring?.promise === promise) this.restoring = undefined;
-        throw error;
+        // A device lost during the rebuild rejects its readback. On a lost device the queue's work counts as done at
+        // the loss, so once it is, the lost promise has settled too.
+        await device.queue.onSubmittedWorkDone?.();
+        throw lostDevices.has(device) ? lostRebuild() : error;
       },
     );
+    watchLost(device);
     this.restoring = { device, promise };
     return promise;
   }
@@ -951,11 +965,11 @@ export class Environment implements EnginePlugin {
         'Environment requires the WebGPU backend; use an engine on the WebGPU backend',
       );
     this.engine = engineRuntime(engine);
-    if (device !== this.resources?.device) this.restore(device).catch((error) => engine.onError(error));
+    if (device !== this.resources?.device) this.restore(device).catch((error) => reportRestore(engine, error));
   }
   onDeviceRestored(engine: EngineKernel): void {
     const device = engineRuntime(engine).gpu;
-    if (device && !this.disposed) this.restore(device).catch((error) => engine.onError(error));
+    if (device && !this.disposed) this.restore(device).catch((error) => reportRestore(engine, error));
   }
   /** Destroys all GPU resources. Also called by `engine.removePlugin` and `engine.dispose`. */
   dispose(): void {

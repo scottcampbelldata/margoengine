@@ -16,6 +16,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Environment } from './environment.js';
+import { reportRestore } from './restore-report.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { IBL_BINDING, ShaderEffect, type LightingTarget, type PBRHooks } from './lighting.js';
 import { HEMISPHERE_TERM } from './hemisphere.js';
@@ -1038,7 +1039,7 @@ export class LightProbes extends ShaderEffect {
     if (device && !this.disposed) {
       this.allocate(device);
       if (this.environment && this.environment.device !== device)
-        this.environment.restore(device).catch((error) => engine.onError(error));
+        this.environment.restore(device).catch((error) => reportRestore(engine, error));
     }
   }
   private allocate(device: GPUDevice): void {

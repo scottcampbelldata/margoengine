@@ -5,12 +5,14 @@
 // How each failure looks (WebGPU specification, "Errors & Debugging" and GPUBuffer.mapAsync):
 // - createBuffer and createTexture do not throw. They return an object that cannot be used and raise a
 //   GPUOutOfMemoryError (or a GPUValidationError with `error: 'validation'`) in the innermost error scope whose filter
-//   matches; with no such scope the device fires `uncapturederror`. The returned object here is the real one, destroyed
+//   matches; with no such scope the device fires `uncapturederror` in a later task. The returned object here is the real one, destroyed
 //   at once, so using it is a real validation error and mapping it rejects.
 // - createBuffer with mappedAtCreation: true throws a RangeError when the allocation fails, as the specification says.
 // - mapAsync rejects with an OperationError DOMException and the buffer stays unmapped.
 //
-// Calls are counted from installation, 1-based, per method; mapAsync counts calls on buffers created after it. The
+// Calls are counted from installation, 1-based, per method; mapAsync counts calls on buffers created after it. With
+// `select`, only the calls it answers true for are counted, so a plan can name "the second texture shadows makes"
+// however the calls of other code interleave with it (an asynchronous rebuild, a lazily made target). The
 // device's own methods are shadowed on the instance (the prototype is not touched), so other devices are unaffected.
 // No imports and no Node APIs: browser test pages import this file, and tests/gpu-faults.test.js runs it on a mock.
 //
@@ -50,13 +52,16 @@ function uncaptured(error) {
 /**
  * Makes the listed calls of `device` fail. `plan` maps createBuffer, createTexture and mapAsync to a call number or a
  * list of them; `error` is the error-scope filter the allocation failures raise ('out-of-memory', the default, or
- * 'validation'). Returns a handle with `calls` (counts per method), `injected` (one record per failure) and
+ * 'validation'); `select(method, descriptor, buffer)` (optional) picks the calls that count, where `buffer` is the
+ * buffer a mapAsync maps. Returns a handle with `calls` (counts per method), `injected` (one record per failure) and
  * `restore()`, also run by `using` through Symbol.dispose.
  */
 export function injectGPUFaults(device, plan = {}) {
   for (const key of Object.keys(plan))
-    if (key !== 'error' && !METHODS.includes(key)) throw new RangeError(`Unknown fault target ${key}`);
-  const filter = plan.error ?? 'out-of-memory';
+    if (key !== 'error' && key !== 'select' && !METHODS.includes(key)) throw new RangeError(`Unknown fault target ${key}`);
+  const filter = plan.error ?? 'out-of-memory',
+    select = plan.select ?? (() => true);
+  if (typeof select !== 'function') throw new TypeError('select must be a function (method, descriptor, buffer)');
   if (!(filter in FILTERS)) throw new RangeError(`Unknown error filter ${filter}: use 'out-of-memory' or 'validation'`);
   const failing = Object.fromEntries(METHODS.map((method) => [method, calls(plan[method], method)])),
     handle = { calls: { createBuffer: 0, createTexture: 0, mapAsync: 0 }, injected: [] },
@@ -83,7 +88,9 @@ export function injectGPUFaults(device, plan = {}) {
         scopes[i].errors.push(error);
         return;
       }
-    device.dispatchEvent(uncaptured(error));
+    // A device fires uncapturederror in a task of its own (WebGPU, "dispatch error"), never inside the call that
+    // failed: code that adds its listener right after its first allocations still hears of them.
+    setTimeout(() => device.dispatchEvent(uncaptured(error)), 0);
   };
 
   const push = device.pushErrorScope,
@@ -100,9 +107,10 @@ export function injectGPUFaults(device, plan = {}) {
     return real ?? scope?.errors[0] ?? null;
   });
 
-  const wrapMap = (buffer) => {
+  const wrapMap = (buffer, descriptor) => {
     const map = buffer.mapAsync;
     shadow(buffer, 'mapAsync', function (...args) {
+      if (!select('mapAsync', descriptor, this)) return map.apply(this, args);
       handle.calls.mapAsync++;
       if (!failing.mapAsync.has(handle.calls.mapAsync)) return map.apply(this, args);
       const error = new DOMException(`Injected mapAsync failure (call ${handle.calls.mapAsync})`, 'OperationError');
@@ -114,6 +122,11 @@ export function injectGPUFaults(device, plan = {}) {
   for (const method of ['createBuffer', 'createTexture']) {
     const create = device[method];
     shadow(device, method, function (descriptor) {
+      if (!select(method, descriptor)) {
+        const resource = create.call(this, descriptor);
+        if (method === 'createBuffer') wrapMap(resource, descriptor);
+        return resource;
+      }
       handle.calls[method]++;
       const fail = failing[method].has(handle.calls[method]);
       if (fail && method === 'createBuffer' && descriptor?.mappedAtCreation) {
@@ -129,7 +142,7 @@ export function injectGPUFaults(device, plan = {}) {
         const error = gpuError(filter, `Injected ${method} failure (call ${handle.calls[method]})`);
         record(method, descriptor?.label, error);
         raise(error);
-      } else if (method === 'createBuffer') wrapMap(resource);
+      } else if (method === 'createBuffer') wrapMap(resource, descriptor);
       return resource;
     });
   }

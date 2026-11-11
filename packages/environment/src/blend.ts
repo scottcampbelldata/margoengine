@@ -7,6 +7,7 @@ import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Environment, EnvironmentOptions } from './environment.js';
+import { reportRestore } from './restore-report.js';
 import { evaluateSH, shBasis } from './sh.js';
 import { common } from './shader-common.js';
 
@@ -363,7 +364,7 @@ export class EnvironmentBlend implements EnginePlugin {
     if (!device || this.disposed) return;
     Promise.all([this.fromValue.restore(device), this.toValue.restore(device), this.environment.restore(device)]).then(
       () => this.restored(),
-      (error) => engine.onError(error),
+      (error) => reportRestore(engine, error),
     );
   }
   /** Disposes the blended environment and the blend's GPU state; the two sources stay with their owner. */

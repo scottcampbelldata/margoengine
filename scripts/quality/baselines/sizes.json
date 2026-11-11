@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15063798,
+  "total": 15064600,
   "history": [
     {
       "date": "2026-10-24",
@@ -8429,6 +8429,12 @@
       "commit": "0a562e5bb1",
       "reason": "water/liquid whitewater (Ihmsen et al. 2012): eager entry 7,965 to 8,941 B gzip (whitewater option validation, readWhitewater, the composite's whitewater layer); the GPU step loads as its own 7,248 B lazy chunk only when options.whitewater is set: seven render-pass programs (bucket grid, normals, potentials, count pyramid, ring head, pool step, sprites), WGSL text that a split would only duplicate",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "f9971708a9",
+      "reason": "environment/blend 4687 to 4743 B: restore failures are reported once and a rebuild on a lost device is skipped (src/restore-report.ts, shared by five plugins); a lazy chunk for 56 B would cost a request. culling/sort 14464 to 14518 B came with 64fe5a31be, whose record was not updated",
+      "grew": 2
     }
   ],
   "items": {
@@ -8652,7 +8658,7 @@
     "@margoengine/culling/models": 9657,
     "@margoengine/culling/parts": 14606,
     "@margoengine/culling/shadows": 20912,
-    "@margoengine/culling/sort": 14464,
+    "@margoengine/culling/sort": 14954,
     "@margoengine/culling/webgl2": 3284,
     "@margoengine/cutscene": 7115,
     "@margoengine/cutscene/curve-editor": 3793,
@@ -8717,7 +8723,7 @@
     "@margoengine/ecs/serialize": 4260,
     "@margoengine/environment": 32706,
     "@margoengine/environment dist/workers/exr-codecs.js": 1835,
-    "@margoengine/environment/blend": 4687,
+    "@margoengine/environment/blend": 4999,
     "@margoengine/environment/cube-camera": 5882,
     "@margoengine/environment/exr-codecs": 1729,
     "@margoengine/environment/exr-tiled": 8112,

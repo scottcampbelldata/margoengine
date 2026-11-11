@@ -6,6 +6,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph } from '@margoengine/core/extension';
 import { Environment, type EnvironmentOptions, type EnvironmentSource } from './environment.js';
+import { reportRestore } from './restore-report.js';
 import type { UltraHDROptions } from './ultrahdr.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { linearColor, type ColorInput } from './color.js';
@@ -270,7 +271,7 @@ export class EnvironmentLighting extends ShaderEffect {
     const device = engineRuntime(engine).gpu,
       environment = this.environment;
     if (device && environment.device !== device && !environment.disposed)
-      environment.restore(device).catch((error) => engine.onError(error));
+      environment.restore(device).catch((error) => reportRestore(engine, error));
   }
 }
 

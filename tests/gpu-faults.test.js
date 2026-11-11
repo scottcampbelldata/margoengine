@@ -80,10 +80,12 @@ test('createTexture fails as a validation error when asked; with no scope the de
   using faults = injectGPUFaults(device, { createTexture: [1, 3], error: 'validation' });
   const a = device.createTexture({ label: 'a' }),
     b = device.createTexture({ label: 'b' });
+  assert.deepEqual(seen, [], 'uncapturederror fires in a later task, as a device fires it');
   device.pushErrorScope('validation');
   device.createTexture({ label: 'c' });
   const caught = await device.popErrorScope();
   assert.equal(caught.name, 'GPUValidationError');
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(
     seen.map((error) => error.name),
     ['GPUValidationError'],
@@ -151,4 +153,30 @@ test('a bad plan is refused before anything is patched', () => {
   assert.throws(() => injectGPUFaults(device, { createSampler: 1 }), /Unknown fault target/);
   assert.throws(() => injectGPUFaults(device, { error: 'internal' }), /Unknown error filter/);
   assert.equal(Object.hasOwn(device, 'createBuffer'), false);
+});
+
+test('select counts only the calls it picks, so other code interleaving its calls moves nothing', async () => {
+  const device = new MockDevice();
+  using faults = injectGPUFaults(device, {
+    createTexture: 2,
+    mapAsync: 1,
+    select: (method, descriptor) => descriptor?.label?.startsWith('shadow'),
+  });
+  device.pushErrorScope('out-of-memory');
+  const made = ['other', 'shadow a', 'other', 'other', 'shadow b', 'shadow c'].map((label) => device.createTexture({ label }));
+  const error = await device.popErrorScope();
+  assert.match(error.message, /Injected createTexture failure \(call 2\)/);
+  assert.deepEqual(
+    made.map((t) => t.destroyed),
+    [false, false, false, false, true, false],
+    'the second shadow texture fails, whatever came between',
+  );
+  assert.deepEqual(faults.calls, { createBuffer: 0, createTexture: 3, mapAsync: 0 });
+  const other = device.createBuffer({ label: 'other', size: 4 }),
+    picked = device.createBuffer({ label: 'shadow readback', size: 4 });
+  await other.mapAsync();
+  assert.equal(other.mapped, true, 'a map of a buffer select refuses is not counted');
+  await assert.rejects(picked.mapAsync(), { name: 'OperationError' });
+  assert.equal(faults.calls.mapAsync, 1);
+  assert.throws(() => injectGPUFaults(device, { select: 'shadow' }), TypeError);
 });
