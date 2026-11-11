@@ -12,6 +12,12 @@
    "status": "same",
    "exact": true
   },
+  "boulder": {
+   "status": "differs",
+   "over2": 0.0102,
+   "mean": 0.137,
+   "exact": true
+  },
   "character-animation": {
    "status": "same",
    "exact": true

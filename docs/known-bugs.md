@@ -2324,7 +2324,25 @@ Fixed by eef03d501 (2026-11-09). Both killed-at-limit Node programs and unfinish
 - **Regression:** tests/boulder-robot.test.js ("the copper piston shafts, washers and joints stay outside the enamel arm
   shells"): 280 crossings on the old file, 0 now.
 
-### Boulder draws differently on the WebGL2 layer, and visual:compat has no entry for it
+### Closed 2026-11-11: KB1926, boulder on the WebGL2 layer is the accepted per-sample MSAA difference
+
+- **Cause:** SSAO. Its extractor reads the post stack's 1x depth, which `SceneTarget.copyDepth`
+  (packages/shared/msaa.js) makes from the nearest of the 4 samples natively; WebGL2 cannot read one sample, so the
+  layer reads the blit-resolved sample, and SSAO's range check turns that depth step into occlusion on hold, bolt hole
+  and robot edges. Proof, one change each on the high tier: SSAO off, 1x MSAA, or a native depth copy that keeps sample 0
+  all give 0.000% of pixels with d > 2 (max d 5); Bloom off, PCF shadows or no light probe leave 1.02%. This is the
+  accepted difference of 2026-10-31 (docs/webgl2-compat-demos.md, "Accepted difference: per-sample reads of
+  multisampled textures"), now with a boulder row; nothing in Margo samples wrongly.
+- **Recorded:** `npm run visual:compat -- --only=boulder --write`: differs, d > 2 on 1.02%, mean 0.137, max 66, native
+  exact. The gate fails the demo if it gets worse than 1.5 times that. Pin: tests/visual-compat-status.test.js ("boulder is
+  recorded as the per-sample MSAA difference").
+- **KB-RM3, the same failure:** local CI's full run of 2026-11-11 15:00 (097cf04ab4) failed `visual:compat` on boulder with
+  "not in visual-compat-expected.json" at 1.78% (mean 0.473, max 79), the numbers of 2026-11-07. The boulder model
+  change 3f258cf9da (KB1914) landed after that run, so it did not cause it. The share fell to 1.02% with bc82057e40
+  (KB1900, SSAO reads full-precision view depth), also after that run; the layer before and after KB0477 measures 1.02%.
+
+Earlier record:
+
 
 - **What:** `npm run visual:compat` fails on `boulder`: the WebGL2 capture differs from the native WebGPU one on 1.78%
   of pixels by more than 2 of 255 (mean 0.473, max 79), while two native captures are identical. The differences are

@@ -113,3 +113,19 @@ test('the demos table round-trips, and each step rewrites only its own columns',
   assert.match(framed, /\| `a` \| high \| runs, same pixels \| exact \| 1\.0 ms \/ 2\.0 ms; 16\.7 ms \/ 16\.7 ms \|/);
   assert.match(framed, /^Last recorded 2026-10-30 at abc/m);
 });
+
+test('boulder is recorded as the per-sample MSAA difference (KB1926) and fails the gate if it gets worse', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const expected = JSON.parse(await readFile(new URL('../scripts/support/visual-compat-expected.json', import.meta.url), 'utf8'));
+  const want = expected.demos.boulder;
+  assert.deepEqual(want, { status: 'differs', over2: 0.0102, mean: 0.137, exact: true });
+  const noise = m(0, 0, 0);
+  // The run that recorded it passes; one past 1.5 times the share (plus 0.001) fails.
+  assert.deepEqual(gateProblems({ status: 'differs', diff: m(0.0102, 0.137, 66), noise }, want), []);
+  assert.notDeepEqual(gateProblems({ status: 'differs', diff: m(0.0165, 0.137, 66), noise }, want), []);
+  // The cause and its like-for-like 1x MSAA row are written down with the accepted per-sample difference.
+  const doc = await readFile(new URL('../docs/webgl2-compat-demos.md', import.meta.url), 'utf8');
+  const section = doc.slice(doc.indexOf('## Accepted difference: per-sample reads of multisampled textures'));
+  assert.match(section, /\| `boulder` \(2026-11-11, Edge 157\) \| 1\.02% \| 0\.000%, 5 \|/);
+  assert.match(section, /`boulder` \(KB1926[^]*SSAO alone/);
+});
