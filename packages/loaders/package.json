@@ -27,6 +27,7 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --experimental-test-module-mocks --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:gpu": "cd ../.. && node packages/loaders/tests/split-scale-check.mjs",
     "test:render:browser": "npm run build && node scripts/test-render-browser.mjs",
     "test:real-files": "npm run build && node scripts/test-real-files.mjs",
     "test:real-files:runtimes": "node scripts/fetch-real-files-runtimes.mjs",
