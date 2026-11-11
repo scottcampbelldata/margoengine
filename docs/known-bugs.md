@@ -1,14 +1,13 @@
 # Known bugs and unverified features
 
 
-### A 10M-triangle Draco scan decodes past @margoengine/decoders' 256 MiB output cap (found 2026-11-11, open)
+### compressDraco cannot encode a 10M-triangle mesh with normals and UVs (found 2026-11-11, open)
 
-- **Repro:** a Draco glTF primitive of 5,000,000 vertices (position, normal, uv) and 10,000,000 triangles decodes to
-  about 280 MB; gltf-pro passes its 2 GiB decoded budget, but `validatedDracoLimits` in `packages/decoders/src/protocol.ts`
-  caps `maxDecodedBytes` at 256 MiB and the native crate's workspace at 256 MiB, so the decode is refused.
-- **Cause:** the decoders' ceiling predates parts; gltf-pro took at most 1,000,000 Draco vertices until 2026-11-11.
-- **Fix to build:** raise the decoders' output and workspace ceilings to what wasm32 memory allows for one decode
-  (measured), with a test at 10M triangles; gltf-pro already passes the right limits.
+- **Repro:** `encodeNativeMesh` in `packages/exporters/src/draco-native-encode.ts` with a 5,004,169-vertex,
+  9,999,392-triangle grid carrying float positions, normals and UVs: its packed input is 280 MB.
+- **Cause:** the encoder refuses packed input over 256 MiB (`Draco encoder input exceeds 256 MiB`); the decoders read
+  up to 384 MiB of output since 2026-11-11, so files at that size decode but cannot be re-encoded here.
+- **Fix to build:** size the encoder's input ceiling from its measured peak memory as the decoders' was.
 
 ### gltf-pro extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
 

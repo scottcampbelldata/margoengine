@@ -593,8 +593,12 @@ test('Draco preflights every count, width and combined output budget before allo
       /component type/,
     ],
     [
-      { kind: 2, points: 1_048_576, attributes: { POSITION: 16, A: 16, B: 16, C: 16, D: 16 } },
-      { attributeIds: { POSITION: 0, A: 1, B: 2, C: 3, D: 4 }, limits: { maxDecodedBytes: Number.MAX_SAFE_INTEGER } },
+      // 7 x 16 floats x 1,048,576 points = 448 MiB, over the 384 MiB ceiling that no caller limit raises.
+      { kind: 2, points: 1_048_576, attributes: { POSITION: 16, A: 16, B: 16, C: 16, D: 16, E: 16, F: 16 } },
+      {
+        attributeIds: { POSITION: 0, A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 },
+        limits: { maxDecodedBytes: Number.MAX_SAFE_INTEGER },
+      },
       /byte/,
     ],
   ];

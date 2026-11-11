@@ -67,14 +67,21 @@ export interface DracoDecodeLimits {
   maxVertices?: number;
   /** Maximum triangle indices; zero permits only point clouds. */
   maxIndices?: number;
-  /** Combined bytes of every requested output attribute and the indices. Cannot raise the 256 MiB ceiling. */
+  /** Combined bytes of every requested output attribute and the indices. Cannot raise the 384 MiB ceiling. */
   maxDecodedBytes?: number;
   /** Required component widths for requested attributes, such as the glTF accessor widths. */
   attributeWidths?: Record<string, number>;
 }
 
+/**
+ * Bytes one Draco decode may output, indices and attributes together: 384 MiB (402,653,184), the most whose measured
+ * peak Wasm memory stays within 90% of the prebuilt module's 2 GiB (tests/draco-output-limit.test.js). A 10M-triangle
+ * scan with normals and UVs decodes to about 280 MB.
+ */
+export const DRACO_OUTPUT_LIMIT = 402_653_184;
+
 const dracoVertexLimit = 16_777_216,
-  dracoByteLimit = 256 * 1024 * 1024;
+  dracoIndexLimit = 134_217_728;
 
 /** Validate before copying or transferring input; repeat in the worker before touching Draco. */
 export function validatedDracoLimits(
@@ -94,8 +101,8 @@ export function validatedDracoLimits(
     return Math.min(value, ceiling);
   };
   const maxVertices = maximum('maxVertices', dracoVertexLimit, 1),
-    maxIndices = maximum('maxIndices', dracoByteLimit / 2, 0),
-    maxDecodedBytes = maximum('maxDecodedBytes', dracoByteLimit, 1);
+    maxIndices = maximum('maxIndices', dracoIndexLimit, 0),
+    maxDecodedBytes = maximum('maxDecodedBytes', DRACO_OUTPUT_LIMIT, 1);
   let attributeWidths: Record<string, number> | undefined;
   if (limits?.attributeWidths !== undefined) {
     if (!limits.attributeWidths || typeof limits.attributeWidths !== 'object' || Array.isArray(limits.attributeWidths))

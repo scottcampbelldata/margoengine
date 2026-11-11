@@ -474,7 +474,10 @@ Limits are validated before copying/transferring the input and are enforced agai
 the worker. All requested attribute widths, the actual vertex/index counts and the
 combined output size must pass before any output `_malloc`, attribute extraction,
 or typed-array copy. Defaults cap vertices at 16,777,216 and combined output at
-256 MiB; caller limits may lower these ceilings. `attributeWidths` maps requested
+384 MiB (402,653,184 B); caller limits may lower these ceilings. 384 MiB is the most
+whose measured peak Wasm memory (up to 4.5 bytes per output byte) fits 90% of the
+prebuilt module's 2 GiB; a 10M-triangle scan with normals and UVs decodes to about
+280 MB in 1.7 s (`node scripts/draco-scale.mjs`). `attributeWidths` maps requested
 semantics to their expected component counts. Limits include final Float32 storage
 for named channels. Draco's internal Wasm geometry decode still allocates before
 its actual counts are available; these are output extraction limits, not a cap on
@@ -523,8 +526,8 @@ geometry.positions;
 Use the same Avocado `/mesh.drc` described above. `decoderPath`, when set, is a
 folder containing `draco-native.wasm`; unset uses the bundled asset. Other
 constructor defaults are four workers capped by hardware threads and the existing
-10 s plus 4 s/MiB timeout. Output limits retain their existing defaults; native
-workspace and input each have a separate 256 MiB ceiling. Source builds require
+10 s plus 4 s/MiB timeout. Output limits are the same 384 MiB; the native
+workspace (output and scratch together) has a 1.5 GiB ceiling and the input 256 MiB. Source builds require
 Cargo and the `wasm32-unknown-unknown` target; installed tarballs contain the asset.
 
 Warm performance parity remains open: the prior 1,937-input campaign has 365

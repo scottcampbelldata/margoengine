@@ -1,6 +1,6 @@
 // Owned-buffer bridge for the clean-room crate. No prebuilt codec is loaded here.
 import { decodeFailed, deviceUnsupported } from './errors.js';
-import { validatedDracoLimits } from './protocol.js';
+import { DRACO_OUTPUT_LIMIT, validatedDracoLimits } from './protocol.js';
 import type { DecodedDracoGeometry, DecodedDracoPoints, DracoRequest, DracoPointsRequest } from './protocol.js';
 
 interface NativeExports {
@@ -173,7 +173,7 @@ function native(module: NativeExports, bytes: Uint8Array, request: DracoRequest,
   try {
     new Uint8Array(module.memory.buffer, input, bytes.length).set(bytes);
     // The crate's workspace budget is separate from the requested output budget.
-    output = module.draco_decode(input, bytes.length, limits.maxVertices, limits.maxIndices, 256 * 1024 * 1024, flavor);
+    output = module.draco_decode(input, bytes.length, limits.maxVertices, limits.maxIndices, DRACO_OUTPUT_LIMIT, flavor);
     if (!output) throw decodeFailed('Draco: allocation failed; export a smaller mesh');
     const view = new DataView(module.memory.buffer);
     length = view.getUint32(output, true);

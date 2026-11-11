@@ -29,6 +29,15 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Bytes of output one decode may produce: 384 MiB, the most whose measured peak memory (up to 4.5 bytes per output
+/// byte, tests/draco-output-limit.test.js) stays within 90% of the 2 GiB prebuilt module, a 10M-triangle scan with
+/// normals and UVs (280 MB) included. Same value as DRACO_OUTPUT_LIMIT in src/protocol.ts.
+pub const OUTPUT_LIMIT: usize = 384 * 1024 * 1024;
+/// Bytes one decode may hold at once, output and scratch together: the measured 4.05x of the output, rounded up.
+pub const WORKSPACE_LIMIT: usize = 4 * OUTPUT_LIMIT;
+/// Loop steps one decode may take: one per output byte, as at the old 256 MiB ceiling.
+pub const WORK_LIMIT: usize = OUTPUT_LIMIT;
+
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
     pub vertices: usize,
@@ -40,7 +49,7 @@ impl Default for Limits {
         Self {
             vertices: 16_777_216,
             indices: 134_217_728,
-            bytes: 256 * 1024 * 1024,
+            bytes: OUTPUT_LIMIT,
         }
     }
 }
@@ -52,8 +61,8 @@ pub(crate) struct Budget {
 impl Budget {
     fn new(bytes: usize) -> Self {
         Self {
-            remaining: bytes.min(256 * 1024 * 1024),
-            work: 256 * 1024 * 1024,
+            remaining: bytes.min(WORKSPACE_LIMIT),
+            work: WORK_LIMIT,
         }
     }
     fn charge(&mut self, count: usize, width: usize) -> Result<usize> {

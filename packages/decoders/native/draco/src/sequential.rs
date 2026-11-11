@@ -135,7 +135,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     if flags & !32768 != 0 {
         return Err(Error::Invalid);
     }
-    let mut budget = Budget::new(256 * 1024 * 1024);
+    let mut budget = Budget::new(crate::WORKSPACE_LIMIT);
     let metadata = if flags & 32768 != 0 {
         Some(crate::Metadata::read(&mut c, &mut budget)?)
     } else {
@@ -316,7 +316,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                         .ok_or(Error::Overflow)?,
                 )
                 .ok_or(Error::Overflow)?;
-            if output_bytes > limits.bytes.min(256 * 1024 * 1024) {
+            if output_bytes > limits.bytes.min(crate::OUTPUT_LIMIT) {
                 return Err(Error::Limit);
             }
             if attr.encoding == 0 {
