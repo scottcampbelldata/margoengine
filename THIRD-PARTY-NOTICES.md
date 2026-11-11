@@ -15,7 +15,7 @@ Versions are the ones in `package-lock.json`; users get whatever their own lockf
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
-| `@dimforge/rapier2d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics2d, margoengine | Rapier 2D rigid-body solver; optional, the app installs and initializes it |
+| `@dimforge/rapier2d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics2d, margoengine | Rapier 2D rigid-body solver; optional: @margoengine/physics2d bundles Rapier 2D, and an app may pass its own through the rapier option |
 | `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/game, @margoengine/physics, margoengine | Rapier rigid-body solver; optional: @margoengine/physics bundles Rapier, and an app may pass its own through the rapier option |
 | `react` | 19.3.0 | MIT | optional peer | @margoengine/game, @margoengine/react, @margoengine/react-kit, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/react-kit, margoengine | React DOM root and portal rendering for scene and HTML components |
@@ -35,6 +35,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
 | @margoengine/sciviz | Standard colour-map tables: viridis, magma, inferno, plasma (Smith and van der Walt); cividis (Nuñez, Anderton and Renslow 2018) | CC0-1.0 (all five published data tables) | colormap shared dist chunk (src/tables.ts: data only, 256 colours per map) | published decimal values preserved as plain numeric RGB rows | NOTICE.md |
 | @margoengine/physics | Rapier 3D rigid-body solver (Dimforge) | Apache-2.0 | dist/rapier3d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled) | the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| @margoengine/physics2d | Rapier 2D rigid-body solver (Dimforge) | Apache-2.0 | dist/rapier2d.wasm, dist/rapier-solver-*.js (Rapier JavaScript, bundled) | the Wasm no; the JavaScript is minified, and its ES-module import of the Wasm resolves to an empty module so the package instantiates the file itself | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 
 ### Licence obligations and how they are met
 
@@ -124,7 +125,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/netcode` | none | none | LICENSE, NOTICE |
 | `@margoengine/oit` | none | none | LICENSE, NOTICE |
 | `@margoengine/physics` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer) | Rapier 3D rigid-body solver (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
-| `@margoengine/physics2d` | @dimforge/rapier2d-compat >=0.14.0 <1 (optional peer) | none | LICENSE, NOTICE |
+| `@margoengine/physics2d` | @dimforge/rapier2d-compat >=0.14.0 <1 (optional peer) | Rapier 2D rigid-body solver (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | `@margoengine/pixel` | none | none | LICENSE, NOTICE |
 | `@margoengine/points` | none | none | LICENSE, NOTICE |
 | `@margoengine/post` | none | Colour-transform references: AgX (attribution) | LICENSE, NOTICE, NOTICE.md |
@@ -277,8 +278,8 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 189 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 95, Apache-2.0 47, MPL-2.0 12, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-3-Clause 3, BSD-2-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
+`package-lock.json` holds 190 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 95, Apache-2.0 48, MPL-2.0 12, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-3-Clause 3, BSD-2-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3, webgpu@0.6.2. Deprecated: whatwg-encoding@3.1.1. `webgpu` is a development dependency only, for the Node proof of `@margoengine/headless`, and is never shipped; its
 install script only clears the macOS quarantine flag on its binary. `rhino3dm` and `laz-perf` are not in the lock: the opt-in
 `test:real-files:runtimes` tool of `@margoengine/loaders` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks

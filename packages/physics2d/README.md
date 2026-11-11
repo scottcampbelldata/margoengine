@@ -2,7 +2,7 @@
 
 Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/physics2d` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-2D rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule and polygon colliders, joints, scene queries, collision events, a character controller and tile map colliders in one call. Rapier is not bundled: you install `@dimforge/rapier2d-compat` (Apache-2.0) yourself and pass the initialized module in.
+2D rigid-body physics for Margo Engine on [Rapier](https://rapier.rs): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule and polygon colliders, joints, scene queries, collision events, a character controller and tile map colliders in one call. Rapier 2D (`@dimforge/rapier2d` 0.21.0, Apache-2.0) comes with this package, nothing else to install: its JavaScript in a lazy chunk and its WebAssembly as a file of its own, `dist/rapier2d.wasm`.
 
 World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to Rapier's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use Rapier's units.
 
@@ -37,9 +37,21 @@ physics.on('beforestep', dt => controller.move([60 * dt, 200 * dt]));
 
 It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interactionGroups` and `tileMapColliders`, the collider list `addTileMap` builds. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
 
+**One load per app.** `await Physics2D.load()` compiles the solver, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The solver is a dynamic import and its Wasm a separate file (`dist/rapier2d.wasm`, 2,404,467 bytes) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm, another Rapier version included, rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded. The `rapier` option still takes a Rapier 2D module you initialized yourself (`@dimforge/rapier2d-compat`, an optional peer).
+
+```ts
+import {Physics2D} from '@margoengine/physics2d';
+
+// The package's own copy found through Node's resolver; in a page, pass the URL your server or CDN serves it from.
+const wasm = new URL('rapier2d.wasm', import.meta.resolve('@margoengine/physics2d'));
+await Physics2D.load({wasm, signal: AbortSignal.timeout(30_000)});
+const physics = new Physics2D(null, {gravity: [0, 320]});
+physics.dispose();
+```
+
 Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional: `npm i @margoengine/physics2d @dimforge/rapier2d-compat`.
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier 2D is bundled (`dist/THIRD-PARTY-NOTICE.md` says what was taken, `dist/LICENSE-Apache-2.0.txt` holds its licence); `@dimforge/rapier2d-compat` is an optional peer, only for the `rapier` option.
 
 Build and unit tests: npm test --workspace @margoengine/physics2d
 

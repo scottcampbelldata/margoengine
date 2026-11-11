@@ -630,6 +630,14 @@ export const LAZY_FILES = [
     measure: 'file',
     when: '`await Physics.load()`, once per app, compiled while it downloads; its JavaScript is the lazy rapier-solver chunk of the entry',
   },
+  {
+    package: '@margoengine/physics2d',
+    file: 'packages/physics2d/dist/rapier2d.wasm',
+    label: 'rapier2d.wasm',
+    kind: 'Rapier 2D Wasm (@dimforge/rapier2d, bundled)',
+    measure: 'file',
+    when: '`await Physics2D.load()`, once per app, compiled while it downloads; its JavaScript is the lazy rapier-solver chunk of the entry',
+  },
 ];
 
 /**
@@ -675,6 +683,17 @@ export const LAZY_SPLITS = [
     source: 'packages/physics/src/rapier-solver.ts',
     baseLabel: 'everything the entry loads before <code>Physics.load()</code>',
     when: '`await Physics.load()`, once per app (import() in physics.ts); its Wasm, rapier3d.wasm, is a file of its own',
+  },
+  {
+    package: 'physics2d',
+    entry: '.',
+    specifier: '@margoengine/physics2d',
+    dist: 'packages/physics2d/dist/index.js',
+    chunk: /^rapier-solver-/,
+    lazyLabel: 'Rapier 2D solver JavaScript',
+    source: 'packages/physics2d/src/rapier-solver.ts',
+    baseLabel: 'everything the entry loads before <code>Physics2D.load()</code>',
+    when: '`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, rapier2d.wasm, is a file of its own',
   },
 ];
 

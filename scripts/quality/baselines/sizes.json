@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14906011,
+  "total": 14988613,
   "history": [
     {
       "date": "2026-10-24",
@@ -8345,6 +8345,12 @@
       "commit": "c58f6081ab",
       "reason": "splats: bounded gzip and deflate output (decompression-bomb cap), /lod 30687 to 30702 B gzip (+15 B), budget 31624 B; the bound lives in the shared inflate, a split would duplicate it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "88472aadea",
+      "reason": "physics2d bundles Rapier 2D 0.21.0: its JavaScript is the lazy rapier-solver chunk (36,005 B gzip, loaded by Physics2D.load()), its Wasm a file of its own; the base the app loads at start-up is 8,423 B (was 8,241 with the solver an app-installed peer)",
+      "grew": 3
     }
   ],
   "items": {
@@ -8716,7 +8722,7 @@
     "@margoengine/fsm/parallel": 2607,
     "@margoengine/fsm/scxml": 8017,
     "@margoengine/fsm/trace": 1863,
-    "@margoengine/game": 996,
+    "@margoengine/game": 946,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,
     "@margoengine/geometry/extras": 9302,
@@ -9016,12 +9022,14 @@
     "@margoengine/oit/peel": 3293,
     "@margoengine/oit/precise": 4033,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 61692,
+    "@margoengine/physics": 61380,
     "@margoengine/physics base (without Rapier solver JavaScript)": 20430,
     "@margoengine/physics lazy Rapier solver JavaScript": 41104,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/next": 188444,
-    "@margoengine/physics2d": 8390,
+    "@margoengine/physics2d": 45639,
+    "@margoengine/physics2d base (without Rapier 2D solver JavaScript)": 8679,
+    "@margoengine/physics2d lazy Rapier 2D solver JavaScript": 37086,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/crt": 4031,
@@ -9787,7 +9795,7 @@
     "leak @margoengine/usdz/compose -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
-    "margoengine/game": 996,
+    "margoengine/game": 946,
     "margoengine/viz": 800,
     "margoengine/web": 577
   }

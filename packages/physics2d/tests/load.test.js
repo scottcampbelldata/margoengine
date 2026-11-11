@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { Physics2D } from '../dist/index.js';
 
 test('Physics2D.load readies the solver, and a world then needs nothing else', async (t) => {
-  t.mock.method(console, 'warn', () => {}); // the solver's own notice about its init arguments
   assert.throws(() => new Physics2D(null), { name: 'MargoError', code: 'state', message: /await Physics2D\.load\(\)/ });
   await assert.rejects(Physics2D.load({ signal: AbortSignal.abort() }), { name: 'AbortError' });
   assert.throws(() => Physics2D.attach(null), { name: 'MargoError', code: 'state' }, 'an aborted call loads nothing');

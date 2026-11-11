@@ -56,7 +56,7 @@ install.
 
 | Package | Install | Why |
 | --- | --- | --- |
-| `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | The 2D solver; `await Physics2D.load()` readies it once per app (the 3D solver comes inside `margoengine/physics`, nothing to install) |
+| `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | Only to pass a Rapier 2D you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | Only to pass a Rapier you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 | `margoengine/ui/react` | `npm i react` | React bindings for the UI package |

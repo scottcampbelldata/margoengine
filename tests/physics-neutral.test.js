@@ -17,12 +17,14 @@ const GAME_PEER = /^\s*"@dimforge\/rapier3d-compat": (">=0\.14\.0 <1",|\{)\s*$/m
 const NAMED = [
   // The optional peers of the umbrella package, generated from the two physics packages.
   ['packages/margoengine/package.json', /@dimforge\/rapier[23]d-compat/i],
-  // What an app installs today for 2D, and the optional 3D peer kept for the `rapier` option (the bundled solver needs no install).
+  // The optional 2D and 3D peers kept for the `rapier` option (both bundled solvers need no install).
   ['packages/margoengine/README.md', /npm i @dimforge\/rapier[23]d-compat/],
   // Scott, 2026-11-10: the game kit keeps its optional Rapier peer. Only these two package.json entries, nowhere else in game.
   ['packages/game/package.json', GAME_PEER],
   // The guard that the root entry never pulls it in.
   ['packages/react/tests/subpaths.test.js', /rapier/i],
+  // The guard that the game kit root emits no Rapier Wasm and its physics subpath emits exactly rapier3d.wasm.
+  ['packages/game/tests/physics-entry.test.js', /rapier3d|Rapier's Wasm/],
   // Vite must see the lazy import before a scene mounts, or it reloads the running page.
   ['packages/react/tests/scene-browser.tsx', /@dimforge\/rapier3d-compat|Rapier/],
 ];

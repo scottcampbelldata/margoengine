@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
+import { interfaceHash } from '../../shared/rapier-wasm.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -19,16 +20,7 @@ const rapierDir = dirname(createRequire(import.meta.url).resolve('@dimforge/rapi
 const rapierGlue = resolve(rapierDir, 'rapier_wasm3d.js');
 const rapierVersion = JSON.parse(await readFile(resolve(rapierDir, 'package.json'), 'utf8')).version;
 // The same hash src/rapier-solver.ts takes of a Wasm it is given, so it can tell this build from any other.
-const rapierInterface = (() => {
-  const module = new WebAssembly.Module(readFileSync(resolve(rapierDir, 'rapier_wasm3d_bg.wasm')));
-  const text =
-    WebAssembly.Module.exports(module).map((entry) => `${entry.kind}:${entry.name}`).join(',') +
-    '|' +
-    WebAssembly.Module.imports(module).map((entry) => `${entry.kind}:${entry.module}:${entry.name}`).join(',');
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
-  return hash >>> 0;
-})();
+const rapierInterface = interfaceHash(new WebAssembly.Module(readFileSync(resolve(rapierDir, 'rapier_wasm3d_bg.wasm'))));
 const wasmStub = '\0rapier-wasm-stub';
 const rapierWasm = {
   name: 'rapier-wasm',

@@ -178,7 +178,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     timeScale: number;
     paused: boolean;
     stepCount: number;
-    static load({ signal }?: Physics2DLoadOptions): Promise<void>;
+    static load({ signal, wasm }?: Physics2DLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: Physics2DOptions): Physics2D;
     constructor(engine: EngineKernel | null, options?: Physics2DOptions);
     get world(): World2D;
@@ -221,6 +221,7 @@ export interface Physics2DEventMap {
 
 export interface Physics2DLoadOptions {
     signal?: AbortSignal;
+    wasm?: RapierWasmSource;
 }
 
 export interface Physics2DOptions {
@@ -279,6 +280,8 @@ export interface RapierModule2D {
         COLLISION_EVENTS: number;
     };
 }
+
+export type RapierWasmSource = string | URL | Response | ArrayBuffer | ArrayBufferView | WebAssembly.Module;
 
 export interface RaycastOptions2D extends QueryFilter2D {
     maxDistance?: number;

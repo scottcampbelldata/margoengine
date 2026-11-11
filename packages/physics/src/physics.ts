@@ -4,7 +4,7 @@ import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from '
 import { PhysicsCollider } from './collider.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
-import { wasmError } from '../../shared/errors.js';
+import { SharedLoad } from '../../shared/shared-load.js';
 import type { RapierWasmSource } from './rapier-solver.js';
 import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
@@ -175,52 +175,11 @@ function callListener(this: never, listener: (event: never) => void): void {
 }
 const identityRotation: Quat = [0, 0, 0, 1];
 
-// The solver `Physics.load` loaded, shared by every world of the app, and the load in flight. A load is cancelled when
-// every call waiting on it has been aborted; one call without a signal keeps it going.
-let solver: RapierModule | null = null;
-let loading: { promise: Promise<RapierModule>; controller: AbortController; waiting: number } | null = null;
-
-function startLoad(wasm: RapierWasmSource | undefined): NonNullable<typeof loading> {
-  const controller = new AbortController(),
-    promise = import('./rapier-solver.js')
-      .then((chunk) => chunk.startRapier(wasm ?? chunk.defaultWasm(), controller.signal))
-      .then(
-        (module) => (solver = module),
-        (error: unknown) => {
-          throw wasmError(error);
-        },
-      )
-      .finally(() => {
-        if (loading?.promise === promise) loading = null;
-      });
-  promise.catch(noop); // a cancelled load nobody waits on must not surface as an unhandled rejection
-  return { promise, controller, waiting: 0 };
-}
-
-async function loadSolver(wasm: RapierWasmSource | undefined, signal: AbortSignal | undefined): Promise<RapierModule> {
-  signal?.throwIfAborted();
-  if (solver) return solver;
-  const load = (loading ??= startLoad(wasm));
-  if (!signal) {
-    load.waiting = Infinity;
-    return load.promise;
-  }
-  load.waiting++;
-  let stop!: () => void;
-  const aborted = new Promise<never>((_, reject) => {
-    stop = () => {
-      if (--load.waiting === 0) load.controller.abort(signal.reason);
-      reject(signal.reason);
-    };
-    signal.addEventListener('abort', stop, { once: true });
-  });
-  try {
-    return await Promise.race([load.promise, aborted]);
-  } finally {
-    if (!signal.aborted) load.waiting--;
-    signal.removeEventListener('abort', stop);
-  }
-}
+// The solver `Physics.load` loaded, shared by every world of the app. Calls during a load share it; the download is
+// cancelled when every call waiting on it has been aborted.
+const solver = new SharedLoad<RapierModule, RapierWasmSource | undefined>((wasm, signal) =>
+  import('./rapier-solver.js').then((chunk) => chunk.startRapier(wasm ?? chunk.defaultWasm(), signal)),
+);
 
 /**
  * Rigid-body physics on Rapier as a Margo Engine engine plugin. Steps a fixed timestep with an accumulator and
@@ -293,7 +252,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * @throws MargoError (`failed`) when the Wasm cannot be fetched or is not Rapier's.
    */
   static async load({ signal, wasm }: PhysicsLoadOptions = {}): Promise<void> {
-    await loadSolver(wasm, signal);
+    await solver.load(wasm, signal);
   }
   /** Creates the Physics on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options: PhysicsOptions = {}): Physics {
@@ -301,7 +260,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   /** @throws MargoError (`state`) before {@link Physics.load} has finished. */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
-    const R = options.rapier ?? solver;
+    const R = options.rapier ?? solver.value;
     if (!R) throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
     if (typeof R.World !== 'function' || !R.ColliderDesc)
       throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics.load().');

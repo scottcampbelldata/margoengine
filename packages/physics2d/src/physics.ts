@@ -1,7 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
-import { LoadOnce } from '../../shared/load-once.js';
+import { SharedLoad } from '../../shared/shared-load.js';
+import type { RapierWasmSource } from './rapier-solver.js';
 import { Body2D, type BodyOptions2D, type BodyOwner2D, type BodyType2D, type SpriteLike } from './body.js';
 import { CharacterController2D, type CharacterOptions2D } from './character.js';
 import { Joint2D, createJointData, type JointOptions2D } from './joint.js';
@@ -17,9 +18,20 @@ import { tileMapColliders, type TileMapBodyOptions, type TileMapSource } from '.
 
 /** Options of {@link Physics2D.load}. */
 export interface Physics2DLoadOptions {
-  /** Stops waiting for the load; the load itself carries on and a later call reuses it. */
+  /**
+   * Stops this call's wait. When no other call is waiting on the same load, it also cancels the download, and the next
+   * call starts again.
+   */
   signal?: AbortSignal;
+  /**
+   * Where Rapier's Wasm comes from: a URL (a CDN or your own server), a fetched `Response`, its bytes or a compiled
+   * `WebAssembly.Module`. Default: `dist/rapier2d.wasm` beside this package, which bundlers emit as its own file. It must
+   * be the Rapier build this package bundles (`@dimforge/rapier2d` 0.21.0). Calls made while a load runs share that load.
+   */
+  wasm?: RapierWasmSource;
 }
+
+export type { RapierWasmSource };
 
 /** Options for creating a Physics2D world; every field has a default. */
 export interface Physics2DOptions {
@@ -109,13 +121,11 @@ function callListener(this: never, listener: (event: never) => void): void {
 }
 const TWO_PI = Math.PI * 2;
 
-// The solver `Physics2D.load` loaded, shared by every world of the app.
-const solver = new LoadOnce<RapierModule2D>(async () => {
-  const module = await import('@dimforge/rapier2d-compat'),
-    api = module.default ?? module;
-  await api.init();
-  return api as unknown as RapierModule2D;
-});
+// The solver `Physics2D.load` loaded, shared by every world of the app. Calls during a load share it; the download is
+// cancelled when every call waiting on it has been aborted.
+const solver = new SharedLoad<RapierModule2D, RapierWasmSource | undefined>((wasm, signal) =>
+  import('./rapier-solver.js').then((chunk) => chunk.startRapier(wasm ?? chunk.defaultWasm(), signal)),
+);
 
 /**
  * 2D rigid-body physics on Rapier as a Margo Engine plugin. Steps a fixed timestep with an accumulator and writes
@@ -152,12 +162,15 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   /**
    * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics2D(engine)` can stay synchronous.
    * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.
+   * Rapier's Wasm is a file of its own (`dist/rapier2d.wasm`), fetched and compiled while it downloads; `wasm` points
+   * at another copy.
    * @example await Physics2D.load();
    * const physics = new Physics2D(engine);
    * @throws AbortError (the signal's reason) when `signal` aborts first.
+   * @throws MargoError (`failed`) when the Wasm cannot be fetched or is not Rapier's.
    */
-  static async load({ signal }: Physics2DLoadOptions = {}): Promise<void> {
-    await solver.load(signal);
+  static async load({ signal, wasm }: Physics2DLoadOptions = {}): Promise<void> {
+    await solver.load(wasm, signal);
   }
   /** Creates the Physics2D on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options: Physics2DOptions = {}): Physics2D {

@@ -1,16 +1,16 @@
 {
-  "commit": "71eb890c0f",
+  "commit": "88472aadea",
   "dirty": true,
   "browser": "msedge 157.0.4341.42 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-D7aHgK3D.js",
+      "file": "assets/dist-Do8sf5rQ.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_model-C83SPRsf-CNT2uSsg.js",
+        "_model-B2UA8DaW-DT88A68I.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -51,14 +51,14 @@
         "assets/basis_transcoder-VXdx5NbI.wasm"
       ]
     },
-    "../../../packages/gltf-pro/dist/compression-OCSE-Ixs.js": {
-      "file": "assets/compression-OCSE-Ixs-BeFMY31W.js",
-      "name": "compression-OCSE-Ixs",
-      "src": "../../../packages/gltf-pro/dist/compression-OCSE-Ixs.js",
+    "../../../packages/gltf-pro/dist/compression-9FL9bikc.js": {
+      "file": "assets/compression-9FL9bikc-B2z89wQ1.js",
+      "name": "compression-9FL9bikc",
+      "src": "../../../packages/gltf-pro/dist/compression-9FL9bikc.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-BAzA3qXL-CEJcPRJR.js"
+        "_asset-CV4fHwiS-DvPBWJwc.js"
       ]
     },
     "../../../packages/gltf-pro/dist/dds.js": {
@@ -80,14 +80,14 @@
       ]
     },
     "../../../packages/gltf-pro/dist/index.js": {
-      "file": "assets/dist-BbamCq-S.js",
+      "file": "assets/dist-CRoVssNQ.js",
       "name": "dist",
       "src": "../../../packages/gltf-pro/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-C83SPRsf-CNT2uSsg.js",
-        "_asset-BAzA3qXL-CEJcPRJR.js",
+        "_model-B2UA8DaW-DT88A68I.js",
+        "_asset-CV4fHwiS-DvPBWJwc.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -221,9 +221,9 @@
       "src": "../../../packages/splats/dist/zstd-CsYgdoCI.js",
       "isDynamicEntry": true
     },
-    "_asset-BAzA3qXL-CEJcPRJR.js": {
-      "file": "assets/asset-BAzA3qXL-CEJcPRJR.js",
-      "name": "asset-BAzA3qXL",
+    "_asset-CV4fHwiS-DvPBWJwc.js": {
+      "file": "assets/asset-CV4fHwiS-DvPBWJwc.js",
+      "name": "asset-CV4fHwiS",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
         "_errors-THVaUwlL-C81vxm_p.js",
@@ -234,7 +234,7 @@
         "../../../packages/gltf-pro/dist/splats.js",
         "../../../packages/gltf-pro/dist/spec-gloss.js",
         "../../../packages/gltf-pro/dist/extended.js",
-        "../../../packages/gltf-pro/dist/compression-OCSE-Ixs.js",
+        "../../../packages/gltf-pro/dist/compression-9FL9bikc.js",
         "../../../packages/gltf-pro/dist/optimize-7SEzNA23.js"
       ]
     },
@@ -284,21 +284,21 @@
       "file": "assets/meshopt-D0I6gboe.js",
       "name": "meshopt"
     },
-    "_model-C83SPRsf-CNT2uSsg.js": {
-      "file": "assets/model-C83SPRsf-CNT2uSsg.js",
-      "name": "model-C83SPRsf",
+    "_model-B2UA8DaW-DT88A68I.js": {
+      "file": "assets/model-B2UA8DaW-DT88A68I.js",
+      "name": "model-B2UA8DaW",
       "imports": [
         "_version-YYhCZP03.js",
         "_extension-Bn1Wm_pY.js",
         "_preload-helper-CRzLMJPS.js",
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-BAzA3qXL-CEJcPRJR.js",
+        "_asset-CV4fHwiS-DvPBWJwc.js",
         "_shader-CCcD92m2-CZ5F82XH.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-D-u4lFVe.js"
       ],
       "dynamicImports": [
-        "../../../packages/gltf-pro/dist/compression-OCSE-Ixs.js"
+        "../../../packages/gltf-pro/dist/compression-9FL9bikc.js"
       ]
     },
     "_preload-helper-CRzLMJPS.js": {
@@ -332,7 +332,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-BZImIqfy.js",
+      "file": "assets/index-BV9abwL1.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -370,15 +370,6 @@
       "brotli": 526
     },
     {
-      "path": "assets/geometry-DP4OBCjY.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 2369,
-      "raw": 3908,
-      "gzip": 1999,
-      "brotli": 1806
-    },
-    {
       "path": "assets/preload-helper-CRzLMJPS.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -388,13 +379,22 @@
       "brotli": 682
     },
     {
-      "path": "assets/index-BZImIqfy.js",
+      "path": "assets/geometry-DP4OBCjY.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 2369,
+      "raw": 3908,
+      "gzip": 1999,
+      "brotli": 1806
+    },
+    {
+      "path": "assets/index-BV9abwL1.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 26842,
+      "transferred": 26839,
       "raw": 64365,
-      "gzip": 26460,
-      "brotli": 23377
+      "gzip": 26457,
+      "brotli": 23316
     },
     {
       "path": "model.glb",
@@ -426,15 +426,15 @@
   ],
   "total": {
     "requests": 8,
-    "transferred": 41997,
+    "transferred": 41994,
     "raw": 92347,
-    "gzip": 38108,
-    "brotli": 33633
+    "gzip": 38105,
+    "brotli": 33572
   },
   "notFetched": [
     {
-      "path": "assets/asset-BAzA3qXL-CEJcPRJR.js",
-      "raw": 31812
+      "path": "assets/asset-CV4fHwiS-DvPBWJwc.js",
+      "raw": 32083
     },
     {
       "path": "assets/basis_transcoder-DRsa3jdg.js",
@@ -449,8 +449,8 @@
       "raw": 1134
     },
     {
-      "path": "assets/compression-OCSE-Ixs-BeFMY31W.js",
-      "raw": 4131
+      "path": "assets/compression-9FL9bikc-B2z89wQ1.js",
+      "raw": 4126
     },
     {
       "path": "assets/data-BpoLbk5s-C-c0qWHd.js",
@@ -473,15 +473,15 @@
       "raw": 27157
     },
     {
-      "path": "assets/dist-BbamCq-S.js",
-      "raw": 973
+      "path": "assets/dist-CRoVssNQ.js",
+      "raw": 978
     },
     {
       "path": "assets/dist-CvGs8hlY.js",
       "raw": 7044
     },
     {
-      "path": "assets/dist-D7aHgK3D.js",
+      "path": "assets/dist-Do8sf5rQ.js",
       "raw": 76605
     },
     {
@@ -521,8 +521,8 @@
       "raw": 7135
     },
     {
-      "path": "assets/model-C83SPRsf-CNT2uSsg.js",
-      "raw": 151293
+      "path": "assets/model-B2UA8DaW-DT88A68I.js",
+      "raw": 151298
     },
     {
       "path": "assets/optimize-7SEzNA23-BesG8gNH.js",

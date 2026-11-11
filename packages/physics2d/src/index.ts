@@ -2,6 +2,7 @@ export { Physics2D } from './physics.js';
 export type {
   Physics2DOptions,
   Physics2DLoadOptions,
+  RapierWasmSource,
   Physics2DEventMap,
   CollisionEvent2D,
   CollisionEventType2D,
