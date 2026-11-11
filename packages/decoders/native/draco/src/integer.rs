@@ -196,10 +196,47 @@ impl Integer {
             },
             0_i32,
         )?;
+        // One row loop per predictor (KB4824a): an engine optimizes only the
+        // loop a stream uses, not every predictor's code.
+        let rows = match self.method {
+            1 => Self::rows::<1>,
+            2 => Self::rows::<2>,
+            3 => Self::rows::<3>,
+            4 => Self::rows::<4>,
+            5 => Self::rows::<5>,
+            6 => Self::rows::<6>,
+            _ => Self::rows::<0>,
+        };
+        rows(
+            self,
+            components,
+            mesh,
+            parent,
+            legacy_parent,
+            budget,
+            &mut prediction,
+            &mut scratch,
+            &mut positions,
+        )
+    }
+    /// Row reconstruction for predictor `M`; 0 covers every method without a mesh predictor.
+    #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
+    fn rows<const M: i8>(
+        &mut self,
+        components: usize,
+        mesh: Option<&Mesh>,
+        parent: Option<&[i32]>,
+        legacy_parent: Option<&[f32]>,
+        budget: &mut Budget,
+        prediction: &mut [i32],
+        scratch: &mut [i32],
+        positions: &mut [usize; 4],
+    ) -> Result<()> {
         for row in 0..self.values.len() / components {
             budget.steps(1)?;
             prediction.fill(0);
-            if self.method == 3 {
+            if M == 3 {
                 let value = mesh.ok_or(Error::Invalid)?.legacy_tex_coords(
                     row,
                     &self.values,
@@ -208,7 +245,7 @@ impl Integer {
                     &mut self.orientations,
                 )?;
                 prediction[..2].copy_from_slice(&value);
-            } else if self.method == 5 {
+            } else if M == 5 {
                 let value = mesh.ok_or(Error::Invalid)?.tex_coords(
                     row,
                     &self.values,
@@ -216,7 +253,7 @@ impl Integer {
                     &mut self.orientations,
                 )?;
                 prediction[..2].copy_from_slice(&value);
-            } else if self.method == 6 {
+            } else if M == 6 {
                 let max = match self.transform {
                     Transform::Normal(max) => max,
                     _ => return Err(Error::Invalid),
@@ -232,30 +269,23 @@ impl Integer {
             } else if row > 0 {
                 let mut predicted_mesh = false;
                 if let Some(mesh) = mesh {
-                    if self.method == 1 {
+                    if M == 1 {
                         predicted_mesh =
-                            mesh.parallelogram(row, components, &self.values, &mut prediction);
-                    } else if self.method == 2 {
-                        if mesh.multi(
-                            row,
-                            components,
-                            &self.values,
-                            budget,
-                            &mut prediction,
-                            &mut scratch,
-                        )? {
+                            mesh.parallelogram(row, components, &self.values, prediction);
+                    } else if M == 2 {
+                        if mesh.multi(row, components, &self.values, budget, prediction, scratch)? {
                             predicted_mesh = true;
                         }
-                    } else if self.method == 4
+                    } else if M == 4
                         && mesh.constrained(
                             row,
                             components,
                             &self.values,
                             &self.crease,
-                            &mut positions,
+                            positions,
                             budget,
-                            &mut prediction,
-                            &mut scratch,
+                            prediction,
+                            scratch,
                         )?
                     {
                         predicted_mesh = true;

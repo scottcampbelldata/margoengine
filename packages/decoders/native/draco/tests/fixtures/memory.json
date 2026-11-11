@@ -27,7 +27,7 @@
           ],
           "min": [
             -0.028035584837198257,
-            -3.725290298461914e-09,
+            -3.725290298461914e-9,
             -0.02803558111190796
           ]
         },
@@ -74,7 +74,7 @@
           ],
           "min": [
             -0.3527080714702606,
-            -5.566945304735782e-08,
+            -5.566945304735782e-8,
             -0.3527080714702606
           ]
         },
@@ -91,6 +91,65 @@
       },
       "licenseSource": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/ABeautifulGame/README.md",
       "licenseSha256": "35b650cc930a9c86de184f28e973e5122e26a0c20b88175e7c362e1faf97596b"
+    }
+  },
+  {
+    "file": "car-concept-body.drc",
+    "inputSha256": "7756ef4b21178063807fa7315c53f13fe6db8f965a917540ebf12dcf41806e2e",
+    "outputSha256": "1e49b28a1aaeb03deb3bac702ab6db131094e98837a45ed38125e3efafeb05cf",
+    "source": {
+      "name": "KhronosGroup/glTF-Sample-Assets/Models/CarConcept/glTF-KTX-BasisU-Draco/CarConcept.gltf:0/0",
+      "sha256": "7756ef4b21178063807fa7315c53f13fe6db8f965a917540ebf12dcf41806e2e",
+      "bytes": 19860,
+      "source": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CarConcept/glTF-KTX-BasisU-Draco/CarConcept.gltf",
+      "sourceSha256": "8bdd76afb00f6b430a0bfb4112ecf67c3c6307d27ebd8298ab92047aefca6cfd",
+      "bufferView": 0,
+      "attributes": {
+        "NORMAL": 3,
+        "POSITION": 0,
+        "TANGENT": 4,
+        "TEXCOORD_0": 1,
+        "TEXCOORD_1": 2
+      },
+      "accessors": {
+        "NORMAL": {
+          "componentType": 5126,
+          "count": 838,
+          "type": "VEC3"
+        },
+        "POSITION": {
+          "componentType": 5126,
+          "count": 838,
+          "max": [
+            1.0939888954162598,
+            1.8939281702041626,
+            0.8328235149383545
+          ],
+          "min": [
+            -1.0939888954162598,
+            -2.389533042907715,
+            0.08852825313806534
+          ],
+          "type": "VEC3"
+        },
+        "TANGENT": {
+          "componentType": 5126,
+          "count": 838,
+          "type": "VEC4"
+        },
+        "TEXCOORD_0": {
+          "componentType": 5126,
+          "count": 838,
+          "type": "VEC2"
+        },
+        "TEXCOORD_1": {
+          "componentType": 5126,
+          "count": 838,
+          "type": "VEC2"
+        }
+      },
+      "licenseSource": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390ddc7a2ae221a1369ef560589cf8c70fb/Models/CarConcept/README.md",
+      "licenseSha256": "af5f76ead54a5039288924f37081d6e1fcd5ccc5b2628faedb926325a73099cd"
     }
   }
 ]

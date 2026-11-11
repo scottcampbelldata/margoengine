@@ -66,6 +66,7 @@ impl Walk<'_, '_> {
         self.sequence.entry_corner.push(c);
         true
     }
+    #[inline(never)]
     fn depth_first(&mut self, budget: &mut Budget) -> Result<()> {
         let mut stack = budget.vector(self.faces.len(), 0_usize)?;
         stack.clear();
@@ -121,6 +122,7 @@ impl Walk<'_, '_> {
             if degrees[v] > 1 { 1 } else { 2 }
         }
     }
+    #[inline(never)]
     fn degree(&mut self, budget: &mut Budget) -> Result<()> {
         let mut degrees = budget.vector(self.vertices.len(), 0_usize)?;
         let mut stacks = [Vec::new(), Vec::new(), Vec::new()];

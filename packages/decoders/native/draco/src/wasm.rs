@@ -57,6 +57,8 @@ fn metadata_buffer(out: &mut Vec<u8>, metadata: crate::Metadata) {
         }
     }
 }
+// Out of line (KB4824a): its copy loops are optimized apart from the entry point.
+#[inline(never)]
 fn result_buffer(result: Result<Geometry>) -> Result<Box<[u8]>> {
     let size = match &result {
         Err(_) => 8,

@@ -64,7 +64,11 @@ pinned Google testdata revision under Apache-2.0. No implementation is included.
 `beautiful-game-first.drc` and `beautiful-game-largest.drc` are unmodified bufferViews
 from the ABeautifulGame GLB credited above (CC BY 4.0, ASWF/MaterialX and Ed Mackey).
 `memory.json` records the pinned source URL, bufferView, source/extract SHA-256 and
-oracle-derived output hash for each. They are memory/correctness regression data
+oracle-derived output hash for each. `car-concept-body.drc` is the unmodified bufferView 0 of
+CarConcept/glTF-KTX-BasisU-Draco/CarConcept.gltf at the same revision (CC BY 4.0,
+Darmstadt Graphics Group GmbH, Eric Chadwick, 2024), SHA-256
+7756ef4b21178063807fa7315c53f13fe6db8f965a917540ebf12dcf41806e2e, used by
+draco-native-tierup.test.js. They are memory/correctness regression data
 only and never runtime assets. No geometry is modified or attributed to Margo.
 
 `multi.bin` contains 289 Margo-crafted complete files and opaque public-API

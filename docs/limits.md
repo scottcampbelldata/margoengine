@@ -3678,6 +3678,19 @@ glTF flavor accepts these version 1 streams although the glTF prebuilt refuses
 every major version 1 file; this is a supported-feature superset. The Wasm grew
 from 122,842 to 127,592 bytes.
 
+Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
+the clean-room decoder live in small functions, so an engine that optimizes
+hot Wasm functions (V8 TurboFan) compiles only the loop a stream uses. On the
+committed CarConcept primitive the optimizing peak fell from 7,683,216 to
+3,241,160 B (Node 26.12, draco-native-tierup.test.js caps it at 3,300,000 B);
+the prebuilt needs 1,626,064 B but starts 1.6 to 1.7 MB higher. Cost: the Wasm
+grew from 127,592 to 145,042 bytes (49,172 to 54,987 B gzip -9), from one copy
+per predictor and per traversal. The entry's measured size went from under its
+70,386 B ceiling to 76,289 B gzip, and its ceiling is now 78,578 B (measured
+plus 3 percent, scripts/quality/baselines/sizes.json). A split into separate
+Wasm files would add a fetch and a compile per stream kind. Output bytes are
+unchanged.
+
 Batch 133 glTF gate repair: textured light frame now uses shared/unit-light.js
 for a destructured direction alias, matching core's unit-direction contract.
 No core/stage changes or pixel tolerances are involved.

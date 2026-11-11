@@ -315,21 +315,15 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
             .ok_or(Error::Overflow)?;
         attr.data = budget.vector(size, 0_u8)?;
         budget.steps(points.checked_mul(components).ok_or(Error::Overflow)?)?;
-        for (point, row) in attr.data.chunks_exact_mut(components * width).enumerate() {
-            for (k, chunk) in row.chunks_exact_mut(width).enumerate() {
-                let value = values[point * dimensions + offset + k];
-                match &transform {
-                    Transform::Quantized(minima, factor) => {
-                        let scaled = value as f32 * factor;
-                        chunk.copy_from_slice(&(scaled + minima[k]).to_le_bytes());
-                    }
-                    Transform::Signed(minima) => chunk.copy_from_slice(
-                        &value.wrapping_add(minima[k] as u32).to_le_bytes()[..width],
-                    ),
-                    Transform::Unsigned => chunk.copy_from_slice(&value.to_le_bytes()[..width]),
-                }
-            }
-        }
+        kd_rows(
+            &mut attr.data,
+            &values,
+            dimensions,
+            offset,
+            components,
+            width,
+            &transform,
+        );
         offset += components;
     }
     Ok(Geometry {
@@ -339,4 +333,32 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
         attributes,
         metadata: None,
     })
+}
+
+/// The per-point output loop of `decode`, out of line (KB4824a): an engine
+/// optimizing it does not also compile the header and transform parsing.
+#[inline(never)]
+fn kd_rows(
+    data: &mut [u8],
+    values: &[u32],
+    dimensions: usize,
+    offset: usize,
+    components: usize,
+    width: usize,
+    transform: &Transform,
+) {
+    for (point, row) in data.chunks_exact_mut(components * width).enumerate() {
+        for (k, chunk) in row.chunks_exact_mut(width).enumerate() {
+            let value = values[point * dimensions + offset + k];
+            match transform {
+                Transform::Quantized(minima, factor) => {
+                    let scaled = value as f32 * factor;
+                    chunk.copy_from_slice(&(scaled + minima[k]).to_le_bytes());
+                }
+                Transform::Signed(minima) => chunk
+                    .copy_from_slice(&value.wrapping_add(minima[k] as u32).to_le_bytes()[..width]),
+                Transform::Unsigned => chunk.copy_from_slice(&value.to_le_bytes()[..width]),
+            }
+        }
+    }
 }

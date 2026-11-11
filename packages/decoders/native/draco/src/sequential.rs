@@ -242,9 +242,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
     let mut indices = budget.vector(nindices, 0_u32)?;
     budget.steps(nindices)?;
     if let Some(mapping) = &mapping {
-        for (out, &index) in indices.iter_mut().zip(&mapping.corner_to_point) {
-            *out = u32::try_from(index).map_err(|_| Error::Overflow)?;
-        }
+        corner_indices(&mut indices, &mapping.corner_to_point)?;
     } else if mesh {
         match c.byte()? {
             0 => {
@@ -458,14 +456,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                 if positions_first && components == 3 && parent.is_none() {
                     let mut values =
                         budget.vector(points.checked_mul(3).ok_or(Error::Overflow)?, 0_i32)?;
-                    for point in 0..points {
-                        let entry = group
-                            .sequence
-                            .as_ref()
-                            .map_or(point, |s| s.point_entry[point]);
-                        values[point * 3..point * 3 + 3]
-                            .copy_from_slice(&integer.values[entry * 3..entry * 3 + 3]);
-                    }
+                    parent_positions(&mut values, &integer.values, group.sequence.as_ref());
                     parent = Some(values);
                 }
             }
@@ -495,41 +486,23 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                             values.len().checked_mul(width).ok_or(Error::Overflow)?,
                             0_u8,
                         )?;
-                        for (chunk, value) in attr.data.chunks_exact_mut(width).zip(values) {
-                            chunk.copy_from_slice(&value.to_le_bytes()[..width]);
-                        }
+                        integer_bytes(&mut attr.data, &values, width);
                     }
                     Format::Quantized { minima, factor } => {
                         attr.data = budget
                             .vector(values.len().checked_mul(4).ok_or(Error::Overflow)?, 0_u8)?;
-                        for (i, (chunk, value)) in attr
-                            .data
-                            .as_chunks_mut::<4>()
-                            .0
-                            .iter_mut()
-                            .zip(values)
-                            .enumerate()
-                        {
-                            let scaled = value as f32 * factor;
-                            let final_value = scaled + minima[i % usize::from(attr.components)];
-                            chunk.copy_from_slice(&final_value.to_le_bytes());
-                        }
+                        quantized_bytes(
+                            &mut attr.data,
+                            &values,
+                            minima,
+                            *factor,
+                            usize::from(attr.components),
+                        );
                     }
                     Format::Normal(bits) => {
                         attr.data =
                             budget.vector(entries.checked_mul(12).ok_or(Error::Overflow)?, 0_u8)?;
-                        for (dst, pair) in attr
-                            .data
-                            .as_chunks_mut::<12>()
-                            .0
-                            .iter_mut()
-                            .zip(values.as_chunks::<2>().0)
-                        {
-                            let vector = crate::normal::unit(pair[0], pair[1], *bits)?;
-                            for (chunk, f) in dst.as_chunks_mut::<4>().0.iter_mut().zip(vector) {
-                                chunk.copy_from_slice(&f.to_le_bytes());
-                            }
-                        }
+                        normal_bytes(&mut attr.data, &values, *bits)?;
                     }
                 }
             }
@@ -539,10 +512,7 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                     .ok_or(Error::Overflow)?;
                 let mut data =
                     budget.vector(points.checked_mul(stride).ok_or(Error::Overflow)?, 0_u8)?;
-                for (point, &entry) in sequence.point_entry.iter().enumerate() {
-                    data[point * stride..(point + 1) * stride]
-                        .copy_from_slice(&attr.data[entry * stride..(entry + 1) * stride]);
-                }
+                point_order(&mut data, &attr.data, &sequence.point_entry, stride);
                 attr.data = data;
             }
         }
@@ -554,4 +524,73 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
         attributes,
         metadata,
     })
+}
+
+// Per-point loops of `decode_flavor` run as separate functions (KB4824a): an
+// engine optimizing one hot loop does not also compile the whole decoder.
+#[inline(never)]
+fn corner_indices(indices: &mut [u32], corner_to_point: &[usize]) -> Result<()> {
+    for (out, &index) in indices.iter_mut().zip(corner_to_point) {
+        *out = u32::try_from(index).map_err(|_| Error::Overflow)?;
+    }
+    Ok(())
+}
+#[inline(never)]
+fn parent_positions(
+    values: &mut [i32],
+    source: &[i32],
+    sequence: Option<&crate::traversal::Sequence>,
+) {
+    for point in 0..values.len() / 3 {
+        let entry = sequence.map_or(point, |s| s.point_entry[point]);
+        values[point * 3..point * 3 + 3].copy_from_slice(&source[entry * 3..entry * 3 + 3]);
+    }
+}
+#[inline(never)]
+fn integer_bytes(data: &mut [u8], values: &[i32], width: usize) {
+    for (chunk, value) in data.chunks_exact_mut(width).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes()[..width]);
+    }
+}
+#[inline(never)]
+fn quantized_bytes(
+    data: &mut [u8],
+    values: &[i32],
+    minima: &[f32],
+    factor: f32,
+    components: usize,
+) {
+    for (i, (chunk, &value)) in data
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(values)
+        .enumerate()
+    {
+        let scaled = value as f32 * factor;
+        let final_value = scaled + minima[i % components];
+        chunk.copy_from_slice(&final_value.to_le_bytes());
+    }
+}
+#[inline(never)]
+fn normal_bytes(data: &mut [u8], values: &[i32], bits: u8) -> Result<()> {
+    for (dst, pair) in data
+        .as_chunks_mut::<12>()
+        .0
+        .iter_mut()
+        .zip(values.as_chunks::<2>().0)
+    {
+        let vector = crate::normal::unit(pair[0], pair[1], bits)?;
+        for (chunk, f) in dst.as_chunks_mut::<4>().0.iter_mut().zip(vector) {
+            chunk.copy_from_slice(&f.to_le_bytes());
+        }
+    }
+    Ok(())
+}
+#[inline(never)]
+fn point_order(data: &mut [u8], source: &[u8], point_entry: &[usize], stride: usize) {
+    for (point, &entry) in point_entry.iter().enumerate() {
+        data[point * stride..(point + 1) * stride]
+            .copy_from_slice(&source[entry * stride..(entry + 1) * stride]);
+    }
 }

@@ -5039,16 +5039,36 @@ the full campaign or isolate physical pages/JIT/live allocations. An initial
 manifest used a missing relative input path and failed before sampling;
 the resolved-path run and setup failure are retained separately.
 
-Bug sweep L5b recheck, 2026-11-11 (Node 26.12, current Wasm, busy dev PC,
-diagnostic): with the same child harness (scripts/acceptance/draco-resource-child.mjs)
-the native decoder's peak RSS was below the full prebuilt on every local input
-tried: a 461-byte predictive mesh 76.2 against 77.9 MB (Liftoff-only 76.6
-against 78.3), ABeautifulGame first 88.0 against 89.2 MB and largest 102.3
-against 103.7 MB, two runs each. The recorded loss inputs (BrainStem glTF-Draco
-primitives, test-only grant) are not on this machine, so the loss is neither
-reproduced nor closed. Next: rerun scripts/acceptance/draco-resources.mjs on
-the pinned corpus; if the loss holds, compare per-stage RSS (after compile,
-instantiate, decode and result copy) to find the stage that grows.
+Bug sweep L5b round 2, 2026-11-11 (KB4824a, cause found and fixed): the pinned
+original corpus (404 entries, 323 unique inputs, BrainStem and CarConcept
+included) was rebuilt outside the repository from the manifest's source URLs,
+every hash matching. With the current Wasm the loss reproduced: 84 of 168
+BrainStem/CarConcept inputs (full) and 93 (glTF), largest +5,107,712 B. The
+excess was not decoder memory: with `--liftoff-only` the native process grows
+1.7 MB against the prebuilt's 2.9 MB on the worst input. V8 dynamic tiering
+(Liftoff, then TurboFan once a function's budget runs out; V8 blog, "Liftoff: a
+new baseline compiler for WebAssembly in V8", C. Backes, 2018,
+https://v8.dev/blog/liftoff, and "WebAssembly Dynamic Tiering ready to try in
+Chrome 96", A. Haas, 2021, https://v8.dev/blog/wasm-dynamic-tiering) compiled
+four hot native functions of 5,623 to 12,171 B, whose optimizing work memory
+grows with body size: 7,402,376 B peak against 1,626,064 B for the prebuilt
+(`--trace-wasm-compilation-times`, deterministic). Every predictor, both
+traversals and all setup code sat in those bodies. Fix, output unchanged: one
+row loop per predictor (`Integer::rows::<M>`), one EdgeBreaker symbol loop per
+traversal with rare split work out of line, the mapping phases, Walk
+traversals, per-point output loops of the sequential and KD decoders and the
+result buffer as separate functions. Same input: 2,178,952 B; the committed
+CarConcept fixture: 7,683,216 to 3,241,160 B. Campaigns on all 323 inputs, one
+observation each, outputs exact: full 1 loss (was 84 on the subset), glTF 2
+losses of 81,920 and 90,112 B, below the 434,176 to 667,648 B spread of the
+native startup stage within the same run; largest native peaks now below the
+prebuilt's (107,794,432 against 108,666,880 B). The full loss is pc_kd_color
+(+196,608 B): the measurement child converts native point attributes to float
+in JavaScript, which Margo's point API never does; without that conversion the
+native process grows 2.1 MB against the prebuilt's 3.9 MB. Regression:
+packages/decoders/tests/draco-native-tierup.test.js (fails at 7,683,216 B
+before, passes at 3,241,160 B). Open: the two glTF observations and the harness
+conversion asymmetry, for a quiet-machine campaign before release.
 
 Fixed in the lane G sweep: the native descriptor rejected widths above 16,
 and quantization, KD minima and prediction scratch also assumed 16 components.

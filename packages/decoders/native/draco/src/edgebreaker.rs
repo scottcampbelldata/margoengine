@@ -148,37 +148,7 @@ impl Topology<'_> {
     pub fn mapping(&mut self, budget: &mut Budget) -> Result<Mapping> {
         let count = self.corners.len();
         if self.seams.is_empty() {
-            let mut mapping = budget.vector(self.created, 0_usize)?;
-            for (i, v) in mapping.iter_mut().enumerate() {
-                *v = i;
-            }
-            let mut vertices = self.created;
-            for &removed in &self.isolated {
-                while vertices > 0 && self.vertex_corner[mapping[vertices - 1]] == NONE {
-                    vertices -= 1;
-                }
-                if removed >= vertices {
-                    continue;
-                }
-                vertices = vertices.checked_sub(1).ok_or(Error::Invalid)?;
-                mapping[removed] = mapping[vertices];
-            }
-            let mut inverse = budget.vector(self.created, NONE)?;
-            for (point, &vertex) in mapping[..vertices].iter().enumerate() {
-                inverse[vertex] = point;
-            }
-            let mut corner_to_point = budget.vector(count, NONE)?;
-            for (out, &vertex) in corner_to_point.iter_mut().zip(&self.corners) {
-                *out = inverse[vertex];
-            }
-            if corner_to_point.contains(&NONE) {
-                return Err(Error::Invalid);
-            }
-            return Ok(Mapping {
-                attributes: Vec::new(),
-                corner_to_point,
-                points: vertices,
-            });
+            return self.plain_mapping(budget);
         }
         budget.charge(self.seams.len(), std::mem::size_of::<AttributeTopology>())?;
         let mut attributes = Vec::new();
@@ -197,6 +167,64 @@ impl Topology<'_> {
             attr.corners = budget.vector(count, NONE)?;
             attr.seam = budget.vector(count, false)?;
         }
+        self.seam_bits(&mut attributes, budget)?;
+        for attr in &mut attributes {
+            self.attribute_fans(attr, budget)?;
+        }
+        let mut mapping = Mapping {
+            attributes,
+            // E9 capped-boundary probes confirm zero for corners that no
+            // deduplication walk reaches, including overwritten partial fans.
+            corner_to_point: budget.vector(count, 0)?,
+            points: 0,
+        };
+        self.assign_points(&mut mapping, budget)?;
+        Ok(mapping)
+    }
+    // The mapping phases run as separate functions (KB4824a): an engine
+    // optimizing one hot phase does not also compile the others.
+    #[inline(never)]
+    fn plain_mapping(&self, budget: &mut Budget) -> Result<Mapping> {
+        let count = self.corners.len();
+        let mut mapping = budget.vector(self.created, 0_usize)?;
+        for (i, v) in mapping.iter_mut().enumerate() {
+            *v = i;
+        }
+        let mut vertices = self.created;
+        for &removed in &self.isolated {
+            while vertices > 0 && self.vertex_corner[mapping[vertices - 1]] == NONE {
+                vertices -= 1;
+            }
+            if removed >= vertices {
+                continue;
+            }
+            vertices = vertices.checked_sub(1).ok_or(Error::Invalid)?;
+            mapping[removed] = mapping[vertices];
+        }
+        let mut inverse = budget.vector(self.created, NONE)?;
+        for (point, &vertex) in mapping[..vertices].iter().enumerate() {
+            inverse[vertex] = point;
+        }
+        let mut corner_to_point = budget.vector(count, NONE)?;
+        for (out, &vertex) in corner_to_point.iter_mut().zip(&self.corners) {
+            *out = inverse[vertex];
+        }
+        if corner_to_point.contains(&NONE) {
+            return Err(Error::Invalid);
+        }
+        Ok(Mapping {
+            attributes: Vec::new(),
+            corner_to_point,
+            points: vertices,
+        })
+    }
+    #[inline(never)]
+    fn seam_bits(
+        &mut self,
+        attributes: &mut [AttributeTopology],
+        budget: &mut Budget,
+    ) -> Result<()> {
+        let count = self.corners.len();
         for c in 0..count {
             budget.steps(1)?;
             let opposite = self.opp(c);
@@ -212,74 +240,75 @@ impl Topology<'_> {
                 }
             }
         }
-        for attr in &mut attributes {
-            let mut incident = budget.vector(self.vertex_corner.len(), false)?;
-            for c in 0..count {
-                if attr.seam[c] {
-                    incident[self.corners[next(c)]] = true;
-                    incident[self.corners[prev(c)]] = true;
-                }
+        Ok(())
+    }
+    #[inline(never)]
+    fn attribute_fans(&self, attr: &mut AttributeTopology, budget: &mut Budget) -> Result<()> {
+        let count = self.corners.len();
+        let mut incident = budget.vector(self.vertex_corner.len(), false)?;
+        for c in 0..count {
+            if attr.seam[c] {
+                incident[self.corners[next(c)]] = true;
+                incident[self.corners[prev(c)]] = true;
             }
-            // At most one attribute vertex per corner. Reserve once so every
-            // later push is covered by the checked allocation budget.
-            budget.charge(count, std::mem::size_of::<usize>() + 1)?;
-            attr.vertex_corner
-                .try_reserve_exact(count)
-                .map_err(|_| Error::Limit)?;
-            attr.boundary
-                .try_reserve_exact(count)
-                .map_err(|_| Error::Limit)?;
-            for (v, &start) in self.vertex_corner.iter().enumerate() {
-                if start == NONE {
-                    continue;
-                }
-                let mut first = start;
-                if incident[v] {
-                    for _ in 0..=count {
-                        budget.steps(1)?;
-                        if attr.seam[next(first)] {
-                            break;
-                        }
-                        let act = self.swing_left(first);
-                        if act == NONE || act == start {
-                            return Err(Error::Invalid);
-                        }
-                        first = act;
-                    }
-                }
-                let mut id = attr.vertex_corner.len();
-                attr.vertex_corner.push(first);
-                attr.boundary.push(incident[v]);
-                attr.corners[first] = id;
-                let mut act = self.swing_right(first);
+        }
+        // At most one attribute vertex per corner. Reserve once so every
+        // later push is covered by the checked allocation budget.
+        budget.charge(count, std::mem::size_of::<usize>() + 1)?;
+        attr.vertex_corner
+            .try_reserve_exact(count)
+            .map_err(|_| Error::Limit)?;
+        attr.boundary
+            .try_reserve_exact(count)
+            .map_err(|_| Error::Limit)?;
+        for (v, &start) in self.vertex_corner.iter().enumerate() {
+            if start == NONE {
+                continue;
+            }
+            let mut first = start;
+            if incident[v] {
                 for _ in 0..=count {
-                    if act == NONE || act == first {
+                    budget.steps(1)?;
+                    if attr.seam[next(first)] {
                         break;
                     }
-                    budget.steps(1)?;
-                    if attr.seam[next(act)] {
-                        id = attr.vertex_corner.len();
-                        attr.vertex_corner.push(act);
-                        attr.boundary.push(true);
+                    let act = self.swing_left(first);
+                    if act == NONE || act == start {
+                        return Err(Error::Invalid);
                     }
-                    attr.corners[act] = id;
-                    act = self.swing_right(act);
-                }
-                if act != NONE && act != first {
-                    return Err(Error::Invalid);
+                    first = act;
                 }
             }
-            if attr.corners.contains(&NONE) {
+            let mut id = attr.vertex_corner.len();
+            attr.vertex_corner.push(first);
+            attr.boundary.push(incident[v]);
+            attr.corners[first] = id;
+            let mut act = self.swing_right(first);
+            for _ in 0..=count {
+                if act == NONE || act == first {
+                    break;
+                }
+                budget.steps(1)?;
+                if attr.seam[next(act)] {
+                    id = attr.vertex_corner.len();
+                    attr.vertex_corner.push(act);
+                    attr.boundary.push(true);
+                }
+                attr.corners[act] = id;
+                act = self.swing_right(act);
+            }
+            if act != NONE && act != first {
                 return Err(Error::Invalid);
             }
         }
-        let mut mapping = Mapping {
-            attributes,
-            // E9 capped-boundary probes confirm zero for corners that no
-            // deduplication walk reaches, including overwritten partial fans.
-            corner_to_point: budget.vector(count, 0)?,
-            points: 0,
-        };
+        if attr.corners.contains(&NONE) {
+            return Err(Error::Invalid);
+        }
+        Ok(())
+    }
+    #[inline(never)]
+    fn assign_points(&self, mapping: &mut Mapping, budget: &mut Budget) -> Result<()> {
+        let count = self.corners.len();
         for (v, &start) in self.vertex_corner.iter().enumerate() {
             if start == NONE {
                 continue;
@@ -341,7 +370,7 @@ impl Topology<'_> {
                 return Err(Error::Invalid);
             }
         }
-        Ok(mapping)
+        Ok(())
     }
 }
 
@@ -513,171 +542,28 @@ pub(crate) fn decode<'a>(
     stack.clear();
     let mut pending = budget.vector(symbols, NONE)?;
     let mut symbol_bits = Bits::new(symbol_data);
-    let mut created = 0_usize;
-    let mut active_context = NONE;
-    let mut predicted = NONE;
-    let mut merged = 0_usize;
-    for id in 0..symbols {
-        budget.steps(1)?;
-        let predicted_ok = if predicted != NONE {
-            predictions.as_mut().ok_or(Error::Invalid)?.bit()?
-        } else {
-            false
-        };
-        let symbol = if predicted_ok {
-            predicted as u32
-        } else if traversal != 2 {
-            if symbol_bits.read(1)? == 0 {
-                0
-            } else {
-                1 | (symbol_bits.read(2)? << 1)
-            }
-        } else if active_context == NONE {
-            7
-        } else {
-            let symbol = contexts[active_context].pop().ok_or(Error::Invalid)?;
-            *[0, 1, 3, 5, 7].get(symbol as usize).ok_or(Error::Invalid)?
-        };
-        let nc = id * 3;
-        let (v, n, p);
-        match symbol {
-            7 => {
-                v = created;
-                n = v + 1;
-                p = v + 2;
-                created += 3;
-                if created > max_vertices {
-                    return Err(Error::Invalid);
-                }
-                stack.push(nc);
-                valences[v] = 2;
-                valences[n] = 2;
-                valences[p] = 2;
-            }
-            3 | 5 => {
-                let a = *stack.last().ok_or(Error::Invalid)?;
-                let vn = root(&mut parent, topo.corners[next(a)], budget)?;
-                let vp = root(&mut parent, topo.corners[prev(a)], budget)?;
-                let new = created;
-                created += 1;
-                if created > max_vertices {
-                    return Err(Error::Invalid);
-                }
-                if symbol == 3 {
-                    v = vn;
-                    n = new;
-                    p = vp;
-                    topo.pair(nc + 1, a)?;
-                } else {
-                    v = vp;
-                    n = vn;
-                    p = new;
-                    topo.pair(nc + 2, a)?;
-                }
-                valences[v] += 1;
-                valences[n] += if symbol == 3 { 2 } else { 1 };
-                valences[p] += if symbol == 3 { 1 } else { 2 };
-                *stack.last_mut().ok_or(Error::Invalid)? = nc;
-            }
-            0 => {
-                let a = *stack.last().ok_or(Error::Invalid)?;
-                let b = topo.boundary(prev(a), true, budget)?;
-                v = root(&mut parent, topo.corners[next(a)], budget)?;
-                n = root(&mut parent, topo.corners[next(b)], budget)?;
-                p = root(&mut parent, topo.corners[prev(a)], budget)?;
-                topo.pair(a, nc + 1)?;
-                topo.pair(b, nc + 2)?;
-                topo.hole[v] = false;
-                valences[n] += 1;
-                valences[p] += 1;
-                *stack.last_mut().ok_or(Error::Invalid)? = nc;
-            }
-            1 => {
-                let b = stack.pop().ok_or(Error::Invalid)?;
-                if pending[id] != NONE {
-                    stack.push(pending[id]);
-                    pending[id] = NONE;
-                }
-                let a = *stack.last().ok_or(Error::Invalid)?;
-                v = root(&mut parent, topo.corners[prev(a)], budget)?;
-                n = root(&mut parent, topo.corners[next(a)], budget)?;
-                p = root(&mut parent, topo.corners[prev(b)], budget)?;
-                let removed = root(&mut parent, topo.corners[next(b)], budget)?;
-                if removed == v {
-                    return Err(Error::Invalid);
-                }
-                topo.pair(a, nc + 2)?;
-                topo.pair(b, nc + 1)?;
-                parent[removed] = v;
-                topo.vertex_corner[removed] = NONE;
-                topo.isolated.push(removed);
-                valences[v] += valences[removed];
-                valences[n] += 1;
-                valences[p] += 1;
-                merged += 1;
-                *stack.last_mut().ok_or(Error::Invalid)? = nc;
-            }
-            _ => return Err(Error::Invalid),
-        }
-        topo.corners[nc..nc + 3].copy_from_slice(&[v, n, p]);
-        // Keep the left boundary representative. Closing a fan preserves its
-        // representative, which determines the first point at an attribute seam.
-        match symbol {
-            7 => {
-                topo.vertex_corner[v] = nc;
-                topo.vertex_corner[n] = nc + 1;
-                topo.vertex_corner[p] = nc + 2;
-            }
-            3 => {
-                topo.vertex_corner[n] = nc + 1;
-                topo.vertex_corner[p] = nc + 2;
-            }
-            5 => {
-                topo.vertex_corner[v] = nc;
-                topo.vertex_corner[p] = nc + 2;
-            }
-            0 => {
-                topo.vertex_corner[p] = nc + 2;
-            }
-            1 => {
-                let mut corner = next(topo.opp(nc + 1));
-                for _ in 0..=corners {
-                    if corner == NONE {
-                        break;
-                    }
-                    budget.steps(1)?;
-                    topo.vertex_corner[v] = corner;
-                    corner = topo.swing_left(corner);
-                }
-                if corner != NONE {
-                    return Err(Error::Invalid);
-                }
-                topo.vertex_corner[p] = nc + 2;
-            }
-            _ => unreachable!(),
-        }
-        active_context = valences[n].clamp(2, 7) - 2;
-        if traversal == 1 {
-            // E16 controls isolate this vertex and threshold: after C or R,
-            // degree >= 6 predicts C, otherwise R. E/L/S clear prediction.
-            predicted = if symbol == 0 || symbol == 5 {
-                if valences[n] >= 6 { 0 } else { 5 }
-            } else {
-                NONE
-            };
-        }
-        if symbol == 7 || symbol == 3 || symbol == 5 {
-            let encoder_id = symbols - id - 1;
-            while events.last().is_some_and(|event| event.0 == encoder_id) {
-                let (_, target, right) = events.pop().ok_or(Error::Invalid)?;
-                let target = symbols - target - 1;
-                if target <= id || pending[target] != NONE {
-                    return Err(Error::Invalid);
-                }
-                pending[target] = if right { next(nc) } else { prev(nc) };
-            }
-        }
-    }
+    // The symbol loop runs alone (KB4824a): an engine optimizing the hot loop
+    // does not also compile the header and setup code above.
+    let connect = match traversal {
+        0 => connect::<0>,
+        1 => connect::<1>,
+        _ => connect::<2>,
+    };
+    let (created, merged) = connect(
+        symbols,
+        max_vertices,
+        corners,
+        &mut predictions,
+        &mut contexts,
+        &mut events,
+        &mut symbol_bits,
+        &mut topo,
+        &mut parent,
+        &mut valences,
+        &mut stack,
+        &mut pending,
+        budget,
+    )?;
     if merged != splits || !events.is_empty() || pending.iter().any(|v| *v != NONE) {
         return Err(Error::Invalid);
     }
@@ -713,6 +599,238 @@ pub(crate) fn decode<'a>(
     topo.created = created;
     topo.update_boundary_corners(budget)?;
     Ok(topo)
+}
+
+/// The EdgeBreaker symbol loop of `decode` for traversal `T`; returns the created and merged vertex counts.
+/// Rare split (S) symbols and split events run out of line, so the loop an engine optimizes stays small.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn connect<'a, const T: u8>(
+    symbols: usize,
+    max_vertices: usize,
+    corners: usize,
+    predictions: &mut Option<Binary<'a>>,
+    contexts: &mut [Vec<u32>],
+    events: &mut Vec<(usize, usize, bool)>,
+    symbol_bits: &mut Bits<'a>,
+    topo: &mut Topology<'a>,
+    parent: &mut [usize],
+    valences: &mut [usize],
+    stack: &mut Vec<usize>,
+    pending: &mut [usize],
+    budget: &mut Budget,
+) -> Result<(usize, usize)> {
+    let mut created = 0_usize;
+    let mut active_context = NONE;
+    let mut predicted = NONE;
+    let mut merged = 0_usize;
+    for id in 0..symbols {
+        budget.steps(1)?;
+        let predicted_ok = if predicted != NONE {
+            predictions.as_mut().ok_or(Error::Invalid)?.bit()?
+        } else {
+            false
+        };
+        let symbol = if predicted_ok {
+            predicted as u32
+        } else if T != 2 {
+            if symbol_bits.read(1)? == 0 {
+                0
+            } else {
+                1 | (symbol_bits.read(2)? << 1)
+            }
+        } else if active_context == NONE {
+            7
+        } else {
+            let symbol = contexts[active_context].pop().ok_or(Error::Invalid)?;
+            *[0, 1, 3, 5, 7].get(symbol as usize).ok_or(Error::Invalid)?
+        };
+        let nc = id * 3;
+        let (v, n, p);
+        match symbol {
+            7 => {
+                v = created;
+                n = v + 1;
+                p = v + 2;
+                created += 3;
+                if created > max_vertices {
+                    return Err(Error::Invalid);
+                }
+                stack.push(nc);
+                valences[v] = 2;
+                valences[n] = 2;
+                valences[p] = 2;
+            }
+            3 | 5 => {
+                let a = *stack.last().ok_or(Error::Invalid)?;
+                let vn = root(parent, topo.corners[next(a)], budget)?;
+                let vp = root(parent, topo.corners[prev(a)], budget)?;
+                let new = created;
+                created += 1;
+                if created > max_vertices {
+                    return Err(Error::Invalid);
+                }
+                if symbol == 3 {
+                    v = vn;
+                    n = new;
+                    p = vp;
+                    topo.pair(nc + 1, a)?;
+                } else {
+                    v = vp;
+                    n = vn;
+                    p = new;
+                    topo.pair(nc + 2, a)?;
+                }
+                valences[v] += 1;
+                valences[n] += if symbol == 3 { 2 } else { 1 };
+                valences[p] += if symbol == 3 { 1 } else { 2 };
+                *stack.last_mut().ok_or(Error::Invalid)? = nc;
+            }
+            0 => {
+                let a = *stack.last().ok_or(Error::Invalid)?;
+                let b = topo.boundary(prev(a), true, budget)?;
+                v = root(parent, topo.corners[next(a)], budget)?;
+                n = root(parent, topo.corners[next(b)], budget)?;
+                p = root(parent, topo.corners[prev(a)], budget)?;
+                topo.pair(a, nc + 1)?;
+                topo.pair(b, nc + 2)?;
+                topo.hole[v] = false;
+                valences[n] += 1;
+                valences[p] += 1;
+                *stack.last_mut().ok_or(Error::Invalid)? = nc;
+            }
+            1 => {
+                (v, n, p) = split(id, nc, topo, parent, valences, stack, pending, budget)?;
+                merged += 1;
+            }
+            _ => return Err(Error::Invalid),
+        }
+        topo.corners[nc..nc + 3].copy_from_slice(&[v, n, p]);
+        // Keep the left boundary representative. Closing a fan preserves its
+        // representative, which determines the first point at an attribute seam.
+        match symbol {
+            7 => {
+                topo.vertex_corner[v] = nc;
+                topo.vertex_corner[n] = nc + 1;
+                topo.vertex_corner[p] = nc + 2;
+            }
+            3 => {
+                topo.vertex_corner[n] = nc + 1;
+                topo.vertex_corner[p] = nc + 2;
+            }
+            5 => {
+                topo.vertex_corner[v] = nc;
+                topo.vertex_corner[p] = nc + 2;
+            }
+            0 => {
+                topo.vertex_corner[p] = nc + 2;
+            }
+            1 => split_fan(topo, v, p, nc, corners, budget)?,
+            _ => unreachable!(),
+        }
+        active_context = valences[n].clamp(2, 7) - 2;
+        if T == 1 {
+            // E16 controls isolate this vertex and threshold: after C or R,
+            // degree >= 6 predicts C, otherwise R. E/L/S clear prediction.
+            predicted = if symbol == 0 || symbol == 5 {
+                if valences[n] >= 6 { 0 } else { 5 }
+            } else {
+                NONE
+            };
+        }
+        if symbol == 7 || symbol == 3 || symbol == 5 {
+            let encoder_id = symbols - id - 1;
+            if events.last().is_some_and(|event| event.0 == encoder_id) {
+                split_events(symbols, id, nc, events, pending)?;
+            }
+        }
+    }
+    Ok((created, merged))
+}
+
+/// Merge step of a split (S) symbol in `connect`; returns the face's (v, n, p).
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn split(
+    id: usize,
+    nc: usize,
+    topo: &mut Topology,
+    parent: &mut [usize],
+    valences: &mut [usize],
+    stack: &mut Vec<usize>,
+    pending: &mut [usize],
+    budget: &mut Budget,
+) -> Result<(usize, usize, usize)> {
+    let b = stack.pop().ok_or(Error::Invalid)?;
+    if pending[id] != NONE {
+        stack.push(pending[id]);
+        pending[id] = NONE;
+    }
+    let a = *stack.last().ok_or(Error::Invalid)?;
+    let v = root(parent, topo.corners[prev(a)], budget)?;
+    let n = root(parent, topo.corners[next(a)], budget)?;
+    let p = root(parent, topo.corners[prev(b)], budget)?;
+    let removed = root(parent, topo.corners[next(b)], budget)?;
+    if removed == v {
+        return Err(Error::Invalid);
+    }
+    topo.pair(a, nc + 2)?;
+    topo.pair(b, nc + 1)?;
+    parent[removed] = v;
+    topo.vertex_corner[removed] = NONE;
+    topo.isolated.push(removed);
+    valences[v] += valences[removed];
+    valences[n] += 1;
+    valences[p] += 1;
+    *stack.last_mut().ok_or(Error::Invalid)? = nc;
+    Ok((v, n, p))
+}
+
+/// Left fan walk after a split (S) symbol in `connect`.
+#[inline(never)]
+fn split_fan(
+    topo: &mut Topology,
+    v: usize,
+    p: usize,
+    nc: usize,
+    corners: usize,
+    budget: &mut Budget,
+) -> Result<()> {
+    let mut corner = next(topo.opp(nc + 1));
+    for _ in 0..=corners {
+        if corner == NONE {
+            break;
+        }
+        budget.steps(1)?;
+        topo.vertex_corner[v] = corner;
+        corner = topo.swing_left(corner);
+    }
+    if corner != NONE {
+        return Err(Error::Invalid);
+    }
+    topo.vertex_corner[p] = nc + 2;
+    Ok(())
+}
+
+/// Split events that end at encoder symbol `symbols - id - 1` in `connect`.
+#[inline(never)]
+fn split_events(
+    symbols: usize,
+    id: usize,
+    nc: usize,
+    events: &mut Vec<(usize, usize, bool)>,
+    pending: &mut [usize],
+) -> Result<()> {
+    let encoder_id = symbols - id - 1;
+    while events.last().is_some_and(|event| event.0 == encoder_id) {
+        let (_, target, right) = events.pop().ok_or(Error::Invalid)?;
+        let target = symbols - target - 1;
+        if target <= id || pending[target] != NONE {
+            return Err(Error::Invalid);
+        }
+        pending[target] = if right { next(nc) } else { prev(nc) };
+    }
+    Ok(())
 }
 
 #[cfg(test)]

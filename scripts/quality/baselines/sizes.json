@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15114114,
+  "total": 15122306,
   "history": [
     {
       "date": "2026-10-24",
@@ -8549,6 +8549,12 @@
       "commit": "sweep-l1 KB5588c",
       "reason": "KB5588c native selection masks (one bit a point or line vertex after a 16-byte style header, applied in the points and lines vertex shaders). Measured min+gzip before -> after: lines 20314 -> 21714, lines/edges 4821 -> 5716, lines/pick 5957 -> 6328, lines/trail 5369 -> 6267, lines/hidden 4062 -> 4963, lines/stroke 4521 -> 5424, lines/texture 6699 -> 7604, lines/debug 9706 -> 10582, points 25180 -> 26315, points/octree 9599 -> 10392, points/surfels 15223 -> 16254, points/pick 5471 -> 5768, points/clip 7420 -> 8221, sciviz/export-vector 3957 -> 4371. Why: the mask in the native shaders replaces sciviz's separate mask renderer, so bound scatters and lines keep EDL, sizes, shapes, widths and dashes and both vector exports match the GPU; the 2M-point stars binding uploads 250,016 B a selection instead of 8,000,000. Trimmed first: sciviz/pointcloud now imports points/octree lazily (no static leak of the 10 KB octree), and maskColor is a shared free function only the sciviz exporters carry (about 100 B off each entry). A split costs a second pipeline and bind group layout per draw style. Core plus stage unchanged.",
       "grew": 14
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "sweep-l5b KB4824a",
+      "reason": "decoders/draco-native measured 76289 B gzip, over its 70386 B ceiling: hot loops in small functions so V8 TurboFan compiles only what a stream uses, optimizing peak 7683216 to 3241160 B on the CarConcept fixture (about 4.4 MB less) with output bytes unchanged, fresh-process RSS losses 84 to 1 (bug sweep L5b, KB4824a); one Wasm per feature, a split per predictor or traversal would add a fetch and a compile per stream kind",
+      "grew": 1
     }
   ],
   "items": {
@@ -8792,7 +8798,7 @@
     "@margoengine/decoders/brotli": 69438,
     "@margoengine/decoders/bzip2": 2168,
     "@margoengine/decoders/dds": 3029,
-    "@margoengine/decoders/draco-native": 70386,
+    "@margoengine/decoders/draco-native": 78578,
     "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/image": 1068811,
     "@margoengine/decoders/jpeg": 4030,
