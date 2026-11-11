@@ -1548,7 +1548,7 @@ Every proof is three fresh browser processes, four devices and six frames, all 7
 captures identical. The top-level budgets are the NVIDIA RTX A6000 measurement; an `amd` section
 measured once on the Radeon adapter gates AMD proofs (proof-contract.mjs `viewerBudget`). All
 budgets were measured on main's area-filter mip chain (65098f33fe); earlier measurements on other mip
-chains are void. SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. Proof report hashes: results/batch-160-job5-proofs.json.
+chains are void. SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11 after the height-correlated Smith G, from 877,419 and 877,434), 879,167 and 873,364 on AMD (not yet re-measured); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (from 2,425,911), 2,424,867 native and 2,426,643 compatibility on AMD (not yet re-measured). Proof report hashes: results/batch-160-job5-proofs.json.
 
 ## Batch 65 roads
 
@@ -1784,7 +1784,7 @@ node scripts/reference-rendering/proof.mjs --case=volume --compat
 
 Each command preserves 72 PNGs and proof.json in a unique external directory,
 validates every original budget, actual AMD adapter and identical decoded RGBA
-bytes. The full volume ceiling remains 13,792,000. Native WebGL2 refusal is
+bytes. The full volume ceiling is 13,794,699 on NVIDIA since 2026-11-11 (was 13,792,000). Native WebGL2 refusal is
 covered by run.mjs. Run gltf-pro's native-volume GPU test for twenty exact slab
 readbacks on each backend, and its unit tests for transformed/instanced shader
 math and exact absent normal-map fallbacks. No benchmark is part of this proof.

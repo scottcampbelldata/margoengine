@@ -3537,7 +3537,8 @@ claim follows from replacing a silent skip with a failure.
 Batch 160 adds the first outside metallic-roughness picture budget: all 123 Khronos textureless sphere
 primitives, matched embedded camera/sun, neutral display transform and every pixel, against Sample Viewer
 PNG output. RTX A6000 RGB MAE 1.837511698404948 on WebGPU and 1.837506612141927 through WebGL2
-compatibility; native WebGL2 explicitly rejects PBR. See whitepaper/results/batch-160-metallic-roughness.json
+compatibility (1.7865498860677083 and 1.7865447998046875 since the height-correlated Smith G of 2026-11-11, whose
+budgets were re-recorded with Scott's ruling; docs/limits.md lists every moved batch 160 budget); native WebGL2 explicitly rejects PBR. See whitepaper/results/batch-160-metallic-roughness.json
 and scripts/reference-rendering/run.mjs. The remaining picture loss is open in known-bugs; other material
 families and the independent path-traced IBL/Cornell controls are still unmeasured. No core change.
 

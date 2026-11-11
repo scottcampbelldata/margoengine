@@ -27,28 +27,28 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 13792000,
-        "square": 1394430502,
+        "absolute": 13794699,
+        "square": 1393039135,
         "max": 148,
-        "mae": 17.537434895833332,
-        "rmse": 42.108313601486884,
+        "mae": 17.54086685180664,
+        "rmse": 42.08730045668216,
         "foreground": 150544,
-        "foregroundAbsolute": 13792000,
-        "foregroundMae": 30.538137244482233,
-        "changed": 146646
+        "foregroundAbsolute": 13794699,
+        "foregroundMae": 30.544113348921247,
+        "changed": 146639
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 13792000,
-          "square": 1394430502,
+          "absolute": 13794699,
+          "square": 1393039135,
           "max": 148,
-          "mae": 17.537434895833332,
-          "rmse": 42.108313601486884,
+          "mae": 17.54086685180664,
+          "rmse": 42.08730045668216,
           "foreground": 150544,
-          "foregroundAbsolute": 13792000,
-          "foregroundMae": 30.538137244482233,
-          "changed": 146646
+          "foregroundAbsolute": 13794699,
+          "foregroundMae": 30.544113348921247,
+          "changed": 146639
         }
       }
     },
@@ -73,28 +73,28 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 1843497,
-        "square": 70743471,
+        "absolute": 1807380,
+        "square": 65914988,
         "max": 142,
-        "mae": 2.344127655029297,
-        "rmse": 9.484459664534075,
+        "mae": 2.2982025146484375,
+        "rmse": 9.15506643863212,
         "foreground": 150544,
-        "foregroundAbsolute": 1843497,
-        "foregroundMae": 4.081856467212243,
-        "changed": 64277
+        "foregroundAbsolute": 1807380,
+        "foregroundMae": 4.001886491656924,
+        "changed": 64265
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 1843497,
-          "square": 70743471,
+          "absolute": 1807380,
+          "square": 65914988,
           "max": 142,
-          "mae": 2.344127655029297,
-          "rmse": 9.484459664534075,
+          "mae": 2.2982025146484375,
+          "rmse": 9.15506643863212,
           "foreground": 150544,
-          "foregroundAbsolute": 1843497,
-          "foregroundMae": 4.081856467212243,
-          "changed": 64277
+          "foregroundAbsolute": 1807380,
+          "foregroundMae": 4.001886491656924,
+          "changed": 64265
         }
       }
     }

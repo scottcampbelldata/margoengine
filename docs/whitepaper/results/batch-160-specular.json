@@ -36,15 +36,15 @@
   },
   "metrics": {
     "pixels": 262144,
-    "absolute": 877419,
-    "square": 45728215,
+    "absolute": 877623,
+    "square": 45728851,
     "max": 255,
-    "mae": 1.1156959533691406,
-    "rmse": 7.625380793167253,
+    "mae": 1.1159553527832031,
+    "rmse": 7.625433820880249,
     "foreground": 49688,
-    "foregroundAbsolute": 877419,
-    "foregroundMae": 5.8861898245049105,
-    "changed": 48846
+    "foregroundAbsolute": 877623,
+    "foregroundMae": 5.887558364192562,
+    "changed": 48847
   },
   "compat": {
     "family": "specular",
@@ -90,15 +90,15 @@
     },
     "metrics": {
       "pixels": 262144,
-      "absolute": 877434,
-      "square": 45728542,
+      "absolute": 877629,
+      "square": 45729151,
       "max": 255,
-      "mae": 1.1157150268554688,
-      "rmse": 7.625408057461974,
+      "mae": 1.1159629821777344,
+      "rmse": 7.625458833824422,
       "foreground": 49688,
-      "foregroundAbsolute": 877434,
-      "foregroundMae": 5.88629045242312,
-      "changed": 48846
+      "foregroundAbsolute": 877629,
+      "foregroundMae": 5.887598615359845,
+      "changed": 48847
     }
   },
   "amd": {

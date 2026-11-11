@@ -27,28 +27,28 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 4131141,
-        "square": 227911849,
-        "max": 255,
-        "mae": 5.253017425537109,
-        "rmse": 17.023657139246332,
-        "foreground": 67217,
-        "foregroundAbsolute": 4131141,
-        "foregroundMae": 20.48658821429103,
-        "changed": 65068
+        "absolute": 4164102,
+        "square": 225989290,
+        "max": 254,
+        "mae": 5.294929504394531,
+        "rmse": 16.951703224391494,
+        "foreground": 67219,
+        "foregroundAbsolute": 4164102,
+        "foregroundMae": 20.64942947678484,
+        "changed": 65071
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 4131146,
-          "square": 227912524,
-          "max": 255,
-          "mae": 5.253023783365886,
-          "rmse": 17.02368234846672,
-          "foreground": 67217,
-          "foregroundAbsolute": 4131146,
-          "foregroundMae": 20.486613009605705,
-          "changed": 65068
+          "absolute": 4164101,
+          "square": 225989199,
+          "max": 254,
+          "mae": 5.294928232828776,
+          "rmse": 16.951699811386508,
+          "foreground": 67219,
+          "foregroundAbsolute": 4164101,
+          "foregroundMae": 20.649424517869452,
+          "changed": 65071
         }
       }
     },
@@ -73,28 +73,28 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 2632772,
-        "square": 107202858,
-        "max": 255,
-        "mae": 3.347742716471354,
-        "rmse": 11.675422180515003,
-        "foreground": 67196,
-        "foregroundAbsolute": 2632772,
-        "foregroundMae": 13.060162311248686,
-        "changed": 64009
+        "absolute": 2632779,
+        "square": 102874219,
+        "max": 254,
+        "mae": 3.3477516174316406,
+        "rmse": 11.437278259017855,
+        "foreground": 67195,
+        "foregroundAbsolute": 2632779,
+        "foregroundMae": 13.060391398169507,
+        "changed": 63973
       },
       "compat": {
         "metrics": {
           "pixels": 262144,
-          "absolute": 2632767,
-          "square": 107202639,
-          "max": 255,
-          "mae": 3.347736358642578,
-          "rmse": 11.675410254905877,
-          "foreground": 67196,
-          "foregroundAbsolute": 2632767,
-          "foregroundMae": 13.060137508185012,
-          "changed": 64009
+          "absolute": 2632778,
+          "square": 102874114,
+          "max": 254,
+          "mae": 3.3477503458658853,
+          "rmse": 11.437272422207936,
+          "foreground": 67195,
+          "foregroundAbsolute": 2632778,
+          "foregroundMae": 13.060386437482947,
+          "changed": 63973
         }
       }
     }

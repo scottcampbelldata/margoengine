@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 24,743 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,808 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -297,7 +297,7 @@ which stays for v1.0.
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,743 B | 61,058 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,808 B | 61,253 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -784,7 +784,9 @@ a gate passes on what its baseline records and fails on anything new or worse, n
 Baselines only shrink. When you fix a violation the gate fails until you lock it in:
 `npm run quality -- --gate=<gate> --update`. Growing a baseline (a new entry's budget, an accepted dependency) needs
 `npm run quality -- --gate=<gate> --update --reason="why"`; the reason is appended to the file's `history`. Size budgets
-only suggest shrinking. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
+only suggest shrinking. `--update` leaves the size budgets of a package whose dist is stale (its build stamp no longer
+matches the checked-out sources, as after a rebase onto other lanes' work) as recorded, and says how many it kept;
+rebuild that package to update them. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
 `test-results/quality.json`.
 
 ## API lock
@@ -2981,7 +2983,7 @@ A light helper retains 528 bytes of Float64 circle samples and two three-number 
 
 ## K2 rendering and test limits
 
-K2 native glass scope: automatic per-surface snapshots apply to graph-managed Engine scenes. A caller-owned already-open external render pass must use a linear HDR target for the exact sum; its display-target snapshot hook remains on the finish-later list. The native path keeps its existing tone mapping and sightline tint; there is no new HDR-equivalence or refraction claim.
+K2 native glass scope: automatic per-surface snapshots apply to graph-managed Engine scenes. A caller-owned already-open external render pass (`createRenderer`) gets the same linear sum on a display-encoded target when its `draw` call lends `options.snapshot` (KB2281, 2026-11-11): one caller pass end, one colour copy into a context-sized snapshot texture and one reopened pass per glass surface, the cost the graph path pays too. Without the hook it keeps the native tint/add blend, exact only on `rgba16float` (measured: 197, 221, 239 against the linear 143, 154, 165 of 255 over a 128 grey). The native path keeps its existing tone mapping and sightline tint; there is no new HDR-equivalence or refraction claim.
 
 K2 native glass measured gzip before/after: gltf-pro 78058/79666 B, model 58923/60402 B, progressive 86739/88346 B, worker 78581/80160 B. Core plus stage remains 24209 B. Three optional ceilings grow in the generated sizes baseline; model remains within its existing ceiling. The synchronous draw adapter, shared lifecycle and scene-copy shader stay together; splitting them would introduce a package cycle or an async gap during model draws. No speed claim.
 
@@ -3004,7 +3006,7 @@ Opaque quad backs now block area-light shadow segments and diffuse paths in both
 sides supply no emission or reflected light. This matches the existing direct point/spot/directional baker's two-sided
 shadow visibility. Alpha omission and glass transport retain their explicit visibility rules. Surface transport still
 uses the stored texel's front normal and diffuse radiance; it does not add two-sided emission or a new material model.
-The historical Cornell loss remains open as detailed in known-bugs.md; this change makes no accuracy-parity claim.
+The historical Cornell loss was a bounce-count mismatch in the reference (KB2604h, fixed 2026-11-11); this change makes no accuracy-parity claim.
 
 Progressive splat cancellation rejects pending consumers and requests async
 iterator return without waiting indefinitely for producer IO or cleanup. The
@@ -3569,6 +3571,12 @@ Root Figure attachment still rejects the engine's WebGL2 preview backend; the op
 adapter adds surface and rectangle drawing below. CPU extraction is not integrated into that adapter yet.
 Strict surface/rectangle drawing parity passes on Chromium/RTX A6000; the other native layer paths remain pending.
 
+KB1405 evidence (2026-11-11): `Figure.create` axes (with scatter points), scatter, line and label volumes on the
+complete WebGL2 layer, on `/tiers` forced to half-float and on LDR, match native WebGPU at 192 x 144: mean(max RGB
+channel difference) at most 0.00004/255 and share(d > 8/255) 0 in every case, with identical tick-label text. The
+bounds were fixed before the first run (mean <= 1, share <= 0.02) in `packages/sciviz/tests/fallback-browser.mjs`,
+which fails when a case does not draw on the layer. This is the evidence for retiring the native `sciviz/webgl2` driver.
+
 Sciviz native drawing piece (batch 181, 2026-11-10): `await attachWebGL2(engine, { axes: false, ... })`
 returns a Figure on a real `backend: 'webgl2'` engine. CPU-backed surfaces, bars, histograms and heatmaps only;
 `signal` defaults absent and cancels module waiting/attachment with its exact reason; the module fetch may continue.
@@ -3649,7 +3657,7 @@ Required test inputs and still-missing real-file proof are listed in
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 24,743 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,145 B of its 22,146 B cap (2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 24,808 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,207 B of its 22,208 B cap (2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -3719,7 +3727,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| One directional light in core | Enforced by design: core's lighting is one direction and one radiance, plus a colourless scalar ambient. | Every light model beyond one sun is an optional package, so apps that need one sun pay for one sun. | No API for a second sun in core; core's own ambient does not light metals. | `@margoengine/clustered`: up to 1,024 point and spot lights (`RangeError: Expected at most 1,024 lights` past that). `@margoengine/clustered/shadows`: shadows for up to 16 of them ([local-shadows-gpu.json](../examples/package-benchmarks/results/local-shadows-gpu.json)). `@margoengine/clustered/area` (8,946 B gzip): up to 64 rectangle area lights (`RangeError: Expected at most 64 area lights`), unshadowed, no texture bindings ([area-lights-gpu.json](../examples/package-benchmarks/results/area-lights-gpu.json)). More directional lights: `@margoengine/clustered/directional` (1,563 B gzip), up to 16 (`RangeError: Expected an array of at most 16 directional lights`), unshadowed. IES profiles: `@margoengine/clustered/ies` (3,697 B gzip), at most 16 distinct profiles, type C files only. Projector spots: `@margoengine/clustered/projector` (2,618 B gzip), at most 16 images of up to 4,096 texels a side. Physical units: `@margoengine/clustered/units` (833 B gzip). All three light entries use storage buffers, no texture bindings ([light-features-gpu.json](../examples/package-benchmarks/results/light-features-gpu.json)). Configurable ambient: `@margoengine/environment` `HemisphereLight` and `AmbientLight`, one per engine. Image-based lighting: `@margoengine/environment`. |
+| One directional light in core | Enforced by design: core's lighting is one direction and one radiance, plus a colourless scalar ambient. Its BRDF is glTF 2.0 Appendix B's: GGX, height-correlated Smith G2 (Heitz 2014; since 2026-11-11, before that separable), Schlick, Lambert, single scattering only (rough metals lose the energy of multiple bounces between microfacets). Clustered lights and the materials package still use the separable G (docs/known-bugs.md). | Every light model beyond one sun is an optional package, so apps that need one sun pay for one sun. | No API for a second sun in core; core's own ambient does not light metals. | `@margoengine/clustered`: up to 1,024 point and spot lights (`RangeError: Expected at most 1,024 lights` past that). `@margoengine/clustered/shadows`: shadows for up to 16 of them ([local-shadows-gpu.json](../examples/package-benchmarks/results/local-shadows-gpu.json)). `@margoengine/clustered/area` (8,946 B gzip): up to 64 rectangle area lights (`RangeError: Expected at most 64 area lights`), unshadowed, no texture bindings ([area-lights-gpu.json](../examples/package-benchmarks/results/area-lights-gpu.json)). More directional lights: `@margoengine/clustered/directional` (1,563 B gzip), up to 16 (`RangeError: Expected an array of at most 16 directional lights`), unshadowed. IES profiles: `@margoengine/clustered/ies` (3,697 B gzip), at most 16 distinct profiles, type C files only. Projector spots: `@margoengine/clustered/projector` (2,618 B gzip), at most 16 images of up to 4,096 texels a side. Physical units: `@margoengine/clustered/units` (833 B gzip). All three light entries use storage buffers, no texture bindings ([light-features-gpu.json](../examples/package-benchmarks/results/light-features-gpu.json)). Configurable ambient: `@margoengine/environment` `HemisphereLight` and `AmbientLight`, one per engine. Image-based lighting: `@margoengine/environment`. |
 | 16 sampled textures and 16 samplers per shader stage | Enforced by WebGPU's guaranteed minimum; Margo's device asks for no more. gltf-pro's physical material with directional shadows, IBL and local shadows uses exactly 16 (asserted in [instancing.test.js](../packages/gltf-pro/tests/instancing.test.js)). | Every adapter, phones included, supports 16. Requiring more would make the same app fail on some devices. | A `RangeError` naming the combination, e.g. `gltf-pro: physical material + shadows + environment:lighting + clustered + clustered:shadows + shader patch needs 17 sampled textures per shader stage; this device allows 16`. | Drop one lighting feature for that material, or use the standard material (8 of 16 with everything attached). `VolumetricFog`, SSAO, clustered lights, area lights and light probes (`@margoengine/environment/probes`: one storage buffer; with an environment fallback they take EnvironmentLighting's place and its bindings) add no textures. Texture arrays are planned after 1.0. |
 | Raster coverage far from the origin, colour against pick | Measured with [far-origin.browser.mjs](../packages/selection/test/far-origin.browser.mjs) (RTX A6000, 2026-11-10): a rotated unit box 1e5 m from the origin on a 64 x 64 canvas without MSAA. The forward-pass ID target agrees with colour on every pixel; the separate 3 x 3 pick pass (`Picking.attach(engine, {capture: false})`, overlays, custom pipelines, sections) disagrees on 7 edge pixels on native WebGPU and 6 on the WebGL2 layer. Near the origin, and at 1e5 with `FloatingOrigin`, 0 pixels disagree on both. | Core composes `model * position` and then `camera * world` in float32 world space, and no shader marks its clip position `@invariant`, so the colour shader and the pick shader may round a vertex on an edge one pixel differently once the translations are large. | A click on the outermost pixel of an edge can miss a mesh that is drawn there, or hit one that is not; the 3 x 3 neighbour fallback hides most of it. These counts compare the picked set with the colour coverage grown by one pixel; agreement of the centre pixel alone, without the fallback, is not measured, as `pick` has no exact mode (Rust engine port R23). | `FloatingOrigin` in `@margoengine/cameras/origin` keeps the camera and placed roots near local zero: 0 disagreeing pixels at 1e5 on both backends. The default `Picking.attach(engine)` reads the ID target written with the colour pass. |
 | float32 coordinates | Measured on the GPU ([large-coordinates-gpu.json](../examples/package-benchmarks/results/large-coordinates-gpu.json), 10 mm part, camera 50 mm away): core alone jitters 0.38 px at 1 km and 42 px at 100 km; at 6,000 km the part is not drawn. Per-stage CPU breakdown in [large-coordinates.md](large-coordinates.md). | Core and its kernel store positions and matrices in float32: half the memory and bandwidth of float64, and the format GPUs consume. | No error. Parts shake while the camera moves, small features collapse, specular shifts (2.8° at 100 km), and far enough out geometry disappears. | `FloatingOrigin` in `@margoengine/cameras/origin` (1,258 B gzip, 0 core bytes): 0.019 px jitter at every distance up to 6,000 km, and `engine.pick` hits the part at every distance ([large-coordinates.md](large-coordinates.md#the-plugin)). Vertices or child offsets that are already kilometres from their root inside one asset must be re-centred at export. |
@@ -3755,7 +3763,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Volumetric clouds (`@margoengine/sky/volumetric-clouds`, 2026-11-07) | Every pixel marches up to `steps` samples (64), and each cloudy sample takes `lightSteps` (6) more toward the sun. | By method: one layer between two heights; a full-resolution march of up to `steps` samples (64) with `lightSteps` (6) toward the sun at each cloudy one, no temporal reuse and no half-resolution pass, so cost follows pixels times steps (a 256 x 192 view took about 15 ms on a Radeon 680M, diagnostic). With multisampled depth the march stops at each pixel's first sample. The sky light is the sky's 64 x 32 reflection map, which includes the sky's own procedural layer if that is on. Proved on one GPU, a Radeon 680M, by behaviour (coverage, depth, motion), not against a reference renderer. | Fixed noise volumes (64³ and 32³) repeat every `scale` metres; static per-pixel jitter leaves a fine grain instead of bands. | Lower `steps` (and `lightSteps`) on slow GPUs, or shorten `maxDistance`; all are live on `clouds.options`. |
 | Volumetric cloud shadows (`@margoengine/sky/cloud-shadows`, 2026-11-07) | By method: every lit receiver pixel marches the cloud field `samples` times (12), each with three noise reads, so cost follows lit pixels; a hard shadow of the sun's centre, with no blur from the sun's size; the light is the shadows' sun, not the sky's, so the two must agree. Points above the layer get no shadow. It keeps its own 64³ and 32³ noise volumes (about 1.2 MB of GPU memory). Proved on one GPU, a Radeon 680M, against the clouds' own view from 48 ground points. | Every lit receiver pixel marches the cloud field `samples` times, and the shadow is a hard one of the sun's centre. | Cost follows lit pixels, the shadow has no blur from the sun's size, and points above the layer get no shadow. | Lower `samples` (default 12, 2 to 64) to cut the cost per lit pixel; drive the sun from the sky's `lighting` option so the shadows' sun and the sky's agree. |
 | Aerial perspective (`@margoengine/sky/aerial`, 2026-11-07) | By method: one 32 x 32 x 32 volume over the view, so the air varies smoothly across 32 screen columns and is read with the first sample of multisampled depth; beyond `maxDistance` (64 km) it holds the last slice; the planet's centre is under the camera, so a camera far from the origin sees the same air; no shadows in the air (no light shafts). Proved on one GPU, a Radeon 680M: transmittance within 0.006 of Beer-Lambert on the CPU at 1, 10 and 40 km. | The air is held in one coarse volume over the view. | On a display target the in-scattered light is blended after the display transform, an approximation. | Use it with Bloom, tonemapping or another HDR scene capture, where the blend is exact; `maxDistance` (default 64,000 m) sets how far the 32 slices reach. |
-| Hillaire sky (`@margoengine/sky/hillaire`, 2026-11-07) | By method: single scattering plus Hillaire 2020's multiple scattering table, no clouds or shadows in the air; the 192 x 108 sky-view table is read bilinearly, so the horizon row blends sky and ground over one texel; the planet's centre is under the camera; the sun's disc has no limb darkening and is held at 65,504 (half-float range) against its true radiance of about 300,000 at illuminance 20. It does not light the scene (no engine sun, ambient or reflection map). Above 100 km each pixel marches 32 steps. Proved on one GPU, a Radeon 680M, by the colours physics gives (blue noon, orange sunset, ozone's twilight), not against a reference renderer. | The sky is single scattering plus a multiple scattering table read at a fixed size, with the sun disc held at the half-float range. | The horizon row blends sky and ground over one texel, and the sky does not light the scene. | Set core's sun from `sky.sun` and `sky.sunTransmittance` to light the scene, or use the root `Sky` with its `lighting` option, which drives the engine's sun and ambient. |
+| Hillaire sky (`@margoengine/sky/hillaire`, 2026-11-07) | By method: single scattering plus Hillaire 2020's multiple scattering table, no clouds or shadows in the air; the 192 x 108 sky-view table is read bilinearly, so the horizon row blends sky and ground over one texel; the planet's centre is under the camera; the sun's disc has no limb darkening and is held at 65,504 (half-float range) against its true radiance of about 300,000 at illuminance 20. It does not light the scene (no engine sun, ambient or reflection map). Above 100 km each pixel marches 32 steps. An atmosphere so thick that almost no light escapes (KB3454's case: 2 /km extinction, no absorption, white ground) gives a finite table, but Hillaire's one transfer for every order over-brightens it (table values up to 455 measured, against the true radiance of order one). Proved on one GPU, a Radeon 680M, by the colours physics gives (blue noon, orange sunset, ozone's twilight), not against a reference renderer. | The sky is single scattering plus a multiple scattering table read at a fixed size, with the sun disc held at the half-float range. | The horizon row blends sky and ground over one texel, and the sky does not light the scene. | Set core's sun from `sky.sun` and `sky.sunTransmittance` to light the scene, or use the root `Sky` with its `lighting` option, which drives the engine's sun and ambient. |
 | Ground albedo feedback (`groundAlbedo` on the Bruneton `Sky`, 2026-11-07) | Enforced: one number or linear RGB from 0 to 1, Bruneton model only (Preetham ignores it). By method: one Lambertian albedo for the whole ground, no texture, no snow sparkle or other directional reflection; the ground's light is gathered at 32 directions per scattering density texel and a 64-entry irradiance table over the sun's elevation, as coarse as the rest of the table; the ground lit by order n - 2 feeds order n (Bruneton and Neyret 2008), and light past the fourth order, from the ground or the air, is left out as before. Proved on a Radeon 680M (LIM-375); no reference sky compared. | The Bruneton tables hold the air only; the ground is a boundary term. | A ground of mixed snow and forest takes one mean value; the brightening does not follow where the snow lies. | Use the mean albedo of the ground the view sees; `HillaireSky`'s `atmosphere.groundAlbedo` takes every order (Hillaire 2020's multiple scattering table), also as one value. |
 | Planet presets (`@margoengine/sky/presets`, 2026-11-07) | Enforced: Mars's dust optical depth from 0 to 10. By method: each world is the Hillaire model's air, so Rayleigh, one Mie (dust) layer with one phase function and an ozone-like absorbing tent; Mars's dust has one asymmetry for every colour, so the blue glow around the setting sun that its wavelength-dependent forward scattering gives is not drawn; no water-ice clouds, no dust layer above the gas's scale height. The dust's green and blue single scattering albedo are Margo's reading of published curves (LIM-378). Worlds with air too thick for the 40-step tables (Venus, Titan) have no preset. | The Hillaire tables hold one Mie layer; a thick atmosphere needs more steps than they take. | A Martian sunset is a dim reddish sun in a bright halo, not blue. | Give your own `atmosphere`, per channel where needed; for thick worlds a custom sky. |
 | Day presets (`@margoengine/scenery/presets`, 2026-11-07) | By method: four fixed looks (noon, golden hour, overcast, dawn) for the Preetham `Sky` with its 2D cloud sheet; the sun's colour comes from the sky's transmittance, but the overcast dimming of direct sun and sky light is a preset value (sun strength 0.5, sky 2.5 stops darker), not a cloud model; no cloud shadows; diffuse floors are Margo design values (LIM-407). | The root `Sky` has no cloud transmittance for the engine light, so a preset sets it. | Overcast is a grey, even light about a fifth of noon's; under a partly cloudy preset the sun is never hidden. | Copy a `DAY_PRESETS` entry and change its values, or add `@margoengine/sky/volumetric-clouds` and `cloud-shadows`. |
@@ -3848,7 +3856,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Cellular noise on the GPU (`@margoengine/shader/noise`, 2026-11-06) | Distances are Euclidean only; there is no Manhattan or Chebyshev form. | By method: `voronoi2` and `voronoi3` search two cells each side, which is exact: 25 and 125 cells, three hashes each in 3D, so `voronoi3` and `worley3` cost far more per pixel than simplex. Not timed. | `voronoi3` and `worley3` cost far more per pixel than simplex. | Run it once in a compute pass, or at low resolution, and sample the result; on the CPU `new Noise(seed).worley(x, y, z)` gives the same field. |
 | SciFiHelmet with default shadows (accepted difference in work, 2026-11-05) | Measured (`helmet`, RTX A6000, Edge 156, 5 runs, `--no-gate`, other jobs running, diagnostic): 0.33 ms GPU a frame against three's WebGL 0.08 and WebGPU 0.07 (0.78 when first measured). Like for like (`helmet-filterpcf-cascades1`, `'pcf'` and one cascade, the setup closest to three's one map): 0.074 ms against 0.085 and 0.068. CPU 0.12 ms against WebGL 0.09 and WebGPU 0.19. | three's side draws one map with one fixed filter. Margo's default draws four cascades and PCSS, so a penumbra widens with the distance to its blocker. Of the 0.33 ms, about 0.12 is the frame with `'pcf'` and four cascades, 0.10 is the pass that finds each layer's nearest depth (it reads all 64 MiB of the four 2048 maps, so memory bandwidth sets its time), and 0.10 is the blocker reads and comparison taps. | Contact-hardening shadows and sharper texels near the camera by default, for about 0.25 ms on this scene. A cheaper filter would change the image, so the default stays. The nearest-depth pass could read only the part of each layer that casters reach and give the same result, but casters carry no bounds yet. | `filter: 'pcf'` and `cascades` on `Shadows`; `@margoengine/quality` sets them on its light and phone tiers. |
 | Rect area lights (accepted difference in work, 2026-11-05) | Measured (`p-rect-area`, 4 lights on 1,000 boxes, RTX A6000, Edge 156, 5 runs, `--no-gate`, other jobs running, diagnostic): 0.38 ms GPU a frame against three's WebGL 0.15 and WebGPU 0.35 (0.47 before entry 67). Like for like (the published fitted edge term with no clip, patched in as a measurement): 0.26 ms. CPU 0.09 ms against 0.61 and 0.83. | Every fragment runs two integrals per light with an exact arc-tangent edge term, held to 1e-5 relative, and clips a quad to the surface's horizon. The fitted term is 1.5e-4 off, and with no clip a quad crossing the horizon reads 0.069 where the true form factor is 0.006. | Exact area light shading at every roughness, for about 0.08 ms per light here. | Fewer lights: every light costs every fragment, as the lights have no range. |
-| USDZ export (2026-11-05) | Measured (`p-export-usdz`, 1,000 nodes of one box, RTX A6000, Edge 156, 3 runs, `--no-gate`, other jobs running, diagnostic): 4.4 ms against three's WebGL 3.2 and 496,187 B against 444,202 B (16.0 ms and 2.46 MB before entry 69). Every mesh is in its own space under `xformOp:transform`; a geometry two or more nodes draw is written once as a class prim that each node references, and nodes that mirror it share one reflected shape, so no matrix keeps a negative determinant. Against the writer that kept single and mirrored meshes in world space, 25 real Khronos models range from 4.6% smaller (ToyCar) to 2.9% larger (NodePerformanceTest, 10,000 nodes each with a matrix of long decimals), so local space is about what the file holds, not its size; against writing every node as its own copy, ABeautifulGame is 91.4 MB in place of 165.9 MB. Load time in AR is not measured. Only `references = </Path>` within the layer is read back. | A loaded textured model keeps its images on the GPU, and a USDZ holds only what the format can carry. | Vertex colours are written for any USD reader but Quick Look draws them grey ([known bug](known-bugs.md#usdz-vertex-colours-draw-grey-in-quick-look)). | `exportUSDZ` of a loaded textured model refuses, as its images are on the GPU; its GLB bytes go in instead, and `measureUSDZ(bytes).skipped` names what a USDZ cannot hold. |
+| USDZ export (2026-11-05) | Measured (`p-export-usdz`, 1,000 nodes of one box, RTX A6000, Edge 156, 3 runs, `--no-gate`, other jobs running, diagnostic): 4.4 ms against three's WebGL 3.2 and 496,187 B against 444,202 B (16.0 ms and 2.46 MB before entry 69). Every mesh is in its own space under `xformOp:transform`; a geometry two or more nodes draw is written once as a class prim that each node references, and nodes that mirror it share one reflected shape, so no matrix keeps a negative determinant. Against the writer that kept single and mirrored meshes in world space, 25 real Khronos models range from 4.6% smaller (ToyCar) to 2.9% larger (NodePerformanceTest, 10,000 nodes each with a matrix of long decimals), so local space is about what the file holds, not its size; against writing every node as its own copy, ABeautifulGame is 91.4 MB in place of 165.9 MB. Load time in AR is not measured. Only `references = </Path>` within the layer is read back. | A loaded textured model keeps its images on the GPU, and a USDZ holds only what the format can carry. | Vertex colours are written for any USD reader; Quick Look draws them only on a mesh with no material, so a paint-only material is left out, and under any other material it draws them grey ([known bug](known-bugs.md#usdz-vertex-colours-draw-grey-in-quick-look)). | `exportUSDZ` of a loaded textured model refuses, as its images are on the GPU; its GLB bytes go in instead, and `measureUSDZ(bytes).skipped` names what a USDZ cannot hold. |
 | USDZ animation (`@margoengine/exporters/usdz-anim`, 2026-11-06) | A joint with a shear in the nodes above it is refused. At most four influences for each vertex. A clip past 100,000 frames is refused. GLB input takes PNG and JPEG images and no Draco or meshopt. The mirroring of a node is read at frame 0. | By method: one clip for each file, as USD has one timeline. Scales in a `SkelAnimation` are half floats, by USD's schema: 2^-11 relative for each joint, so 5.9e-3 of the model's size at worst for a chain of 12. | Tracks are sampled at `fps`, default 30: a STEP key turns over one frame, and a clip that ends between two frames holds its last pose on the next one, so it runs up to one frame longer. Measured worst 3.1e-4 of the model's size, inside the 5.9e-3 that half-float scales allow, and 4.6e-7 on clips that keep scale 1. Morph weights are not written and are named in `skipped`, with `KHR_animation_pointer` channels. Quick Look shows a file at real size and the default is the model's true size, which glTF says is metres: `height` measures the rest pose, and a clip can reach further, which `bounds` in the result says. The first real iPhone test (Fox-Run, 2026-11-06) failed on size. After the fix Fox-Run and the Robot files looked right on one iPhone, 8 of the 76 files were tried, and the rigged figure still floats off the ground ([known bug](known-bugs.md#animated-usdz-the-fix-for-the-first-iphone-failure-awaits-a-retest)); whether the clipping and the failed move had another cause is not known. No anchoring metadata is written: Quick Look places a file without it, and what it does to moving a model is unmeasured. | Fox.glb is 79 m tall and robot-expressive 4.46 m, so `height` is what makes such a model fit a room, and the result's `size` and `bounds` say so first. |
 | Blender characters (`@margoengine/blender/anim`) | Enforced ([animation.py](../tools/blender-addon/animation.py), [anim.ts](../packages/blender/src/anim.ts)): up to eight bone influences per vertex, relative shape keys only, one clip per action sampled at every frame (LINEAR), a skinned mesh carries only its Armature modifier (vertex groups only: no envelopes, Preserve Volume or mask group), every vertex weighted to a deform bone, no instanced animated meshes. Matches Blender 5.2.3 within 1.2e-6 m (LIM-389). | Sampling every frame bakes constraints, IK and curve shapes into plain keyframes any glTF player reads. | Object-level animation is not exported, and other modifiers must be applied first; every joint has a channel in every clip, so files grow with bones times frames. | Bake object motion onto a bone; apply modifiers before export. |
 | Blender components (`@margoengine/blender/components`) | Enforced ([components.ts](../packages/blender/src/components.ts)): colliders are `box`, `sphere`, `capsule` or `cylinder` sized from the mesh's local box (or `margo:size`), on mesh objects only; lights are point, spot or directional on the tagged mesh object; scripts must be registered by name; static files only. Matches the mechanics within 1 cm at rest (LIM-396). | Implicit shapes are what KHR_implicit_shapes carries and what every solver handles fast. | No mesh or convex-hull colliders from tags, no joints, no Blender rigid body or light objects (lights and cameras come with the scene option). | Model a simple collider mesh and tag it, or add bodies in code with `@margoengine/physics`. |
@@ -3924,7 +3932,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | --- | --- | --- | --- | --- |
 | glTF download budget | Enforced: gltf-pro reads at most `maxDownloadBytes` (default 512 MiB, 536,870,912 B: `assetLimit`, 64 MiB before 2026-11-11) of JSON, buffers and images per load, and decoded accessors, packed geometry and decoded images may each use 4x that (2 GiB by default); a Draco primitive takes up to 16,777,216 vertices and 50,331,648 indices (1,000,000 each before), and `@margoengine/decoders` outputs at most 384 MiB (402,653,184 B) per Draco decode (256 MiB before 2026-11-11), the most whose measured peak Wasm memory fits 90% of the prebuilt decoder's 2 GiB ([draco-output-limit.test.js](../packages/decoders/tests/draco-output-limit.test.js)): a 9,999,392-triangle grid with normals and UVs (a 5.8 MB stream, 280,126,112 B decoded) peaks at 1,035,534,336 B of Wasm memory in the prebuilt decoder and 812,449,792 B in the clean-room one, 3.7x and 2.9x its output; positions only, the worst measured mix, takes 4.5x (`node packages/decoders/scripts/draco-scale.mjs [side] [--positions]`). Draco connectivity can be a few KB for millions of regular triangles, so input size cannot bound decode memory: a 4 KB cut of that grid claims 666 MB (clean-room) or 795 MB (prebuilt) before it fails with `MargoError failed`, within the ceiling; the stage's `addGLTF` reads up to 512 MiB and sends a file over 64 MiB to gltf-pro; `@margoengine/gltf` reads at most 64 MiB ([asset.ts](../packages/gltf-pro/src/asset.ts), [loading.js](../packages/shared/loading.js); [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js), [gltf-draco-limits.test.js](../tests/gltf-draco-limits.test.js), [gltf-routing.test.js](../packages/stage/tests/gltf-routing.test.js)). Khronos ABeautifulGame (a 43 MB GLB whose 33 2048x2048 textures decode to 528 MiB) fits the default image budget. | Bounds memory for any URL an app is handed, at a size where a 10M-triangle scan (about 300 MB raw, or about 800 MB decoded from a 40 MB Draco file) loads with no options; the decoded budget does not shrink with compression. | gltf-pro names the option for the download and packed-geometry budgets, e.g. `RangeError: glTF exceeds download budget (536870912 bytes; raise the maxDownloadBytes option)`; decoded accessors and images over 4x throw `RangeError: Decoded glTF exceeds byte budget` or `RangeError: glTF images exceed decoded size limit`; the light loader throws `glTF download byte budget exceeded` or `glTF buffers exceed 64 MiB`. | gltf-pro's `maxDownloadBytes` option, which also lowers the budget for apps that load untrusted URLs on small devices; for the light loader, use gltf-pro. |
 | Malformed and hostile files | Enforced at each parser's trust boundary (glTF, gltf-pro with its parse worker and progressive stream, `.margo`, Draco, KTX2, meshopt, HDR, EXR, UltraHDR, FBX), checked by seeded fuzzers (`npm run fuzz`, [targets-formats.js](../scripts/fuzz/targets-formats.js); regressions in [fuzz-formats-regressions.test.js](../tests/fuzz-formats-regressions.test.js)): every input ends in a result or the package's own error. Limits added with them: a gltf-pro document nested deeper than 256 levels ([asset.ts](../packages/gltf-pro/src/asset.ts)); an EXR chunk that decodes to more than 256 MiB, or chunks too small to hold the image ([exr.ts](../packages/environment/src/exr.ts)); a Draco or KTX2 decode running longer than 10 s plus 4 s per MiB of input ([pool.ts](../packages/decoders/src/pool.ts)). How long large valid Draco and KTX2 files take to decode: not measured. | Files from a URL are untrusted: a malformed one must fail with an error the app can show, not crash, hang, read outside its bytes or claim memory its size cannot justify. | `TypeError: Invalid glTF JSON: nested deeper than 256 levels`, `RangeError: Unsupported EXR: a chunk decodes to more than 256 MiB`, `RangeError: Invalid EXR: chunks are too small for the image size`, `MargoError: Draco decode timed out after <limit> ms (corrupt data?); the decoder worker was restarted`. | The decoders' `timeout` option (`Infinity` turns the limit off). No real glTF comes near 256 levels; EXR: fewer channels per file. |
-| Vertices per primitive | Enforced: gltf-pro takes up to 16,777,216 vertices per primitive (2^24), loaded as parts of at most `maxPartVertices` (default 262,144, 1,024 to 1,048,576) each; skinned and morphed primitives must fit one part; `loadGLTFProgressive` streams them part by part, each part drawn as it arrives ([progressive.test.js](../packages/gltf-pro/tests/progressive.test.js)); the light `@margoengine/gltf` loader takes up to 1,000,000 vertices in total ([parts.test.js](../packages/gltf-pro/tests/parts.test.js), [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Packed geometry is still bounded by the decoded budget (4x `maxDownloadBytes`; 80 B a vertex, 4 B an index). Measured (Node 26, busy machine, diagnostic): a 1,001,000-vertex grid loads as 4 parts with 0.37% of its vertices copied onto the cuts, packed in about 240 ms. At 10M triangles (RTX A6000, 2026-11-11, [test-parts-browser.mjs](../packages/gltf-pro/scripts/test-parts-browser.mjs), native and WebGL2 layer): a 2,237 x 2,237-vertex field (5,004,169 vertices, 9,999,392 triangles, one primitive, a 240,093,656 B GLB) loads with no options through `loadGLTF` and `loadGLTFProgressive` and draws the same pixels as the field pre-split at export into 20 row bands, in a far, a low and a close view; Node's `prepareGLTF` peaks at 782,875,020 B of ArrayBuffers, 3.26 bytes per input byte. Work counts with `CulledModels`, close view (far view: every part): `maxPartVertices` 65,536: 78 parts, 12 drawn, 1,550,309 triangles; 262,144 (default): 20 parts, 9 drawn, 4,683,190 triangles; 1,048,576: 5 parts, 4 drawn, 8,363,067 triangles. The default stays 262,144 rather than the largest part a device binds: larger parts save at most 15 draws and submit 1.8x the triangles close up. | Each part's vertex buffer is also bound as a storage buffer, so 262,144 vertices (20 MiB) stays inside the WebGPU default binding (128 MiB) and the WebGL2 layer's 2048-context one (64 MiB); indices pass through float32, exact up to 2^24. Parts follow Hoppe 1999, Sander et al. 2007, Yoon et al. 2005, Isenburg and Lindstrom 2005, Cignoni et al. 2005, Kerbl et al. 2018 and Karis et al. 2021 (cited in [parts.ts](../packages/gltf-pro/src/parts.ts)). | Over 2^24: `MargoError` code `unsupported` naming 16777216; a skinned or morphed primitive over the part size: `unsupported` naming `maxPartVertices`; a part over a device's binding: `RangeError` naming its bytes and `maxPartVertices`; the light loader: `RangeError: glTF exceeds one million vertices`. | Split a primitive over 2^24 vertices (or a rigged one over the part size) at export; lower `maxPartVertices` for a device with a small storage binding. |
+| Vertices per primitive | Enforced: gltf-pro takes up to 16,777,216 vertices per primitive (2^24), loaded as parts of at most `maxPartVertices` (default 262,144, 1,024 to 1,048,576) each; skinned and morphed primitives must fit one part; `loadGLTFProgressive` streams them part by part, each part drawn as it arrives ([progressive.test.js](../packages/gltf-pro/tests/progressive.test.js)); the light `@margoengine/gltf` loader takes up to 1,000,000 vertices in total ([parts.test.js](../packages/gltf-pro/tests/parts.test.js), [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Packed geometry is still bounded by the decoded budget (4x `maxDownloadBytes`; 80 B a vertex, 4 B an index). Measured (Node 26, busy machine, diagnostic): a 1,001,000-vertex grid loads as 4 parts with 0.37% of its vertices copied onto the cuts, packed in about 240 ms. At 10M triangles (RTX A6000, 2026-11-11, [test-parts-browser.mjs](../packages/gltf-pro/scripts/test-parts-browser.mjs), native and WebGL2 layer): a 2,237 x 2,237-vertex field (5,004,169 vertices, 9,999,392 triangles, one primitive, a 240,093,656 B GLB) loads with no options through `loadGLTF` and `loadGLTFProgressive` and draws the same pixels as the field pre-split at export into 20 row bands, in a far, a low and a close view; Node's `prepareGLTF` peaks at 782,875,020 B of ArrayBuffers, 3.26 bytes per input byte. Work counts with `CulledModels`, close view (far view: every part): `maxPartVertices` 65,536: 78 parts, 12 drawn, 1,550,309 triangles; 262,144 (default): 20 parts, 9 drawn, 4,683,190 triangles; 1,048,576: 5 parts, 4 drawn, 8,363,067 triangles. Without `CulledModels` the draw loop tests each part's bounding sphere against the camera frustum on the CPU (one test per primitive per draw, 2026-11-11, [parts.test.js](../packages/gltf-pro/tests/parts.test.js)), so a part out of view issues no draw; instanced, rigged, deformed, own-shader and displaced primitives are drawn untested. The default stays 262,144 rather than the largest part a device binds: larger parts save at most 15 draws and submit 1.8x the triangles close up. | Each part's vertex buffer is also bound as a storage buffer, so 262,144 vertices (20 MiB) stays inside the WebGPU default binding (128 MiB) and the WebGL2 layer's 2048-context one (64 MiB); indices pass through float32, exact up to 2^24. Parts follow Hoppe 1999, Sander et al. 2007, Yoon et al. 2005, Isenburg and Lindstrom 2005, Cignoni et al. 2005, Kerbl et al. 2018 and Karis et al. 2021 (cited in [parts.ts](../packages/gltf-pro/src/parts.ts)). | Over 2^24: `MargoError` code `unsupported` naming 16777216; a skinned or morphed primitive over the part size: `unsupported` naming `maxPartVertices`; a part over a device's binding: `RangeError` naming its bytes and `maxPartVertices`; the light loader: `RangeError: glTF exceeds one million vertices`. | Split a primitive over 2^24 vertices (or a rigged one over the part size) at export; lower `maxPartVertices` for a device with a small storage binding. |
 | Dash caps (`dashCap` on `LineMaterial`) | By method: a cap reaches half the line width past its dash in pixels while dashes stay in world units, so a gap narrower than the width closes up. A cap stops at the line's own ends, and picks count gaps as line. | Ends are drawn in the fragment, with no extra geometry per dash. | Dotted lines keep the dot width on screen while their spacing follows perspective. | Widen `gapSize`, or use `worldUnits` widths. |
 | Adaptive point size (`adaptiveSize` on `OctreeCloud` in `@margoengine/points/octree`) | By method: density is per node and assumes a surface (points per cube face), so a volume of points gets smaller points than its gaps need. Sizes are written on the CPU, at most 500,000 points a selection, when the nodes drawn under a node change. A random sample still leaves gaps: 98 percent of the pixels covered at the default `scale` of 1.5 in the browser check. | Point sizes already have a channel, so this needs no second shader. | Far parts look solid, with larger and softer points. A big camera jump takes a few frames to settle sizes. | Raise `scale`; set `maxPixelSize` to cap the growth. |
 | Surfels (`SurfelPlugin` in `@margoengine/points/surfels`) | Enforced by method: opaque, always tests and writes depth, no textures, no `PointsPlugin.pick`; WebGPU only. Scene depth holds each disc pushed back by up to `blendDepth` radii. Each point draws twice, plus one full-screen pass. Extra targets take 12 bytes a sample: about 100 MB at 1920 x 1080 with 4x MSAA. Speed is not measured. | Weighted colour needs a sum and a divide, so it cannot be one blended draw; pushing the scene's own depth keeps meshes in the same test. | About twice the point cost of `PointsPlugin`. Something drawn later that lies within the push of a surface can show through it. | `PointsPlugin` where speed matters more; a smaller `blendDepth` for thin layers close together. |
@@ -4012,7 +4020,8 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Splat depth (`@margoengine/splats/depth`, 2026-11-07) | Proved on a Radeon 680M with a real capture (LIM-444). By method: a pixel takes the centre depth of the nearest splat whose own opacity there reaches `threshold` (default 0.5); depth is written after the cloud draws. | Splats blend far to near and the colour pass cannot write depth without hiding the splats behind; accumulated (median) depth needs a front-to-back pass. | Thin captures of many faint splats get depth only where one splat is solid (1,514 of 4,463 covered pixels on the raccoon fixture at 0.5); a mesh drawn before the cloud is not hidden by splats in front of it beyond the normal blend; transparent meshes (drawn before) are covered by the blend. | Lower `threshold`; draw glass with the cloud through `@margoengine/oit/vfx`. |
 | Streamed splat level of detail (`@margoengine/splats/lod`, 2026-11-07) | Proved on a Radeon 680M with a real capture (LIM-453); the past-3,000,000 case on a procedural stand-in. By method: at most `budget` splats (up to 3,000,000) are drawn, in slots of the largest node; inner nodes are moment-matched merges, not trained levels. | One cloud holds at most 3,000,000 splats and sorts on the GPU every frame over its whole pool; streamed nodes must fit fixed slots. | Every pool splat is projected and sorted each frame, drawn or not; a refinement waits for all its children; a coarse level looks blurrier than a trained one; distance is measured from the bounding sphere, no frustum test. | Raise `budget` up to 3,000,000; serve trained levels through your own `SplatLodSource`. |
 | One sort for many splat clouds (`@margoengine/splats/set`, 2026-11-08) | Proved on a Radeon 680M with a real capture (LIM-464). | One pool of at most 3,000,000 splats; every member has the same SH count; first-fit ranges can fragment. | Every pool splat is projected and sorted each frame, free ranges too; `setMatrix` rewrites the member from the CPU (a whole upload); clouds outside the set still sort apart. | Size `capacity` to the clouds you add; add the clouds that overlap to one set. |
-| Degree-3 splat cloud vs the storage binding (`Splats.attach`, 2026-11-08) | Enforced: `setup` refuses a buffer past `maxBufferSize` or `maxStorageBufferBindingSize`. The device asks for no limit above the WebGPU minimum, so the binding is 134,217,728 bytes. Degree-3 SH is 16 coefficients per channel, float32, 192 bytes a splat, so 699,050 splats fit and 699,051 do not (`packages/splats/test/storage-fit.test.js`). The published truck at iteration 7,000 has 1,692,538 splats and is refused. | The SH buffer is one storage binding, and core does not raise the binding size. | A degree-3 cloud longer than 699,050 splats throws `RangeError: Splat attributes exceed device storage limits; use fewer splats.` A shorter degree, or no SH, fits more. | Keep a degree-3 cloud to 699,050 splats, or drop `sphericalHarmonics`. The batch 168 row uses that prefix. Both bounds draw on a real GPU (`node packages/splats/test/gpu/scale-check.mjs`, 2026-11-10): 3,000,000 splats without SH at 15.2 ms a frame natively and 401.6 ms on the WebGL2 layer, 699,050 of degree 3 at 7.8 and 123.6 ms (busy machine, diagnostic; the WebGL2 figures are a speed bug in docs/work-lists/speed-phase.md). |
+| Degree-3 splat cloud vs the storage binding (`Splats.attach`, 2026-11-08, rerun 2026-11-11) | Enforced: `setup` refuses a buffer past `maxBufferSize` or `maxStorageBufferBindingSize`. Core asks for the adapter's figures (d9be88943f), so natively the binding is the adapter's (2 GiB and more on the RTX A6000); on a default device, and on the WebGL2 layer, it is 134,217,728 bytes. Degree-3 SH is 16 coefficients per channel, float32, 192 bytes a splat, so at 128 MiB 699,050 splats fit and 699,051 do not (`packages/splats/test/storage-fit.test.js`). The published truck at iteration 7,000 has 1,692,538 splats (325 MB of SH): it attaches and draws natively and is refused at attach on the WebGL2 layer. | The SH buffer is one storage binding; the WebGL2 layer's compute tier reads a binding through word textures that hold 128 MiB. | On the WebGL2 layer, or a device with the default binding size, a degree-3 cloud longer than 699,050 splats throws `RangeError: Splat attributes exceed device storage limits; use fewer splats.` A shorter degree, or no SH, fits more. | Use WebGPU for degree-3 clouds past 699,050 splats, or drop `sphericalHarmonics` on the WebGL2 layer. All three sizes run on a real GPU (`node packages/splats/test/gpu/scale-check.mjs`, natively and with MARGO_COMPAT=1, 2026-11-11, busy machine, diagnostic): 3,000,000 splats without SH at 13.6 ms a frame natively and 597.9 ms on the WebGL2 layer, 699,050 of degree 3 at 4.9 and 120.5 ms, the truck's 1,692,538 of degree 3 at 9.0 ms natively (the WebGL2 figures are a speed bug in docs/work-lists/speed-phase.md). |
+| Splat projection near the view's edge (`Splats`, 2026-11-11, KB2604f) | By method: the EWA Jacobian is linearised at the splat's view direction clamped to 1.3 times the half-view tangent, as 3DGS training does, so a splat whose centre lies far outside the view draws a narrower ellipse than its exact projection would. The Truck capture at iteration 7,000 scores 20.882 dB PSNR against its `000001` photograph (full cloud, RTX A6000, `packages/splats/scripts/truck-photo.mjs`); not the paper's dataset average. | Trained captures expect this clamp; without it splats beside the camera stretch across the frame. | A large splat just outside the view may show a slightly smaller edge than an exact ray-traced Gaussian. | None needed for trained captures; for exact Gaussians at the edge, widen the field of view. |
 | Core meshes culled on the GPU (`CulledMeshes`, 2026-11-10) | Enforced: up to `maxStorageBufferBindingSize / 96` instances of one geometry, 1,398,101 at the default 128 MiB binding, else a `RangeError` naming the figure. Before this, past 1,048,574 instances of one geometry core's instance buffer doubles to 2,097,150 slots (201 MB) and CulledMeshes bound all of it and sized its own lists to the next power of two: every frame failed with `gpu-lost`. It now binds only the slots in use and stops doubling at the binding. Measured (RTX A6000, busy machine, diagnostic only): 1,200,000 instances, frames identical to core's; whole field 1,108,601 drawn, 24.8 ms wall a frame; facing out over a corner 1,928 drawn, 20.1 ms; WebGL2 layer 155 and 48 ms. | One storage binding per per-instance buffer; Margo's device asks for no larger binding (core). | The corner view still costs 20 ms with under 2,000 drawn: per-frame work grows with the instance count, not the drawn count (speed phase item). | `packages/culling/test/gpu/meshes-scale-check.mjs`, native and `--compat`. |
 | Point cloud size per device (`@margoengine/points`, 2026-11-10) | Enforced: every per-point buffer of a cloud is one storage binding, so the widest bounds the count: 12-byte positions (and surfel normals) give 11,184,810 points at the default 128 MiB binding, `colorFormat: 'float'` (16 bytes) 8,388,608. A bigger cloud throws a `RangeError` naming its ceiling before any buffer is made. Before this only positions were checked, so a float-coloured cloud of 8.4 to 11.2 million points failed inside WebGPU with a validation error. | One storage binding per buffer; Margo's device asks for no larger binding (core). | Bigger clouds must be split, or streamed with the octree path. | `packages/points/tests/storage-limit.test.js`; on a real GPU `node packages/points/tests/scale-check.mjs` (2026-11-10) draws both bounds with no validation error: 11,184,810 points at the default `pointBudget` of 1,000,000 in 5.7 ms a frame, all drawn in 16.1 ms, 8,388,608 float-coloured all drawn in 13.0 ms natively; 16.1, 20.3 and 15.5 ms on the WebGL2 layer (busy machine, diagnostic). |
 | Compressed splat input (`parseSpz`, `parseSog`, 2026-11-10) | Enforced: an SPZ version 2 or 3 gzip stream is cut off with a `RangeError` once it expands past 195,000,016 bytes (a 16-byte header and 3,000,000 splats of degree 3 at 65 bytes each, the largest body the reader accepts); a deflated SOG ZIP entry once it passes the size its directory declares. Before this the whole stream was inflated first, so a few hundred kilobytes of gzip could take gigabytes. | A stream's output is read in pieces and counted as it arrives. | A version 2 or 3 file padded past the largest body is refused even if its header asks for fewer splats. | None: real files are far below the bound (`packages/splats/test/spz-sog.test.js`, the two bomb cases). |
@@ -4047,7 +4056,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Scaled ancestors (`LabelRenderer` in `@margoengine/labels`, 2026-11-08) | By method: the overlay follows CSS scales on the canvas's ancestors, read from drawn widths each update; in another `parent` the canvas's scale is its drawn width over `offsetWidth`, a whole number of pixels, so a canvas of fractional CSS width is matched to about half a pixel across. Not done: rotations and skews on the ancestors, and any transform on the canvas element itself (LIM-546). | `getBoundingClientRect` reports drawn sizes and `offsetWidth` layout sizes, so their ratio is the scale; a rotation needs the full matrix, which the DOM does not give. | Labels drift off their points inside a rotated element or on a canvas with its own transform. | Put the transform on an ancestor of the canvas, not the canvas; keep rotated frames for static pages. |
 | Smooth partial occlusion (`fade` in `@margoengine/html`, 2026-11-08) | Enforced: `radius` 0 to 256 CSS pixels, `samples` a whole number 2 to 8, `duration` 0 to 10 s. By method: the opacity is the clear share of a `samples` x `samples` grid of depth tests over a square around the anchor, so it moves in steps of 1 / samples squared and a gap in the geometry narrower than the grid spacing can be missed; samples off the canvas count as clear. Both backends (WebGL2 by occlusion queries, LIM-552); results arrive a frame or two late (LIM-550). Unmeasured: cost per frame at full capacity (up to 64 depth reads an anchor). | One compute dispatch reads every anchor's grid from the shared depth target, so the fade needs no extra render pass; the grid is what bounds its work. | An anchor at a thin pole or a fence fades by the share of the grid the pole covers, not by the share of the element's box. | Raise `samples` for finer steps, or `radius` to the element's half size to fade by its whole box. |
 | Failed allocations on the WebGL2 layer (`@margoengine/webgl2-compat`, 2026-11-11) | By method: after each `bufferData`, `texStorage2D`/`texStorage3D` and `renderbufferStorage` the layer reads `gl.getError()` once; `GL_OUT_OF_MEMORY` becomes a `GPUOutOfMemoryError` (`CompatOutOfMemoryError`) on the `out-of-memory` error scope or `uncapturederror`, any other GL error an `internal` one ([device.test.js](../packages/webgl2-compat/test/device.test.js), "an allocation the driver refuses is an out-of-memory error"). | WebGL2 reports a failed allocation only through `getError`, and the object then draws as if empty. | One `getError` per allocation (none per draw or submit); on browsers that defer allocation the error may come at first use instead, which the layer does not see. | Watch `out-of-memory` scopes or `uncapturederror` around large allocations, as on WebGPU. |
-| Storage bindings on the WebGL2 layer (`@margoengine/webgl2-compat`, 2026-11-10) | Enforced: `maxStorageBufferBindingSize` is min(128 MiB, 2,048 x 16 x MAX_TEXTURE_SIZE), 64 MiB on a 2048 context; a bind group with a storage binding over it, or whose storage bindings together pass one 2,048-wide RGBA32UI data texture (2,048 x 16 x MAX_TEXTURE_SIZE bytes), reports a WebGPU validation error naming the figure and binds nothing ([device.test.js](../packages/webgl2-compat/test/device.test.js)). | WebGL2 has no storage buffers: the layer reads them through one data texture per bind group. | Before 2026-11-10 an over-size binding reached GL unchecked and failed there. | Keep each storage binding within the device's `maxStorageBufferBindingSize`; spread large bindings over several bind groups. |
+| Storage bindings on the WebGL2 layer (`@margoengine/webgl2-compat`, 2026-11-10, group total raised 2026-11-11) | Enforced: `maxStorageBufferBindingSize` is min(128 MiB, 2,048 x 16 x MAX_TEXTURE_SIZE), 64 MiB on a 2048 context; a bind group with a storage binding over it, or whose storage bindings together pass one RGBA32UI data texture of maxTextureDimension2D x maxTextureDimension2D texels (1 GiB at 8,192, 64 MiB at 2,048), reports a WebGPU validation error naming the figure and binds nothing ([device.test.js](../packages/webgl2-compat/test/device.test.js)). The texture is 2,048 texels wide and grows wider only for a group that would otherwise pass maxTextureDimension2D in height. | WebGL2 has no storage buffers: the layer reads them through one data texture per bind group. The 128 MiB binding cap is the WebGPU default, which is also what the compute tier's word textures hold (4,096 x 8,192 words). | Before 2026-11-10 an over-size binding reached GL unchecked and failed there; from then to 2026-11-11 a group past 256 MiB in total was refused, so a 3,000,000-splat cloud (360 MB in its projection group) did not attach. | Keep each storage binding within the device's `maxStorageBufferBindingSize`. |
 | Occlusion on WebGL2 (`HTML` in `@margoengine/html`, 2026-11-08) | By method: on the `@margoengine/webgl2-compat/preview` preview backend each depth test is an `ANY_SAMPLES_PASSED` occlusion query of a one-pixel point drawn after the scene at the anchor's depth less `depthBias`, through the renderer's own camera matrix; one round is in flight per anchor, read when the browser makes it available (a frame or more later); samples off the view count as clear; `fade` runs here too, so the fade row's "WebGPU only" no longer holds (LIM-552). Not done: geometry other passes draw after the html pass is not seen. Unmeasured: cost per frame with many anchors (one draw call and query per test). | The preview draws straight to the canvas, whose depth WebGL2 cannot sample or read back; a query against it is the only test of that depth. | Many anchors with `fade` on WebGL2 cost samples x samples draws each per round. | Keep `samples` small on WebGL2, or use WebGPU, where one dispatch tests every anchor. |
 | DOM drawn into the scene (`HTMLTexture` in `@margoengine/html/texture`, 2026-11-08) | Enforced: `pixelRatio` 0.25 to 4, a size above 0 (the element's CSS size or `width` and `height`), a matrix of 16 finite numbers, WebGPU (the WebGL2 fallback throws). By method: the element is drawn as a texture, so the quad shows a picture of it, drawn again on a mutation, input, focus, hover or HTML-in-canvas paint event, a frame or more after the change; with `'foreign-object'` the element's fonts and images must be data URLs the SVG image embeds (it loads nothing), and changes no event shows (a loaded font, a style sheet) need `invalidate()`; the pointer is routed by the nearest quad under it, so scene geometry in front of a quad does not stop the pointer reaching the element (LIM-556). Unmeasured: raster cost per redraw, cost with many surfaces. | The browser's own hit test, focus and events reach the element only where it is laid out, so the invisible holder is moved under the pointer; HTML-in-canvas snapshots only elements inside the viewport, so the holder rests at its top left. | A panel half behind a wall still takes clicks through the wall. | Turn `interactive` off on a surface while geometry covers it, or keep interactive quads unblocked. |
 | Anchor capacity (`HTML` in `@margoengine/html`, 2026-11-08) | Enforced: `capacity` a whole number 1 to 1,048,576 (default 1,024), so at most 16 MiB of anchor points and 16,384 workgroups of 64. By method: slots and buffers grow by doubling to the capacity and never shrink; per-frame work runs to the highest slot ever used, so removing the newest anchors does not shorten it; buffers grow at the next depth test, so a new anchor past the old size waits one test (LIM-559). Unmeasured: cost per frame with many anchors (each still has its own DOM element; on WebGL2 one query a test). | Growing to the anchors in use keeps a large `capacity` free until it is used; one dispatch still tests every anchor. | A page that adds 100,000 anchors and removes most keeps their slots and the work to the highest. | Reuse anchors, or make a new `HTML` overlay after removing most of them. |
@@ -4198,7 +4207,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Context restore on the WebGL2 preview (`@margoengine/webgl2-compat/restore`, 2026-11-06) | Proved in Chromium with `WEBGL_lose_context`: identical pixels after a loss, picks, geometry added during the loss, `onDeviceRestored` in each scene, and a reboot on a live context ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. `rebootDevice` waits 30,000 ms by default (`timeout`) for a lost context. | The browser decides whether a lost context returns, and the plugin must be attached before the loss, or the browser never gives it back. | Frames draw nothing during a loss. A timed-out wait reports `timeout`, and a later restore still recovers. An app that draws on demand draws again itself, from `onDeviceRestored`. | A new engine on a new canvas. |
 | XR on the WebGL2 compatibility layer (`@margoengine/webgl2-compat/xr`, 2026-11-06) | Run on real devices with stand-ins for `navigator.xr`, `XRGPUBinding` and `XRWebGLLayer`: no pixel differs from native WebGPU in either eye (Chromium, RTX A6000, [xr-browser.mjs](../packages/webgl2-compat/test/xr-browser.mjs)). No headset or phone has run it, and Firefox and Safari have not been run. | WebGL2 sessions show an `XRWebGLLayer`, whose framebuffer takes draws only, and its depth buffer cannot be filled from another texture. | One extra full-eye copy a frame, and no depth for the compositor to reproject by. The first frame that makes a compute pipeline shows nothing while the compute runtime loads. | `installXR({ framebufferScale })` to trade sharpness for speed; WebGPU where the browser has it. |
 | Size comparison is WebGPU only (2026-11-10) | The engine size table in [whitepaper/claims.md](whitepaper/claims.md) counts Margo core + stage at 24,209 B gzip, which is WebGPU only; WebGL2 runs through the optional `@margoengine/webgl2-compat` (106,729 B gzip full layer, 3,533 B gzip preview), measured with `bundleBytes` in `scripts/measure-size.js`. | One backend keeps the core small; the fallback is a download WebGPU users never make. | Rows for three.js WebGPURenderer, PlayCanvas and Filament include their WebGL2 path; Margo's does not. The table covers only engines that ship PBR, lights and a scene graph, and no row includes shadows. | Read core + stage + layer for a WebGL2 browser. |
-| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl2-compat/test/preview-webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 24,743 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the small WebGL2 preview: each needs effects, particles, skinning or compute, and all of them run on the layer. | `@margoengine/webgl2-compat/preview` (3,443 B gzip, stays for v1.0 as the small preview, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The WebGL2 compatibility layer (`@margoengine/webgl2-compat`) is what the site runs without WebGPU, and the fuller fallback: it runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
+| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl2-compat/test/preview-webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 24,808 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the small WebGL2 preview: each needs effects, particles, skinning or compute, and all of them run on the layer. | `@margoengine/webgl2-compat/preview` (3,443 B gzip, stays for v1.0 as the small preview, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The WebGL2 compatibility layer (`@margoengine/webgl2-compat`) is what the site runs without WebGPU, and the fuller fallback: it runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
 | Automatic escalation from the preview (`@margoengine/webgl2-compat/auto`, 2026-11-06) | Proved in Chromium with WebGPU removed and with it present ([browser-check.mjs](../packages/webgl2-compat/test/preview-browser-check.mjs)). Firefox and Safari have not been run. Only a refusal (code `unsupported`) during `setup` escalates, and only with `loadCompat`. | The layer cannot show frames on a canvas that holds the preview's context, and a canvas keeps its first context, so the element is replaced with a copy; listeners on the old element do not carry over. The app passes the import because no package may name the layer ([isolation.test.js](../packages/webgl2-compat/test/isolation.test.js)). | `setup` runs twice when escalating. A package added after `setup` refuses as usual. The React `Canvas` does not escalate: its `loadCompat` prop installs the layer before the engine, so it sets up once and keeps its canvas, at the cost of the layer's download where the preview would have done. | Install the layer yourself before `Engine.create`, as its README shows. |
 | WebGPU pages alive at once | Measured on an Intel Arc 140V laptop (Edge and Chrome 156, headless, 2026-10-30): with 3 WebGPU pages alive in one browser process a new page's `requestDevice` took 10.6 s, and the 4th page never got a device or finished its pipeline compile (4 of 7 runs); 2 pages at once, one page at a time, or 4 separate browsers always started. The NVIDIA RTX A6000 desktop starts 4 at once. Enforced since then: each `Engine.create` startup step (`requestAdapter`, `requestDevice`, each pipeline compile) has a limit ([renderer.ts](../packages/core/src/renderer.ts), [core-startup-watchdog.test.js](../tests/core-startup-watchdog.test.js)). | The stall is in the driver or the browser's GPU process, not the page: the pages already drawing keep drawing every frame while the new one waits. | One `console.warn` (`Margo: still waiting for requestDevice after 8 s; see https://margoengine.com/errors#timeout`) after `startupWarning` ms (default 8,000), then a rejection with `MargoError` code `timeout` naming the step after `startupTimeout` ms (default 30,000); `backend: 'auto'` with a `fallback` draws on WebGL2 instead. Before, `Engine.create` never settled and the canvas stayed blank at 300 x 150. | Start several engines one at a time (each after the previous has drawn) and dispose those that leave the screen; the demo gallery must not start many engines at once. `signal` cancels creation; raise `startupTimeout` for a slow first compile. |
 | Compute on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-28, [compute.html](../packages/webgl2-compat/test/compute.html) cases and a timing page). Compute entry points that store only their own texel run as fragment draws and those with a bounded number of stores as point draws, on the GPU. The rest (atomics, workgroup memory, barriers, stores in loops of unknown length) run on the CPU in JavaScript: a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16 lights, 2.8 ms with 64 and 9.4 ms with 256 (37 to 94 million loop iterations a second); a 64-wide workgroup reduction with 7 barriers runs 4.4 million invocations a second (65,536 in 14.9 ms). | WebGL2 has no compute shaders, storage buffers or atomics. | The same results as WebGPU (the layer's compute check compares both on one GPU), slower: GPU-written inputs of a CPU kernel are read back synchronously (counted in the device's `stalls`). Multisampled and external textures cannot be read by CPU-tier kernels (MargoError `unsupported`); cube textures are sampled there as on WebGPU, seamless; CPU kernels compile with `new Function` where the page allows it (CSP `unsafe-eval`) and otherwise run on the interpreter of the next row. A NaN that a CPU-tier kernel stores, bitcasts or packs is written as the one quiet NaN 0x7fc00000 (f16 0x7e00), so its sign and payload are not kept, which WGSL 15.7.2 allows (any value) and which keeps the bytes the same on every engine and on the interpreter. A CPU-tier dispatch stops at its work budget, 100,000,000 invocations plus loop iterations by default (`cpuWorkBudget`), and is reported as a `GPUInternalError` coded `failed` with nothing stored. | Keep per-frame CPU-tier work under the numbers measured here; [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) lists the tiers. A transform-feedback tier for own-index stores is parked (speed only: those stores already run on the scatter tier with the same pixels, about 0.09 ms more per stored word, measured in the roadmap). |
@@ -4661,9 +4670,10 @@ Occlusion entry: 1,516 B gzip, budget 1,772 B, with package dependencies externa
 ## Batch 168 lightmap reference
 
 The modified Cornell box has 15 parallelograms and 881 irradiance texels. Against a complete Cycles
-128-sample diffuse bake, physical lightmap MAE is 0.069543 (relative 0.211475), max 0.900128.
-One coarse radiosity bounce, 16 bounce rays and 16 area samples are not a converged path tracer.
-The 8-bit step is 0.016984. This error remains open in known-bugs.md; no speed claim is made.
+128-sample diffuse bake at one indirect bounce on both sides (Cycles `diffuse_bounces` 1, Margo `bounces` 1,
+path mode, 32 paths and 16 area samples a texel), physical lightmap MAE is 0.024863 (relative 0.087125), max
+0.284111. The rest is Margo's ray noise: the mean of 8 seeds gives MAE 0.012063, under the 8-bit step 0.016813.
+`bounceRays` stops at 32 a bake; average seeds or denoise for less. No speed claim is made (KB2604h).
 
 
 ## Batch 168 transparency reference
@@ -4789,12 +4799,57 @@ Core plus stage remains 23,837 B gzip.
 
 The metallic-roughness test covers the entire 123-primitive Khronos textureless sphere model with a
 fixed camera/sun, no IBL and 4x MSAA, at 512 x 512 on the RTX A6000 only. The full-frame RGB byte MAE
-ceiling is exactly the measured 1.837511698404948 on WebGPU and 1.837506612141927 on the WebGL2
-compatibility layer; max channel error is 254. Foreground errors and integer sum budgets are recorded in
+ceiling is exactly the measured 1.7865498860677083 on WebGPU and 1.7865447998046875 on the WebGL2
+compatibility layer (re-recorded 2026-11-11, see "Batch 160 budgets re-recorded" below); max channel error is 254. Foreground errors and integer sum budgets are recorded in
 whitepaper/results/batch-160-metallic-roughness.json. Native WebGL2 rejects PBR explicitly.
 This is an open image-quality loss, not proof of physically accurate materials or other devices. Frozen
 reference PNGs remain outside the repository; CI unit tests validate the comparison contract and record,
 while the GPU reproduction requires those outside files. No speed or bundle-size change is claimed.
+
+## Batch 160 budgets re-recorded (2026-11-11, accepted differences)
+
+Scott's ruling of 2026-11-11 ("Yes, re-record"): the batch 160 reference-rendering budgets in
+`docs/whitepaper/results/batch-160-*.json` are re-recorded at the values measured after four deliberate renderer
+changes. Each step was bisected on the RTX A6000 (Edge 157, NVIDIA 617.42): every old budget reproduces exactly at
+the parent of the commit that moved it. None of the four is a defect; each makes Margo's output more correct by its own
+standard, and the picture comparison against the Sample Viewer moves with it.
+
+- `da12bd07e1`, core uploads the unit light direction (float64 normalize on the CPU): one float32 rounding moves a few
+  pixels one code (iridescence +1, anisotropy +3, clearcoat +1 absolute).
+- `65098f33fe`, area-filter mip chains, BLEND colour weighted by alpha: transparent white texels no longer grey opaque
+  black lines down the chain, while the Sample Viewer's minified lines show the plain average (iridescence +159,327,
+  anisotropy +207, clearcoat +960 absolute).
+- `401c2e032b`, native glass composited in linear light: Margo draws black where the Sample Viewer is black; total
+  error falls but the foreground union shrinks by 4 pixels.
+- `edcb6debb` (KB5875a), height-correlated Smith G2 (Heitz 2014) in core and gltf-pro: no microfacet hidden from both
+  the light and the eye is counted twice, so rough surfaces at grazing angles are no longer too dark.
+
+Before -> after, all-pixel absolute RGB-byte error, native WebGPU / WebGL2 compatibility (square, max and foreground
+changed with them; the files hold every field):
+
+| Case | Before | After | Cause |
+| --- | --- | --- | --- |
+| metallic-roughness | 1,445,078 / 1,445,074 | 1,405,000 / 1,404,996 (-2.8%) | Smith G2 |
+| clearcoat | 1,321,922 / 1,321,925 | 1,322,815 / 1,322,815 (+0.07%) | light direction, mips, Smith G2 (-68) |
+| sheen | 1,120,735 / 1,120,735 | 1,119,468 / 1,119,468 (-0.1%) | Smith G2 |
+| anisotropy | 819,207 / 819,207 | 811,914 / 811,911 (-0.9%; square +0.1%) | light direction, mips, Smith G2 |
+| iridescence | 454,341 / 454,338 | 613,669 / 613,668 (+35%) | light direction, mips |
+| transmission | 1,763,456 / 1,763,453 | 1,590,947 / 1,590,946 (-9.8%; foreground 67,050 -> 67,046) | linear glass, Smith G2 |
+| volume | 1,680,190 / 1,680,190 | 1,471,401 / 1,471,401 (-12%) | Smith G2 |
+| specular | 877,419 / 877,434 | 877,623 / 877,629 (+0.02%) | Smith G2 |
+| ior | 2,425,911 / 2,425,911 | 2,411,082 / 2,411,082 (-0.6%) | Smith G2 |
+| transmission Cycles full | 4,131,141 / 4,131,146 | 4,164,102 / 4,164,101 (+0.8%) | linear glass, Smith G2 |
+| transmission Cycles direct | 2,632,772 / 2,632,767 | 2,632,779 / 2,632,778 | linear glass, Smith G2 |
+| volume Cycles full | 13,792,000 / 13,792,000 | 13,794,699 / 13,794,699 (+0.02%) | Smith G2 |
+| volume Cycles direct | 1,843,497 / 1,843,497 | 1,807,380 / 1,807,380 (-2.0%) | Smith G2 |
+
+Trade-off: iridescence and clearcoat now sit further from the Sample Viewer picture because Margo filters the
+displayed texture and keeps the light direction exact; the other moves are gains. The clustered and clustered-point
+Cornell budgets did not move. The environment IBL budget is not re-recorded: its native direct row is 1 over since
+`40e6f183dc`, a change outside this ruling (docs/known-bugs.md). The AMD rows (`amd` in specular and ior,
+`batch-160-amd-*.json`) were measured before these changes and are not re-measured; an AMD rerun is owed.
+Reproduce: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
+scripts/reference-rendering/run.mjs --case=<case> [--compat]`, then `transport.mjs --case=<transmission|volume>`.
 
 ## React Native target dropped (LIM-615)
 
@@ -4835,8 +4890,8 @@ Every normal quality gate must pass before landing.
 Height lighting accumulates in an owned rgba16float image (8 bytes per target pixel), then converts once to the caller format. Individual sums still have half-float blend precision. The 100-light .001 contribution regression is within one display byte.
 
 Clearcoat job 2: full Khronos ClearCoatTest, 27 primitives, neutral/sRGB, identical camera and sun,
-no IBL, 512 x 512. RGB-byte MAE 1.6809107462565105 WebGPU and 1.6809145609537761 WebGL2
-compatibility, max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
+no IBL, 512 x 512. RGB-byte MAE 1.6820462544759114 on WebGPU and on WebGL2
+compatibility (re-recorded 2026-11-11), max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
 whitepaper/results/batch-160-clearcoat.json. The image residual remains an open defect, with
 formulation differences recorded separately from its unisolated complete cause.
 
@@ -4846,7 +4901,7 @@ Optional wfc/constraints 2,460 B min+gzip; root 1,824 B, overlapping 2,451 B; pe
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
 512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
-1.4250882466634114 on both WebGPU and actual WebGL2 compatibility; maximum error 167.
+1.4234771728515625 on both WebGPU and actual WebGL2 compatibility (re-recorded 2026-11-11); maximum error 167.
 Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
 The full residual remains open; this does not prove physical equivalence.
 
@@ -4875,9 +4930,9 @@ Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics en
 
 | Capability | Limit | Cost and evidence |
 | --- | --- | --- |
-| Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/restir`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
+| Resampled emissive lighting (LIM-617) | `@margoengine/voxel-pathtracer/resampled`: integer `candidates` 1-64, default 8; 1 retains the original kernel exactly. Independent RIS only, without spatial or temporal reuse. | Larger counts split proposals between emitted-power sampling and cosine/phase directions. Every valid proposal evaluates visibility; directional proposals also trace an intersection. Native WebGL2 refuses with code `unsupported` and a help link; the compatibility layer runs the variant. The generated many-light regression requires 2x lower squared error at 32 samples, not a wall-time speedup or general variance guarantee. |
 
-Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, restir 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,837 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
+Entry sizes with bare peers external: root 80,431 B gzip, studio 1,047 B, resampled 1,934 B. The root's subclass factory/kernel hook, backend-help repair and full-distance MIS correction require 120 B beyond its previous 80,311 B size budget; the size ratchet records this deliberate integration and the new entry with its standard headroom. Core plus stage remains 23,837 B, under the unchanged 25,000 B gate. No sampling threshold is relaxed.
 
 ## Painterly post effects (batch 77, LIM-619)
 
@@ -4955,7 +5010,7 @@ analytic unit furnace. Native WebGPU and WebGL2 compatibility run the shader; na
 `unsupported` and a registered help link. Native device restoration and disposal are exercised.
 
 Entry size with bare peers external: guiding 2,535 B gzip; new budget 2,791 B includes the standard 256 B headroom.
-Root 80,431 B, studio 1,047 B, restir 1,934 B and core plus stage 23,837 B remain unchanged. No existing size,
+Root 80,431 B, studio 1,047 B, resampled 1,934 B and core plus stage 23,837 B remain unchanged. No existing size,
 accuracy or time gate was relaxed.
 
 ## WFC heap and chunks (batch 69)
@@ -5071,11 +5126,11 @@ Optional transitions/live cross-fades two independently rendered current RGBA8 i
 
 Historical transitions entry measurements after the owner-scene repair and live entry: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B min+gzip. Earlier batch-76 measurements above describe the corresponding earlier commits. Each umbrella feature re-export measures 65 B.
 
-Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0416755676269531 WebGPU and 1.0416755676269531 WebGL2 compatibility; maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
+Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0324020385742188 WebGPU and 1.0323982238769531 WebGL2 compatibility (re-recorded 2026-11-11); maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
 
-Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
+Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.7803204854329427 WebGPU and 0.7803192138671875 WebGL2 compatibility (re-recorded 2026-11-11); maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
 
-Batch 160 job 5: SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. 512 x 512, fixed camera/white sun, black background, no IBL, neutral/sRGB, all RGB pixels counted; native WebGL2 explicitly refuses PBR. NVIDIA and AMD differ by under 0.7 percent of absolute error through hardware filtering and float-to-unorm rounding, which the APIs leave to the implementation, so each adapter keeps its own first measurement; the AMD WebGL2 figure includes the Direct3D 11 trilinear blend difference recorded below. Budgets: whitepaper/results/batch-160-specular.json and batch-160-ior.json. Direct-light evidence alone, no physical or IBL equivalence.
+Batch 160 job 5: SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11), 879,167 and 873,364 on AMD (measured before the height-correlated Smith G, not yet re-measured); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (re-recorded 2026-11-11), 2,424,867 native and 2,426,643 compatibility on AMD. 512 x 512, fixed camera/white sun, black background, no IBL, neutral/sRGB, all RGB pixels counted; native WebGL2 explicitly refuses PBR. NVIDIA and AMD differ by under 0.7 percent of absolute error through hardware filtering and float-to-unorm rounding, which the APIs leave to the implementation, so each adapter keeps its own first measurement; the AMD WebGL2 figure includes the Direct3D 11 trilinear blend difference recorded below. Budgets: whitepaper/results/batch-160-specular.json and batch-160-ior.json. Direct-light evidence alone, no physical or IBL equivalence.
 
 Batch 99 heterogeneous RGB media: optional voxel-pathtracer/media adds finite RGB extinction coefficients
 in 0..1000000 per world unit on media palette materials. Explicit extinction overrides scalar density;
@@ -5494,7 +5549,7 @@ The calibration fixtures are authored stand-ins run on a real external binary. T
 establish exact subsurface, glass or atmosphere parity, independent whole-image repeatability,
 or a noise-free moving-camera denoiser. No speed claim is made.
 
-The corrected root entry measures 80997 B min+gzip. Optional restir/guiding/sky/media/mesh/spectral
+The corrected root entry measures 80997 B min+gzip. Optional resampled/guiding/sky/media/mesh/spectral
 entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage remains 23797 B,
 strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
 
@@ -5605,7 +5660,7 @@ per-world-unit transmittance range limit. See [native volume range](native-volum
 Native WebGL2 explicitly refuses PBR; compatibility is actual
 WebGL2. AMD Radeon(TM) Graphics / RDNA 2, Windows driver 32.0.21042.62, is the
 repeatability adapter because NVIDIA/Intel MSAA blending varies. The full Cycles
-volume absolute ceiling stays 13,792,000. No speed or equivalence claim.
+volume absolute ceiling is 13,794,699 (re-recorded 2026-11-11 from 13,792,000). No speed or equivalence claim.
 
 
 Fresh job 4 AMD volume full Cycles RGB-byte MAE is 17.472838083902996 on
@@ -5643,7 +5698,7 @@ The WebGL2 compatibility README example also initializes independently of full t
 
 The sky README bakes its environment, then starts the progressive viewport independently of full tracer readiness. The bake still has its documented AbortSignal; no bake or driver-compilation deadline was raised. Preview-to-tracing startup is proven separately from any compilation-time bound.
 
-History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain ReSTIR 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
+History/artifact landing confirmation (Batch 99): the root entry is 81,007 B min+gzip; core plus stage is 23,924 B gzip, below 25,000 B. Optional entries remain resampled 1,934 B, studio 1,047 B, guiding 2,535 B, sky 212 B, media 1,954 B, mesh 22,864 B and spectral 1,541 B. Entry/network records come from one clean package revision. All 9 README examples pass the unchanged module deadline. No timing result.
 
 
 ## Optional codec diagnostic restoration (2026-11-10)
@@ -9397,7 +9452,7 @@ Review 2 water composition: Caustics tracks live Water vertex deformation, inclu
 
 ## AVIF still images (batch 203 job 4)
 
-`@margoengine/decoders/avif` provides AVIFDecoder/decodeAVIF; /image dispatches lazily. The Margo-authored Rust SIMD decoder supports independent intra AV1 images, 8/10/12-bit 420/422/444 and monochrome, palettes, intra copy, grain, filters/restoration/superres, grids/identity, alpha/premultiplication and ordered clap/irot/imir. Output is straight RGBA8 by default or normalized RGBA16, retaining source bitDepth, CICP and ICC. ICC is metadata; output remains in the source encoded color space and has no automatic display profile or HDR tone map. RGB CICP matrices 0/1/2/4-14 are interpreted by H.273, with 2 defaulting to BT.601; derived systems require declared primaries/transfer. Reserved codes reject.
+`@margoengine/decoders/avif` provides AVIFDecoder/decodeAVIF; /image dispatches lazily. The Margo-authored Rust SIMD decoder supports independent intra AV1 images, 8/10/12-bit 420/422/444 and monochrome, palettes, intra copy, grain, filters/restoration/superres, grids/identity, alpha/premultiplication and ordered clap/irot/imir. A 'prem' reference must name exactly the primary item's one alpha auxiliary item; any other 'prem' reference rejects as invalid. Output is straight RGBA8 by default or normalized RGBA16, retaining source bitDepth, CICP and ICC. ICC is metadata; output remains in the source encoded color space and has no automatic display profile or HDR tone map. RGB CICP matrices 0/1/2/4-14 are interpreted by H.273, with 2 defaulting to BT.601; derived systems require declared primaries/transfer. Reserved codes reject.
 
 Defaults: maxPixels 2^26 per item, maxMemory 512 MiB (configurable through 1 GiB), workerLimit hardware concurrency capped at four (1-16), timeout 10 s plus 4 s/MiB. A conservative 128 bytes per padded luma sample bounds codec workspace before allocation; item/grid output also consumes the budget. The Wasm memory ceiling is 1 GiB. Input transfer defaults false. Aborting or disposing terminates the worker's active decode; later use creates a new worker. No core or stage code changes. Inter-frame/animated/progressive/layered streams, large-scale tile lists, protected/external items and derived tone-map/sample-transform items reject explicitly. These are outside the coordinator's independent intra still-image scope.
 
@@ -9752,7 +9807,7 @@ cache, competitive timing result or full CSS/Yoga conformance is claimed.
 The [volume controls](sciviz-rivals.md) record full 64/128 cubes at 256 x 256. The historical shaded anisotropic row differs in step and lighting. Isotropic controls share inputs and nominal integration distance but retain half-float/float storage, jitter, interpolation and output differences. Margo retains opaque-depth capture/composition work. Exact repeated frames are required independently; cross-engine image differences are reported, not asserted equivalent. Timing pending the quiet rerun.
 
 
-The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)) draws every scene at 256 x 256. Rows past a source table repeat its rows and are labelled replicated; the volume scenes share one nearest-neighbour resample of the MRI head. Image differences are observations, never pass marks. Cosmograph keeps its own animation loop, which also runs during Margo's samples. The analytic references converge at second order (sphere area error 0.062 %, volume 0.12 %, ABC streamline 0.0013, isoline 0.00024 at 65 samples per axis). Timing pending the quiet rerun.
+The full batch 182 comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)) draws every scene at 256 x 256. Rows past a source table repeat its rows and are labelled replicated; the volume scenes share one nearest-neighbour resample of the MRI head. Image differences are observations, never pass marks. Cosmograph keeps its own animation loop, which also runs during Margo's samples. The analytic references converge at second order (sphere area error 0.062 %, volume 0.12 %, ABC streamline 0.0013, isoline 0.00024 at 65 samples per axis); VTK.js 38.0.5 gives the same errors on the same grids (`node scripts/sciviz-compare.mjs --accuracy`), and its isoline comes back as separate two-point segments where Margo returns one closed line. Accepted difference: Cosmograph 2.5.1 draws width-1 links at 0.42 of the asked colour (brightest link pixel over the background) where Margo draws the asked colour; the cause is inside the rival and Margo keeps the asked colour (like-for-like inputs; report field `linkPeak`). Timing pending the quiet rerun.
 
 ## Preview contract owners restored (lane E, 2026-11-10)
 
@@ -10013,6 +10068,7 @@ is not an option, and the normal path builds with the hardware branch only.
   layer's features check named its gradient helpers `dx` and `dy` and now names them `gx` and `gy`, as what it tests is
   the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases).
 
 ### Firefox prints WebGL advisory warnings that the lod and materials browser checks count as errors (found 2026-11-11, open)
 
@@ -10043,13 +10099,18 @@ is not an option, and the normal path builds with the hardware branch only.
   Firefox on a quiet machine, and see whether the case finishes given the time.
 
 
-### gltf-pro parts cull one by one only under CulledModels (found 2026-11-11, open)
+### Fixed 2026-11-11: gltf-pro parts culled one by one only under CulledModels (bug sweep L2, KB0027)
 
 - **Repro:** `npm run test:gpu:parts` in packages/gltf-pro: without `CulledModels`, a 20-part 10M-triangle field draws
   all 20 parts in a close view where 9 are in the frustum (`draws` in test-results/gltf-pro-parts.json).
 - **Cause:** the frame's own culling tests a gltf-pro node's bounds, not each primitive's; parts of one primitive share
   a node.
 - **Fix to build:** test each primitive's sphere on the CPU in the PBR draw loop (work count: spheres tested per frame).
+- **Fix:** the PBR draw loop tests each primitive's bounding sphere against the camera planes (`outsideView` in
+  packages/gltf-pro/src/model.ts): one sphere test per primitive per draw call, measured once per vertex array, and a
+  part out of view issues no draw. Primitives whose vertices may move (instanced, skinned, morphed, deformed, own
+  shader, displacement map) are not tested. Regression: packages/gltf-pro/tests/parts.test.js ("each part culls on its
+  own"): a strip in 3 parts with a frustum over the first draws 1, not 3.
 
 ### compressDraco cannot encode a 10M-triangle mesh with normals and UVs (found 2026-11-11, open)
 
@@ -10084,19 +10145,6 @@ is not an option, and the normal path builds with the hardware branch only.
   error (`GPUOutOfMemoryError`) to its scope or as `uncapturederror` (packages/webgl2-compat/test/device.test.js).
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
   results kept, watching for an `out-of-memory` error.
-
-### SSR and SSGI keep a clear-colour buffer after disposal (found by check:owners, 2026-11-11, open)
-
-- **Repro:** add `ssr: ['SSR'], ssgi: ['SSGI']` to the `entries` of `packages/post/test/owner-lifetime.fixture.js` and run
-  `node scripts/check-owner-lifetime.mjs --packages=post`: all 22 `SSR.attach` and `SSGI.attach` cases fail 'no leaked
-  GPU buffers, textures or query sets'.
-- **Cause:** `packages/shared/clear-color.js` keeps one 16 byte uniform buffer per colour in a per-device cache of 64
-  (core's eviction fix, aaace8b22f, bounds it). SSR and SSGI clear with a colour of their own, so the first clear makes
-  that buffer under the plugin, and it stays in the cache after the plugin is disposed, until 64 newer colours evict it
-  or the device goes.
-- **Fix to build:** count the users of each cached colour and destroy its buffer when the last user is disposed (or
-  give SSR and SSGI their clear values through a buffer they own), then add both to the post fixture. Core change:
-  needs Scott's yes unless it is zero bytes.
 
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
@@ -10170,6 +10218,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   core for rendering only, and multisampled when the engine is). Reading it would need, per `screen` layer, the pass
   ended, the covered region copied (or resolved) to a texture, and a new pass begun, or the whole composite moved to
   an extra target: a new copy and an extra render pass per frame, which Scott's ruling (2026-11-10) does not allow.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0171/report.md` with the raw WebGPU and WebGL2 page `screen-blend.html`. Reproduces on 2026-11-11 on this PC's AMD RDNA2 iGPU (19 of 1024 pixels off, including source 151 over destination 16: 157 instead of 158) and not on the RTX A6000.
 
 ### Fixed 2026-11-11: the transitions GLSL oracle and the WGSL port disagreed at a texel edge (list 5 R6 row 21)
 
@@ -10250,6 +10299,21 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Chromium (`chromiumExecutablePath`) by their real paths. Headless Chromium, Edge, Chrome, WebKit and an executable named
   by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
   headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
+
+### Fixed 2026-11-11: SSR and SSGI kept a clear-colour buffer after disposal
+
+- **Repro:** SSR or SSGI in a partial view (a viewport smaller than the canvas), then dispose it: the 16 byte uniform
+  buffer behind its material clear stayed alive until 64 newer colours evicted it or the device went. With
+  `ssr: ['SSR'], ssgi: ['SSGI']` in `packages/post/test/owner-lifetime.fixture.js`, all 22 `SSR.attach` and
+  `SSGI.attach` cases of `check:owners` failed 'no leaked GPU buffers, textures or query sets'.
+- **Cause:** `packages/shared/clear-color.js` caches one buffer per colour per device, and nothing released post's
+  entries when the pass that made them went away.
+- **Fix (0 B in core + stage):** post bundles its own copy of the cache, used only by its material clears. The new
+  `releaseClears(device)` export (core never imports it, so core's bundle drops it) hands back the device's cached
+  colour buffers; `MaterialClear.dispose()` retires them, and SSR and SSGI call it whenever they release their targets
+  (resize, device restore, dispose). Another live clear on the device makes its colour again on its next partial view.
+  Tests: `packages/post/test/material-clear.test.js` (fails on the old build: dispose and restore left the buffer),
+  `tests/clear-draw.test.js`, and SSR and SSGI in the post owner fixture.
 
 ### Fixed 2026-11-11: per-object `device.lost` reactions kept disposed objects alive as long as their device
 
@@ -10492,6 +10556,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   for it (limits.md, video/record). Found on the way: `scripts/browser.js` reported `hardware.browserName` as `chromium`
   for every `MARGO_BROWSER=webkit` or `firefox` run, since those engines launch through the default Chromium path; it now
   names the engine (`tests/browser-startup.test.js`, "a MARGO_BROWSER=webkit run names webkit").
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0401/report.md` with `webm-colour.html`. Not runnable on this PC (Playwright WebKit for Windows has no MediaRecorder); the page passes on Edge 157, the WebKit numbers are the Mac record above and need a Mac run before filing.
 
 ### WebKit canvas snapshot: drawImage keeps returning a frame's first read (WebKit sweep, 2026-11-11, WebKit's side)
 
@@ -10508,6 +10573,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 - **Margo:** no library path reads a canvas twice in one frame (`exporters` `capture` resizes the canvas before each tile
   read, which replaces the drawing buffer). The voxel check now draws its disposed frame after the queue drains, as its
   other steps already did; the assertion (0 red pixels) is unchanged. To report upstream at bugs.webkit.org.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0425/report.md` with `drawimage.html`. Not runnable on this PC (Playwright WebKit for Windows has no WebGPU); the page gives the expected red, green, blue on Edge 157. Needs a Mac run before filing.
 
 ### Fixed: WebKit ephemeral sessions: AssetCache and RangeCache stored nothing (WebKit sweep, 2026-11-11)
 
@@ -10537,13 +10603,25 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 - **Regression:** `packages/cache/test/stale-touch.test.js` (four "refuses Blobs as WebKit does" cases); the fake
   IndexedDB's `refuseBlobs: 'webkit'` models the stall. Three of the four time out on the parent.
 
-### WebKit: cache `test:browser` evictionReads step over its limit (found 2026-11-11, open)
+### Fixed 2026-11-11: WebKit: cache `test:browser` evictionReads step over its limit
 
 - **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` (Windows, busy dev PC): plain
   `evictionReads` (2,030 fetches and writes) took 158.9 s and the indexed run passed the 180 s call limit; Chromium took
-  17.7 s and 8.8 s in the same session. Every step before it passes.
-- **Cause:** not found. Each of its 2,030 requests goes through the check's `context.route`, which on Playwright WebKit
-  is a round trip to the test process; a measurement of the route's share against the cache's own IndexedDB time is next.
+  17.7 s and 8.8 s in the same session.
+- **Cause:** not the check's `context.route` (the same with and without it). Measured in Playwright WebKit on Windows,
+  every IndexedDB request outstanding at once is answered on its own timer tick of about 15 ms (1 get 15 ms, 10 gets in
+  one transaction 152 ms, 40 gets 547 ms; a lone `setTimeout(0)` 15 ms; Chromium 0.1 ms), so time there follows the
+  number of requests. The cache made more than it needed: a miss read the bytes record it then found absent, the
+  default eviction used a read transaction and then a write transaction, the index opened its last-use cursor when
+  nothing had to go, and every miss of a burst was its own transaction that read the totals again (and, by default,
+  every record again: 2,000 misses read 2 million records).
+- **Fix:** a miss asks only for the record; the default eviction reads and writes in one transaction; the index opens
+  no cursor within the budget; misses queued behind a running write share one transaction (in arrival order, the same
+  stored result as separate writes), reading the records or the totals once (`AssetCacheEviction.writeAll`). WebKit
+  `evictionReads` now 70.1 s plain and 72.6 s indexed. Regression: packages/cache/test/write-requests.test.js
+  (requests per miss, and a 60-miss burst against separate writes).
+- Found with it and fixed: the check expected `requestIdleCallback` in every window; WebKit has none, so it now
+  expects what the page has (the Prefetcher's timer fallback runs there).
 
 ### Safari recordCanvas MP4 of 2 frames claims 5,576 s (batch 121, 2026-11-10, open)
 
@@ -10630,11 +10708,14 @@ Found by reading the shaders against Max 1995 and the package's own docs; fixed 
   so a wrapped read is seamless), and the portable figure format restores tables the same way. Regression:
   packages/sciviz/tests/colormaps.test.js (cyclic lookup case).
 
-### Open from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
+### Fixed 2026-11-11 from the batch 132 sciviz audit (2026-11-10): HDF5 reader gaps
 
-- **Dense attributes are not read.** `src/hdf5.ts` reads attribute messages (type 12) only; an object with more than 8
-  attributes stores them in a fractal heap (attribute info message, type 21) and `attributes()` returns none or some.
-  Repro needs a file written with h5py and 9 or more attributes on one object; no fixture has one yet.
+- **Fixed 2026-11-11 (KB0535a): dense attributes were not read.** `src/hdf5.ts` read attribute messages (type 12) only;
+  an object with more than 8 attributes stores them in a fractal heap (attribute info message, type 21) and
+  `attributes()` returned none or some. It now walks the attribute info message's name index (v2 B-tree, type 8
+  records) and reads each attribute message from the heap; shared attribute messages still raise the coded error.
+  Regression: packages/sciviz/tests/hdf5.test.js (dense attributes case: the test writes a 12-attribute object with
+  its own fractal heap and B-tree, after the HDF5 file format specification 3.0, since no h5py was available).
 - **Fixed 2026-11-11 (KB0535b): the implicit chunk index walked every chunk.** `src/hdf5.ts` looped over all chunks of
   a dataset with an implicit index whatever the selection, with no abort check, so a large shape with chunk size 1 took
   very long (2^40 x 4 in 1 x 4 chunks never finished). It now lists, per axis, only the chunks holding a selected value
@@ -11098,9 +11179,9 @@ gate retaining its existing five known failures and no new failure.
   many-light GPU evidence below remain separate requirements. No speed claim.
 - Guiding evidence: guiding.html renders its convergence reference with the guided estimator itself and uses absolute bounds for dim scenes. Use an independent root/analytic reference and justified relative bounds.
 - Many-light evidence: restir.html covers diffuse receivers and absorption only. Rough metal, coat and scattering-media vertices need root-reference comparisons with relative bounds.
-- Reuse naming: /restir implements per-pixel RIS without spatial or temporal reuse. Implement reuse or rename the entry and documentation; retain the equal-cost work-count question without timing runs during the build phase.
+- Fixed reuse naming (2026-11-11): the per-pixel RIS entry, which has no spatial or temporal reuse, was named `/restir`. It is now `/resampled` (the class and factory were already `ResampledVoxelPathTracer` and `resampledEmitters`); README, limits, claims and reproduce follow. `tests/entry-names.test.js` fails on any entry or script named ReSTIR. Spatiotemporal reuse is not added: it correlates samples across pixels and frames, which a progressive converged render does not want, and no web rival ships it. The equal-cost work-count question stays open for the speed phase.
 - Fixed resampled README gate: isolated exact-example diagnostic passes the unchanged 20-second deadline on native WebGPU (Dawn). Its trace pipeline takes 15.5 seconds and capture 0.13 seconds, so this diagnostic is not ANGLE D3D11 compilation. The prior failure has no per-phase record; the actual runner selection also passes 1/1 at its unchanged deadline. No readiness wait, capture or deadline was removed.
-- Root emitter MIS: the full-distance medium-boundary regression is currently only in the optional restir GPU suite. Add it to the root GPU suite so a root-only run detects reversion.
+- Fixed root emitter MIS coverage (2026-11-11): the full-distance medium-boundary regression was only in the optional resampled GPU suite. The root `test:gpu` now runs `mediaboundary` (tests/browser-check.html and browser-check.mjs): voxel emission and an area light through an absorbing slab against independent quadrature at the same 0.02 bound. With the old last-segment distance restored it fails at 0.7557 against 0.6917.
 
 ### Fixed 2026-11-09: owned Chromium close waited on helper programs (SHUTDOWN_TIMEOUT, five lanes)
 
@@ -11745,6 +11826,7 @@ remaining unverified real-file variants. Their proof gaps are not claimed fixed 
 - **Evidence:** 40 cycles on the new path under the same load (2026-11-10 01:32 to 01:34): 0 timeouts, 0 leaks; close 347 ms median, 2,130 ms maximum; 5 cycles handed off at the grace, in which the kernel needed up to 9.3 s after the close to finish with the browser (cycles 33 to 35: 9,338, 4,950 and 5,230 ms), every browser, child and host process gone by then and no survivor file written; no Node process or pipe handle left in the suite. `tests/browser-host.test.js` (a real host process; a browser the kernel never finishes with is logged as a survivor at the bound, in the host) and `tests/browser-teardown.test.js` ("a browser process the kernel has not finished tearing down cannot hold the close past the grace"; the in-process design it replaces asserted `SHUTDOWN_TIMEOUT` for that case in its own test, and `tests/browser-host.test.js` runs it through `launchBrowser` against a real host whose browser never exits).
 - **False survivor, fixed 2026-11-10 (batch 217, lane P):** the host's waiter reported a listed child as a survivor 677 ms after the end, which failed the close with `SHUTDOWN_TIMEOUT` at `scripts/lib/browser.mjs:344`. The waiter read each pid's start time to tell ours from a newer process, and took a start time it could not read (PowerShell's getter gives `$null`) for a survivor. Measured as a black box: a process the waiter has found and the kernel then finishes with has no readable start time (its object already signalled: `WaitForExit(0)` true), while every process Chromium starts as this user stays readable through its teardown (9 of 9 listed; an 8 GB process killed mid-read stayed readable until it was gone); and 135 of 958 processes on the dev PC (services such as svchost, WmiPrvSE, SearchProtocolHost) are unreadable, so a pid such a service takes over was reported too. Both mean the pid names no process of ours, so the waiter now skips it. A survivor is still reported only after the waiter's bound. Regressions in `tests/browser-teardown.test.js`: "Windows waiter: an ended process gone before its start time was read is not a survivor" (the race widened by ending the process between lookup and read) and "a pid held by a process this user cannot query is not reported as ours" (pid 4); both fail on the parent with the pid reported.
 - **Still open:** why the kernel takes over 30 s in that machine state is not Margo's to find or fix. A line in `test-results/browser-host-survivors.log` is the signal to look at the Edge version or the driver; the GPU slot is released while the kernel may still be freeing the ended browser's allocations (docs/limits.md).
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB1703/report.md` with `teardown-latency.mjs` and `load.html`. On a quiet 2026-11-11 PC it does not give the multi-second case (median exit 104 ms with 4 busy browsers, 253 ms with 12, max 470 ms); the report says a Windows trace from a slow run is still needed.
 
 ### Open, outside Margo, worked around 2026-11-10: ANGLE Vulkan writes fragment output 7 wrong after dead programs are deleted
 
@@ -12065,6 +12147,8 @@ does not own. Each entry says exactly what is needed to close it.
 
 ### USDZ vertex colours draw grey in Quick Look
 
+- **Status:** worked around 2026-11-11 for paint-only materials (bug sweep L2, KB2028); the Apple defect is open.
+
 - **What:** a painted mesh from `exportUSDZ` is flat grey in Quick Look (macOS 27.2 thumbnail, 2026-11-05). `usdchecker
   --arkit` passes, and `@margoengine/usdz`, `readUSDA` and any reader that follows `UsdPrimvarReader` get the colours.
 - **Repro:** `exportUSDZ({ nodes: [{ geometry: { positions, normals, indices, colors, colorSize: 3 }, material: { color:
@@ -12075,6 +12159,10 @@ does not own. Each entry says exactly what is needed to close it.
 - **Plan:** leave the material out when it says nothing but the paint (no textures, metalness 0, roughness 1, no
   emission, opaque), and teach `@margoengine/usdz` to read `displayColor` on an unbound mesh. A material that says more
   cannot show paint on Apple's renderer; it needs the colours baked into a texture.
+- **Workaround (landed):** `exportUSDZ` writes a paint-only mesh unbound (no Material, no `MaterialBindingAPI`), and
+  `@margoengine/usdz` already read an unbound mesh's `displayColor`. Regression: packages/exporters/tests/usdz.test.js
+  ("a paint-only material is left out"). Still open upstream: Quick Look ignores `UsdPrimvarReader_float3` on
+  `inputs:diffuseColor`; still owed: a Quick Look thumbnail of the unbound file on a Mac (none on this PC).
 
 ### WebXR AR hit testing: never run on an AR device
 
@@ -12301,6 +12389,7 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
+  Upstream report (draft, nothing filed): `docs/upstream-reports/KB2224c/report.md`; no standalone repro exists yet (a plain clear page holds 60).
 
 ### Fixed 2026-11-11: three routes broke WebGPU compatibility-level rules (KB2272); surfels at 4x still refuse
 
@@ -12321,11 +12410,11 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Repro:** in `packages/webgl2-compat/test/adapter-browser.js` attach `Bloom` alone in a `PACKAGES` case.
 - **Needed:** the same capture-format choice as `PostStack` (`captureFormat` in `packages/post/src/stack.ts`), with a case in the adapter check.
 
-### External PBR display passes
+### Fixed 2026-11-11: external PBR display passes blend glass in encoded values (KB2281)
 
-- K2 external-pass follow-up: PBRModel.draw with a caller-owned already-open external pass on a display-encoded target still uses native tint/add blending; reproduce with bright glass over a bright background via createRenderer. Cause: the caller owns the open pass and the package cannot end it to snapshot its background. Graph-managed Engine scenes are fixed; use a linear HDR external target pending a caller-supplied snapshot hook.
-
-- **Lane C source audit (2026-11-10):** PBRDeviceRenderer.draw still receives an already-open caller-owned pass and view; its prepare method handles deformation, not a colour snapshot. The caller snapshot API and its bright-background regression remain open. No renderer or assertion was changed for this entry.
+- **Was:** `PBRModel.createRenderer(device).draw(context, pass, view)` into a caller-owned, already-open pass on a display-encoded target drew native glass with the tint/add blend in stored values: bright glass over a 128 grey read 197, 221, 239 of 255 against the linear 143, 154, 165. The package cannot end the caller's pass to snapshot the light behind a surface.
+- **Fix:** `draw` takes `options.snapshot(pass, target)`: before each glass surface the caller ends its pass, writes the colour into `target` and returns the reopened pass, and `draw` returns the open pass. The glass then composites in linear light as graph-managed scenes do. Without the hook the native blend stays (exact on `rgba16float`), as documented in the gltf-pro README. Regression: `packages/gltf-pro/tests/external-glass.test.js`, `packages/materials/test/native-glass-browser.mjs` (`externalGlass`, 143, 155, 165 with the hook).
+- **Still open elsewhere:** `@margoengine/xr` draws its eyes through `createRenderer` without a hook (bug-sweep row KB2281-xr).
 
 ### Findings of the outside audit (2026-10-28)
 
@@ -12526,6 +12615,7 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   GPU) for a day and count resets; if 153 still comes, a per-second recorder (GPU engine use and memory per process,
   Edge GPU processes, lock holders, running tests; kept with the private notes) saves the 150 s before it, and the
   NVIDIA driver is the next suspect (update it, or try with hardware-accelerated GPU scheduling off).
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB2426/report.md` with `collect-evidence.ps1`. There is no on-demand trigger; on 2026-11-11 the System log still holds ten event 153 entries (3 on 11-11 before 00:25, 7 on 11-09), none during the repro runs of that morning.
 
 ### 4x MSAA blending is not repeatable (RTX A6000 under CPU load, and Intel Arc 140V)
 
@@ -12646,9 +12736,13 @@ Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-
 feature that a web rival or desktop tool documents, with no export, README section or test in `@margoengine/sciviz`.
 Repro: search `packages/sciviz/src` and `packages/sciviz/tests` for the name.
 
-- **Rival accuracy rows are unmeasured.** The four closed-form references run on Margo only.
-- **Cosmograph link appearance differs** at the shared colour and width: its links draw dimmer than the colour asked
-  for (graph smoke mean RGB difference 23). Cause on its side not investigated (black box); the layout matches.
+- **Fixed 2026-11-11 (KB2594a): rival accuracy rows were unmeasured.** `node scripts/sciviz-compare.mjs --accuracy` now runs the isosurface, streamline and isoline references through VTK.js 38.0.5 public filters (black box, in engine-bench) next to Margo; the results are in [sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md#accuracy-against-closed-form-answers). Beer-Lambert has no public VTK.js extraction API, and the other five rivals expose no isosurface, streamline or contour output, so those rows are recorded as not measurable. Regression: tests/sciviz-compare.test.js (accuracy references case).
+- **Closed 2026-11-11 (KB2594b) as a measured accepted difference: Cosmograph link appearance differs** at the shared
+  colour and width (graph smoke mean RGB difference 23). Measured: the brightest interior link pixel is the asked
+  colour in Margo and 0.42 of it over the background in Cosmograph 2.5.1, with linkOpacity 1 and
+  linkVisibilityMinTransparency 1 (its documented opacity options at full), so the cause is inside the rival. Recorded in
+  [sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md) and docs/limits.md. Regression: tests/sciviz-compare.test.js
+  (graph link peak case); the comparison report carries `linkPeak`.
 
 ## Performance losses still open
 
@@ -12678,30 +12772,35 @@ Measured but not fixed. Their history, sources and rerun commands are in
   Batch 182 diagnoses unequal anisotropic stepping/lighting and extra Margo depth/capture work; its separate
   isotropic controls record full workloads. Two per-frame matrix allocations are removed with exact uniform-byte
   regression coverage. The elapsed-time loss remains open; [controls and reproduction](sciviz-rivals.md).
-- **A degree-3 cloud of 1,692,538 splats does not attach** (`@margoengine/splats`, perf history entry 103): the
-  published truck at iteration 7,000. SH is 16 coefficients per channel as float32 (192 bytes a splat, about 310 MiB).
-  `Splats.attach` refuses that buffer because the device's `maxStorageBufferBindingSize` stays at the WebGPU minimum
-  of 134,217,728 bytes. Core does not request a higher limit. The largest degree-3 cloud that attaches is 699,050
-  splats. The batch 168 row uses that prefix of the ply on both sides. Cause: the storage binding is not raised, and
-  the SH buffer is one binding. Publishing the prefix does not close it. Rerun 2026-11-11 (lane L4): natively it now
-  attaches and draws, since core asks the adapter for its binding limit (d9be88943f): `scale-check.mjs` with a
-  1,692,538-splat degree-3 case covers 61.0% of the frame on the RTX A6000. On the WebGL2 layer even the existing
-  3,000,000-splat case (no SH) now refuses at attach: `createBindGroup: its storage bindings total 360000016 bytes, over
-  the 268435456 bytes one WebGL2 data texture holds` (from 1e5d2f94d3), so `MARGO_COMPAT=1 node
-  packages/splats/test/gpu/scale-check.mjs` fails on main. Next: splats splits its compute bindings across bind groups
-  under that per-group total, or the layer spreads one group over several textures; then the truck row reruns at full
-  size.
+- **A degree-3 cloud of 1,692,538 splats does not attach on the WebGL2 layer** (`@margoengine/splats` on
+  `@margoengine/webgl2-compat`, perf history entry 103): the published truck at iteration 7,000, 325 MB of SH (16
+  coefficients per channel as float32, 192 bytes a splat). Natively it attaches and draws since core asks the adapter
+  for its binding size (d9be88943f): 61.0% of the frame on the RTX A6000. The 3,000,000-splat case without SH, refused
+  on the layer from 1e5d2f94d3 (`createBindGroup: its storage bindings total 360000016 bytes, over the 268435456
+  bytes`), is fixed 2026-11-11: the shared data texture grows wider than 2,048 texels instead of refusing the group
+  (Regression: `packages/webgl2-compat/test/device.test.js`, "a bind group whose storage bindings pass 2,048 x
+  maxTextureDimension2D rows"; `MARGO_COMPAT=1 node packages/splats/test/gpu/scale-check.mjs` draws it). Still open on
+  the layer: `maxStorageBufferBindingSize` and `maxBufferSize` stay at the WebGPU defaults (128 and 256 MiB), so the
+  truck's SH binding is refused at attach with the documented RangeError, which scale-check asserts. Cause: the compute
+  tier reads a storage buffer through an R32UI word texture at most 4,096 words wide (`words` in
+  `packages/webgl2-compat/src/compute/runtime.ts`), 128 MiB at 8,192 rows. Next: four words a texel (RGBA32UI) in the
+  compute tier, then raise both adapter limits to what one data texture holds.
 - **Truck 7k prefix frame is slower than GaussianSplats3D 0.4.7** (`@margoengine/splats`, perf history entry 103):
   10.765 ms against 4.500 ms, one still frame of the 699,050 prefix at 979 x 546, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470).
   The rival's shared-memory GPU sort drew no calls, so the number is its CPU sort. Repro:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
   Cause not yet found. Publishing the number does not close it.
-- **Truck 7k prefix does not match the published photograph** (`@margoengine/splats`, perf history entry 103):
-  world-to-camera PSNR 12.226 dB (MAE 52.272), camera-to-world 10.672 dB (MAE 59.713), against `000001`. The rival
-  at the same world-to-camera pose is 9.994 dB (MAE 60.646). The principal point is the image centre. The model is
-  the 7,000-iteration prefix, not the paper's 30,000-iteration cloud, and it is not the paper's dataset-average
-  PSNR. Cause not yet found. Publishing the number does not close it.
+- **Fixed (KB2604f, 2026-11-11): Truck 7k did not match the published photograph** (`@margoengine/splats`, perf
+  history entries 103 and 115): it scored 12.226 dB. Cause: the projection linearised the EWA Jacobian at each
+  splat's true view direction; a splat beside the camera (x / depth far past the view) got an ellipse thousands of
+  pixels long that covered the frame, so the camera-to-world pose (the right one) drew a grey blur and lost to the
+  wrong world-to-camera pose. The prefix was not the cause (full cloud 12.262 dB before the fix). Fix: the
+  linearisation point is clamped to 1.3 times the half-view tangent, the convention the captures were trained with
+  (shader.ts `projectSplat`, shared by picking). Full 1,692,538-splat cloud, camera-to-world: PSNR 20.882 dB
+  (MAE 13.037); the 699,050 prefix 12.814 dB. Regression: `packages/splats/test/gpu/check.mjs` case "beside" (a
+  splat at x / depth 30 lit 16,384 of 16,384 pixels, now 0). Measure: `node scripts/gpu-lock.mjs run
+  --owner=<you> --gpu=splats-truck-photo -- node packages/splats/scripts/truck-photo.mjs`. Sources: Kerbl, Kopanas, Leimkuehler and Drettakis 2023, "3D Gaussian Splatting for Real-Time Radiance Field Rendering", ACM TOG 42(4), https://doi.org/10.1145/3592433; Zwicker, Pfister, van Baar and Gross 2001, "EWA Volume Splatting", IEEE Visualization, https://doi.org/10.1109/VISUAL.2001.964490; Ye and Kanazawa 2023, "Mathematical Supplement for the gsplat Library", https://arxiv.org/abs/2312.02121.
 - **10 million points are slower than potree-core 2.0.17** (`@margoengine/points`, perf history entry 105):
   9.000 ms against 5.400 ms, one settled frame of a single 10,000,000 point leaf, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600).
@@ -12709,22 +12808,14 @@ Measured but not fixed. Their history, sources and rerun commands are in
   `readPixels`, because `fenceSync` returned `WAIT_FAILED`. Repro:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
   Cause not yet found. Publishing the number does not close it.
-- **Cornell box irradiance does not match a Cycles bake** (`@margoengine/lightmap`, perf history entry 108):
-  mean absolute error 0.069543 per channel over 881 texels, 0.211475 of the Cycles mean (0.328848). Margo's mean
-  is 0.305736. The largest miss is 0.900128. The 8-bit step is 0.016984. Blender 5.3.0 Beta, Cycles, 128 samples,
-  `diffuse_bounces` 2. Margo uses physical irradiance, one per-quad radiosity bounce and 16 area samples. The
-  short block top is snapped from (240, 165, 272) to (242, 165, 274). Repro:
-  `node packages/lightmap/scripts/rival-bench.mjs` after the lightmap build. Cycles runs outside the repository.
-  Cause: Margo gathers only 16 cosine rays from each texel using a single mean outgoing radiance per quad,
-  whereas Cycles integrates spatially varying transport. Area sampling and 8-bit irradiance quantization also
-  contribute; their individual shares of the error are not isolated. Publishing the number does not close it.
-  Batch 187 fixes a separate cause: area shadow rays and diffuse gathers culled opaque back faces, allowing light
-  through the tops of the blocks onto floor texels inside them. Both sides now block visibility; only front hits
-  supply outgoing radiance. With the unchanged frozen 881-texel reference, physical path mode, seed 1, 16 area
-  samples, one bounce and 32 bounce rays, MAE is 0.048730 (relative 0.148184), maximum 0.353979. This is still an
-  open accuracy difference, not parity: finite ray counts, cached texel-centre direct illumination, RGBA8 output
-  and the reference's diffuse-event convention remain to be isolated in the fix phase. No reference was replaced.
-
+- **Fixed (KB2604h, 2026-11-11): Cornell box irradiance did not match a Cycles bake** (`@margoengine/lightmap`,
+  perf history entries 108 and 116): MAE 0.069543 (0.048730 after batch 187). Cause: the Cycles reference baked
+  `diffuse_bounces` 2 against Margo's 1 indirect bounce (a +1 left from when faces were baked alone and the ceiling
+  came out black at 1). With every face present Cycles at 1 lights the ceiling and matches Margo at 1. Fix:
+  `packages/lightmap/scripts/cornell-cycles.py` bakes Margo's count, the bench refuses a reference with another
+  count and uses path bounces (32 paths). Result: MAE 0.024863 (relative 0.087125); 8 seeds 0.012063, under the
+  8-bit step 0.016813, so the rest is ray noise. Regression: `packages/lightmap/tests/cornell-cycles-lifecycle.py`
+  (run by `cornell-box.test.js`), which failed on the old script (`diffuse_bounces` 2).
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node
   scripts/physics2d-kernel-browsers.mjs` (the Box2D build is in reproduce.md). Cause, measured: the broad phase was
@@ -12772,6 +12863,7 @@ Measured but not fixed. Their history, sources and rerun commands are in
 The entries below were measured with `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu` (busy
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
+- **Upstream reports (drafts, nothing filed):** `docs/upstream-reports/KB2481/report.md` (this entry) and `docs/upstream-reports/KB3508/report.md` (the NVIDIA repro page `msaa-blend-repeat.html`, which has no Margo code). On 2026-11-11 the page still reproduces on the RTX A6000 (WebGPU: 299 of 299 frames differ, 36 distinct images; with `mask: 7` none). The Intel Arc half has no hand-written repro and could not be run here.
 
 ### createInstancedMesh draws 50,000 boxes slower than three.js
 
@@ -13303,12 +13395,14 @@ packages/gltf-pro/tests/readme-pointer.test.js checks all three animated values 
 Khronos MetalRoughSpheresNoTextures under a matched embedded camera and directional sun differs from the
 Sample Viewer: all-pixel RGB byte MAE 1.837511698404948, foreground MAE 11.58277025673087,
 RMSE 6.388144511474295, max 254, 40,875 differing pixels of 262,144. Compatibility WebGL2 MAE
-1.837506612141927. Full evidence: docs/whitepaper/results/batch-160-metallic-roughness.json.
+1.837506612141927. Since the height-correlated Smith G (KB5875a, 2026-11-11) the measured and recorded MAE is
+1.7865498860677083 (WebGPU) and 1.7865447998046875 (WebGL2 compatibility); see docs/limits.md, "Batch 160 budgets
+re-recorded". Full evidence: docs/whitepaper/results/batch-160-metallic-roughness.json.
 Repro: scripts/reference-rendering/run.mjs under the shared GPU lock (see whitepaper reproduction).
 
 Known Margo causes to isolate: gltf-pro/src/shader.ts clamps perceptual roughness to 0.045 even for the
-sample's authored zero-roughness column, and packages/shared/light-terms.js uses separable single-scatter
-Smith G, without height correlation or multiple-scattering compensation. Appendix B.3.6 describes why
+sample's authored zero-roughness column, and its single-scatter Smith G has no multiple-scattering compensation
+(it was separable until 2026-11-11 and is height-correlated since, KB5875a). Appendix B.3.6 describes why
 these model choices can lose energy. The Sample Viewer is treated strictly as a black box: its exact model
 is not inferred from source. These are known limitations of Margo's formulation, not a quantified attribution
 of this entire picture error. The residual including the thin model text and silhouettes is not yet isolated;
@@ -13326,9 +13420,10 @@ Repro: `node scripts/reference-rendering/run.mjs --case=clearcoat` through the G
 fetching its source and capturing the reference as documented in whitepaper/reproduce.md.
 Entire Khronos ClearCoatTest, 27 primitives, no IBL, identical camera and sun, 512 x 512.
 All-pixel RGB MAE 1.6809107462565105 (WebGPU), 1.6809145609537761 (compatibility WebGL2),
-maximum byte error 180. Frozen result: whitepaper/results/batch-160-clearcoat.json.
+maximum byte error 180. Frozen result: whitepaper/results/batch-160-clearcoat.json. Re-recorded 2026-11-11 at
+1.6820462544759114 on both backends (absolute 1,322,815) after da12bd07e1, 65098f33fe and KB5875a (Scott's ruling).
 Cause of the complete residual is not yet isolated. Known formulation differences to investigate:
-Margo clamps clearcoat roughness to .045 and uses separable single-scatter Smith; its coat direct
+Margo clamps clearcoat roughness to .045 and uses single-scatter Smith (height-correlated since 2026-11-11); its coat direct
 Fresnel uses VdotH, while the extension's nonnormative layering example uses NdotV.
 None of these has been proved to explain the full image error. Base-material, texture-filtering,
 normal-map and silhouette errors are included, not removed by masking. No reference-specific
@@ -13341,6 +13436,7 @@ image has 62142 foreground pixels against the unchanged minimum 62180.
 A 24-frame complete single-instance native control repeats exactly, which
 does not explain the cross-capture difference. Causes remain unisolated;
 no budget, assertion or renderer was changed to pass this comparison.
+Resolved 2026-11-11: the +1 is da12bd07e1 (bisected); the budget is re-recorded with the entries below.
 
 ### Fixed 2026-11-09: WFC weight arithmetic overflow
 
@@ -13507,24 +13603,26 @@ using the existing sky model. Its generated native/compatibility value and lifec
 parity or moving-camera denoising defects. Stylized night, isotropic higher orders and the fixed-altitude distant
 map are documented limits, not claims of astronomical or spectral reference accuracy.
 
-### Open: nearly closed conservative Hillaire atmospheres
+### Fixed: nearly closed conservative Hillaire atmospheres (KB3454, 2026-11-11)
 
-The existing raster Hillaire model accepts atmospheres whose geometric-series transfer rounds to one.
+The raster Hillaire model gave nonfinite radiance for atmospheres whose geometric-series transfer rounds to one.
 Repro: HillaireSky with atmosphere `{rayleigh:[1,1,1],mie:1,mieAbsorption:0,rayleighHeight:100000,
-mieHeight:100000,groundAlbedo:[1,1,1]}` on Earth radii. A native GPU probe returns nonfinite radiance.
-Cause: `packages/sky/src/atmosphere-luts.ts` computes `L2 / (1 - fms)`; in this opaque conservative domain
-`fms` rounds to one and L2 underflows to zero. The model needs a numerically stable treatment beyond its
-large-mean-free-path approximation; no epsilon clamp or scattering-order truncation was added. The new
-environment bake rejects vertical scattering depth above 6 before allocating, keeping an upward-quarter
-escape bound exp(-6 / 0.625) / 4 above Float32 subtraction error. This is an explicit bake domain limit,
-not a repair of the pre-existing raster model. Regression: sky-environment.test.js checks the domain refusal.
-
-Lane G current-main readback isolates the same defect inside the 32x32
-multiple-scattering table: 1600 of 4096 components are nonfinite on both
-native and compatibility devices, while the default control is finite.
-The later HDR scene capture instead saturates to finite 65504, so a finite
-display/readback does not establish finite internal transport. No clamp,
-scattering-order truncation or broader raster-domain refusal was substituted.
+mieHeight:100000,groundAlbedo:[1,1,1],ozone:[0,0,0]}` on Earth radii: 2688 of the 3072 RGB components of the
+32x32 multiple scattering table were nonfinite on native and compatibility devices.
+Cause: `packages/sky/src/atmosphere-luts.ts` computed `L2 / (1 - fms)` with `fms` a sum that rounds to one, and
+both L2 and the throughput underflow f32 deep in such a medium (a vertical optical depth near 200).
+Fix: 1 - f_ms of each direction is now summed as what leaves it (final throughput plus what the medium absorbs,
+an exact telescoping of the step integrals), and both that sum and L2 are kept as v x exp(-e), e an optical depth,
+added log-sum-exp style so every rescale factor is at most one (Blanchard, Higham and Higham 2021, "Accurately
+computing the log-sum-exp and softmax functions", IMA J. Numer. Anal. 41(4), https://doi.org/10.1093/imanum/draa038;
+Milakov and Gimelshein 2018, "Online normalizer calculation for softmax", https://arxiv.org/abs/1805.02867). No
+clamp, epsilon or order truncation. Earth's tables are unchanged (noon, sunset, twilight and the table-against-march
+check give the same values). The closed table now holds finite values up to 455 (native) and 444 (compatibility
+level): Hillaire's one-transfer-for-every-order approximation is far outside its domain there, which is a model
+limit, not a numeric failure. The environment bake's refusal above vertical scattering depth 6 stays as its own
+domain limit (sky-environment.test.js).
+Regression: `packages/sky/test/features-check.mjs` hillaire, case "closed" (nonfinite table count 0, finite sky),
+both backends.
 
 ### Fixed while building batch 76 job 2: mask addressing and bitmap usage
 
@@ -13554,28 +13652,33 @@ The previously open non-default-scene disposal defect was fixed separately in 18
 
 GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=iridescence, each with and without --compat, reproduce the complete-scene measured budgets. Full residual causes are not isolated. Anisotropy retains all strength/roughness rows and labels. Iridescence retains all 346 primitives in its three-dimensional material/film-IOR/thickness grid; this direct-light camera contains overlapping spheres and sparse highlights, with no IBL. Margo uses its shared anisotropic GGX and thin-film implementation; the figures alone do not attribute the loss to a particular formula. Silhouette, tone-map and filtering differences remain included, and no small shader fix is claimed without an isolating regression.
 
-Bisected 2026-11-11 (RTX A6000, Edge, native WebGPU; each step built with build:packages and run once through the GPU
-lock with only the failing case). Four batch 160 cases fail on main; every budget was reproduced exactly at the
-commit that froze it, so the browser and driver did not move them. No commit found is a renderer defect, so nothing
-was reverted and no budget changed; whether to keep these results is Scott's ruling.
-- da12bd07e1 (core uploads the light direction normalized once on the CPU in float64): iridescence 454,341 to
-  454,342, anisotropy 819,207 to 819,210, clearcoat 1,321,922 to 1,321,923 absolute (the Lane G figures above). One
-  float32 rounding of the direction moves a few pixels one code.
-- 65098f33fe (area-filter mips; BLEND base colour maps weighted by alpha): iridescence to 613,669 (budget 454,341),
-  anisotropy to 819,417. The IridescenceMetallicSpheres guides texture is 2048 x 2048 BLEND: 3,975,856 texels are
-  alpha 0 with white RGB, 114,010 are opaque black lines. A plain average greys the lines down the chain by mixing in
-  invisible white; the weighted chain keeps them black, which is what a premultiplied box filter of the displayed
-  texture gives. All 2,558 changed pixels got darker, towards the filtered texture and away from the Sample Viewer,
-  whose minified lines show the plain average. Anisotropy: 179 label pixels (OPAQUE, plain chain) one or two codes
-  brighter, exact texel loads in place of one hardware bilinear fetch.
-- 401c2e032b (native glass composited in linear light): transmission absolute error falls from 1,763,456 to
-  1,590,805 on main, but foreground coverage is 67,046 against 67,050. Margo now draws black where the Sample Viewer
-  is black (15 pixels behind the red glass that used to read up to 222,89,53 are 0), and 11 new nonblack pixels
-  appear, so the union shrinks by 4.
+Accepted 2026-11-11 (Scott, "Yes, re-record"): four batch 160 cases failed on main after deliberate renderer
+changes, bisected on the RTX A6000 (Edge, each old budget reproduced exactly at the parent commit, so the browser and
+driver did not move them): da12bd07e1 (unit light direction from the CPU: iridescence +1, anisotropy +3, clearcoat +1),
+65098f33fe (alpha-weighted area-filter mips: iridescence 454,342 to 613,669, anisotropy +207, clearcoat 1,321,923 to
+1,322,883; the IridescenceMetallicSpheres guides texture is 2048 x 2048 BLEND, alpha-0 white with opaque black lines,
+which the weighted chain keeps black and the Sample Viewer greys), 401c2e032b (linear glass: transmission 1,763,456
+to 1,590,805, foreground 67,050 to 67,046). The height-correlated Smith G (KB5875a) then moved these and the other
+direct-light cases. Every budget is re-recorded at its measured value; before and after figures and causes are in
+docs/limits.md, "Batch 160 budgets re-recorded". The picture residual against the Sample Viewer stays open above.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3497/report.md`; it points at the KB3508 NVIDIA page and says the link is consistent, not proven.
+
+### Batch 160 environment IBL budget 1 over since 40e6f183dc (open, needs Scott's ruling)
+
 Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
-scripts/reference-rendering/run.mjs --case=<iridescence|anisotropy|clearcoat|transmission>` at the commit and its
-parent after `npm run build:packages`. Frozen budgets remain unchanged and these are not the sciviz/dispersion ANGLE
-exemption.
+scripts/reference-rendering/environment.mjs` after `npm run build:packages`. Native direct row: absolute 2,294,442
+against its budget 2,294,441 (square 76,817,356 against 76,817,341); the full row and both compatibility rows pass.
+Cause, bisected 2026-11-11 on the RTX A6000: 40e6f183dc (environment keeps the GGX lobe width when cosTheta rounds to
+one) gives 2,294,441 at its parent and 2,294,442 at the commit; the height-correlated Smith G does not touch this
+scene (no sun). The change is a deliberate fix, but this budget is outside the 2026-11-11 re-record ruling, so it is
+unchanged until Scott rules. The compatibility rows already measured lower (2,294,384 and 1,482,472) before that.
+
+### Batch 160 AMD budgets not re-measured after the 2026-11-11 changes (open)
+
+The `amd` rows of batch-160-specular.json and batch-160-ior.json and the budgets in batch-160-amd-transmission.json
+and batch-160-amd-volume.json were measured before da12bd07e1, 65098f33fe, 401c2e032b and KB5875a; only the NVIDIA
+rows were re-recorded. Repro: the same scripts with MARGO_GPU=amd on the Radeon (RDNA 2) machine. Cause: no AMD
+adapter on the dev PC. Owed: rerun there and re-record under the same ruling.
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 
@@ -13617,6 +13720,7 @@ Lane G current-main raw-API repro retains all 1280 triangles and captures
 eight raw-WebGL2 hashes, no validation errors. Both exact-repeat assertions
 fail. This is still an external multisample-blend problem with an unknown
 closed-driver mechanism, not an attributed Margo repair.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3508/report.md` with `msaa-blend-repeat.html` (WebGPU and WebGL2, no Margo code). On 2026-11-11, Edge 157, RTX A6000: WebGPU 299 of 299 frames differ (36 distinct), `mask: 7` none; WebGL2 on ANGLE D3D11 10 of 299 differ (9 distinct), on ANGLE Vulkan and D3D11on12 none; the AMD iGPU none.
 
 ### Fixed: medium boundary offsets shortened physical transport (Batch 99)
 
@@ -15077,7 +15181,7 @@ Fixed 2026-11-11 (batch 171 job 6 follow-up): clearing the demo's Sun (UTC) date
 
 Batch 258 dependent fixture: after-scene-browser.tsx now waits for its actual held asset request, in addition to Suspense fallback, before exposing the snapshot. The previous count-0/count-1 race is covered by the unchanged React browser request assertion.
 
-Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles remain resident until atlas eviction/renderer disposal. Repro: create, draw and remove a sequence of new ImageTexture objects; the colour atlas retains their tile slots. Cause: image tiles share the glyph atlas lifetime. These build-phase quality gaps are queued in private finish-later, with residency limits documented.
+Image follow-up (batch 258): generic attachMirror does not yet emit labelled Image roles; replaced image tiles stayed resident until atlas eviction/renderer disposal (fixed 2026-11-11, KB4990b: a build that no longer draws an image releases its colour atlas slots, and a page left empty is reused; 100 replacements of a 250 px image used 16 pages and then threw "Glyph atlas is full", now at most 3 pages; regression packages/ui/tests/webgl2.test.js and packages/text/tests/text.test.js KB4990b cases). These build-phase quality gaps are queued in private finish-later, with residency limits documented.
 
 
 Fixed in batch 262 scene editing: a non-callable Edit.discard previously entered
@@ -15367,7 +15471,7 @@ Fixed 2026-11-10: loaders/geo pre-abort precedence (batch 202). Shapefile and MV
 - Batch 213 MToon integration: two independently loaded blended models with crossing renderQueueOffsetNumber values retain scene model order; the material adapter orders primitives only inside one model. Global model queue scheduling is a fix-phase follow-up.
 - Batch 213 MToon integration: an alpha-cutout shadow caster with a spatially varying UV animation mask uses the static alpha UV while beauty moves; optional shadow sampling does not receive the material's mask/time bindings. Beauty, normals, emission and hull animation are built; shadow integration is a fix-phase follow-up.
 
-- Existing gltf-pro GPU driver: test-extensions-browser.js reads argv[2] as a name filter, so --compat selects zero checks. Use MARGO_COMPAT=1 with no filter for the full compatibility run; driver repair waits for the fix phase.
+- Fixed 2026-11-11 (bug sweep L2, KB5289c): test-extensions-browser.js read argv[2] as a name filter, so --compat selected zero checks and passed. It now takes the first argument that is not a flag as the filter and refuses a filter that matches no check (scripts/name-filter.mjs). Regression: packages/gltf-pro/tests/name-filter.test.js.
 Fixed 2026-11-10: Existing physical-material compatibility limit physical compatibility sampler plan (aa3e347da). The unchanged MARGO_COMPAT=1 scripts/gltf-pro-materials-gpu-check.js passes every extended/transmissive and complete-lighting pipeline plus all 64 iridescence and 96 direct BRDF cases, with zero GPU/page errors. No shader, assertion or tolerance changed in this sweep.
 
 Batch 246 job 3: no open plane-rendering defect found by the matrix, depth and real-GPU ray-plane checks. Existing cross-lane browser-inventory findings remain listed above.
@@ -15627,7 +15731,7 @@ Fixed 2026-11-10: Batch 194 job 3 reobserved physical compatibility sampler plan
 - Voxel-net native Deno host: native WebSocket has no ping/pong observation hook. After clientTimeout without application input, the existing authoritative server can close an otherwise reachable idle client. Repro: join via serveVoxelDeno then stop client.update longer than clientTimeout. Cause: Deno handles control pongs internally and exposes only application message activity. Follow-up: native-provider liveness integration without inventing byte counters. Keep client.update running meanwhile.
 
 
-- Batch 198 compass: attach CameraProjection and ViewCompass, request Top, then drag a cardinal. Continuous spin at that exact pole retains projection.up instead of turning the image because ViewCube.pole deliberately preserves a projection-owned valid screen up. Ordinary turntable drags, all cardinal clicks and menu actions work. Small rule-22 finish item: integrate arbitrary pole heading with projection-owned screen up without changing quarter-roll semantics or ownership.
+Fixed 2026-11-11 (KB5545b): Batch 198 compass spin at the Top pole under a CameraProjection kept projection.up, so the image did not turn. A drag on the cube or its compass now turns the projection's vertical up to the heading it reached (rolled as the view is); clicks, named views and quarter rolls still leave it alone. Regression: packages/viewcube/test/compass.test.js (KB5545b case).
 ### Batch 235 job 3: captured-matrix and water feedback contract
 
 Environment now exposes the matrix of its last successful captured image rather than requiring consumers to read a mutable camera. captureOnly keeps capture active without drawing a second rectangle; water filters its draw from that capture to avoid self-feedback. Regression: environment/tests/mirror.test.js and water/test/reflector.browser.mjs prove snapshot identity, capture-only drawing, independent offscreen-object projection, exact unready fallback, SSR compilation and lifecycle.
@@ -15676,12 +15780,12 @@ The rebased water GPU script also placed its build after the first test, violati
 
 Fixed in batch 274 decomp: zero-size factor stacks used to enter the matrix loop once per virtual matrix, allowing huge empty batches to stall. A zero-output work guard preserves empty factors with no kernel calls; packages/compute/tests/decomp.test.js checks the count (64 before, zero after) independently of time.
 
-Batch 274 fix-phase polish: removing/corrupting the served decomp-kernel.wasm asset, or denying its compilation by CSP, can expose native filesystem/CompileError failures rather than a help-linked MargoError. Cause: decomp.ts load() translates HTTP failures but does not wrap readFile/instantiate failures. Numerical decompositions and normal asset loading are complete; normalize these failure types in the fix phase (rule 22).
+Fixed 2026-11-11 (bug sweep L5): removing or corrupting decomp-kernel.wasm, or a CSP that denies its compilation, exposed a raw filesystem error or CompileError. load() in decomp.ts now wraps every read, fetch, compile and link failure as a `failed` MargoError with the original kept as `cause`; an abort stays an AbortError. Regression: packages/compute/tests/decomp.test.js "decomp Wasm read and compile failures reject as coded MargoErrors".
 Fixed batch 270 GPU gate registration: new parity checks ran only by hand because the vfx test:gpu manifest still listed its original five scripts. Added native and compatibility parity.mjs --all commands. Regression: packages/vfx/test/gpu-registration.test.js fails with the previous manifest (zero parity commands), and passes with both backend commands.
 Batch 184 fur: fixed the new coarsest-stack sampling defect before landing. Sampling the outer shell at normalized height 1 made two-shell fur's only outer sample empty, because every procedural strand tapers before height 1. Shells now sample k/shells; CPU and native/compat 1x/4x GPU regressions require a nonempty two-shell result. The caster output regression also checks a comma before the added UV varying, for input structs with no trailing comma. Existing unrelated wireframe compatibility findings remain tracked under rules 21/22.
 Batch 184 generated aliases: umbrella regeneration also supplies the missing post/mask alias for the already landed post entry; it is a generated facade and manifest mapping only.
 
-Fur follow-up integration, outside the completed shell-controls row: combining an inherited displacementMap with FurMaterial and Shadows applies that map in beauty but not the custom caster, because the custom caster takes precedence over the ordinary map displacement. Fur also has no custom TAA velocity hook yet; TAA currently assumes a texture-displacement layout when that hook is absent, so the optional TAA combination is unsupported until its adapter is composed. Repro: createFur with displacementMap plus Shadows, or attach TAA while advancing wind time. Preserve shell controls and the existing exact-reset regressions while composing those optional hooks in the fix phase.
+Fixed 2026-11-11 (KB5588b, sweep L2): the fur caster record now moves on top of the material's own displacementMap record (built-material passes it to `caster`), in the shadow, contact-shadow, selection and depth passes alike, and it carries TAA's velocity patch: the same move and strand cut, with the move run again on last frame's fur block (TAA's `move`/`program` contract), so wind has motion vectors. The record is kept while unchanged instead of rebuilt per read. Regression: packages/materials/tests/fur.test.js (displaced caster, TAA graph and before-move WGSL) and packages/materials/test/fur-browser.mjs (displaced shells with Shadows and TAA with advancing wind, native and compatibility, 1x and 4x, no GPU errors). Original entry: Fur follow-up integration, outside the completed shell-controls row: combining an inherited displacementMap with FurMaterial and Shadows applies that map in beauty but not the custom caster, because the custom caster takes precedence over the ordinary map displacement. Fur also has no custom TAA velocity hook yet; TAA currently assumes a texture-displacement layout when that hook is absent, so the optional TAA combination is unsupported until its adapter is composed. Repro: createFur with displacementMap plus Shadows, or attach TAA while advancing wind time. Preserve shell controls and the existing exact-reset regressions while composing those optional hooks in the fix phase.
 
 
 - Fixed in batch 173 job 4: ordinary, fusion and cinematic rays now stop at actual opaque scene depth. volume-depth-browser.mjs covers half-volume analytical colour, opaque geometry moving after progressive saturation, layer insertion order and actual device reboot on both GPU backends.
@@ -15741,7 +15845,7 @@ Repro: `MARGO_COMPAT=1` then `node packages/quality/test/features-browser.mjs` u
 - Fixed, lane S prefiltered IBL metadata overflow (2026-11-10): encodePrefilteredIBL checks the complete KTX2 key/value byte count, including the length word, key and padding, before accessing source mips or allocating output. The validated full source chain is sized from its dimensions; edges 8192/16384 cannot fit the u32 field and throw RangeError. The dimension-only regression in packages/environment/tests/prefiltered.test.js fails on the parent without allocating large fixtures, also checking that a 4096-edge source reaches ordinary mip validation. Existing bit-exact round trips and malformed-file checks remain intact.
 
 Fixed 2026-11-10: batch 201 AudioListener direct disposal registration. A registered listener now delegates to its owning Scene.removePlugin, which releases its name and frame passes before calling the existing resource teardown. Same-name replacement works immediately, stale handles retain replacement ownership, and another scene's same-name listener remains attached. Regression: packages/audio/tests/audio.test.js has two cases that fail on the parent; listener-disposal-browser.mjs checks the real engine on native WebGPU and WebGL2. Engine-driven cleanup and lazy audio-context creation are preserved; core is unchanged.
-Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject correctly but textureSource's shared validation message names KHR_texture_basisu; reproduce with a non-object DDS extension value. Valid DDS loading is unaffected. Correct the diagnostic in the fix phase.
+Fixed 2026-11-11 (bug sweep L2, KB5663b; regression packages/gltf-pro/tests/dds.test.js): textureSource names the malformed extension. Original entry: Batch 201 DDS follow-up: malformed MSFT_texture_dds extension shapes reject correctly but textureSource's shared validation message names KHR_texture_basisu; reproduce with a non-object DDS extension value. Valid DDS loading is unaffected. Correct the diagnostic in the fix phase.
 
 
 Batch 136 replacement proof: the geometric-normal unsigned-residue scoring defect is fixed with circular-distance and complete-payload selection; the sparse high-precision RAW cutoff is expanded within a fixed memory bound. Rust regressions and the 76-row two-decoder corpus pass with no open defect found in this scope.
@@ -15764,7 +15868,7 @@ Fixed 2026-11-10: GPU package-runner owner collision (batch 180). Unrelated work
 Batch 136 removal landing blocker fixed: supply-chain regeneration previously replaced the whole notices file and discarded appended asset credits. Explicit retained addenda, legacy-boundary migration, unknown-boundary rejection and an idempotence/stale-generated-content regression preserve them. No remaining blocker in this scope.
 Fixed 2026-11-10: Build-phase follow-up (batch 177 job 3). notice regeneration preserves appended asset credits (8b508ad02). tests/supply-chain.test.js checks retained addenda, idempotence and current generated notices.
 
-Batch 274 fix-phase API polish: Module.stateDict() and Tensor.read() in compute/nn expose no AbortSignal, so an in-flight large state readback cannot be cancelled by their callers. Repro: start model.stateDict() for a large model; there is no signal option to pass. Cause: the existing wrappers call GpuArray.read() without forwarding ReadOptions; BatchNorm follows that existing signature. Add optional wait/read options through nested modules in the fix phase. NN-extra numerical execution, gradients and saved state are complete.
+Fixed 2026-11-11 (bug sweep L5): Module.stateDict() and Tensor.read() in compute/nn took no options, so a large state readback could not be cancelled. Tensor.read(options) forwards ReadOptions; stateDict({ signal }) passes the signal to every parameter read and nested module, BatchNorm running statistics included. Regression: packages/compute/tests/nn.test.js "stateDict and Tensor.read forward an AbortSignal through nested modules".
 ### Fixed: batch 1 umbrella package test discovery
 
 The original fourteen packages were repaired by 68b55c2ed. The later umbrella package added tests/export-order.test.js without scripts.test, reproducing the same class: node --test tests/package-test-scripts.test.js reported the missing file. Its manifest now runs every tests/*.test.js file. Existing regression: tests/package-test-scripts.test.js, which failed before the manifest change.
@@ -15782,7 +15886,7 @@ Batch 177 job 4: no open correctness defect in the checked chart presentation pa
 
 API conventions lane (2026-11-10): unchanged materials dispersion compatibility reproduces the tracked 4x live-reset error 0.000244140625 against 0; native passes 278 checks/254 captures. The changed optional Fur.attach entry is never imported by this fixture, whose materials root is unchanged. Retain the existing fix-phase item under rules 21/22 without a tolerance or renderer change.
 - Fixed 2026-11-11 (KB5700a): opacity 1 in the scalar, bricked, multi-volume, quality and curvilinear marches stayed partly transparent when the per-step length was a tiny fraction of the reference (curvilinear referenceStep 1000, or density 1e-4), because the opacity correction capped alpha first (log of max(1 - a, 1e-6), or a clamp to 0.999999). Opacity 1 is infinite extinction, so each march now takes alpha exactly 1 for any positive step (density 0 stays clear); GPU picking does the same, so `opacityThreshold: 1` finds an opacity-1 voxel. Regressions: packages/sciviz/tests/volume-physics-browser.mjs case 8, curvilinear-browser.mjs `opaque`, bricks-browser.js, pick-gpu-browser.mjs.
-- Fix-phase follow-up in existing curvilinear physical metrics: scale a unit cube and referenceStep together by 1e20 or 1e-20, with matching figure limits. Its raw physical length(d*span) squares can overflow/underflow float32 before opacity correction. The tetrahedral entry normalizes extents/reference together and covers both scales; port that bounded metric to the other owning optional paths in the fix phase.
+- Fixed 2026-11-11 (KB5700b): curvilinear physical metrics: scale a unit cube and referenceStep together by 1e20 or 1e-20, with matching figure limits. Its raw physical length(d*span) squared overflowed or underflowed float32 before the opacity correction (1e20 drew fully opaque). The march now measures lengths and the reference in units of the longest box side, as the tetrahedral and AMR entries already did. Regression: packages/sciviz/tests/curvilinear-browser.mjs `scaled` (both scales match the unit cube within 1 of 255).
 
 
 - Fixed 2026-11-11 (KB5700c, batch 174 multivariate brush history): after two axis brushes and SelectionStore.undo the controller kept its last range map, so the next axis gesture reapplied the undone range. SelectionStore brushes now carry an optional `predicate` kept through undo, redo, toJSON and fromJSON; parallel coordinates and scatter matrices store their ranges there and rebuild them on every store change. Regressions: packages/sciviz/tests/link.test.js (predicate history), parcoords-browser.mjs (period, radius, undo, then period).
@@ -15796,8 +15900,9 @@ Batch 179 state capture: default MSAA transparent rendering is not self-bit-stab
 
 Quality scanner race: running quality alongside React subpath tests can list then read a temporary .subpaths-* fixture after the test deletes it, yielding ENOENT in clean-room.js; run these gates sequentially until the scanner owns a stable file list. Found during batch 179, outside the state codec.
 
-Batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t => [t*t, 0, 0]) sampled by a CPU-coloured line at t=0.123 is restored from a 256-entry Float32 table, with interpolation error versus the original closure. Cause: executable closures cannot be serialized and the table matches GPU texture sampling, not arbitrary analytic CPU sampling. Preserve exact CPU colours or a registered declarative map definition in the fix phase.
-- Batch 178 job 3 media quality: manually setting a scatter cloud material to world size before perspective tiled capture makes its splats too small in short tiles. Repro: scatter.cloud.material.sizeUnits = world, capture with tileSize below image height. Cause: the points focal-length uniform uses tile height while the capture camera retains its full-view fov. Default sciviz pixel-size scatter is unaffected. Fix-phase item under rule 22; all required media formats are built.
+Fixed 2026-11-11 (KB5700h): batch 179 custom colour-map quality tail: Colormap('quadratic', 'sequential', t => [t*t, 0, 0]) sampled by a CPU-coloured line at t=0.123 was restored from a 256-entry Float32 table, with interpolation error versus the original closure. Loading now takes a `colormaps` option: a registered map (or a built-in) whose name, kind and saved table all match restores as itself, exact; any other map still rebuilds from the table. Regression: packages/sciviz/tests/color-scales.test.js (KB5700h case). Original note: Cause: executable closures cannot be serialized and the table matches GPU texture sampling, not arbitrary analytic CPU sampling. Preserve exact CPU colours or a registered declarative map definition in the fix phase.
+- Fixed 2026-11-11 (KB5700i): batch 178 job 3 media quality: a scatter cloud material set to world size drew its splats too small in short tiles of a perspective tiled capture (scatter.cloud.material.sizeUnits = 'world', tileSize below the image height). Cause: the points focal-length uniform (packages/points/src/frame.ts) took the tile height with the full-view fov, ignoring the cropped tile projection. It now derives pixels per world unit from the clip matrix (the y row without its share along the w row, over the w row length), as the orthographic branch already did, so cropped and off-axis projections keep their scale. Regressions: packages/points/tests/frame-scale.test.js; packages/sciviz/tests/export-media-browser.mjs (world-size splats, 64-pixel tiles against one 512-pixel tile: 0 of 1932 covered pixels differ on both backends, 1880 before).
+- Fixed 2026-11-11 (found under KB5700i): a perspective 3D figure exported with exportImage or renderMediaTiles drew no layers at all (axes, scatter, lines), only the background. Cause: the tile camera rebuilt the default perspective in packages/sciviz/src/media-tiles.ts with near minus far sign-flipped from core's reversed-depth WebGPU projection, so every fragment fell outside the depth range. The tile camera now uses the core perspective of the same fov, near and far; a custom camera.project is still taken as the source camera made it. Regression: packages/sciviz/tests/export-media-browser.mjs (a perspective scatter covers 1932 pixels of the export, 0 before; in a probe the export and the live canvas held the same 2805 red marker pixels).
 
 Batch 177 job 5: no open correctness defect in the checked live-data paths. Source cancellation covers asynchronous parse waits, including a parser that synchronously aborts its signal. A removed trace no longer appears in ChartPolish unified hover. The streaming SVG regression counts its 64 clipped data circles separately from the intentional legend swatch. Protocol fixtures close the RFC 6455 connection once; no renderer/browser shutdown code changed.
 
@@ -15825,7 +15930,7 @@ Fixed 2026-11-11 (lane L4): water browser checks run with MARGO_COMPAT=1 and no 
 
 Fixed upstream: batch 203 duplicate navmesh package-directory probe finding. The entry anchoring in e295cc68a, output-directory creation in 3296cce94 and import repair in 6ede7aa75 are on main. All 121 unchanged CPU tests pass from the package directory on 2026-11-10, including both affected probes.
 
-- Batch 203 AVIF validation tail: malformed prem item references with no auxiliary alpha, multiple targets or a target other than the actual alpha are ignored rather than rejected. Repro: add such a prem reference to a valid AVIF primary item. Cause: image.rs tests equality with the one alpha ID and treats a mismatch as straight alpha. Valid straight/premultiplied alpha decoding is implemented; strict invalid-reference rejection is a fix-phase item under rule 22.
+- Fixed 2026-11-11 (bug sweep L5): Batch 203 AVIF validation tail. A 'prem' item reference with no auxiliary alpha, no or several targets, or a target other than the alpha item was read as straight alpha. image.rs now accepts only a 'prem' reference to exactly the one alpha item (ISO/IEC 23008-12 'prem' reference type; AVIF v1.1.0 section 4) and rejects every other shape as invalid. Regression: packages/decoders/native/avif/tests/premultiplied.rs.
 
 
 
@@ -15835,7 +15940,7 @@ Fixed 2026-11-10: nearestPoint now compares projectPoint's normalized near=0/far
 
 Batch 181 job 3 gate fix: linked mask rendering suppressed original draw visibility and Figure queries excluded that visible source data. The upstream linked-draw owner protocol preserves CPU/GPU picking and brush selection, respects replacement visibility and unregisters on disposal. Regression: packages/sciviz/tests/pick-visibility.test.js plus unchanged demos-browser.mjs star brushes.
 
-## Batch 132 audit: compute SVD does not converge on a matrix of many repeated columns
+## Fixed 2026-11-11: compute SVD does not converge on a matrix of many repeated columns
 
 Repro (CPU backend, any host): fill a 512 x 512 matrix row-major from `seed = (seed * 1103515245 + 12345) >>> 0`
 computed in doubles (the product loses its low bits, so the stream cycles and only about 15,600 distinct values fill
@@ -15848,6 +15953,8 @@ relative stopping test (Drmac and Veselic, LAPACK Working Note 170, 2007, sectio
 converging). Fix to build: treat a column whose norm falls below eps times the largest column norm as numerically
 zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
 relative accuracy the Jacobi method keeps for graded columns.
+
+Fixed (bug sweep L5): a column whose norm times the input scale is below 2^-150 (its f32 singular value is 0 in every case) is set to exactly zero, takes no more rotations and is completed orthogonally; graded columns above that floor keep every rotation (Rust test `svd_floor_keeps_graded_values_and_zeroes_only_f32_zero_columns`). The repro converges in 11 to 20 sweeps. The basis completion now picks the axis with the smallest row norm and orthogonalizes only it twice (CGS2), so the repro takes 8 s instead of 85 s on a loaded dev PC. Regression: packages/compute/tests/decomp.test.js "svd converges on a 512 x 512 matrix of many repeated columns".
 
 Fixed 2026-11-10: review 3 SV4 transfer-binding reentrant abort. The abort listener now exists before the initial caller render callback; an already-disposed initialization cannot subscribe to later transfer changes. Failed initialization restores the previous classifier and releases listeners, with both errors retained if restoration also fails. Regression: packages/sciviz/tests/transfer.test.js covers initial synchronous abort, throwing render callbacks and failed restoration; all three fail on the parent. Default LUT work, numerical transfer tests and rendering bounds are unchanged.
 
@@ -15935,6 +16042,7 @@ The sciviz GPU gate encountered the known ANGLE D3D11 MSAA resolve defect docume
 Batch 176 job 5: no open defect found in the declared tensor/OLS/Cartesian tracking contract. Device precision, degenerate-axis ambiguity, raw indefinite fits and analysis/preprocessing limits are recorded in limits.md.
 
 Batch 176 job 6: no open defect found in the declared first-model molecular sphere/stick contract. Unknown-element fallbacks, geometric bond inference and unsupported assembly/ribbon formats are explicit in limits.md.
+- **Upstream report drafts (nothing filed):** `docs/upstream-reports/KB5247d/report.md` (dispersion live reset) and `docs/upstream-reports/KB5185b/report.md` (atmosphere zero-cloud hash). Neither has a standalone repro; the nearest evidence is `docs/upstream-reports/KB3508/msaa-blend-repeat.html?api=webgl2` (ANGLE D3D11 + RTX A6000 returns different bytes for identical 4x frames, Vulkan does not). The report for this entry itself belongs to the webgl2-compat lane (KB5822a).
 
 ### Batch 137 quality gap closed
 
@@ -15989,11 +16097,26 @@ Cause: packages/core/src/camera.ts `fitToBoundingBox` raises the radius to `2 ne
 away) and never checks `distance - radius >= near` (which a wide angle breaks). Fix to build: fit the true radius, then
 move out (or lower `near`) only when `distance - radius < near`.
 
-### Note: core direct light follows the 2021 glTF Appendix B
+### Fixed 2026-11-11: core direct light used the separable Smith G of the 2021 glTF Appendix B (KB5875a)
 
-The shader uses the separable Smith G of the 2021 revision of glTF 2.0 Appendix B; the current revision gives the
-height-correlated form (Heitz 2014). The clean-room record now says which revision (P46). Moving to the
-height-correlated form changes WebGL, gltf-pro and core pixels together and is Scott's call.
+Core's WGSL direct light, its WebGL2 twin (`@margoengine/webgl2-compat` preview) and gltf-pro (base shader, the
+physical shader's coat lobe and the extended materials' isotropic path) multiplied two separate G1 terms, which counts a
+microfacet hidden from both the light and the eye twice and darkens rough surfaces at grazing angles. They now use the
+height-correlated G2 = 1 / (1 + Lambda(v) + Lambda(l)) of Heitz 2014 (JCGT 3(2), eq. 99), the form the current glTF
+Appendix B.3.2 gives (`smithGCorrelated` in `packages/shared/light-terms.js`). G2 is never below G1 G1; on the tests'
+grid the largest gain is over 25 percent (rough, grazing); at normal incidence both are 1. Core + stage 24,812 B to
+24,808 B gzip (the expression is shorter). Scott's 2026-11-11 core ruling. Regression: packages/core/tests/smith.test.js,
+packages/gltf-pro/tests/smith.test.js, packages/webgl2-compat/test/smith.test.js (each fails on the separable form).
+The other PBR shaders (clustered, materials, terrain, lod, animation, post decals, voxel) still write the separable
+`smithG` (next entry).
+
+### Open: clustered, materials and the other PBR shaders still use the separable Smith G (2026-11-11)
+
+Repro: `packages/shared/light-terms.js` `smithG` (and `ggxNamed`), used by clustered/src/shader.ts, materials,
+terrain, lod imposters, animation VAT, post material decals and voxel render. A clustered light on a core or gltf-pro
+material uses the separable G while the sun uses the height-correlated one, so the two lights shade the same surface
+with different masking. Cause: KB5875a moved only core, its WebGL2 twin and gltf-pro (the approved core row). Fix to
+build: switch `smithG` to the height-correlated form and re-record each package's proofs.
 
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 
@@ -16087,10 +16210,10 @@ says assume 1) and one without `softness` interpolated toward 1 (format: assume 
 
 ### Open: sprites findings not fixed in the audit
 
-- Nine-slice with squeezed or fractional borders leaves a one-pixel gap under `snap`: borders [4, 0, 4, 0] on an
-  8-wide rect drawn 7 wide at x 0 put the left part over [0, 3.5) and the right part, snapped on its own, over
-  [4, 7.5), so pixel 3 is empty and the right edge overshoots by half a pixel (slice.ts sliceParts with
-  sprite.ts snapToPixel). Worked out from the arithmetic; not rendered.
+- Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
+  because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
+  unrotated image once, from float32, so parts that share an edge meet there. Regression: packages/sprites/tests/slice.test.js
+  (KB6013a case).
 - Spine IK keys that leave out `bendPositive`, `compress` or `stretch` keep the setup values; the JSON export format
   page says "Assume false if omitted" for keys, but it shows a 3.8 export and the 4.x default was not confirmed from a
   specification, so this is left as it is (spine.ts applyAnimation constraint loop).
@@ -16305,6 +16428,7 @@ as unsupported by the light loader.
   the full `stylizedNight` body from a branch the frame never takes: ANGLE's or Apple's Metal compiler, not Margo's text.
   Left red: making two different programs round alike would mean steering that compiler with dead code. No tolerance
   changed.
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB6171a/report.md`. No standalone repro: it needs a Mac and a hand-minimised page, which this PC cannot do.
 
 ## Batch 132 audit: viewcube (fixed)
 
@@ -16325,7 +16449,7 @@ Scott's coordinator ruling (2026-11-10) accepts the identical-stream and backend
 
 ### Batch 159 matrix preflight gaps (2026-11-10)
 
-Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md. MeshoptCubeTest fails because gltf-pro recognizes KHR meshopt views but only EXT fallback-buffer markers; the packer omits that KHR fallback payload. The compute and grading adapters reject APIs now available in shader; coefficient-supplied SH and point-position/configurable-element lens-flare inputs still need owning-package work. Black-box reference depth-material WebGPU, USDZ (both) and FourCC-zero DDS (both) fail their current adapter/fixture contracts. Exact errors and outputs: docs/whitepaper/results/bp-159-preflight.json. These remain open; no test assertion or workload was removed.
+Update 2026-11-11 (bug sweep L2 round 2, KB6250d/e/f): closed as rival unsupported. The depth-material WebGPU, USDZ and FourCC-zero DDS rows are three.js 0.186.1 failures on cases Margo completes; bench/parity-causes.json records each with its measured error, the matrix shows them as rival unsupported, and tests/parity-diagnoses.test.js holds that (docs/whitepaper/parity-diagnoses.md, round 3). The shared scene and adapter are unchanged. Still open here: the compute and grading adapters and the SH/lens-flare inputs (KB6250b, KB6250c). Update 2026-11-11 (bug sweep L2, KB6250a): the MeshoptCubeTest row was fixed by 1d9d2297bb (gltf-pro honours KHR_meshopt_compression fallback buffers; regression packages/gltf-pro/tests/meshopt-fallback.test.js), and the packer in bench/scenes/parity/margo-loaders.js keeps KHR fallback buffers; the harness's pack of the sample parses with the meshopt decoder on current main. The three other black-box rows (depth-material, USDZ, FourCC-zero DDS) fail on the three.js side of the harness (bp-159-preflight.json: NodeBuilder refuses MeshDepthMaterial, the USDZ loader throws on isVector3, DDSLoader reports an unsupported FourCC 0), not in Margo. Original entry: Repro: the --runs=1 correctness preflight in docs/whitepaper/parity-diagnoses.md. MeshoptCubeTest fails because gltf-pro recognizes KHR meshopt views but only EXT fallback-buffer markers; the packer omits that KHR fallback payload. The compute and grading adapters reject APIs now available in shader; coefficient-supplied SH and point-position/configurable-element lens-flare inputs still need owning-package work. Black-box reference depth-material WebGPU, USDZ (both) and FourCC-zero DDS (both) fail their current adapter/fixture contracts. Exact errors and outputs: docs/whitepaper/results/bp-159-preflight.json. These remain open; no test assertion or workload was removed.
 
 ### hygiene gate 6: TypeScript async API threw "getNodeId requires a RemoteNode" once (2026-11-10)
 
@@ -16870,7 +16994,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,743 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,808 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
@@ -17941,7 +18065,7 @@ Use `@margoengine/splats/data` for `parseSplat`, `validateSplats` and the
 `SplatData` type without loading GPU rendering or radix-sort shaders. Root
 exports retain the same functions for applications that also render splats.
 
-Optional WebGPU Gaussian rendering that accepts 1-3,000,000 world-space splats (an input cap, not a frame-rate promise: adapter storage/memory limits may allow fewer, and frame time at the cap depends on the GPU). Compute projects each positive-definite 3D covariance through the camera Jacobian into a 2D ellipse with a 0.3-pixel variance floor. Instanced quads cover three standard deviations; the fragment shader evaluates Gaussian opacity and blends far to near against read-only reversed scene depth.
+Optional WebGPU Gaussian rendering that accepts 1-3,000,000 world-space splats (an input cap, not a frame-rate promise: adapter storage/memory limits may allow fewer, and frame time at the cap depends on the GPU). Compute projects each positive-definite 3D covariance through the camera Jacobian into a 2D ellipse with a 0.3-pixel variance floor. The Jacobian is linearised at the splat's view direction clamped to 1.3 times the half-view tangent, as trained captures expect, so a splat beside or behind the edge of the view cannot stretch across the frame. Instanced quads cover three standard deviations; the fragment shader evaluates Gaussian opacity and blends far to near against read-only reversed scene depth.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
@@ -17967,8 +18091,6 @@ Optional `sphericalHarmonics` contains 4, 9 or 16 coefficients per splat, with R
 Orthographic cameras (any `camera.matrix` with a constant clip w, such as `CameraProjection` from `@margoengine/cameras`) use the affine Jacobian: a splat's pixel size depends only on the zoom, not its depth. The depth range is the projection's own near/far, which may lie behind the eye, sort keys are measured from the near plane, and spherical harmonics use the fixed viewing direction. The package reads only the clip matrix and does not depend on the cameras package.
 
 Each frame creates sortable unsigned depth keys on the GPU. Eight stable 4-bit LSD radix passes run per-workgroup histograms, hierarchical exclusive prefix scans, a scan of block totals, and scatter. Workgroup bit masks and population counts preserve input order within equal digits; equal-depth splats retain source order. Off-frustum, transparent and out-of-range centers sort to the end and render no fragments. The runtime performs no CPU sorting, per-splat frame allocation or GPU readback.
-
-Base GPU allocations are approximately 128 bytes per splat (384 MB at three million), plus small histograms/uniforms and optional SH. CPU copies for recovery are additional. Center-depth sorting approximates intersecting ellipsoids; near-plane-crossing centers are culled. Multiple clouds sort independently: combine overlapping clouds into one data set when global order matters. Splats do not write depth unless `./depth` is attached (below), cast directional shadows or receive PBR lighting. They can render alongside shadows, clustered meshes, animation, VFX and TAA; temporal history uses underlying opaque depth. Frame rate and sorting time depend on hardware and fill rate, with no 1-2 ms or locked-60-FPS guarantee.
 
 [README continues: https://margoengine.com/llms/packages/splats.md]
 
@@ -18933,7 +19055,7 @@ coin.visible = false;
 | --- | --- | --- |
 | `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture`, or a list of same-size ones |
 | `camera` | `{x: 0, y: 0, zoom: 1}` | World point at the top-left and pixels per world unit, read each frame |
-| `snap` | true | Rounds each image's corner to a whole pixel after the camera, read each frame |
+| `snap` | true | Rounds each image's edges to whole pixels after the camera (an unrotated image both edges, so nine-slice parts meet with no gap; a rotated one its corner), read each frame |
 | `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
 | `target` | frame's colour | A texture, or a function returning one, to draw into instead |
 | `clear` | `[0, 0, 0, 0]` | With `target`: the clear colour, or false to draw over it |
@@ -20263,7 +20385,7 @@ including an empty array. The original standalone tracers remain available.
 ```ts
 import { Engine } from 'margoengine/core';
 import { ComposedVoxelPathTracer } from 'margoengine/voxel-pathtracer/compose';
-import { resampledEmitters } from 'margoengine/voxel-pathtracer/restir';
+import { resampledEmitters } from 'margoengine/voxel-pathtracer/resampled';
 import { causticGuiding } from 'margoengine/voxel-pathtracer/guiding';
 import { coloredMedia } from 'margoengine/voxel-pathtracer/media';
 import { triangleMeshes } from 'margoengine/voxel-pathtracer/mesh';

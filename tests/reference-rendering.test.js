@@ -99,8 +99,8 @@ test('clearcoat has frozen all-pixel budgets on both supported PBR backends', ()
   assert.equal(baseline.referenceSha256, baseline.compat.referenceSha256);
   assert.equal(baseline.sceneSha256, baseline.compat.sceneSha256);
   assert.equal(baseline.compat.hardware.webgpu.vendor, 'margo-webgl2');
-  assert.equal(baseline.metrics.absolute, 1321922);
-  assert.equal(baseline.compat.metrics.absolute, 1321925);
+  assert.equal(baseline.metrics.absolute, 1322815);
+  assert.equal(baseline.compat.metrics.absolute, 1322815);
 });
 
 test('sheen has measured budgets for its entire twenty-primitive scene on both backends', () => {
@@ -108,8 +108,8 @@ test('sheen has measured budgets for its entire twenty-primitive scene on both b
     readFileSync(new URL('../docs/whitepaper/results/batch-160-sheen.json', import.meta.url)),
   );
   for (const row of [baseline, baseline.compat]) {
-    assert.equal(row.metrics.absolute, 1120735);
-    assert.equal(row.metrics.square, 33927045);
+    assert.equal(row.metrics.absolute, 1119468);
+    assert.equal(row.metrics.square, 33899646);
     assert.equal(row.metrics.max, 167);
     assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
     assert.equal(row.margo.primitives, 20);
@@ -122,8 +122,8 @@ test('sheen has measured budgets for its entire twenty-primitive scene on both b
 });
 
 for (const [family, primitives, absolute, compatAbsolute, square, compatSquare, max] of [
-  ['anisotropy', 50, 819207, 819207, 29848293, 29848299, 254],
-  ['iridescence', 346, 454341, 454338, 4616933, 4616922, 127],
+  ['anisotropy', 50, 811914, 811911, 29877972, 29877969, 254],
+  ['iridescence', 346, 613669, 613668, 18117459, 18117470, 127],
 ])
   test(`${family} retains every primitive and its own measured backend budgets`, () => {
     const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
@@ -154,8 +154,8 @@ test('path-traced floats keep their row order, byte order and fixed display tran
 });
 
 for (const [family, primitives, absolute, square, max] of [
-  ['transmission', 22, 1763456, 78975278, 255],
-  ['volume', 23, 1680190, 31577626, 113],
+  ['transmission', 22, 1590947, 66568819, 254],
+  ['volume', 23, 1471401, 22496007, 110],
 ])
   test(`${family} preserves the full sample and exact viewer and path-transport budgets`, () => {
     const read = (suffix) =>
@@ -188,21 +188,21 @@ for (const [family, primitives, absolute, square, max] of [
     }
   });
 
-test('Radeon continuation retains the original volume transport budgets', () => {
+test('volume transport budgets are the 2026-11-11 re-recorded measurements', () => {
   const budget = JSON.parse(
     readFileSync(new URL('../docs/whitepaper/results/batch-160-volume-transport.json', import.meta.url)),
   );
-  assert.equal(budget.rows.full.metrics.absolute, 13792000);
-  assert.equal(budget.rows.full.compat.metrics.absolute, 13792000);
-  assert.equal(budget.rows.direct.metrics.absolute, 1843497);
-  assert.equal(budget.rows.direct.compat.metrics.absolute, 1843497);
+  assert.equal(budget.rows.full.metrics.absolute, 13794699);
+  assert.equal(budget.rows.full.compat.metrics.absolute, 13794699);
+  assert.equal(budget.rows.direct.metrics.absolute, 1807380);
+  assert.equal(budget.rows.direct.compat.metrics.absolute, 1807380);
 });
 
 // Batch 160 job 5, measured on main's area-filter mip chain (65098f33fe): NVIDIA rows are the shared budget, the AMD
 // rows gate AMD proofs. Each row: native absolute, compat absolute, native square, compat square.
 for (const [family, primitives, nvidia, amd] of [
-  ['specular', 24, [877419, 877434, 45728215, 45728542], [879167, 873364, 45728589, 45667350]],
-  ['ior', 23, [2425911, 2425911, 72834015, 72834015], [2424867, 2426643, 72838947, 72986541]],
+  ['specular', 24, [877623, 877629, 45728851, 45729151], [879167, 873364, 45728589, 45667350]],
+  ['ior', 23, [2411082, 2411082, 72778266, 72778266], [2424867, 2426643, 72838947, 72986541]],
 ])
   test(`${family} freezes the measured full-scene error on each adapter and PBR backend`, () => {
     const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));

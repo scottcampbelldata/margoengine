@@ -35,15 +35,15 @@
   },
   "metrics": {
     "pixels": 262144,
-    "absolute": 1120735,
-    "square": 33927045,
+    "absolute": 1119468,
+    "square": 33899646,
     "max": 167,
-    "mae": 1.4250882466634114,
-    "rmse": 6.5681404215662225,
+    "mae": 1.4234771728515625,
+    "rmse": 6.565487717396565,
     "foreground": 60922,
-    "foregroundAbsolute": 1120735,
-    "foregroundMae": 6.132075987875207,
-    "changed": 53841
+    "foregroundAbsolute": 1119468,
+    "foregroundMae": 6.125143626276222,
+    "changed": 53834
   },
   "compat": {
     "family": "sheen",
@@ -83,15 +83,15 @@
     },
     "metrics": {
       "pixels": 262144,
-      "absolute": 1120735,
-      "square": 33927045,
+      "absolute": 1119468,
+      "square": 33899646,
       "max": 167,
-      "mae": 1.4250882466634114,
-      "rmse": 6.5681404215662225,
+      "mae": 1.4234771728515625,
+      "rmse": 6.565487717396565,
       "foreground": 60922,
-      "foregroundAbsolute": 1120735,
-      "foregroundMae": 6.132075987875207,
-      "changed": 53841
+      "foregroundAbsolute": 1119468,
+      "foregroundMae": 6.125143626276222,
+      "changed": 53834
     }
   },
   "viewer": {

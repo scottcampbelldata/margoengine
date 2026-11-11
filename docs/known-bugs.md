@@ -3338,7 +3338,9 @@ packages/gltf-pro/tests/readme-pointer.test.js checks all three animated values 
 Khronos MetalRoughSpheresNoTextures under a matched embedded camera and directional sun differs from the
 Sample Viewer: all-pixel RGB byte MAE 1.837511698404948, foreground MAE 11.58277025673087,
 RMSE 6.388144511474295, max 254, 40,875 differing pixels of 262,144. Compatibility WebGL2 MAE
-1.837506612141927. Full evidence: docs/whitepaper/results/batch-160-metallic-roughness.json.
+1.837506612141927. Since the height-correlated Smith G (KB5875a, 2026-11-11) the measured and recorded MAE is
+1.7865498860677083 (WebGPU) and 1.7865447998046875 (WebGL2 compatibility); see docs/limits.md, "Batch 160 budgets
+re-recorded". Full evidence: docs/whitepaper/results/batch-160-metallic-roughness.json.
 Repro: scripts/reference-rendering/run.mjs under the shared GPU lock (see whitepaper reproduction).
 
 Known Margo causes to isolate: gltf-pro/src/shader.ts clamps perceptual roughness to 0.045 even for the
@@ -3361,7 +3363,8 @@ Repro: `node scripts/reference-rendering/run.mjs --case=clearcoat` through the G
 fetching its source and capturing the reference as documented in whitepaper/reproduce.md.
 Entire Khronos ClearCoatTest, 27 primitives, no IBL, identical camera and sun, 512 x 512.
 All-pixel RGB MAE 1.6809107462565105 (WebGPU), 1.6809145609537761 (compatibility WebGL2),
-maximum byte error 180. Frozen result: whitepaper/results/batch-160-clearcoat.json.
+maximum byte error 180. Frozen result: whitepaper/results/batch-160-clearcoat.json. Re-recorded 2026-11-11 at
+1.6820462544759114 on both backends (absolute 1,322,815) after da12bd07e1, 65098f33fe and KB5875a (Scott's ruling).
 Cause of the complete residual is not yet isolated. Known formulation differences to investigate:
 Margo clamps clearcoat roughness to .045 and uses single-scatter Smith (height-correlated since 2026-11-11); its coat direct
 Fresnel uses VdotH, while the extension's nonnormative layering example uses NdotV.
@@ -3376,6 +3379,7 @@ image has 62142 foreground pixels against the unchanged minimum 62180.
 A 24-frame complete single-instance native control repeats exactly, which
 does not explain the cross-capture difference. Causes remain unisolated;
 no budget, assertion or renderer was changed to pass this comparison.
+Resolved 2026-11-11: the +1 is da12bd07e1 (bisected); the budget is re-recorded with the entries below.
 
 ### Fixed 2026-11-09: WFC weight arithmetic overflow
 
@@ -3591,29 +3595,33 @@ The previously open non-default-scene disposal defect was fixed separately in 18
 
 GPU-locked scripts/reference-rendering/run.mjs --case=anisotropy and --case=iridescence, each with and without --compat, reproduce the complete-scene measured budgets. Full residual causes are not isolated. Anisotropy retains all strength/roughness rows and labels. Iridescence retains all 346 primitives in its three-dimensional material/film-IOR/thickness grid; this direct-light camera contains overlapping spheres and sparse highlights, with no IBL. Margo uses its shared anisotropic GGX and thin-film implementation; the figures alone do not attribute the loss to a particular formula. Silhouette, tone-map and filtering differences remain included, and no small shader fix is claimed without an isolating regression.
 
-Bisected 2026-11-11 (RTX A6000, Edge, native WebGPU; each step built with build:packages and run once through the GPU
-lock with only the failing case). Four batch 160 cases fail on main; every budget was reproduced exactly at the
-commit that froze it, so the browser and driver did not move them. No commit found is a renderer defect, so nothing
-was reverted and no budget changed; whether to keep these results is Scott's ruling.
-- da12bd07e1 (core uploads the light direction normalized once on the CPU in float64): iridescence 454,341 to
-  454,342, anisotropy 819,207 to 819,210, clearcoat 1,321,922 to 1,321,923 absolute (the Lane G figures above). One
-  float32 rounding of the direction moves a few pixels one code.
-- 65098f33fe (area-filter mips; BLEND base colour maps weighted by alpha): iridescence to 613,669 (budget 454,341),
-  anisotropy to 819,417. The IridescenceMetallicSpheres guides texture is 2048 x 2048 BLEND: 3,975,856 texels are
-  alpha 0 with white RGB, 114,010 are opaque black lines. A plain average greys the lines down the chain by mixing in
-  invisible white; the weighted chain keeps them black, which is what a premultiplied box filter of the displayed
-  texture gives. All 2,558 changed pixels got darker, towards the filtered texture and away from the Sample Viewer,
-  whose minified lines show the plain average. Anisotropy: 179 label pixels (OPAQUE, plain chain) one or two codes
-  brighter, exact texel loads in place of one hardware bilinear fetch.
-- 401c2e032b (native glass composited in linear light): transmission absolute error falls from 1,763,456 to
-  1,590,805 on main, but foreground coverage is 67,046 against 67,050. Margo now draws black where the Sample Viewer
-  is black (15 pixels behind the red glass that used to read up to 222,89,53 are 0), and 11 new nonblack pixels
-  appear, so the union shrinks by 4.
-Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
-scripts/reference-rendering/run.mjs --case=<iridescence|anisotropy|clearcoat|transmission>` at the commit and its
-parent after `npm run build:packages`. Frozen budgets remain unchanged and these are not the sciviz/dispersion ANGLE
-exemption.
+Accepted 2026-11-11 (Scott, "Yes, re-record"): four batch 160 cases failed on main after deliberate renderer
+changes, bisected on the RTX A6000 (Edge, each old budget reproduced exactly at the parent commit, so the browser and
+driver did not move them): da12bd07e1 (unit light direction from the CPU: iridescence +1, anisotropy +3, clearcoat +1),
+65098f33fe (alpha-weighted area-filter mips: iridescence 454,342 to 613,669, anisotropy +207, clearcoat 1,321,923 to
+1,322,883; the IridescenceMetallicSpheres guides texture is 2048 x 2048 BLEND, alpha-0 white with opaque black lines,
+which the weighted chain keeps black and the Sample Viewer greys), 401c2e032b (linear glass: transmission 1,763,456
+to 1,590,805, foreground 67,050 to 67,046). The height-correlated Smith G (KB5875a) then moved these and the other
+direct-light cases. Every budget is re-recorded at its measured value; before and after figures and causes are in
+docs/limits.md, "Batch 160 budgets re-recorded". The picture residual against the Sample Viewer stays open above.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB3497/report.md`; it points at the KB3508 NVIDIA page and says the link is consistent, not proven.
+
+### Batch 160 environment IBL budget 1 over since 40e6f183dc (open, needs Scott's ruling)
+
+Repro: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
+scripts/reference-rendering/environment.mjs` after `npm run build:packages`. Native direct row: absolute 2,294,442
+against its budget 2,294,441 (square 76,817,356 against 76,817,341); the full row and both compatibility rows pass.
+Cause, bisected 2026-11-11 on the RTX A6000: 40e6f183dc (environment keeps the GGX lobe width when cosTheta rounds to
+one) gives 2,294,441 at its parent and 2,294,442 at the commit; the height-correlated Smith G does not touch this
+scene (no sun). The change is a deliberate fix, but this budget is outside the 2026-11-11 re-record ruling, so it is
+unchanged until Scott rules. The compatibility rows already measured lower (2,294,384 and 1,482,472) before that.
+
+### Batch 160 AMD budgets not re-measured after the 2026-11-11 changes (open)
+
+The `amd` rows of batch-160-specular.json and batch-160-ior.json and the budgets in batch-160-amd-transmission.json
+and batch-160-amd-volume.json were measured before da12bd07e1, 65098f33fe, 401c2e032b and KB5875a; only the NVIDIA
+rows were re-recorded. Repro: the same scripts with MARGO_GPU=amd on the Radeon (RDNA 2) machine. Cause: no AMD
+adapter on the dev PC. Owed: rerun there and re-record under the same ruling.
 
 ### Batch 160 jobs 4 and 5: parked static-render variation (open)
 

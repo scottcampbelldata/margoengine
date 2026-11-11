@@ -1865,12 +1865,57 @@ Core plus stage remains 23,837 B gzip.
 
 The metallic-roughness test covers the entire 123-primitive Khronos textureless sphere model with a
 fixed camera/sun, no IBL and 4x MSAA, at 512 x 512 on the RTX A6000 only. The full-frame RGB byte MAE
-ceiling is exactly the measured 1.837511698404948 on WebGPU and 1.837506612141927 on the WebGL2
-compatibility layer; max channel error is 254. Foreground errors and integer sum budgets are recorded in
+ceiling is exactly the measured 1.7865498860677083 on WebGPU and 1.7865447998046875 on the WebGL2
+compatibility layer (re-recorded 2026-11-11, see "Batch 160 budgets re-recorded" below); max channel error is 254. Foreground errors and integer sum budgets are recorded in
 whitepaper/results/batch-160-metallic-roughness.json. Native WebGL2 rejects PBR explicitly.
 This is an open image-quality loss, not proof of physically accurate materials or other devices. Frozen
 reference PNGs remain outside the repository; CI unit tests validate the comparison contract and record,
 while the GPU reproduction requires those outside files. No speed or bundle-size change is claimed.
+
+## Batch 160 budgets re-recorded (2026-11-11, accepted differences)
+
+Scott's ruling of 2026-11-11 ("Yes, re-record"): the batch 160 reference-rendering budgets in
+`docs/whitepaper/results/batch-160-*.json` are re-recorded at the values measured after four deliberate renderer
+changes. Each step was bisected on the RTX A6000 (Edge 157, NVIDIA 617.42): every old budget reproduces exactly at
+the parent of the commit that moved it. None of the four is a defect; each makes Margo's output more correct by its own
+standard, and the picture comparison against the Sample Viewer moves with it.
+
+- `da12bd07e1`, core uploads the unit light direction (float64 normalize on the CPU): one float32 rounding moves a few
+  pixels one code (iridescence +1, anisotropy +3, clearcoat +1 absolute).
+- `65098f33fe`, area-filter mip chains, BLEND colour weighted by alpha: transparent white texels no longer grey opaque
+  black lines down the chain, while the Sample Viewer's minified lines show the plain average (iridescence +159,327,
+  anisotropy +207, clearcoat +960 absolute).
+- `401c2e032b`, native glass composited in linear light: Margo draws black where the Sample Viewer is black; total
+  error falls but the foreground union shrinks by 4 pixels.
+- `edcb6debb` (KB5875a), height-correlated Smith G2 (Heitz 2014) in core and gltf-pro: no microfacet hidden from both
+  the light and the eye is counted twice, so rough surfaces at grazing angles are no longer too dark.
+
+Before -> after, all-pixel absolute RGB-byte error, native WebGPU / WebGL2 compatibility (square, max and foreground
+changed with them; the files hold every field):
+
+| Case | Before | After | Cause |
+| --- | --- | --- | --- |
+| metallic-roughness | 1,445,078 / 1,445,074 | 1,405,000 / 1,404,996 (-2.8%) | Smith G2 |
+| clearcoat | 1,321,922 / 1,321,925 | 1,322,815 / 1,322,815 (+0.07%) | light direction, mips, Smith G2 (-68) |
+| sheen | 1,120,735 / 1,120,735 | 1,119,468 / 1,119,468 (-0.1%) | Smith G2 |
+| anisotropy | 819,207 / 819,207 | 811,914 / 811,911 (-0.9%; square +0.1%) | light direction, mips, Smith G2 |
+| iridescence | 454,341 / 454,338 | 613,669 / 613,668 (+35%) | light direction, mips |
+| transmission | 1,763,456 / 1,763,453 | 1,590,947 / 1,590,946 (-9.8%; foreground 67,050 -> 67,046) | linear glass, Smith G2 |
+| volume | 1,680,190 / 1,680,190 | 1,471,401 / 1,471,401 (-12%) | Smith G2 |
+| specular | 877,419 / 877,434 | 877,623 / 877,629 (+0.02%) | Smith G2 |
+| ior | 2,425,911 / 2,425,911 | 2,411,082 / 2,411,082 (-0.6%) | Smith G2 |
+| transmission Cycles full | 4,131,141 / 4,131,146 | 4,164,102 / 4,164,101 (+0.8%) | linear glass, Smith G2 |
+| transmission Cycles direct | 2,632,772 / 2,632,767 | 2,632,779 / 2,632,778 | linear glass, Smith G2 |
+| volume Cycles full | 13,792,000 / 13,792,000 | 13,794,699 / 13,794,699 (+0.02%) | Smith G2 |
+| volume Cycles direct | 1,843,497 / 1,843,497 | 1,807,380 / 1,807,380 (-2.0%) | Smith G2 |
+
+Trade-off: iridescence and clearcoat now sit further from the Sample Viewer picture because Margo filters the
+displayed texture and keeps the light direction exact; the other moves are gains. The clustered and clustered-point
+Cornell budgets did not move. The environment IBL budget is not re-recorded: its native direct row is 1 over since
+`40e6f183dc`, a change outside this ruling (docs/known-bugs.md). The AMD rows (`amd` in specular and ior,
+`batch-160-amd-*.json`) were measured before these changes and are not re-measured; an AMD rerun is owed.
+Reproduce: `node scripts/gpu-lock.mjs run --owner=<you> --gpu=reference-rendering -- node
+scripts/reference-rendering/run.mjs --case=<case> [--compat]`, then `transport.mjs --case=<transmission|volume>`.
 
 ## React Native target dropped (LIM-615)
 
@@ -1911,8 +1956,8 @@ Every normal quality gate must pass before landing.
 Height lighting accumulates in an owned rgba16float image (8 bytes per target pixel), then converts once to the caller format. Individual sums still have half-float blend precision. The 100-light .001 contribution regression is within one display byte.
 
 Clearcoat job 2: full Khronos ClearCoatTest, 27 primitives, neutral/sRGB, identical camera and sun,
-no IBL, 512 x 512. RGB-byte MAE 1.6809107462565105 WebGPU and 1.6809145609537761 WebGL2
-compatibility, max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
+no IBL, 512 x 512. RGB-byte MAE 1.6820462544759114 on WebGPU and on WebGL2
+compatibility (re-recorded 2026-11-11), max 180. Native WebGL2 rejects PBR. Exact integer budgets and frozen hashes:
 whitepaper/results/batch-160-clearcoat.json. The image residual remains an open defect, with
 formulation differences recorded separately from its unisolated complete cause.
 
@@ -1922,7 +1967,7 @@ Optional wfc/constraints 2,460 B min+gzip; root 1,824 B, overlapping 2,451 B; pe
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
 512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
-1.4250882466634114 on both WebGPU and actual WebGL2 compatibility; maximum error 167.
+1.4234771728515625 on both WebGPU and actual WebGL2 compatibility (re-recorded 2026-11-11); maximum error 167.
 Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
 The full residual remains open; this does not prove physical equivalence.
 
@@ -2147,11 +2192,11 @@ Optional transitions/live cross-fades two independently rendered current RGBA8 i
 
 Historical transitions entry measurements after the owner-scene repair and live entry: root 4307 B, custom 5045 B, mask 5273 B, live 2501 B min+gzip. Earlier batch-76 measurements above describe the corresponding earlier commits. Each umbrella feature re-export measures 65 B.
 
-Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0416755676269531 WebGPU and 1.0416755676269531 WebGL2 compatibility; maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
+Batch 160 job 6: AnisotropyStrengthTest, all 50 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 1.0324020385742188 WebGPU and 1.0323982238769531 WebGL2 compatibility (re-recorded 2026-11-11); maximum 254. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-anisotropy.json. Direct-light evidence alone, no physical or IBL equivalence.
 
-Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.5777244567871094 WebGPU and 0.5777206420898438 WebGL2 compatibility; maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
+Batch 160 job 6: IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/white sun, black background, no IBL, neutral/sRGB. MAE 0.7803204854329427 WebGPU and 0.7803192138671875 WebGL2 compatibility (re-recorded 2026-11-11); maximum 127. All RGB pixels counted; native WebGL2 explicitly refuses PBR. Exact measured integer budgets: whitepaper/results/batch-160-iridescence.json. Direct-light evidence alone, no physical or IBL equivalence.
 
-Batch 160 job 5: SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. 512 x 512, fixed camera/white sun, black background, no IBL, neutral/sRGB, all RGB pixels counted; native WebGL2 explicitly refuses PBR. NVIDIA and AMD differ by under 0.7 percent of absolute error through hardware filtering and float-to-unorm rounding, which the APIs leave to the implementation, so each adapter keeps its own first measurement; the AMD WebGL2 figure includes the Direct3D 11 trilinear blend difference recorded below. Budgets: whitepaper/results/batch-160-specular.json and batch-160-ior.json. Direct-light evidence alone, no physical or IBL equivalence.
+Batch 160 job 5: SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11), 879,167 and 873,364 on AMD (measured before the height-correlated Smith G, not yet re-measured); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (re-recorded 2026-11-11), 2,424,867 native and 2,426,643 compatibility on AMD. 512 x 512, fixed camera/white sun, black background, no IBL, neutral/sRGB, all RGB pixels counted; native WebGL2 explicitly refuses PBR. NVIDIA and AMD differ by under 0.7 percent of absolute error through hardware filtering and float-to-unorm rounding, which the APIs leave to the implementation, so each adapter keeps its own first measurement; the AMD WebGL2 figure includes the Direct3D 11 trilinear blend difference recorded below. Budgets: whitepaper/results/batch-160-specular.json and batch-160-ior.json. Direct-light evidence alone, no physical or IBL equivalence.
 
 Batch 99 heterogeneous RGB media: optional voxel-pathtracer/media adds finite RGB extinction coefficients
 in 0..1000000 per world unit on media palette materials. Explicit extinction overrides scalar density;
@@ -2681,7 +2726,7 @@ per-world-unit transmittance range limit. See [native volume range](native-volum
 Native WebGL2 explicitly refuses PBR; compatibility is actual
 WebGL2. AMD Radeon(TM) Graphics / RDNA 2, Windows driver 32.0.21042.62, is the
 repeatability adapter because NVIDIA/Intel MSAA blending varies. The full Cycles
-volume absolute ceiling stays 13,792,000. No speed or equivalence claim.
+volume absolute ceiling is 13,794,699 (re-recorded 2026-11-11 from 13,792,000). No speed or equivalence claim.
 
 
 Fresh job 4 AMD volume full Cycles RGB-byte MAE is 17.472838083902996 on

@@ -105,8 +105,8 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains (an area filter at odd sizes, so no texel is skipped; colour weighted by alpha for `BLEND` base colour maps, so transparent texels give no dark fringes) and honor glTF filtering and wrapping.
 
 The outside-reference test renders all 123 primitives of Khronos MetalRoughSpheresNoTextures with a shared
-camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.837511698404948 on the recorded
-RTX A6000; the WebGL2 compatibility layer measures 1.837506612141927. Native WebGL2 rejects PBR with code
+camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.7865498860677083 on the recorded
+RTX A6000; the WebGL2 compatibility layer measures 1.7865447998046875. Native WebGL2 rejects PBR with code
 `unsupported`. These are measured error ceilings, not visual parity. The unresolved picture loss, full
 settings, source hashes and coverage are in [batch 160 reproduction](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
 From a built checkout, with the outside reference PNG already captured:

@@ -2007,7 +2007,7 @@ LIM-561 and LIM-562 additionally require format round trips (rgba8unorm, bgra8un
 
 | Claim | Evidence | Scope |
 | --- | --- | --- |
-| All-pixel RGB MAE 1.837511698404948 against a Khronos Sample Viewer picture; compatibility WebGL2 1.837506612141927 | [Raw result](results/batch-160-metallic-roughness.json), `scripts/reference-rendering/run.mjs`, `tests/reference-rendering.test.js` | RTX A6000, Edge 157, 512 x 512, all 123 sample-model primitives, 4x MSAA, matched embedded camera/sun, no IBL; measured loss, not physical equivalence. Native WebGL2 explicitly rejects PBR. Integer absolute/squared/max budgets equal the recorded measurements. |
+| All-pixel RGB MAE 1.7865498860677083 against a Khronos Sample Viewer picture; compatibility WebGL2 1.7865447998046875 (re-recorded 2026-11-11 from 1.837511698404948 / 1.837506612141927) | [Raw result](results/batch-160-metallic-roughness.json), `scripts/reference-rendering/run.mjs`, `tests/reference-rendering.test.js` | RTX A6000, Edge 157, 512 x 512, all 123 sample-model primitives, 4x MSAA, matched embedded camera/sun, no IBL; measured loss, not physical equivalence. Native WebGL2 explicitly rejects PBR. Integer absolute/squared/max budgets equal the recorded measurements. |
 
 ## Wasm CSP diagnostics (2026-11-09)
 
@@ -2026,13 +2026,13 @@ constant-preserving bilinear/mean arithmetic provide this fixture invariant; no 
 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
-| RGB-byte MAE 1.6809107462565105 WebGPU; 1.6809145609537761 WebGL2 compatibility | [Exact result and frozen hashes](results/batch-160-clearcoat.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=clearcoat` | Entire ClearCoatTest, 27 primitives, 512 x 512, shared embedded camera/sun, no IBL, neutral/sRGB, all pixels. Native WebGL2 rejects PBR. Picture loss stays open; no physical-equivalence claim. |
+| RGB-byte MAE 1.6820462544759114 WebGPU and WebGL2 compatibility (re-recorded 2026-11-11 from 1.6809107462565105 / 1.6809145609537761) | [Exact result and frozen hashes](results/batch-160-clearcoat.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=clearcoat` | Entire ClearCoatTest, 27 primitives, 512 x 512, shared embedded camera/sun, no IBL, neutral/sRGB, all pixels. Native WebGL2 rejects PBR. Picture loss stays open; no physical-equivalence claim. |
 
 ### Sheen, job 3
 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
-| RGB-byte MAE 1.4250882466634114 on WebGPU and WebGL2 compatibility | [Frozen result](results/batch-160-sheen.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=sheen` | Entire 20-primitive SheenTestGrid; all pixels at 512 x 512, matched camera/sun, no IBL, neutral/sRGB. Native WebGL2 rejects PBR. Open image loss, not physical equivalence. |
+| RGB-byte MAE 1.4234771728515625 on WebGPU and WebGL2 compatibility (re-recorded 2026-11-11 from 1.4250882466634114) | [Frozen result](results/batch-160-sheen.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=sheen` | Entire 20-primitive SheenTestGrid; all pixels at 512 x 512, matched camera/sun, no IBL, neutral/sRGB. Native WebGL2 rejects PBR. Open image loss, not physical equivalence. |
 
 ### One optional WebGL2 package
 
@@ -2110,13 +2110,17 @@ evidence and the batch 168 physical contact-shadow loss remain unchanged.
 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
-| RGB-byte MAE 1.0416755676269531 / 1.0416755676269531 | [Frozen result](results/batch-160-anisotropy.json), tests/reference-rendering.test.js | Complete 50-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
+| RGB-byte MAE 1.0324020385742188 / 1.0323982238769531 (re-recorded 2026-11-11 from 1.0416755676269531 on both) | [Frozen result](results/batch-160-anisotropy.json), tests/reference-rendering.test.js | Complete 50-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
 
 ### Batch 160 iridescence, job 6
 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
-| RGB-byte MAE 0.5777244567871094 / 0.5777206420898438 | [Frozen result](results/batch-160-iridescence.json), tests/reference-rendering.test.js | Complete 346-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
+| RGB-byte MAE 0.7803204854329427 / 0.7803192138671875 (re-recorded 2026-11-11 from 0.5777244567871094 / 0.5777206420898438) | [Frozen result](results/batch-160-iridescence.json), tests/reference-rendering.test.js | Complete 346-primitive sample, WebGPU / WebGL2 compatibility, all pixels. Matched camera/direct light; unresolved residual. |
+
+### Batch 160 budgets re-recorded, 2026-11-11
+
+Scott's ruling of 2026-11-11 ("Yes, re-record"): the NVIDIA reference-rendering budgets of the batch 160 cases are re-recorded at the values measured after da12bd07e1 (unit light direction), 65098f33fe (alpha-weighted area-filter mips), 401c2e032b (linear glass) and edcb6debb (height-correlated Smith G2, KB5875a). Each is a measured accepted difference; before and after figures, the bisected cause of each move and the trade-off are in docs/limits.md ("Batch 160 budgets re-recorded"). The claims below give the new figures. The environment IBL budget and the AMD rows are not re-recorded (docs/known-bugs.md).
 
 ### Batch 160 specular and IOR, job 5
 
@@ -2124,7 +2128,7 @@ Claim: Margo's KHR_materials_specular and KHR_materials_ior paths render the com
 SpecularTest and IORTestGrid scenes within frozen all-pixel budgets against the glTF Sample Viewer,
 repeatably. Proof: results/batch-160-specular.json, batch-160-ior.json and
 batch-160-job5-proofs.json (72 identical captures per adapter and backend on NVIDIA RTX A6000 and
-AMD RDNA 2, native and WebGL2 compatibility). SpecularTest (24 primitives) absolute 877,419 native and 877,434 compatibility on NVIDIA, 879,167 and 873,364 on AMD; IORTestGrid (23 primitives) 2,425,911 on both NVIDIA backends, 2,424,867 native and 2,426,643 compatibility on AMD. Direct-light pictures only; no physical,
+AMD RDNA 2, native and WebGL2 compatibility). SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11 after the height-correlated Smith G, from 877,419 and 877,434), 879,167 and 873,364 on AMD (not yet re-measured); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (from 2,425,911), 2,424,867 native and 2,426,643 compatibility on AMD (not yet re-measured). Direct-light pictures only; no physical,
 IBL, cross-vendor byte-equality or speed claim.
 
 ### Batch 160 constant-environment IBL, job 7
@@ -2427,7 +2431,7 @@ native 1,512,739 / 13,741,199 / 1,746,854; compatibility 1,512,128 / 13,741,752 
 1,747,921. Every unchanged square/max/foreground gate also passes.
 Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
 results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
-to docs/whitepaper). The full volume ceiling remains 13,792,000.
+to docs/whitepaper). The full volume ceiling was 13,792,000 until 2026-11-11 and is 13,794,699 since (re-recorded on NVIDIA after the height-correlated Smith G; the AMD figures above predate it).
 The analytic GPU test passes twenty exact slab pixels on each backend; all 47
 gltf-pro/materials runtime README examples pass with zero exceptions.
 The complete changed-package CPU run passes 783 tests with zero failures/skips.

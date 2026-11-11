@@ -35,15 +35,15 @@
   },
   "metrics": {
     "pixels": 262144,
-    "absolute": 819207,
-    "square": 29848293,
+    "absolute": 811914,
+    "square": 29877972,
     "max": 254,
-    "mae": 1.0416755676269531,
-    "rmse": 6.160687236844978,
-    "foreground": 56351,
-    "foregroundAbsolute": 819207,
-    "foregroundMae": 4.84585899096733,
-    "changed": 48767
+    "mae": 1.0324020385742188,
+    "rmse": 6.163749348430177,
+    "foreground": 56355,
+    "foregroundAbsolute": 811914,
+    "foregroundMae": 4.802377783692663,
+    "changed": 48799
   },
   "compat": {
     "family": "anisotropy",
@@ -83,15 +83,15 @@
     },
     "metrics": {
       "pixels": 262144,
-      "absolute": 819207,
-      "square": 29848299,
+      "absolute": 811911,
+      "square": 29877969,
       "max": 254,
-      "mae": 1.0416755676269531,
-      "rmse": 6.160687856044903,
-      "foreground": 56351,
-      "foregroundAbsolute": 819207,
-      "foregroundMae": 4.84585899096733,
-      "changed": 48766
+      "mae": 1.0323982238769531,
+      "rmse": 6.163749038983999,
+      "foreground": 56355,
+      "foregroundAbsolute": 811911,
+      "foregroundMae": 4.8023600390382395,
+      "changed": 48798
     }
   },
   "viewer": {
