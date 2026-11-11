@@ -2446,7 +2446,10 @@ reports it once through `engine.onError` (coded `failed`, help `gpu-lost`) and d
 until the ordinary restore rebuilds every batch and plugin; later errors from the same device are not reported again. Other
 uncaptured errors (validation) still fail every frame with the coded fault. Optional packages scope their own allocations
 (`packages/shared/error-scope.js` `scoped`) and leave them unused until the device confirms them, so a failure there stays in
-the package: `CulledMeshes` draws the affected meshes unculled until the next restore. Evidence:
+the package: `CulledMeshes` draws the affected meshes unculled until the next restore. On a device without
+`core-features-and-limits` (the compatibility level, the WebGL2 layer) every shadow map receivers bind as a '2d-array'
+view, a one-cascade map included, is made with `textureBindingViewDimension: '2d-array'` (KB-C34f; evidence
+`packages/shadows/test/compat-view-dimension.test.js` and `packages/webgl2-compat/test/adapter-browser.mjs`). Evidence:
 `tests/deep-core-allocation-failure.test.js` (out-of-memory reported once, device rebuilt, next frame draws; validation still
 throws), `scripts/restore-fault-sweep.mjs` (every allocation a restore makes, core's and each package's, failed once in a real
 browser: reported once, no frame throws, the next frame draws the scene, then a clean restore gives the same resources and

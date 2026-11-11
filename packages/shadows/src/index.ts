@@ -65,6 +65,13 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
   COPY_DST: number;
 };
+// Receivers bind every map as a '2d-array' view. A device without core-features-and-limits (the compatibility level,
+// the WebGL2 layer) binds a texture only as the view dimension it was made for, '2d' by default for one layer (one cascade
+// with `bounds`), so there each map says so; full-level devices get the descriptors they always did.
+const arrayBinding = (device: GPUDevice) =>
+  device.features?.has('core-features-and-limits') === false
+    ? ({ textureBindingViewDimension: '2d-array' } as const)
+    : undefined;
 /** The WebGPU pass context a custom caster's `drawShadow` receives (`ShadowContext.context`). */
 type ShadowPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /** Directional shadow settings, read every frame from `shadows.options`; invalid values throw RangeError or TypeError. */
@@ -891,6 +898,7 @@ export class Shadows implements EnginePlugin {
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_SRC |
           GPUTextureUsage.COPY_DST,
+        ...arrayBinding(this.device!),
       });
     this.cached = texture();
     this.combined = texture();
@@ -915,8 +923,8 @@ export class Shadows implements EnginePlugin {
         Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
           texture.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
         );
-    this.tintMap = device.createTexture({ size, format: 'rgba8unorm', usage });
-    this.tintDepth = device.createTexture({ size, format: 'depth32float', usage });
+    this.tintMap = device.createTexture({ size, format: 'rgba8unorm', usage, ...arrayBinding(device) });
+    this.tintDepth = device.createTexture({ size, format: 'depth32float', usage, ...arrayBinding(device) });
     this.tintViews = layers(this.tintMap);
     this.tintDepthViews = layers(this.tintDepth);
     this.tintStale = true;
