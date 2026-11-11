@@ -31,7 +31,8 @@
     "test:real-files": "npm run build && node scripts/test-real-files.mjs",
     "test:real-files:runtimes": "node scripts/fetch-real-files-runtimes.mjs",
     "fixtures": "node scripts/fetch-fixtures.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:split-scale": "npm run build && node tests/split-scale-check.mjs"
   },
   "sideEffects": false,
   "exports": {

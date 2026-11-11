@@ -93,7 +93,7 @@ export { decompressLZF } from './lzf.js';
 export { readZipDirectory, readZipEntry, crc32 } from './zip.js';
 export type { ZipEntry, ZipOptions } from './zip.js';
 export { computeVertexNormals, faceNormal } from './normals.js';
-export { toGeometry, pointsToGeometry, CORE_MAX_VERTICES } from './geometry.js';
+export { toGeometry, toGeometries, splitTriangles, pointsToGeometry, CORE_MAX_VERTICES } from './geometry.js';
 export type { ToGeometryOptions, PointsToGeometryOptions } from './geometry.js';
 export { createMeshes } from './engine.js';
 export type { CreateMeshesOptions, LoadedMeshes } from './engine.js';

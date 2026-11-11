@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15003330,
+  "total": 15003757,
   "history": [
     {
       "date": "2026-10-24",
@@ -8375,6 +8375,12 @@
       "commit": "29b4a5cea3",
       "reason": "new entry @margoengine/terrain/planet-recipes (craters, ridged noise, domain warp, presets; planet entry unchanged)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "b9debbc429",
+      "reason": "loaders/render splits parts past the core 1,000,000-vertex limit (splitTriangles, toGeometries): 3,148 to 3,319 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8901,7 +8907,7 @@
     "@margoengine/loaders/off": 2992,
     "@margoengine/loaders/pdb": 2464,
     "@margoengine/loaders/ply": 4220,
-    "@margoengine/loaders/render": 3148,
+    "@margoengine/loaders/render": 3575,
     "@margoengine/loaders/svg": 11621,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,

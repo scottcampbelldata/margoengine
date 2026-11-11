@@ -1,7 +1,7 @@
 import { PbrMaterial, type Geometry } from '@margoengine/core';
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
-import { pointsToGeometry, toGeometry, type PointsToGeometryOptions, type ToGeometryOptions } from './geometry.js';
+import { pointsToGeometry, toGeometries, type PointsToGeometryOptions, type ToGeometryOptions } from './geometry.js';
 import { SRGBToLinear as toLinear } from '@margoengine/math/color';
 
 /** Options of createMeshes: parent, material values, one mesh or one per group, and the geometry options. */
@@ -52,7 +52,9 @@ function averageColor(loaded: LoadedGeometry, group: LoadedGroup | undefined): [
 
 /**
  * Creates engine meshes for a loaded result: one per group (3MF objects and colors) or one for the whole mesh,
- * with a `PbrMaterial` per distinct color. Point clouds become octahedron markers through `pointsToGeometry`.
+ * with a `PbrMaterial` per distinct color. A mesh or group past the core limit of 1,000,000 vertices becomes several
+ * meshes (see toGeometries), with one shared material. Point clouds become octahedron markers through
+ * `pointsToGeometry`.
  */
 export function createMeshes(
   engine: EngineKernel,
@@ -94,18 +96,14 @@ export function createMeshes(
     loaded.groups.every((group) => group.properties && !group.color && !group.name && !group.objectId)
   ) {
     const group = !options.merge ? undefined : loaded.groups?.length === 1 ? loaded.groups[0] : undefined;
-    parts.push({
-      geometry: toGeometry(loaded, { normals: options.normals }),
-      color: group?.color ? colorFor(group) : colorFor(undefined),
-    });
+    const color = group?.color ? colorFor(group) : colorFor(undefined);
+    for (const geometry of toGeometries(loaded, { normals: options.normals })) parts.push({ geometry, color });
   } else
     for (const group of loaded.groups) {
       if (!group.count) continue;
-      parts.push({
-        geometry: toGeometry(loaded, { normals: options.normals, group }),
-        color: colorFor(group),
-        name: group.name,
-      });
+      const color = colorFor(group);
+      for (const geometry of toGeometries(loaded, { normals: options.normals, group }))
+        parts.push({ geometry, color, name: group.name });
     }
   const meshes: Mesh[] = [];
   try {

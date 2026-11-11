@@ -92,7 +92,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseLAS` (`/las`, async) | See [LAS and LAZ](#las-and-laz) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
-Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
+Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `toGeometries` (the same, split into parts of at most 1,000,000 vertices with seam-free normals), `splitTriangles`, `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
 
 ## How it works
 
@@ -122,7 +122,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ## Limits
 
-- Core `Geometry` holds positions and normals only, at most 1,000,000 vertices: UVs and vertex colors are kept in `LoadedGeometry` but not rendered, and larger meshes must be split by group. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
+- Core `Geometry` holds positions and normals only, at most 1,000,000 vertices: UVs and vertex colors are kept in `LoadedGeometry` but not rendered. `toGeometries` and `createMeshes` split a larger mesh into consecutive triangle ranges of at most 1,000,000 vertices each; smooth normals are computed over the whole mesh first, so the parts meet without seams, and a vertex on a cut is stored in both parts. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face properties are ignored. OFF per-face colors and binary OFF are not supported. VTK XML (`.vtp`, `.vtu`), other legacy dataset types, VERTICES/LINES cells and cell data are not read. PCD ignores fields other than position, normal, rgb/rgba and intensity.
 - 3MF: textures (`texture2dgroup`), composite materials, multi-properties, beam lattices, slices and ZIP64 or encrypted packages are not supported; objects of type `other` are skipped.
 - glTF lives in gltf and gltf-pro.
@@ -132,13 +132,13 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 `parseSTL` reads binary and ASCII STL into plain typed arrays and does nothing else: no GPU objects, no parts, no smoothing, and no welding unless you ask. A 204,800-triangle binary file becomes 614,400 vertices, as the file stores them.
 
 ```ts
-import {parseSTL, toGeometry} from 'margoengine/loaders';
+import {parseSTL, toGeometries} from 'margoengine/loaders';
 const signal = AbortSignal.timeout(30_000);
 
 const bytes = await (await fetch('/parts/bracket.stl', {signal})).arrayBuffer();
 const mesh = parseSTL(bytes, {signal});          // weld: true shares corners that have equal positions
 console.log(mesh.positions.length / 9, 'triangles', mesh.colors ? 'with colors' : 'without colors');
-const geometry = toGeometry(mesh, {normals: 'flat'}); // a core Geometry, if the mesh is under 1,000,000 vertices
+const parts = toGeometries(mesh, {normals: 'flat'}); // core Geometries of at most 1,000,000 vertices each
 ```
 
 | Result | Content |
@@ -148,7 +148,7 @@ const geometry = toGeometry(mesh, {normals: 'flat'}); // a core Geometry, if the
 | `colors` | binary files using the VisCAM / SolidView color extension (attribute bit 15 set; red bits 10-14, green 5-9, blue 0-4), sRGB 0 to 1, 0.8 gray for facets without one; absent otherwise and for ASCII |
 | `indices` | `0, 1, 2, ...`, or the weld's indices |
 
-Options (defaults): `weld: false`, `maxTriangles: 16,000,000`, `maxVertices: 8,000,000` (checked before allocating, so a short file cannot claim millions), `signal` (aborts with a `LoaderError` of code `'aborted'`, checked every 16,384 triangles). A binary file is recognised by its length (`84 + 50 * triangles`), so binary files whose header starts with `solid` still work; otherwise text starting with `solid` is read as ASCII, several solids in one file are concatenated, and keywords are case-insensitive. Errors are `LoaderError`s: `'truncated'` (data shorter than the header says; pass the whole file), `'syntax'`, `'limit'` (raise `maxTriangles` or `maxVertices`), `'header'`, `'aborted'`. The Materialise Magics color variant and per-facet colors in ASCII files are not read.
+Options (defaults): `weld: false`, `maxTriangles: 16,000,000`, `maxVertices: 8,000,000` (checked before allocating, so a short file cannot claim millions; the output has three vertices per triangle before welding, so the default `maxVertices` admits 2,666,666 triangles: pass `maxVertices: 3 * triangles` for more), `signal` (aborts with a `LoaderError` of code `'aborted'`, checked every 16,384 triangles). A binary file is recognised by its length (`84 + 50 * triangles`), so binary files whose header starts with `solid` still work; otherwise text starting with `solid` is read as ASCII, several solids in one file are concatenated, and keywords are case-insensitive. Errors are `LoaderError`s: `'truncated'` (data shorter than the header says; pass the whole file), `'syntax'`, `'limit'` (raise `maxTriangles` or `maxVertices`), `'header'`, `'aborted'`. The Materialise Magics color variant and per-facet colors in ASCII files are not read.
 
 The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loader.
 
@@ -230,8 +230,9 @@ model.dispose();
 `createPBRMeshes` returns a `PBRModel` (dispose it when done) that renders per-vertex sRGB colors and linear
 `attributes.opacity` through `@margoengine/gltf-pro`. Group RGBA fills in only a missing channel; `baseColorFactor`
 multiplies the result, and any alpha below one draws blended. `parent`, `normals`, `roughness`, `metalness` and
-`doubleSided` work as in `createMeshes`; `unlit` uses the unlit material. It accepts triangle meshes with at most
-1,000,000 vertices and 4096 parts, and refuses point clouds, malformed attributes, overlapping groups and data over
+`doubleSided` work as in `createMeshes`; `unlit` uses the unlit material. It accepts triangle meshes of any size within `maxBytes`
+and at most 4096 parts (a part past 1,000,000 vertices becomes several primitives of one mesh, split as
+`toGeometries` splits), and refuses point clouds, malformed attributes, overlapping groups and data over
 `maxBytes` before allocating GPU resources. `npm run test:render:browser` checks the colors on the GPU.
 
 ## Files that refer to other files

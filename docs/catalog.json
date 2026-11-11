@@ -568,7 +568,9 @@
       "readZipDirectory",
       "readZipEntry",
       "sampleDAESampler",
+      "splitTriangles",
       "tmxLayerQuads",
+      "toGeometries",
       "toGeometry"
     ],
     "category": "Loading and formats"

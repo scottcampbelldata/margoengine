@@ -508,6 +508,13 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   instance count (likely core's per-frame CPU walk of 1.2M entities with culling off): a speed bug to diagnose with
   GPU timestamps (Stats with timestamp-query) and a CPU profile before release.
 
+- Loader meshes past the core vertex limit: a 2,828 x 2,828 height field (7,997,584 vertices, 15,983,858 triangles,
+  the parsers' default `maxVertices`) through `createMeshes`, split into 9 parts of at most 1,000,000 vertices
+  (`node packages/loaders/tests/split-scale-check.mjs`, native and `MARGO_COMPAT=1`). Work per frame: 9 draws of one
+  material (one per part); the split adds no per-frame buffer write, bind group or allocation, and a mesh under the
+  limit is one draw as before. Building the parts: 1.2 s on the CPU. Target: 60 fps on the RTX A6000 natively and on
+  the WebGL2 layer; mid laptop iGPU 30 fps natively. Busy-machine diagnostic 2026-11-10: 4.1 ms wall natively,
+  15.5 ms on the WebGL2 layer.
 ### Water caustics at scale (lague plan 5, 2026-11-10)
 
 `node packages/water/test/caustics-scale.browser.mjs`, native and `MARGO_COMPAT=1`. Cases: default (Water 128 segments, map

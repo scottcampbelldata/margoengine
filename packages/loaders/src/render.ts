@@ -2,7 +2,7 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf-pro/model';
 import { SRGBToLinear } from '@margoengine/math/color';
 import type { CreateMeshesOptions } from './engine.js';
-import { CORE_MAX_VERTICES, toGeometry } from './geometry.js';
+import { splitTriangles, toGeometries } from './geometry.js';
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 
 /**
@@ -40,8 +40,9 @@ function attribute(value: Float32Array | undefined, length: number, name: string
  * Source RGB is sRGB; opacity is linear. Group RGBA supplies only missing vertex channels, independently.
  * Uncovered index ranges render with white/opaque fallback. The explicit material factor multiplies RGBA.
  * Returns the renderer's owned model: dispose it once finished; its existing lifecycle restores GPU resources.
- * The input is never modified. Point clouds, overlapping groups, more than one million source vertices,
- * more than 4096 parts, or an exceeded packed-data budget are refused before any GPU allocation.
+ * The input is never modified. A part past the core limit of 1,000,000 vertices becomes several primitives of one
+ * glTF mesh, split as toGeometries splits (normals seam-free). Point clouds, overlapping groups, more than 4096
+ * parts, or an exceeded packed-data budget are refused before any GPU allocation.
  */
 export function createPBRMeshes(
   engine: EngineKernel,
@@ -63,8 +64,6 @@ export function createPBRMeshes(
     metalness = unit(options.metalness ?? 0, 'metalness'),
     maxBytes = options.maxBytes ?? 256 * 1024 * 1024;
   if (!Number.isInteger(count) || count < 3) range('positions must contain at least three xyz vertices');
-  if (count > CORE_MAX_VERTICES)
-    throw new LoaderError(format, 'limit', `source vertices exceed ${CORE_MAX_VERTICES}; split the asset`);
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) range('maxBytes must be a positive safe integer');
   if (!['auto', 'smooth', 'flat'].includes(mode)) range('normals must be auto, smooth or flat');
   if (factor.length !== 4) range('baseColorFactor must contain four values');
@@ -108,12 +107,14 @@ export function createPBRMeshes(
   if (parts.length > 4096) throw new LoaderError(format, 'limit', 'more than 4096 parts; merge or split the asset');
   // Count before preparing any renderer resources. The same source order is used by toGeometry's compaction.
   let bytes = 0;
+  const chunks: Uint32Array[][] = [];
   for (const part of parts) {
     const triangles = indices.subarray(part.start, part.start + part.count),
-      used = mode === 'flat' ? triangles.length : new Set(triangles).size;
-    if (used > CORE_MAX_VERTICES)
-      throw new LoaderError(format, 'limit', 'flat shading exceeds the vertex limit; split the asset');
-    bytes += used * 80 + triangles.length * 4;
+      split = splitTriangles(triangles, count, mode === 'flat').map((r) =>
+        triangles.subarray(r.start, r.start + r.count),
+      );
+    chunks.push(split);
+    for (const chunk of split) bytes += (mode === 'flat' ? chunk.length : new Set(chunk).size) * 80 + chunk.length * 4;
     if (bytes > maxBytes)
       throw new LoaderError(
         format,
@@ -123,32 +124,37 @@ export function createPBRMeshes(
   }
   const geometry: PreparedGeometry[][] = [],
     doc: GLTFDocument = { asset: { version: '2.0' }, nodes: [], meshes: [], materials: [] };
-  for (const part of parts) {
-    const core = toGeometry(loaded, { normals: mode, group: part }),
-      triangles = indices.subarray(part.start, part.start + part.count),
-      sources = mode === 'flat' ? triangles : new Set(triangles),
-      vertices = new Float32Array((core.vertices.length / 6) * 20);
-    let target = 0,
-      transparent = factor[3] < 1;
-    for (const source of sources) {
-      const o = target * 20,
-        c = source * 3,
-        uv = source * 2,
-        fallback = part.color;
-      vertices.set(core.vertices.subarray(target * 6, target * 6 + 3), o);
-      vertices[o + 3] = 1;
-      vertices.set(core.vertices.subarray(target * 6 + 3, target * 6 + 6), o + 4);
-      if (loaded.uvs) vertices.set(loaded.uvs.subarray(uv, uv + 2), o + 12);
-      for (let k = 0; k < 3; k++) vertices[o + 16 + k] = SRGBToLinear(loaded.colors?.[c + k] ?? fallback?.[k] ?? 1);
-      const alpha = opacity?.[source] ?? fallback?.[3] ?? 1;
-      vertices[o + 19] = alpha;
-      transparent ||= alpha < 1;
-      target++;
+  for (const [p, part] of parts.entries()) {
+    // toGeometries splits the part exactly as splitTriangles did above, so cores[k] is built from chunks[p][k].
+    const cores = toGeometries(loaded, { normals: mode, group: part }),
+      primitives: PreparedGeometry[] = [];
+    let transparent = factor[3] < 1;
+    for (const [k, core] of cores.entries()) {
+      const triangles = chunks[p][k],
+        sources = mode === 'flat' ? triangles : new Set(triangles),
+        vertices = new Float32Array((core.vertices.length / 6) * 20);
+      let target = 0;
+      for (const source of sources) {
+        const o = target * 20,
+          c = source * 3,
+          uv = source * 2,
+          fallback = part.color;
+        vertices.set(core.vertices.subarray(target * 6, target * 6 + 3), o);
+        vertices[o + 3] = 1;
+        vertices.set(core.vertices.subarray(target * 6 + 3, target * 6 + 6), o + 4);
+        if (loaded.uvs) vertices.set(loaded.uvs.subarray(uv, uv + 2), o + 12);
+        for (let j = 0; j < 3; j++) vertices[o + 16 + j] = SRGBToLinear(loaded.colors?.[c + j] ?? fallback?.[j] ?? 1);
+        const alpha = opacity?.[source] ?? fallback?.[3] ?? 1;
+        vertices[o + 19] = alpha;
+        transparent ||= alpha < 1;
+        target++;
+      }
+      primitives.push({ vertices, indices: core.indices });
     }
     const index = geometry.length;
-    geometry.push([{ vertices, indices: core.indices }]);
+    geometry.push(primitives);
     doc.nodes!.push({ mesh: index, name: part.name });
-    doc.meshes!.push({ primitives: [{ attributes: {}, material: index }] });
+    doc.meshes!.push({ primitives: primitives.map(() => ({ attributes: {}, material: index })) });
     doc.materials!.push({
       name: part.name,
       pbrMetallicRoughness: { baseColorFactor: [...factor], roughnessFactor: roughness, metallicFactor: metalness },

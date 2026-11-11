@@ -819,7 +819,14 @@ export function readZipEntry(input: BinaryInput, entry: ZipEntry, options?: ZipO
 
 export function sampleDAESampler(sampler: DAESampler, time: number, out?: Float64Array): Float64Array;
 
+export function splitTriangles(triangles: Uint32Array, vertexCount: number, flat: boolean, limit?: number): {
+    start: number;
+    count: number;
+}[];
+
 export function tmxLayerQuads(map: LoadedTMX, layer: TMXTileLayer, options?: TileQuadsOptions): TileQuads;
+
+export function toGeometries(loaded: LoadedGeometry, options?: ToGeometryOptions): Geometry[];
 
 export function toGeometry(loaded: LoadedGeometry, options?: ToGeometryOptions): Geometry;
 
