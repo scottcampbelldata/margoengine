@@ -499,6 +499,8 @@ layouts), no WebGPU errors; occlusion drew as few as 4,770 of 28,672 parts where
 
 - Static parts, one geometry per batch; `CulledInstances` has one `PbrMaterial` per batch, and `CulledParts` holds one per
   part. At most 1,000,000 parts and 96 bytes x parts within `maxStorageBufferBindingSize`.
+- `CulledMeshes` culls up to `maxStorageBufferBindingSize / 96` instances of one geometry (1,398,101 at the default
+  128 MiB binding); more throw a `RangeError` naming the figure, so spread them over several geometries.
 - With bounding spheres, thin parts just behind a surface (a rod under a plate) are rarely culled: use `bounds: 'box'`.
   On an open layout the depth prepass and pyramid cost more GPU time than occlusion saves; use `'frustum'` there.
 - Occluders are the package's own parts plus what `addOccluder` names; everything else draws but does not occlude.

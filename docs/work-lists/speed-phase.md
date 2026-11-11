@@ -500,6 +500,13 @@ with GPU timestamp queries (native) and wall time per frame (WebGL2 layer, no ti
   the 1,000,000 default natively and 30 fps at the 100,000 light preset on the WebGL2 layer. Busy-machine diagnostic
   2026-11-10: native GPU 1.77 ms; WebGL2 layer 107 ms wall, a speed bug to diagnose (likely the compute emulation
   path at 8,192 workgroups) before release.
+- CulledMeshes at scale: 1,200,000 core meshes of one box (`node packages/culling/test/gpu/meshes-scale-check.mjs`,
+  native and `--compat`). Work count per frame: instances tested 1,200,000; drawn 1,108,601 (whole field) and 1,928
+  (facing out over a corner); one indirect draw a geometry. Target: 60 fps on the RTX A6000 natively and on the
+  WebGL2 layer; mid laptop iGPU 30 fps natively. Busy-machine diagnostic 2026-11-10: 24.8 / 20.1 ms wall natively,
+  155 / 48 ms on the WebGL2 layer. The corner view drawing under 2,000 still takes 20 ms, so the cost follows the
+  instance count (likely core's per-frame CPU walk of 1.2M entities with culling off): a speed bug to diagnose with
+  GPU timestamps (Stats with timestamp-query) and a CPU profile before release.
 
 ### Water caustics at scale (lague plan 5, 2026-11-10)
 

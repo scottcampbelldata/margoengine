@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 14994055,
+  "total": 14994594,
   "history": [
     {
       "date": "2026-10-24",
@@ -8357,6 +8357,12 @@
       "commit": "378d1f67c8",
       "reason": "New optional compute/distance entry absent (0 B) to 5187 B min+gzip, ceiling 5443 B. Plan estimate was 3500 B; the extra is the CPU-backend flood (about 0.6 KB, so the CPU and GPU nearest-seed buffers can be compared bit for bit), the exact transform shared with text (about 0.9 KB, the oracle and distanceTransformExact) and signed, Voronoi and validation code. Splitting would add another entry and loader for the same API. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "a9280d58f2",
+      "reason": "culling: CulledMeshes binds only the instances in use and caps its doubling at the storage binding (gpu-lost past 1,048,574 instances of one geometry); root 14050 to 14208 B gzip (+158 B); the check is the feature, no split possible",
+      "grew": 1
     }
   ],
   "items": {
@@ -8570,7 +8576,7 @@
     "@margoengine/creative/targets": 4277,
     "@margoengine/creative/targets-depth": 3946,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 14096,
+    "@margoengine/culling": 14635,
     "@margoengine/culling/bounds": 20401,
     "@margoengine/culling/depth": 6320,
     "@margoengine/culling/dynamic": 7842,

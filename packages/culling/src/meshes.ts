@@ -75,6 +75,8 @@ interface Occlusion {
   depth: GPURenderPipeline;
 }
 let serial = 0;
+/** The part of core's instance buffer a slot uses: the whole buffer can be larger than one storage binding. */
+const inUse = (buffer: GPUBuffer, slot: Slot) => ({ buffer, size: Math.min(buffer.size, slot.capacity * 96) });
 
 /**
  * GPU culling for regular core meshes: every frame a compute pass tests each drawn instance of core's batches against
@@ -341,10 +343,11 @@ export class CulledMeshes implements EnginePlugin {
     }
     s.reset[0] = slot.data[1];
     if (s.instance !== instance || s.hiz !== hiz) {
-      const group = (pipeline: GPUPipelineBase, entries: [number, GPUBuffer][]) =>
+      const used = inUse(instance, slot),
+        group = (pipeline: GPUPipelineBase, entries: [number, GPUBuffer][]) =>
         d.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
-          entries: entries.map(([binding, buffer]) => ({ binding, resource: { buffer } })),
+          entries: entries.map(([binding, buffer]) => ({ binding, resource: buffer === instance ? used : { buffer } })),
         });
       const shared: [number, GPUBuffer][] = [
         [0, o.uniform],
@@ -380,8 +383,13 @@ export class CulledMeshes implements EnginePlugin {
       this.slots.set(batch.geometry, (slot = { capacity: 0, buffers: [], data: new Uint32Array(this.shape ? 16 : 8) }));
     const instance = engine.geometryBuffers(batch.geometry)!.instance;
     if (batch.count > slot.capacity) {
+      // Every per-instance buffer, core's instance buffer included, is one storage binding of 96 B an instance.
+      const most = Math.floor(Math.min(d.limits.maxStorageBufferBindingSize, d.limits.maxBufferSize) / 96);
+      if (batch.count > most)
+        throw new RangeError(`CulledMeshes: at most ${most} instances of one geometry here; use several geometries.`);
       for (const b of slot.buffers) b.destroy();
-      const n = Math.max(256, 2 ** Math.ceil(Math.log2(batch.count))),
+      // Doubling, but never past the binding: a count just over a power of two must still fit.
+      const n = Math.min(Math.max(256, 2 ** Math.ceil(Math.log2(batch.count))), Math.max(batch.count, most - (most % 256))),
         S = GPUBufferUsage.STORAGE,
         make = (size: number, usage: number) => {
           const b = d.createBuffer({ size, usage: usage | GPUBufferUsage.COPY_DST });
@@ -407,7 +415,8 @@ export class CulledMeshes implements EnginePlugin {
         entries: [
           r(this.frameBuffer!),
           r(slot.uniform!),
-          r(instance),
+          // Core's instance buffer can be larger than one binding (its capacity doubles): bind only the slots in use.
+          inUse(instance, slot),
           r(visible),
           r(local),
           r(groups),
