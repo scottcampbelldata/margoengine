@@ -86,6 +86,17 @@ export class CompatBuffer {
     this.size = size;
     this.usage = usage;
     this.label = descriptor.label ?? '';
+    const most = device.limits.maxBufferSize;
+    if (size > most) {
+      // WebGPU: a validation error and an invalid buffer that holds nothing; mapped at creation, a RangeError.
+      if (descriptor.mappedAtCreation) throw new RangeError(`A buffer mapped at creation is limited to ${most} bytes; pass a smaller size`);
+      device.validationError(
+        `createBuffer${this.label ? ` '${this.label}'` : ''}: ${size} bytes is over this device's maxBufferSize of ${most}`,
+      );
+      this.gl = this.element = this.shadow = null;
+      this.destroyed = true;
+      return;
+    }
     const gl = device.gl;
     // Uniform blocks are bound in 16-byte rows, so GL buffers are rounded up to whole rows.
     const glSize = Math.max(16, Math.ceil(size / 16) * 16);

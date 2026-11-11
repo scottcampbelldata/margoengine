@@ -50,6 +50,11 @@
 - **Measured 2026-11-11, (3):** a plain Firefox 157 page prints the "final row" advisory for every `texSubImage2D` from a
   pixel buffer, full rows from an exact buffer included, and "partial upload ... lazy initialization" for a partial
   upload into a `texStorage2D` texture. Earlier "prints nothing" runs did not catch the console.
+- **Measured 2026-11-11, (3), KBL3c:** unpack alignment 1, 4 and 8 all print it for an exact 4 x 4 RGBA8 upload from a
+  64-byte buffer; the same upload from a `Uint8Array` prints nothing, and every upload lands. So it is a Firefox defect,
+  not the layer's alignment. Minimal repro and Mozilla draft (not filed):
+  [docs/upstream-reports/KBL3c](upstream-reports/KBL3c/report.md). The layer's buffer uploads stay; whether it uploads
+  data textures from memory in Firefox, or the checks accept that exact line, is an open coordinator call.
 - **Next:** (2) the checks assert the deliberate `loseContext()` line exactly once (coordinator call); (3) initialise data
   textures at creation, and test whether another unpack alignment stops the "final row" advisory, else an upstream
   report draft. Owner: webgl2-compat (layer) and the two checks.
@@ -131,6 +136,11 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   symptom is fixed: the WebGL2 layer never read `GL_OUT_OF_MEMORY`, so a buffer or texture the driver could not allocate
   read as empty and drew silently; it now reads `getError()` once after each allocation and reports an `out-of-memory`
   error (`GPUOutOfMemoryError`) to its scope or as `uncapturederror` (packages/webgl2-compat/test/device.test.js).
+- **Seen again 2026-11-11 (bug sweep L3a, origin/main c4c68ae515 plus the layer's maxBufferSize check):** the
+  `MARGO_COMPAT=1 test:gpu` pass of `packages/webgl2-compat` read "clear glass" 0.7623 (sd 0.0143, 1,861 px) against 1,
+  with diffuse, metal and plastic right just before it; other lanes held GPU slots at the time. No `out-of-memory` or
+  validation line in the log. The same case alone right after passed (1.0000, sd 0). Still not found; owner
+  voxel-pathtracer with webgl2-compat, an Opus hunt.
 - **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
   results kept, watching for an `out-of-memory` error.
 
@@ -2915,6 +2925,15 @@ Measured but not fixed. Their history, sources and rerun commands are in
   `packages/webgl2-compat/test/compute-browser.mjs` (a 160 MiB scatter target, stores on both sides of 128 MiB), and
   `packages/splats/test/gpu/scale-check.mjs`, which now draws the truck natively and with `MARGO_COMPAT=1` (61.0% of the
   frame on both). Found while fixing it: the layer's `createBuffer` does not check `maxBufferSize` (KBnew-compat-maxbuffer).
+- **Fixed (KBnew-compat-maxbuffer, 2026-11-11): the WebGL2 layer's `createBuffer` allocated any size**
+  (`@margoengine/webgl2-compat`), past the device's `maxBufferSize`, where WebGPU raises a validation error and hands back
+  an invalid buffer. It now reports the validation error (`createBuffer '<label>': N bytes is over this device's
+  maxBufferSize of M`), allocates nothing and returns a buffer that holds nothing; mapped at creation it throws a
+  RangeError. Regression: `packages/webgl2-compat/test/device.test.js`, "createBuffer refuses a size past the device
+  maxBufferSize". KB-L3b (a context with MAX_TEXTURE_SIZE 2,048, where one word texture holds 16 MiB under a 64 MiB
+  binding) is covered by the same multi-texture fix as KB2604d; regression: the `scatterLayersSmall` case of
+  `packages/webgl2-compat/test/compute-browser.mjs` (a 40 MiB scatter target over three word textures on that context;
+  it failed on the parent of KB2604d with an incomplete framebuffer).
 - **Truck 7k prefix frame is slower than GaussianSplats3D 0.4.7** (`@margoengine/splats`, perf history entry 103):
   10.765 ms against 4.500 ms, one still frame of the 699,050 prefix at 979 x 546, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470).

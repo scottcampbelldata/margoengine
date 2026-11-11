@@ -241,6 +241,32 @@ test('a device has the WebGPU default storage binding and buffer sizes unless it
   low.destroy();
 });
 
+// Bug KBnew-compat-maxbuffer (bug sweep L3): createBuffer allocated any size, past the device's maxBufferSize, where
+// WebGPU raises a validation error and hands back an invalid buffer (and a RangeError for one mapped at creation).
+test('createBuffer refuses a size past the device maxBufferSize, as WebGPU does', async () => {
+  const allocated = [];
+  const gl = new Proxy(fakeContext({ limits: { MAX_TEXTURE_SIZE: 8192 } }), {
+    get: (context, key) =>
+      key === 'bufferData' ? (target, size) => allocated.push(size) : key in context ? context[key] : () => ({}),
+  });
+  const device = await (await createCompatGPU({ createContext: () => gl }).requestAdapter()).requestDevice();
+  const most = device.limits.maxBufferSize;
+  device.pushErrorScope('validation');
+  const fits = device.createBuffer({ size: most, usage: 0x80 | 0x8 });
+  assert.equal(await device.popErrorScope(), null, 'maxBufferSize itself is allowed');
+  assert.ok(allocated.includes(most));
+  allocated.length = 0;
+  device.pushErrorScope('validation');
+  const over = device.createBuffer({ size: most + 4, usage: 0x80 | 0x8, label: 'big' });
+  assert.match((await device.popErrorScope())?.message ?? '', /createBuffer 'big': 268435460 bytes is over this device's maxBufferSize of 268435456/);
+  assert.equal(over.size, most + 4, 'an invalid buffer keeps the size asked for');
+  assert.deepEqual(allocated, [], 'nothing is allocated for it');
+  over.destroy();
+  assert.throws(() => device.createBuffer({ size: most + 4, usage: 0x1, mappedAtCreation: true }), RangeError);
+  fits.destroy();
+  device.destroy();
+});
+
 test('array layer capacity is advertised from GL and negotiated independently for each device', async () => {
   for (const capacity of [256, 2048, 4096]) {
     const fresh = async () => {

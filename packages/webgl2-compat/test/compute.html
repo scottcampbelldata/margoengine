@@ -492,7 +492,75 @@ const cases = {
     run(device, p, [g], 3);
     return { values: { first, second: await read() }, tier: tierOf(p) };
   },
+  // Bug sweep L3 (KB-L3b): on a context with MAX_TEXTURE_SIZE 2,048 a word texture holds 16 MiB (2,048 x 2,048 words),
+  // under the 64 MiB binding that context allows. A 40 MiB binding spans three word textures; words are stored at its
+  // start, around the first texture boundary and at its end. largeWords covers the 8,192 context.
+  scatterLayersSmall: (device) => layeredWords(device, 40 * 2 ** 20, 2048 * 2048, 2048),
 };
+
+/**
+ * A real WebGL2 context that reports `size` as its MAX_TEXTURE_SIZE and, as an older GPU would, refuses texture storage
+ * past it with INVALID_VALUE (OpenGL ES 3.0, TexStorage2D and TexStorage3D).
+ */
+const smallContext = (size) => (attributes) => {
+  const gl = new OffscreenCanvas(1, 1).getContext('webgl2', attributes);
+  let refused = 0;
+  const storage = (name) => (...args) => {
+    const [w, h] = args.slice(3);
+    if (w > size || h > size) refused ||= gl.INVALID_VALUE;
+    else gl[name](...args);
+  };
+  const own = {
+    getParameter: (name) => (name === gl.MAX_TEXTURE_SIZE ? size : gl.getParameter(name)),
+    getError: () => {
+      const error = refused || gl.getError();
+      refused = 0;
+      return error;
+    },
+    texStorage2D: storage('texStorage2D'),
+    texStorage3D: storage('texStorage3D'),
+  };
+  return new Proxy(gl, {
+    get: (target, key) => own[key] ?? (typeof target[key] === 'function' ? target[key].bind(target) : target[key]),
+  });
+};
+async function layeredWords(device, size, boundary, maxTexture) {
+  const requiredLimits = { maxBufferSize: size, maxStorageBufferBindingSize: size };
+  const own = device.gl
+    ? await (await createCompatGPU(maxTexture ? { createContext: smallContext(maxTexture) } : {}).requestAdapter()).requestDevice({ requiredLimits })
+    : await (await navigator.gpu.requestAdapter()).requestDevice({ requiredLimits });
+  own.pushErrorScope('validation');
+  const p = compute(own, `
+    override B: u32;
+    @group(0) @binding(0) var<storage, read_write> out: array<u32>;
+    @compute @workgroup_size(32) fn main(@builtin(global_invocation_id) id: vec3u) {
+      let n = arrayLength(&out);
+      var i = id.x;
+      if (id.x >= 64u) { i = n - 96u + id.x; } else if (id.x >= 32u) { i = B - 48u + id.x; }
+      out[i] = i * 2654435761u + 1u;
+    }`, 'main', { B: boundary });
+  const out = own.createBuffer({ size, usage: B.STORAGE | B.COPY_SRC });
+  run(own, p, [group(own, p, [{ buffer: out }])], 3);
+  const slice = async (word) => {
+    const r = own.createBuffer({ size: 256, usage: B.MAP_READ | B.COPY_DST }), e = own.createCommandEncoder();
+    e.copyBufferToBuffer(out, word * 4, r, 0, 256);
+    own.queue.submit([e.finish()]);
+    await r.mapAsync(1);
+    const words = [...new Uint32Array(r.getMappedRange())];
+    r.unmap();
+    r.destroy();
+    return words;
+  };
+  const n = size / 4,
+    values = { start: await slice(0), boundary: await slice(boundary - 32), end: await slice(n - 64) };
+  const error = await own.popErrorScope(),
+    gl = own.gl ? own.gl.getError() : 0,
+    tier = tierOf(p);
+  out.destroy();
+  own.destroy();
+  if (error || gl) throw new Error(`own device: ${error?.message ?? `GL error ${gl}`}`);
+  return { values, tier };
+}
 
 async function runCase(device, name) {
   const errors = [];

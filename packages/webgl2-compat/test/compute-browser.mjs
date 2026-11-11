@@ -28,6 +28,7 @@ const TIERS = {
   cpuCube: 'cpu',
   asyncPipeline: 'scatter',
   scatterAfterWrite: 'scatter',
+  scatterLayersSmall: 'scatter',
 };
 
 /** Sends the page with `?strict` a policy that forbids `new Function`, as a real header. */
