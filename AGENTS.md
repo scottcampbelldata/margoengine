@@ -85,9 +85,19 @@ Scott's rule (2026-11-05): no landing queue, no integrator, no hooks that block 
 - Before you push, run the fast gate: `npm run lint`, `npm run hygiene`, `npm run check:banned-terms`, `npm run build:packages`, `npm run api:check`, `npm run quality`, the tests of the packages you changed and of the packages that depend on them, and the GPU tests (WebGPU and the WebGL2 compatibility layer) of the packages you changed only (Scott, 2026-11-10: skip every test that is not necessary; the scheduled full GPU check in CI covers the dependents on `main`). A change that alters exports commits the `npm run api:update` output. Never run `npm run verify` before a push (Scott, 2026-11-09: "no more full verifies unless they're absolutely necessary", never doubled; "If CI takes care of the full verifies, you have no business running them"). No exception: local CI runs the only full verify.
 - The one full `npm run verify` runs after the push, once per newest `main`, in local CI on the dev PC (scheduled task "Margo CI (CPU)", result in the local CI status record on the dev PC). Nothing waits for it. A red run on `main` is fixed forward by the lane whose commit caused it within about 2 hours, with a regression test, or that commit is reverted. Nothing is released from a commit local CI has not passed.
 - README work waits until the features are built (Scott, 2026-11-09: "The read me's can wait ... Build features, fill in gaps"). During the build phase do not run `check:readme-run` and do not write or fix README examples; add one line per changed package to `docs/work-lists/readme-owed.md` instead. The README rules in this file apply again in the README phase before release.
-- Agents push to `main` themselves once the checks above pass (Scott, 2026-11-05): rebase onto current `main`, fast-forward push, then keep your worktree for the next job (creating one takes minutes: dependencies and LFS). Remove a worktree only when its whole lane or task is finished. Never force-push.
+- Agents push to `main` themselves once the checks above pass (Scott, 2026-11-05): rebase onto current `main`, fast-forward push, then keep your worktree for the next job (creating one takes minutes: dependencies and LFS). Remove the worktree and its branch when the task is finished (see "Branches and folders"). Never force-push.
 - Never delete or rewrite another session's branch or uncommitted work without Scott's say-so.
 - Never write git config from a worktree; add worktrees with `--no-track`.
+
+## Branches and folders
+
+Scott's rule (2026-11-10, after the third pile-up of over 100 branches and folders): the drive holds one folder per agent that is working right now, plus the local CI folder, and nothing else.
+
+- Finished work goes to `main` and comes off the drive the same day: push, confirm the commit is on `origin/main`, then `git worktree remove` the folder and `git branch -D` the branch once the agent's task is done. An agent reuses its folder for its next job in the same task instead of making a new one.
+- Unfinished work worth keeping is never deleted: an agent is put on it to finish and land it, then its folder and branch are deleted. Work that is not worth landing (dead ends, duplicates, anything already on `main`) is deleted.
+- Never keep work in bundles, patches, archive, backup or "parked" folders, or backup branches. Git history on `main` is the record.
+- Land small: push each working piece, so a stopped job leaves little behind.
+- `node scripts/worktree-report.mjs` lists every worktree, branch, remote branch and stray sibling folder with its unlanded commits and changed files. The coordinator runs it at every helper report and clears each row with no working agent (lands it through an agent, or deletes it) before starting anything new. A helper's final report states that its folder and branch are deleted, or which agent still works in them.
 
 ## Documentation is part of the change
 
