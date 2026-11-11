@@ -39,6 +39,9 @@ export function unboundedBrowserScripts(read = (file) => readFileSync(new URL(fi
   for (const file of files) {
     if (/\.test\.js$|(^|\/)node_modules\/|(^|\/)dist\/|^scripts\/lib\/browser\.mjs$|^scripts\/browser\.js$/.test(file))
       continue;
+    // Upstream defect repros go to other projects' trackers with no Margo code in them, so they cannot import
+    // shutdown.mjs; they run by hand, never in a suite or gate (docs/upstream-reports/run-page.mjs).
+    if (file.startsWith('docs/upstream-reports/')) continue;
     const source = read(file);
     if (!LAUNCH.test(source) || /shutdown\.mjs/.test(source)) continue;
     const direct = /\b(?:chromium|firefox|webkit)\.launch\(|launchPersistentContext\(/.test(source);
