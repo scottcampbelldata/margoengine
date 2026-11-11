@@ -1292,11 +1292,13 @@ export class Replayer {
       device = this.device;
     const key = `${colors.map((c) => c?.key ?? '-').join(',')}|${depth?.key ?? ''}`;
     const owners = [...colors.filter((c): c is Sub => !!c), ...(depth ? [depth] : [])].map((c) => c.owner);
-    return device.framebuffer(key, owners, (fbo) => {
+    return device.framebuffer(key, owners, (fbo, made) => {
       device.state.bindDrawFramebuffer(fbo);
       colors.forEach((c, i) => c?.attach(gl.COLOR_ATTACHMENT0 + i));
       if (depth) depth.attach(this.depthPoint(depth.info));
       gl.drawBuffers(colors.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE)));
+      // Once, when made: the same attachments again keep their completeness (see CompatDevice.framebuffer).
+      if (!made) return;
       const status = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER);
       if (status !== gl.FRAMEBUFFER_COMPLETE)
         device.validationError(

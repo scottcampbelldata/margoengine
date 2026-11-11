@@ -332,7 +332,7 @@ export class CompatDevice extends EventTarget {
   /** Cached framebuffers by attachment key, with how to attach them again and the frame they were last attached in. */
   private readonly framebuffers = new Map<
     string,
-    { fbo: WebGLFramebuffer; build: (fbo: WebGLFramebuffer) => void; frame: number }
+    { fbo: WebGLFramebuffer; build: (fbo: WebGLFramebuffer, made: boolean) => void; frame: number }
   >();
   /**
    * @internal Frames this device's canvases have shown (CompatCanvasContext.present). A cached framebuffer is attached
@@ -605,24 +605,28 @@ export class CompatDevice extends EventTarget {
    * after the context's OffscreenCanvas was shown with transferToImageBitmap: no GL error, a complete framebuffer, the
    * texture keeps the uploaded data. Attaching the texture again before that draw makes it land (measured on an Apple
    * M6, HeadlessChrome 156.0.8078.4, raw WebGL2 with no layer: docs/known-bugs.md "Batch 132 audit: animation").
+   * `build` gets `made` true only when the framebuffer is new: attaching the same subresources again cannot change its
+   * completeness, so a caller checks that once. checkFramebufferStatus waits for the GPU process to run every command
+   * before it: checked on every attach, it was 14.9 s of a 15.7 s profile of the biomes flythrough on a Radeon 680M,
+   * and the first flight took 335 s with it, 266 s without (docs/work-lists/amd-gpu-hunt.md row 34).
    */
   framebuffer(
     key: string,
     textures: readonly CompatTexture[],
-    build: (fbo: WebGLFramebuffer) => void,
+    build: (fbo: WebGLFramebuffer, made: boolean) => void,
   ): WebGLFramebuffer {
     const cached = this.framebuffers.get(key);
     if (cached) {
       if (cached.frame !== this.frame) {
         cached.frame = this.frame;
-        cached.build(cached.fbo);
+        cached.build(cached.fbo, false);
       }
       return cached.fbo;
     }
     const fbo = this.gl.createFramebuffer() as WebGLFramebuffer;
     this.framebuffers.set(key, { fbo, build, frame: this.frame });
     for (const t of textures) t.framebuffers.add(key);
-    build(fbo);
+    build(fbo, true);
     return fbo;
   }
 

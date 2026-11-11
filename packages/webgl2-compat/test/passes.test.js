@@ -37,3 +37,38 @@ test('device.passes counts replayed passes and the draws that draw something', a
   r.drawIndexed(0, 1, 0, 0, 0);
   assert.equal(d.passes.draws, 1);
 });
+
+// AMD GPU hunt row 34: a cached framebuffer is attached again on its first use in each frame (the ANGLE Metal upload
+// workaround), and each attach also called checkFramebufferStatus, which waits for the GPU process to run every command
+// before it: once per render target per frame, 14.9 s of a 15.7 s profile of the biomes flythrough on a Radeon 680M.
+test('a cached framebuffer is attached again each frame but checked for completeness once, when made', async () => {
+  const d = await device(),
+    r = d.replayer,
+    counts = { check: 0, attach: 0 },
+    check = d.gl.checkFramebufferStatus;
+  d.gl.checkFramebufferStatus = (target) => (counts.check++, check(target));
+  // One colour subresource as the replayer makes them for a pass's attachment.
+  const sub = { key: 't1.0', owner: { framebuffers: new Set() }, info: { kind: 'color' }, level: 0 },
+    target = { ...sub, attach: () => counts.attach++ };
+  const fbo = r.single(target);
+  assert.deepEqual(counts, { check: 1, attach: 1 }, 'made, attached and checked');
+  assert.equal(r.single(target), fbo);
+  assert.deepEqual(counts, { check: 1, attach: 1 }, 'the same frame reuses it as it is');
+  for (let frame = 0; frame < 3; frame++) {
+    d.frame++;
+    assert.equal(r.single(target), fbo);
+  }
+  assert.deepEqual(counts, { check: 1, attach: 4 }, 'attached again in each new frame, never checked again');
+  // An incomplete framebuffer is still reported, once, when it is made.
+  const errors = [];
+  d.gl.checkFramebufferStatus = () => (counts.check++, 0x8cd6);
+  d.addEventListener('uncapturederror', (e) => (e.preventDefault(), errors.push(e.error.message)));
+  r.single({ ...sub, key: 't2.0', attach: () => counts.attach++ });
+  d.frame++;
+  r.single({ ...sub, key: 't2.0', attach: () => counts.attach++ });
+  // The layer dispatches uncapturederror in a task of its own, as WebGPU does.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(counts.check, 2);
+  assert.equal(errors.length, 1, 'reported once');
+  assert.match(errors[0], /complete WebGL2 framebuffer \(status 0x8cd6\)/);
+});
