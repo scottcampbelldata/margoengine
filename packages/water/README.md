@@ -369,6 +369,38 @@ defaults, 3 GiB at 2048 and 32 layers), and every depth slice draws two triangle
 (measured numbers in [limits](../../docs/limits.md)). There is no per-channel dispersion: every colour refracts at the
 same index. Method and sources: [caustics record](../../docs/water-caustics.md).
 
+## Particle liquid
+
+`@margoengine/water/liquid` draws any set of particles as a liquid surface: your own solver's output, a recorded
+cache, a compute array. Each particle is a sphere sprite; their nearest depth is smoothed by a narrow-range filter
+(sharp silhouettes, no bleeding across depth gaps), and one composite pass refracts the scene behind by the summed
+thickness, absorbs it by Beer-Lambert, and adds the Fresnel reflection of the sky and the sun's highlight. It is an HDR
+`PostStack` stage on WebGPU and the WebGL2 layer, and renders only: it moves no particle.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { ParticleLiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// 32,768 particles 2.5 cm apart in a block; after each step of your own solver call liquid.update().
+const positions = new Float32Array(32768 * 3);
+for (let i = 0; i < 32768; i++)
+  positions.set([(i % 32) * 0.025 - 0.4, Math.floor(i / 1024) * 0.025, (Math.floor(i / 32) % 32) * 0.025 - 0.4], i * 3);
+const liquid = ParticleLiquid.attach(engine, { particles: { positions }, radius: 0.025 });
+engine.render({ delta: 1 / 60 });
+```
+
+`particles.positions` is a `Float32Array` (uploaded at creation and on each `update()`), a `GPUBuffer` with STORAGE
+usage, or anything with such a `buffer` such as a `@margoengine/compute` `GpuArray` (read in place, no copy);
+`stride` (default 3 floats), `offset` (0) and `count` (required for a GPU source) say where the centres are. Up to
+4,194,304 particles. Defaults: `radius` 0.05, `ior` 1.333, `absorption` [0.38, 0.1, 0.045] per world unit (Water's own),
+`color` [1, 1, 1], `smoothing` 0.7 * radius (the filter's world-space sigma), `filterRange` 10 * radius and
+`filterClamp` radius (the paper's delta and mu), `maxFilterRadius` 32 pixels, `thicknessScale` 1 (the thickness is the
+sum of the sphere chords; set it to your packing fraction), `resolutionScale` 1 (0.5 draws the thickness at half
+resolution), `shininess` 2000, the sky gradient of Water (`skyHorizon`, `skyZenith`) or an `environment` texture, and
+`enabled` true. A frame is six render passes and six draws (two instanced sprite draws, four full-screen ones), one
+320-byte uniform write and no new bind group; `frameStats` reports them. The liquid writes no scene depth. Method,
+sources and measured numbers: [liquid record](../../docs/water-liquid.md).
+
 ## Wave subsurface scattering
 
 `@margoengine/water/scatter` makes thin crests glow when the viewer looks toward one of the Water's directional

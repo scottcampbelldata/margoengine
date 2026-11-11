@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15005416,
+  "total": 15013637,
   "history": [
     {
       "date": "2026-10-24",
@@ -8393,6 +8393,12 @@
       "commit": "a218d76ff1",
       "reason": "usdz/skel checks joint indices against the skeleton and the 16-bit JOINTS range: 7,987 to 8,100 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "3432961089",
+      "reason": "lague plan 1: new optional entry water/liquid (ParticleLiquid, 7965 B); water root, core and stage unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -9677,6 +9683,7 @@
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7590,
     "@margoengine/water/flow": 3158,
+    "@margoengine/water/liquid": 8221,
     "@margoengine/water/query": 4719,
     "@margoengine/water/rain": 2811,
     "@margoengine/water/reflector": 2660,

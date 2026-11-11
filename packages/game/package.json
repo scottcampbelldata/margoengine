@@ -3243,6 +3243,10 @@
       "types": "./dist/water/rivers.d.ts",
       "import": "./dist/water/rivers.js"
     },
+    "./water/liquid": {
+      "types": "./dist/water/liquid.d.ts",
+      "import": "./dist/water/liquid.js"
+    },
     "./weather": {
       "types": "./dist/weather.d.ts",
       "import": "./dist/weather.js"

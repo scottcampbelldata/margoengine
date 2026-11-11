@@ -7556,3 +7556,6 @@ GPU path that loads compute/fft lazily and batches frames; no core, stage or bac
 formulas, FFT against a direct DFT, Parseval, round trip within 6e-8, Griffin-Lim SNR and convergence, GPU against CPU on both
 backends (docs/limits.md, "Audio offline spectrograms"). Missing: the Rust/Wasm FFT A/B and quiet-machine timings
 (docs/work-lists/speed-phase.md), the phase vocoder.
+
+## Section 5 evidence: lague plan 1 particle liquid
+Optional water/liquid (ParticleLiquid) is an HDR PostStack stage of six render passes: sphere sprites to r32float eye depth with a depth32float attachment, three narrow-range filter passes (Truong and Yuksel 2018), additive r16float thickness, one composite. It reads particle centres from a storage buffer in the vertex stage (the WebGL2 layer's data texture) and uses no compute, workgroup memory, barriers or 32-bit float blending, so both backends run the same WGSL as draws. Evidence: packages/water/test/liquid.browser.mjs passes natively and with MARGO_COMPAT=1 (GPU filter equals the float64 oracle within 1e-4 at every covered pixel, refraction and Fresnel against ray optics, steady-frame work counts at 1,000,000 particles). Missing: the iGPU timing and the quiet-machine rerun (docs/work-lists/speed-phase.md). No core, stage or water root change.

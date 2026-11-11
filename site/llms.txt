@@ -221,12 +221,12 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 3 entry points
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 4 entry points
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 6 entry points
-- [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 13 entry points
+- [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 14 entry points
 - [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 29 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 24 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 11 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 21 entry points
-- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 12 entry points
+- [@margoengine/water API](https://margoengine.com/llms/api/water.md): 13 entry points
 - [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 7 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 12 entry points
 - [@margoengine/road API](https://margoengine.com/llms/api/road.md): 11 entry points
@@ -249,7 +249,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/ui API](https://margoengine.com/llms/api/ui.md): 12 entry points
 - [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 5 entry points
 - [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 6 entry points
-- [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 11 entry points
+- [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 12 entry points
 - [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 11 entry points
 - [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 3 entry points
 - [@margoengine/physics2d API](https://margoengine.com/llms/api/physics2d.md): 2 entry points
@@ -266,7 +266,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 19 entry points
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 13 entry points
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 6 entry points
-- [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 19 entry points
+- [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 20 entry points
 - [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 83 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 10 entry points
 - [@margoengine/react API](https://margoengine.com/llms/api/react.md): 40 entry points
@@ -338,6 +338,7 @@ One page per package: every exported name with its declaration, generated from t
 - [A complete Margo React scene layer](https://margoengine.com/llms/docs/react-scene.md): This is Margo's own version of the React Three Fiber surface: the canvas, the helpers, post, physics, and XR. It does not wrap Fiber, and…
 - [README live-link fixture](https://margoengine.com/llms/docs/readme-live.md): The README runner executes Blender's live-link example unchanged. Its top-level async loop intentionally waits for pagehide, so module…
 - [Releasing to npm](https://margoengine.com/llms/docs/releasing.md): Nothing is published without the maintainer's go-ahead for that release. The only publish path is the manual…
+- [FSM live inspection follow-up (2026-11-10)](https://margoengine.com/llms/docs/research/fsm-inspection.md): Compared two public specifications before writing this repair:
 - [Biased implicit footprints (2026-11-10)](https://margoengine.com/llms/docs/review5-compat-bias.md): `textureSampleBias` now emits hardware `texture` or `textureOffset` with a bias, just as unbiased implicit sampling preserves the hardware…
 - [Refused effect restoration (2026-11-10)](https://margoengine.com/llms/docs/review5-effect-restoration.md): DOF, Bloom and SSAO used to release their old resources and call setup on a replacement device. LDR refusal then left their registered…
 - [SSGI ANGLE D3D11 investigation (2026-11-10)](https://margoengine.com/llms/docs/review5-ssgi-angle.md): The RTX A6000 reproduction is `node packages/post/test/ssgi-bounce-browser.mjs --compat` after `npm run build:packages`. The unchanged…
@@ -384,9 +385,10 @@ One page per package: every exported name with its declaration, generated from t
 - [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`), one row per feature group. It is for roadmap…
 - [Toon parity, batch 194](https://margoengine.com/llms/docs/toon-parity.md): Job 1 is already implemented by `@margoengine/rigging/mtoon`, commit 1f0b43783. Reuse `MToon.attach(model)`; do not create a second…
 - [Verification wiring repaired during size restoration](https://margoengine.com/llms/docs/verification-repairs.md): Finding 8's full verification exposed inherited integration defects at 5ec86fe7c:
-- [Batch 234 caustics](https://margoengine.com/llms/docs/water-caustics.md): The optional `@margoengine/water/caustics` entry provides refracted surface flux, world-space receiver projection, RGB absorption and…
+- [Batch 234 caustics](https://margoengine.com/llms/docs/water-caustics.md): Verification, 2026-11-10 (lague plan 5): all caustics tests pass on native WebGPU and the WebGL2 layer (projector 7 cases, energy 3 cases…
 - [Batch 234: spectral ocean](https://margoengine.com/llms/docs/water-fft.md): Scope: job 1, optional `@margoengine/water/fft`. No core or stage source changes. The previous water root exported `Water` and its…
 - [Flow-map water](https://margoengine.com/llms/docs/water-flow.md): The optional water/flow entry exports WaterFlow and WaterFlowOptions. Attach after Water, with a map provider returning a painted or…
+- [Particle liquid](https://margoengine.com/llms/docs/water-liquid.md): `@margoengine/water/liquid` adds `ParticleLiquid`, an HDR `PostStack` stage that draws any set of particle centres as a liquid surface…
 - [Batch 234: wave queries](https://margoengine.com/llms/docs/water-query.md): Job 2: optional `@margoengine/water/query`. Core and stage are unchanged.
 - [Calm-water planar reflection input](https://margoengine.com/llms/docs/water-reflector.md): The optional water/reflector entry exports WaterReflection, WaterReflectionOptions and WaterPlanarCapture. It borrows…
 - [Local interactive water ripples](https://margoengine.com/llms/docs/water-ripples.md): Batch 235 job 1 adds `@margoengine/water/ripples`. Attach Ripples after a live Water in the same engine. `disturb(x,z,radius,strength)`…
