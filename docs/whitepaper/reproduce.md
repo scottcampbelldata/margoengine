@@ -522,7 +522,10 @@ npm run bench -- features
 ```
 
 The gate refuses battery power and waits for a quiet CPU and GPU. Any case whose runs spread more than 10% makes the
-run invalid. An official label on an invalid run stays invalid. The head-to-head with three.js and other engines runs
+run invalid. Every before-and-after comparison also follows the quiet speed-phase protocol in docs/benchmarking.md
+("Quiet speed-phase protocol"): both revisions built before either is timed, an A/A run of one build in both roles
+first, 1000 samples for any p99, and the GPU clock, power limit and throttle state recorded before and after each
+side. A run that misses one of these is diagnostic, not a published number. An official label on an invalid run stays invalid. The head-to-head with three.js and other engines runs
 the same scenes from `C:DevelopmentProjectsengine-bench` (`--engines=all`, see docs/benchmarking.md "Comparing
 engines").
 
@@ -570,6 +573,10 @@ route is a clone because 1.0.0 is not on npm yet.
   holds it). Close other GPU apps; on an integrated GPU even a browser tab changes the result.
 - Headless Edge/Chrome with `--disable-gpu-vsync --disable-frame-rate-limit`, so FPS is throughput, not the display.
 - Medians of alternating rounds; compare A/B only within one run (clocks drift between runs).
+- Record the GPU clock and power state with each side of a comparison (the `nvidia-smi` query in docs/benchmarking.md,
+  "Quiet speed-phase protocol"); a power-limit cap can halve the clock between two runs.
+- Percentiles are nearest rank from `scripts/lib/percentile.mjs`; a p99 needs 1000 samples to be more than the
+  maximum.
 
 ## Commands by claim area
 

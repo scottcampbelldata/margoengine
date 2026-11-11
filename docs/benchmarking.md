@@ -235,6 +235,37 @@ A number is official only if all of these hold:
 
 Everything else is smoke or dev and must say so wherever it is quoted.
 
+### Quiet speed-phase protocol
+
+The speed phase before release (all timed runs wait for it) adds these steps on top of the gate above. They come
+from the native Rust engine's benchmark work, where each one caught a wrong result. A timed comparison that skips one
+is diagnostic only.
+
+1. **Build both revisions before timing either.** Check out the baseline and the candidate in two worktrees, run
+   `npm run build:packages` (and any example build the case needs) in both, then start timing. Never build one revision
+   between the other's runs: a build heats the CPU and, on a shared power budget, slows the GPU, so whichever side ran
+   after the build looked slower.
+2. **A/A first.** Run the same build in both roles, with the same harness, order and sample count as the A/B. The
+   A/A difference is the floor: an A/B difference inside it is no difference, and an A/A difference outside the
+   spread means the machine is not quiet, so stop and find what is running.
+3. **1000 samples for any p99.** With nearest rank (see [Statistics](#statistics)) p99 is the 990th of 1000 samples;
+   with fewer than 100 it is simply the largest one. Report a p99 only from 1000 or more samples, and call it the
+   maximum otherwise. Medians and per-round minimums need fewer, but say how many.
+4. **Record the GPU clock and power state** before and after each side, and keep it with the result. On NVIDIA:
+
+   ```sh
+   nvidia-smi --query-gpu=name,driver_version,pstate,clocks.sm,clocks.max.sm,clocks.mem,power.draw,power.limit,enforced.power.limit,clocks_throttle_reasons.active --format=csv
+   ```
+
+   In the Rust engine's runs a power limit held the GPU at about 800 MHz in one run against about 1950 MHz in
+   another. A run whose two sides differ in power limit or performance state, or that shows an
+   active throttle reason other than GPU idle (`0x1`, normal between frames), is invalid. The bench tool
+   records the GPU name and driver but not the clocks yet, so this is a manual step.
+5. **Interleave and compare minimums.** Old and new take turns in one session, compared by per-round minimums
+   (AGENTS.md, paired A/B rule), with identical output checked on both sides.
+6. **Instrumented runs are diagnostic.** A run with a profiler attached, extra timestamp passes, debug counters, a
+   debug build or `--no-gate` explains a number; it is never the number. Label it diagnostic wherever it is kept.
+
 ## Choosing the browser
 
 Every browser check in `scripts/` and `examples/` launches through `scripts/lib/browser.mjs`, so one set of variables
