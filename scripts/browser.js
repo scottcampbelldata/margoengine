@@ -99,10 +99,17 @@ export async function startDevServer({
   // It also turns the file watcher off for real: Vite's mergeConfig skips null values, so `watch: null` below lost to
   // the root vite.config.mjs's `watch: { ignored }`, and a build in the same checkout that rewrote a module the page had
   // loaded reloaded the page in the middle of a suite ("Execution context was destroyed", tests/dev-server-watch.test.js).
+  // The same merge concatenates arrays: the root config's '**/*.html' joined the start page in optimizeDeps.entries, so
+  // every suite server scanned every HTML page in the checkout and one unresolvable import in any of them skipped
+  // pre-bundling for the suite's page (tests/dev-server-watch.test.js). The resolved entries are the start page alone.
+  const entry = startPath.replace(/^\//, '');
   const own = {
     name: 'margo-start-owner',
     enforce: 'pre',
-    configResolved: (config) => void (config.server.watch = null),
+    configResolved: (config) => {
+      config.server.watch = null;
+      config.optimizeDeps.entries = [entry];
+    },
     configureServer: (started) => void (server = started),
   };
   try {
@@ -111,7 +118,7 @@ export async function startDevServer({
       resolve: { alias: aliases },
       plugins: [own, ...plugins],
       cacheDir,
-      optimizeDeps: { entries: [startPath.replace(/^\//, '')] },
+      optimizeDeps: { entries: [entry] },
       // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
       // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
       server: { host: '127.0.0.1', port, strictPort: true, watch: null },

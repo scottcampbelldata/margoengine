@@ -43,3 +43,17 @@ test('a page keeps its execution context when a module it loaded is rewritten on
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Found while chasing KB-L4-W1 (2026-11-11): startDevServer asks Vite to scan only the suite's start page for
+// dependencies, but Vite's mergeConfig concatenates arrays, so the root vite.config.mjs's '**/*.html' came along and
+// every suite server scanned every HTML page in the checkout before its first page load. One unresolvable import in
+// any other page (an untracked local page, a rival comparison page) made the scan fail with "Failed to run dependency
+// scan" and pre-bundling was skipped for the suite's own page.
+test('a suite dev server scans only its start page for dependencies', async () => {
+  const dev = await startDevServer({ startPath: '/LICENSE', port: 0 });
+  try {
+    assert.deepEqual(dev.server.config.optimizeDeps.entries, ['LICENSE']);
+  } finally {
+    await dev.close();
+  }
+});

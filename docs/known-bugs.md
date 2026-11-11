@@ -258,6 +258,19 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
+### Fixed 2026-11-11: every suite dev server scanned every HTML page in the checkout for dependencies
+
+- **Repro:** `startDevServer({ startPath: '/LICENSE', port: 0 })` from `scripts/browser.js`; its
+  `server.config.optimizeDeps.entries` held the root `vite.config.mjs` list (`'**/*.html'` and its exclusions) as well
+  as the start page.
+- **Cause:** startDevServer passes `optimizeDeps.entries: [startPath]`, but Vite's mergeConfig concatenates arrays, so
+  the root config's whole-checkout pattern came along. Each suite server scanned every page before its first load, and
+  one unresolvable import in any other page (an untracked local page, for example) failed the scan ("Failed to run
+  dependency scan"), which skips pre-bundling for the suite's own page.
+- **Fix:** the start-owner plugin sets the resolved `optimizeDeps.entries` to the start page alone, next to the watcher
+  setting it already overrides for the same reason. The root dev servers keep the root config. Regression:
+  tests/dev-server-watch.test.js ("a suite dev server scans only its start page").
+
 ### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
 
 - **Repro:** `node scripts/gpu-lock.mjs run --owner=lane-x -- node scripts/csp-check.mjs` exited 2 with
