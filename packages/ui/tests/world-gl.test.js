@@ -9,7 +9,7 @@ test('world-gl preserves panel identity and registers a raw WebGL2 draw without 
   const ui = makeUi(),
     panel = new WorldPanel(ui),
     renderer = new GlWorldPanels({ input: false });
-  renderer.setup({ backend: 'webgl2' });
+  renderer.setup({ sceneOf: () => undefined, backend: 'webgl2' });
   renderer.add(panel);
   const passes = [];
   renderer.registerPasses({ add: (p) => passes.push(p) });
@@ -27,7 +27,7 @@ test('world-gl static attach uses the engine plugin lifecycle', () => {
   const engine = {
     use: (p) => {
       plugin = p;
-      p.setup({ backend: 'webgl2' });
+      p.setup({ sceneOf: () => undefined, backend: 'webgl2' });
       return engine;
     },
   };

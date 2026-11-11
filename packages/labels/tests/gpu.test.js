@@ -96,9 +96,9 @@ test('depth conventions, invalid input, font changes, abort and atlas exhaustion
 
 test('attach waits for fonts, registers once, detaches and leaves no registration on abort', async () => {
   const plugins = new Map(), engine = {
-    use(layer) { assert.equal(loaded, true); plugins.set(layer.name, layer); layer.setup(this); },
+    use(layer) { if (!layer.name.startsWith('gpu-labels:attach:')) assert.equal(loaded, true); plugins.set(layer.name, layer); layer.setup(this); },
     sceneOf(layer) { return plugins.get(layer.name) === layer ? this : undefined; },
-    removePlugin(name) { const layer = plugins.get(name); plugins.delete(name); layer?.dispose(); },
+    removePlugin(name) { const layer = plugins.get(name); plugins.delete(name); layer?.dispose?.(); },
   };
   let loaded = false;
   const layer = await GPULabelLayer.attach(engine, { font: { ...font, async load() { loaded = true; } } });
@@ -109,4 +109,24 @@ test('attach waits for fonts, registers once, detaches and leaves no registratio
   const abort = new AbortController();
   await assert.rejects(GPULabelLayer.attach(engine, { font: { ...font, async load() { abort.abort(); } }, signal: abort.signal }), { name: 'AbortError' });
   assert.equal(plugins.size, 0);
+});
+
+test('attach joins the scene that was active when it was called, not the one active after the font loads', async () => {
+  const scenes = [], make = (name) => {
+    const scene = { name, plugins: new Map(), use(plugin) { this.plugins.set(plugin.name, plugin); plugin.setup?.(engine); },
+      removePlugin(key) { this.plugins.delete(key); } };
+    scenes.push(scene);
+    return scene;
+  };
+  const first = make('first'), second = make('second');
+  let active = first;
+  const engine = {
+    use(plugin) { active.use(plugin); },
+    sceneOf(plugin) { return scenes.find((scene) => scene.plugins.get(plugin.name) === plugin); },
+    removePlugin(name) { active.removePlugin(name); },
+  };
+  const pending = GPULabelLayer.attach(engine, { font: { ...font, async load() { active = second; } } });
+  const layer = await pending;
+  assert.equal(first.plugins.get(layer.name), layer);
+  assert.equal(second.plugins.size, 0);
 });

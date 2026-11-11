@@ -368,7 +368,7 @@ test('UiRenderer attaches the pointer, keyboard and mirror to the canvas and rem
     warn = console.warn;
   console.warn = () => {};
   try {
-    renderer.setup({ backend: 'webgl2', canvas });
+    renderer.setup({ sceneOf: () => undefined, backend: 'webgl2', canvas });
   } finally {
     console.warn = warn;
   }
@@ -380,7 +380,7 @@ test('UiRenderer attaches the pointer, keyboard and mirror to the canvas and rem
   const plain = new UiRenderer(ui, { mirror: false, input: false });
   console.warn = () => {};
   try {
-    plain.setup({ backend: 'webgl2', canvas });
+    plain.setup({ sceneOf: () => undefined, backend: 'webgl2', canvas });
   } finally {
     console.warn = warn;
   }

@@ -48,7 +48,7 @@ function setup() {
     warnings = [];
   console.warn = (...args) => warnings.push(args.join(' '));
   try {
-    renderer.setup({ backend: 'webgl2', canvas: { clientWidth: 640 } });
+    renderer.setup({ sceneOf: () => undefined, backend: 'webgl2', canvas: { clientWidth: 640 } });
   } finally {
     console.warn = warn;
   }
@@ -136,7 +136,7 @@ test('a lost WebGL2 context draws nothing; after a restore the painter is made a
   run(gl);
   assert.equal(gl.calls.slice(before).filter((c) => c[0] === 'drawArraysInstanced').length, 0, 'nothing drawn on a lost context');
   const fresh = fakeGl();
-  renderer.onDeviceRestored({ backend: 'webgl2', canvas: { clientWidth: 640 } });
+  renderer.onDeviceRestored({ sceneOf: () => undefined, backend: 'webgl2', canvas: { clientWidth: 640 } });
   run(fresh);
   assert.equal(fresh.calls.filter((c) => c[0] === 'linkProgram').length, 2, 'programs built on the new context');
   assert.ok(fresh.calls.some((c) => c[0] === 'drawArraysInstanced'));

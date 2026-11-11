@@ -183,6 +183,7 @@ export class UiRenderer implements EnginePlugin {
 
   /** Release every GPU resource, atlases included. The `Ui` is not disposed. */
   dispose(): void {
+    const engine = this.engine;
     this.disposed = true;
     this.detach?.();
     this.detach = undefined;
@@ -193,6 +194,8 @@ export class UiRenderer implements EnginePlugin {
     this.glPainter = this.gl = undefined;
     this.device = undefined;
     this.engine = undefined;
+    // Disposing directly also leaves the engine: a registered renderer without a device would run on the next frame.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol.for('Symbol.dispose')) as symbol](): void {

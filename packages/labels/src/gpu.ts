@@ -52,6 +52,8 @@ interface Shape {
   bounds: number[];
 }
 
+let attachSerial = 0;
+
 /**
  * Screen-constant, SDF label layer with one instanced draw across all labels and atlas pages.
  * Create asynchronously, then attach with engine.use(layer). No DOM elements per point.
@@ -59,10 +61,21 @@ interface Shape {
 export class GPULabelLayer implements EnginePlugin {
   /** Loads the font and registers the layer. Default options match create(). */
   static async attach(engine: EngineKernel, options: GPULabelOptions = {}): Promise<GPULabelLayer> {
+    // Snapshot the active scene before the load yields: the layer joins the scene attach was called for.
+    const runtime = engine as Engine;
+    let scene: ReturnType<Engine['sceneOf']>;
+    const scope: EnginePlugin = {
+      name: 'gpu-labels:attach:' + attachSerial++,
+      setup() {
+        scene = runtime.sceneOf(scope);
+      },
+    };
+    runtime.use(scope);
+    scene!.removePlugin(scope.name);
     const layer = await GPULabelLayer.create(options);
     try {
       options.signal?.throwIfAborted();
-      engine.use(layer);
+      scene!.use(layer);
       return layer;
     } catch (error) {
       layer.dispose();

@@ -159,7 +159,7 @@ test('WorldPanels refuses the WebGL2 preview before installing input or taking o
   const plugin = new WorldPanels({ input: false }).add(panel);
   try {
     assert.throws(
-      () => plugin.setup({ backend: 'webgl2' }),
+      () => plugin.setup({ sceneOf: () => undefined, backend: 'webgl2' }),
       (error) => error.code === 'unsupported' && /https:\/\/margoengine.com\/errors#webgpu/.test(error.message),
     );
     let updated = 0;

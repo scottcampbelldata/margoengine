@@ -555,8 +555,11 @@ export class TextRenderer implements EnginePlugin {
 
   /** Releases every GPU resource, atlases included. Texts stay registered, so the plugin can be used again. */
   dispose(): void {
+    const engine = this.engine;
     this.releaseGpu(true);
     this.engine = undefined;
+    // Disposing directly also leaves the engine: a registered renderer without a device would run on the next frame.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

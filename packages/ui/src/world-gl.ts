@@ -282,6 +282,7 @@ export class GlWorldPanels extends BaseWorldPanels {
     this.setup(engine);
   }
   override dispose(): void {
+    const engine = this.glEngine;
     this.glDetach?.();
     this.glDetach = undefined;
     for (const p of this.glPanels.keys()) this.releaseGl(p);
@@ -292,6 +293,7 @@ export class GlWorldPanels extends BaseWorldPanels {
     this.glProgram = this.glVao = undefined;
     this.glDevice = this.glEngine = undefined;
     super.dispose();
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
 }
 function captureState(gl: WebGL2RenderingContext) {

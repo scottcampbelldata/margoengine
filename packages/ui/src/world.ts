@@ -694,6 +694,7 @@ export class WorldPanels implements EnginePlugin {
 
   /** Free every panel texture and detach the canvas listeners. The panels' `Ui`s are not disposed. */
   dispose(): void {
+    const engine = this.engine;
     this.detach?.();
     this.detach = undefined;
     this.cancel();
@@ -704,6 +705,8 @@ export class WorldPanels implements EnginePlugin {
     this.mipCache.clear();
     this.panels.clear();
     this.device = this.engine = undefined;
+    // Disposing directly also leaves the engine: a registered plugin without a device would run on the next frame.
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol.for('Symbol.dispose')) as symbol](): void {
