@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15091043,
+  "total": 15091322,
   "history": [
     {
       "date": "2026-10-24",
@@ -8507,6 +8507,12 @@
       "commit": "40e8245886",
       "reason": "cache batches miss writes (WebKit evictionReads), sprites snaps both edges (KB6013a), ui releases image atlas slots (KB4990b)",
       "grew": 7
+    },
+    {
+      "date": "2026-11-11",
+      "commit": "5179414773",
+      "reason": "compute/decomp 3579 to 3602 B gzip (budget 3835 to 3858): KB5588a coded MargoError with cause for a missing or corrupt decomp-kernel.wasm (c859962c92); the error path is the whole growth, a split would add a request for 23 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -8674,7 +8680,7 @@
     "@margoengine/compute/autodiff": 5845,
     "@margoengine/compute/autotune": 3791,
     "@margoengine/compute/cpu-wasm": 41443,
-    "@margoengine/compute/decomp": 3835,
+    "@margoengine/compute/decomp": 4114,
     "@margoengine/compute/distance": 5443,
     "@margoengine/compute/fft": 6037,
     "@margoengine/compute/frame": 32440,

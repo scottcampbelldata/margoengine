@@ -1,4 +1,5 @@
 import type { Font, TextLayout } from '@margoengine/text';
+import { rangeError } from '../../shared/errors.js';
 import type { Rgba } from './color.js';
 
 /** A filled and outlined rounded rectangle, in device pixels. */
@@ -77,11 +78,11 @@ export interface RectStyle {
 
 const CLEAR: Rgba = [0, 0, 0, 0];
 
-/** Throws a RangeError unless every value is finite: NaN passes every size test and would reach the GPU. */
+/** Throws a coded RangeError (help #ui) unless every value is finite: NaN passes every size test and would reach the GPU. */
 function finite(what: string, ...values: (number | undefined)[]): void {
   for (const value of values)
     if (value !== undefined && !Number.isFinite(value))
-      throw new RangeError(`DrawList ${what} must be finite; pass finite UI units, not ${value}`);
+      throw rangeError(`DrawList ${what} must be finite; pass finite UI units, not ${value}`, 'ui');
 }
 
 /**
@@ -103,7 +104,7 @@ export class DrawList {
   /** Empty the list and start a new version at `scale` pixels per UI unit. */
   clear(scale: number): void {
     if (!(scale > 0) || !Number.isFinite(scale))
-      throw new RangeError(`DrawList scale must be finite and above 0; pass device pixels per UI unit, not ${scale}`);
+      throw rangeError(`DrawList scale must be finite and above 0; pass device pixels per UI unit, not ${scale}`, 'ui');
     this.commands.length = 0;
     this.clips.length = 0;
     this.alpha = 1;
@@ -186,7 +187,7 @@ export class DrawList {
    * @throws RangeError when no clip is open: a stray popClip would end a clip its caller did not make.
    */
   popClip(): void {
-    if (!this.clips.pop()) throw new RangeError('DrawList popClip has no open clip; pass each pushClip one popClip');
+    if (!this.clips.pop()) throw rangeError('DrawList popClip has no open clip; pass each pushClip one popClip', 'ui');
     this.commands.push({ type: 'unclip' });
   }
 }
