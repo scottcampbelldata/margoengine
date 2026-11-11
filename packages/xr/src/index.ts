@@ -113,6 +113,22 @@ export async function createXREngine(
   return engine;
 }
 
+// The XRs on each device, told once when it is lost. A reaction on device.lost cannot be removed: one made per XR kept
+// every disposed XR on an engine's device alive as long as that device (docs/known-bugs.md). The one reaction, made
+// outside any XR's scope, holds the device and this set, which an XR leaves on dispose.
+const lostWatch = new WeakMap<GPUDevice, Set<XR>>();
+function watchLost(device: GPUDevice): Set<XR> {
+  let set = lostWatch.get(device);
+  if (!set) {
+    const live = (set = new Set());
+    lostWatch.set(device, live);
+    void device.lost.then((info) => {
+      for (const xr of [...live]) xr['lostDevice'](info);
+    });
+  }
+  return set;
+}
+
 /** WebGPU WebXR plugin: negotiates a session, tracks inputs and draws the scene in stereo. `using` or `dispose()` detaches it. */
 export class XR implements EnginePlugin {
   /** Plugin name, 'xr'. */
@@ -214,14 +230,15 @@ export class XR implements EnginePlugin {
   ) {
     this.route = shared ? 'engine' : 'separate';
     if (!shared) this.renderer = new StereoRenderer(device);
-    device.lost.then((info) => {
-      if (!this.disposed) {
-        this.lost = true;
-        this.fail(new MargoError('failed', `XR GPU device lost: ${info.message}; create a new XR with XR.create.`));
-      }
-    });
+    watchLost(device).add(this);
     // The engine reports its own device's errors; a device of XR's own reports here.
     if (!shared) device.addEventListener('uncapturederror', this.uncaptured);
+  }
+  /** Its device was lost (one reaction per device, called by `watchLost`). */
+  private lostDevice(info: GPUDeviceLostInfo): void {
+    if (this.disposed) return;
+    this.lost = true;
+    this.fail(new MargoError('failed', `XR GPU device lost: ${info.message}; create a new XR with XR.create.`));
   }
   setup(engine: Engine): void {
     this.engine = engine;
@@ -507,6 +524,7 @@ export class XR implements EnginePlugin {
     const session = this.session;
     this.ended();
     this.device.removeEventListener('uncapturederror', this.uncaptured);
+    lostWatch.get(this.device)?.delete(this);
     // The engine's own device stays with the engine.
     if (this.route === 'separate') this.device.destroy();
     if (session) void session.end().catch((error) => this.engine.onError(error));

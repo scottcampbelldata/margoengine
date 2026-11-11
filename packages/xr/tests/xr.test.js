@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
+import { setImmediate } from 'node:timers/promises';
 import { Engine, TransformStore, box, FrameGraph } from '@margoengine/core/extension';
 import { wgsl } from '../../core/dist/shaders.js';
 import { XR, XRManager, XRController, useXRSession, createXREngine } from '../dist/index.js';
@@ -881,3 +884,29 @@ test('disposing XR in an eye hook stops later hooks and GPU submission', async (
   assert.deepEqual(seen,['dispose']);assert.deepEqual(f.errors,[]);
 });
 test('framebuffer scale reaches native layer creation and rejects invalid values before negotiation',async t=>{const f=await fixture(t),xr=await XR.create(f.engine);for(const framebufferScale of [0,-1,NaN,Infinity,1e308,1e-100])await assert.rejects(xr.requestSession('immersive-vr',{framebufferScale}),RangeError);assert.equal(f.requests.length,0);await xr.requestSession('immersive-vr',{framebufferScale:.625});assert.equal(xr.projectionLayer.init.scaleFactor,.625);await xr.end();assert.equal(xr.projectionLayer,undefined);});
+
+// A reaction on device.lost cannot be removed: one made per XR kept every disposed XR on the engine's device alive as long
+// as the device (docs/known-bugs.md). The device now has one reaction over the XRs still on it.
+test('a disposed XR is collected while its engine device lives; a live one still fails when it is lost', async (t) => {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc');
+  try {
+    const f = await fixture(t);
+    const reference = await (async () => {
+      const xr = await XR.create(f.engine);
+      xr.dispose();
+      return new WeakRef(xr);
+    })();
+    for (let i = 0; i < 5 && reference.deref(); i++) {
+      await setImmediate();
+      gc();
+    }
+    assert.ok(reference.deref() === undefined, 'the disposed XR is still reachable from its live device');
+    const xr = await XR.create(f.engine);
+    f.lose();
+    await setImmediate();
+    await assert.rejects(xr.requestSession(), /lost/);
+  } finally {
+    setFlagsFromString('--no-expose-gc');
+  }
+});
