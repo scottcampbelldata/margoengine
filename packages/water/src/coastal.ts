@@ -64,7 +64,8 @@ const topology = `
 @group(0) @binding(1) var<storage,read_write> connected:array<atomic<u32>>;
 fn root(index:u32)->u32 {
  var p=index;
- loop {let next=atomicLoad(&connected[p]);if(next==p){return p;}atomicMin(&connected[p],atomicLoad(&connected[next]));p=next;}
+ loop {let next=atomicLoad(&connected[p]);if(next==p){break;}atomicMin(&connected[p],atomicLoad(&connected[next]));p=next;}
+ return p;
 }
 fn join(a:u32,b:u32){
  var x=a;var y=b;
