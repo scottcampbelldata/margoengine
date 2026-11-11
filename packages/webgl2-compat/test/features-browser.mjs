@@ -50,6 +50,33 @@ function differences(a, b, path = '', out = []) {
   return out;
 }
 
+/** Bits of the binary16 below (toward zero) and above a finite value inside the half range, exact in doubles. */
+function halfNeighbours(v) {
+  const a = Math.abs(v),
+    sign = v < 0 || Object.is(v, -0) ? 0x8000 : 0,
+    e = Math.max(Math.floor(Math.log2(a || 2 ** -24)), -14),
+    step = 2 ** (e - 10),
+    k = Math.floor(a / step);
+  // n steps above zero: a subnormal half below 2^-14, else exponent e (e + 1 when n reaches 2048).
+  const encode = (n) => (n * step < 2 ** -14 ? sign | n : sign | (((e + 15) << 10) + (n - 1024)));
+  return k * step === a ? [encode(k)] : [encode(k), encode(k + 1)];
+}
+
+/** Bits of the nearest binary16 of a finite value inside the half range, ties to even. */
+function nearestHalf(v) {
+  const [below, above] = halfNeighbours(v);
+  if (above === undefined) return below;
+  const value = (h) => {
+    const e = (h >> 10) & 31,
+      m = h & 1023;
+    return e ? (1 + m / 1024) * 2 ** (e - 15) : m * 2 ** -24;
+  };
+  const a = Math.abs(v),
+    down = a - value(below),
+    up = value(above) - a;
+  return down < up || (down === up && !(below & 1)) ? below : above;
+}
+
 /** The compressed-blend scope of each footprint case: linear-mip rows (with their probe) and nearest-mip sweeps. */
 const SCOPE = {
   implicitFootprint: (keys) => ({
@@ -98,6 +125,16 @@ try {
       assert.deepEqual(differences(rest(native.result), rest(compat.result)), [], `${name}: compat differs from native`);
       assert.deepEqual(compressedFailures(native.result, compat.result, scope), [], `${name}: compressed mip blend: not native's LOD through the driver's blend`);
       lines.push(`${name}: same LOD as native (nearest-mip sweeps), each blended texel the driver's own blend at it, the rest same as native`);
+    } else if (name === 'halfExport') {
+      // WGSL leaves an inexact narrowing to either neighbour, so native may store either half; the layer stores the
+      // nearest (ties to even) on every GPU, also where the driver's export truncates (Radeon 680M, ANGLE D3D11).
+      const { values } = compat.result;
+      assert.equal(values.length, 32, 'halfExport values');
+      assert.deepEqual(compat.result.halves, values.map(nearestHalf), 'halfExport: the layer stores the nearest half');
+      native.result.halves.forEach((h, i) =>
+        assert.ok(halfNeighbours(values[i]).includes(h), `halfExport native ${values[i]}: ${h} is neither neighbour`),
+      );
+      lines.push(`${name}: the layer stores the nearest half of each value, native one of the two neighbours`);
     } else {
       const diff = differences(native.result, compat.result);
       assert.deepEqual(diff, [], `${name}: compat differs from native`);

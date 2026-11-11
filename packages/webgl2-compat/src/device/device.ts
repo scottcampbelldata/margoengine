@@ -10,6 +10,7 @@ import { extensions, type Extensions, GLObjects, GLState } from './gl.js';
 import { fence, fenceDone, nextGPUTask } from './tasks.js';
 import { ExternalCopies } from './externals.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
+import { exportTruncatesHalf } from './half-export.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
   CompatBindGroup,
@@ -190,7 +191,7 @@ export class CompatGPU {
       return Promise.resolve(null);
     }
     const formats = caps.tier === 'full' ? undefined : (await import('../tiers.js')).tierFormats(caps.tier);
-    return new CompatAdapter(gl, caps, budget, formats);
+    return new CompatAdapter(gl, caps, budget, formats, !formats && exportTruncatesHalf(gl));
   }
 
   /** The canvas format the layer renders fastest: WebGL2 stores rgba. */
@@ -214,6 +215,11 @@ export class CompatAdapter {
     readonly cpuWorkBudget = CPU_WORK_BUDGET,
     /** @internal Lower-tier target selection, loaded only for a lower-tier adapter. */
     readonly tierFormats?: TierFormats,
+    /**
+     * @internal True when this GPU's colour export truncates float32 to binary16 (device/half-export.ts): render
+     * pipelines then round their narrowed outputs to the nearest half in the shader.
+     */
+    readonly halfExportRounding = false,
   ) {
     this.features = featuresOf(capabilities);
     this.limits = Object.freeze(limitsOf(capabilities));

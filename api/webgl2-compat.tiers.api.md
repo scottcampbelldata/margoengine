@@ -113,6 +113,7 @@ class CompatAdapter {
     readonly capabilities: WebGL2Capabilities;
     readonly cpuWorkBudget: number;
     readonly tierFormats?: TierFormats | undefined;
+    readonly halfExportRounding: boolean;
     readonly features: ReadonlySet<string>;
     readonly limits: Readonly<Record<string, number>>;
     readonly info: {
@@ -124,7 +125,8 @@ class CompatAdapter {
     readonly isFallbackAdapter = false;
     constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities,
     cpuWorkBudget?: number,
-    tierFormats?: TierFormats | undefined);
+    tierFormats?: TierFormats | undefined,
+    halfExportRounding?: boolean);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;
 }
 

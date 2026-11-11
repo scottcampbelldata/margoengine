@@ -519,6 +519,34 @@ Fixed 2026-11-11 (bug sweep L6b): a gate step's time limit counted time queued f
 with ERR_GPU_COMMAND_NOT_GPU and those suites could not take a slot. A GPU word in any part of a test script's name now
 makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a GPU word in a later part of their name").
 
+### Fixed 2026-11-11: Radeon 680M, every draw's colour export truncates to binary16 on the WebGL2 layer (list 5 R6 rows 28, 29)
+
+- **What:** on the Beelink (Radeon 680M, driver 32.0.21030.2001, Chrome, ANGLE D3D11), `environment`
+  `test:gpu:fog-all` under `MARGO_COMPAT=1` found `fog.enabled = false` differing from no fog in 55 VFX pixels by one
+  binary16 step (max 2^-11, at 4x and 1x) and in the 8-bit canvas variants; `sky` `browser-check.mjs` found the full
+  Sky and the narrow Sky 8 afterlight pixels apart (max 2^-11). Native WebGPU passes both.
+- **Repro (raw WebGL2, no Margo code):** a fragment shader writes uniform floats into a 1 x n RGBA16F target. One
+  float32 step under a half (0.49999997, 0.99999994, 0.24609374) stores the half below (0.49975586, 0.99951172,
+  0.24597168), with or without blending; a value just over a half midpoint stores the half below too, so the export
+  rounds toward zero. `packHalf2x16` truncates the same way, and an RGBA8 target gets the truncated half before its
+  UNORM rounding (row 25). In fog-all the disabled-fog program stores 0.24609375 where the unfogged program stores
+  the half below; rounded to the nearest both store 0.24609375, so the two float32 colours (two texts, equal in exact
+  arithmetic, compiled apart by a rounding) sit on either side of that half, and truncation makes the gap a whole step.
+- **Cause:** below Margo: the driver narrows every colour export by truncation. WGSL lets an inexact conversion to a
+  narrower float take either neighbour, so this is within the spec, but on this GPU it turns any one-ulp difference
+  under a half step into a visible one, where round to nearest (native WebGPU here, other GPUs under ANGLE) hides it.
+- **Fix (`packages/webgl2-compat/src/device/half-export.ts`):** the adapter probes once (one draw of 1 - 2^-24 into
+  RGBA16F, read back); where the export truncates, every render pipeline rounds its float outputs for 16-bit float
+  and 8-bit or 10-bit UNORM targets to the nearest binary16 (ties to even) after main, which the truncation then keeps
+  exactly. Other GPUs compile unchanged shaders. Regression: `features-browser.mjs` case `halfExport` (32 values off a
+  half step, the layer must store the nearest half, native one of the two neighbours; without the rounding the layer
+  stored the half below, 14335 for 0x3800 first) and `test/half-export.test.js` (which outputs are rounded, and the
+  shader's arithmetic against an exhaustive nearest-half search). fog-all then passes all 87 checks under compat.
+- **Left (row 29):** the sky afterlight comparison drops from 8 pixels at 2^-11 to 2 pixels at 2^-12. Those are two
+  float32 results a step apart that straddle a half midpoint, the shape of the ANGLE Metal meadow entry: two different
+  programs, rounded apart by the compiler, which round to nearest cannot hide. Reported to the manager; the test is
+  unchanged and stays red under `MARGO_COMPAT=1` on this machine.
+
 ### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
 
 - **Repro:** `node scripts/gpu-lock.mjs run --owner=lane-x -- node scripts/csp-check.mjs` exited 2 with

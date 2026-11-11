@@ -99,6 +99,8 @@ const sum = (counts) => Object.values(counts).reduce((a, b) => a + b, 0);
 
 test('every WebGL object the device makes is deleted by the device; destroy() leaves created equal to deleted', async () => {
   const { gl, device } = await recordingDevice();
+  // The adapter's startup probes (the binary16 export) delete their own objects before the device exists.
+  const probes = gl.deleted.length;
   device.createBuffer({ size: 256, usage: GPUBufferUsageLike.VERTEX | GPUBufferUsageLike.COPY_DST });
   device.createBuffer({ size: 64, usage: GPUBufferUsageLike.INDEX });
   device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: 0x14 });
@@ -111,7 +113,7 @@ test('every WebGL object the device makes is deleted by the device; destroy() le
   assert.equal(created.VertexArray, 2);
   device.destroy();
   assert.deepEqual({ ...device.glObjects.deleted }, { ...device.glObjects.created }, 'created == deleted after destroy');
-  assert.equal(gl.deleted.length, sum(deleted), 'each delete reached the context once');
+  assert.equal(gl.deleted.length - probes, sum(deleted), 'each delete reached the context once');
   assert.ok(kept.length);
 });
 

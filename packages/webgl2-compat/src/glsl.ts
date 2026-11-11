@@ -18,6 +18,8 @@ export type {
   GLSLVarying,
 } from './glsl/emit.js';
 export { encodeName as glslName, floatLiteral as glslFloat } from './glsl/emit.js';
+/** @internal The render pipelines' binary16 export rounding (device/half-export.ts), exported for its tests. */
+export { HALF_ROUND_GLSL, roundHalfExports } from './device/half-export.js';
 
 /** One stage of a pipeline to translate: a module (source or checked IR) and its entry point. */
 export interface TranslateStage {
