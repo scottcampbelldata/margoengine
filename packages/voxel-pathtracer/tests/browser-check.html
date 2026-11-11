@@ -941,12 +941,18 @@ window.check={
  async determinism(){
   look([18,14,26],[-3,3,-2]);
   const scene=scenes.materials();
+  let reads=0;
+  const make=device().createBuffer.bind(device());
+  device().createBuffer=(desc)=>{const buffer=make(desc);if(desc.label==='voxel-pathtracer census'){const map=buffer.mapAsync.bind(buffer);buffer.mapAsync=(...args)=>(reads++,map(...args));}return buffer;};
   return withTracer(scene,{},async(t)=>{
    // On the WebGL2 layer: the passes the layer replayed and its synchronous GPU reads (stalls) for the first render;
    // the route stops each part's path loop once a census read back says every path finished.
-   const d=device(),count=()=>({run:d.passes?.run,stalls:d.stalls}),delta=(x,y)=>({run:y.run-x.run,stalls:y.stalls-x.stalls});
+   // Census read-backs (each waits about a frame in the browser): the first render reads one after every window, a
+   // render after it reads its parts' censuses once, together (it runs each part for the iterations the one before
+   // needed); the second render's image must equal the first's bit for bit.
+   const d=device(),count=()=>({run:d.passes?.run,stalls:d.stalls,reads:reads}),delta=(x,y)=>({run:y.run-x.run,stalls:y.stalls-x.stalls,reads:y.reads-x.reads});
    const before=count();
-   const a=await t.renderImage({width:96,height:64,samples:16,seed:5}),after=count(),b=await t.renderImage({width:96,height:64,samples:16,seed:5}),c=await t.renderImage({width:96,height:64,samples:16,seed:6});
+   const a=await t.renderImage({width:96,height:64,samples:16,seed:5}),after=count(),b=await t.renderImage({width:96,height:64,samples:16,seed:5}),again=count(),c=await t.renderImage({width:96,height:64,samples:16,seed:6});
    let same=0,other=0;for(let i=0;i<a.color.length;i++){if(a.color[i]===b.color[i])same++;if(a.color[i]!==c.color[i])other++;}
    let passes;
    if(d.passes){
@@ -955,10 +961,10 @@ window.check={
     const w0=count(),whole=await t.renderImage({width:96,height:64,samples:16,seed:5}),w1=count();
     d.voxelTraceWholeLoop=false;
     let equal=0;for(let i=0;i<a.color.length;i++)if(Object.is(a.color[i],whole.color[i]))equal++;
-    passes={stopped:delta(before,after),whole:delta(w0,w1),equal};
+    passes={stopped:delta(before,after),horizon:delta(after,again),whole:delta(w0,w1),equal};
    }
    return {values:a.color.length,identical:same,differentWithOtherSeed:other,passes,errors:errors.splice(0)};
-  }).then(async(result)=>{
+  }).finally(()=>{device().createBuffer=make;}).then(async(result)=>{
    // On the WebGL2 layer a tracer made again with the same scene and options makes no GL program: the layer shares one
    // per GLSL and vertex layout, so a rebuild neither compiles nor leaves dead programs for the browser to delete.
    const objects=device().glObjects;

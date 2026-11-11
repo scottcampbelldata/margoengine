@@ -8,11 +8,11 @@
 // stops recording once every path of a part has finished. Every other kernel runs as it stands on the layer's own tiers.
 import { FRAME, TRACE } from './shaders.js';
 import { FLAG_SPLIT } from './layout.js';
-import { loopLimit, loopWindows, stagedTrace, type Stage, type StagedTrace } from './compat-staged.js';
+import { loopLimit, stagedTrace, type Stage, type StagedTrace } from './compat-staged.js';
 
 declare const GPUShaderStage: { FRAGMENT: number; COMPUTE: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number; COPY_SRC: number; COPY_DST: number };
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number; QUERY_RESOLVE: number };
 declare const GPUMapMode: { READ: number };
 
 /** Adds one dispatch's sums into the image buffers as `trace` does on WebGPU: a run's first samples replace them. */
@@ -59,13 +59,23 @@ export interface RouteKernel {
 
 const SUMS = 'rgba32float',
   STATE = 'rgba32uint',
-  // Paths a part of a dispatch traces at once: its state is 2 x 6 pages x 128 bytes a path (about 50 MB).
-  PART_PATHS = 1 << 15,
+  // Marks the paths every program skips (the census writes 1 where a path finished an iteration ago).
+  MARK = 'stencil8',
+  // Paths a part of a dispatch traces at once: its state is 2 x 6 pages x 128 bytes a path (about 200 MB). A program
+  // costs about 12 microseconds of GPU time and 7 of JavaScript whatever its size (RTX A6000, ANGLE Vulkan), so a part
+  // four times the 2^15 paths it had before draws a quarter of the programs for the same paths.
+  PART_PATHS = 1 << 17,
   // Uniform slots for the parts' places, reused in turn (a submission holds far fewer parts than this).
   PART_SLOTS = 4096,
   SLOT = 256,
-  // Censuses fall on multiples of this many iterations (loopWindows), one uniform slot each.
+  // Iterations a part runs between censuses (a submission each).
+  WINDOW = 8,
+  // Censuses fall on multiples of this many iterations (WINDOW, and the loop's limit), one uniform slot each.
   STEP = 4,
+  // Dispatches in a row whose paths all finished a window before the horizon that bring it down a window.
+  SHRINK = 4,
+  // Occlusion queries a set may hold (WebGPU's limit); a dispatch needing more reads a census after every window.
+  MAX_QUERIES = 4096,
   CENSUS_SLOTS = Math.ceil(loopLimit(64) / STEP) + 1;
 
 interface Pages {
@@ -81,6 +91,9 @@ interface Pages {
   groups: Map<number, GPUBindGroup>;
   /** The census's bind group per copy of page 0. */
   census: GPUBindGroup[];
+  /** 1 where a path has finished and both copies of its pages hold its final state: no program draws there. */
+  mark: GPUTexture;
+  markView: GPUTextureView;
 }
 
 /** Four rgba32float targets of a size: `finish` reads one set and draws into another, the add kernel reads them. */
@@ -110,10 +123,18 @@ export class TraceRoute {
   readonly #censusModule: GPUShaderModule;
   /** The census's iteration per slot. */
   readonly #censusK: GPUBuffer;
-  /** The census's result, read back between windows (mapAsync: the CPU waits for it without stalling the GPU). */
-  readonly #readback: GPUBuffer;
-  readonly #censusTarget: GPUTexture;
-  #census: GPURenderPipeline | undefined;
+  /** Census results, read back with mapAsync (the CPU waits for them without stalling the GPU). */
+  #readback: GPUBuffer;
+  /** The occlusion query counting a census's unmarked paths, and the buffer it resolves into. */
+  #queries: GPUQuerySet;
+  #resolved: GPUBuffer;
+  /**
+   * Per maxBounces, the iterations each part of a dispatch runs before its census is checked, and how many dispatches
+   * in a row had every path finished a window earlier (SHRINK of them take the horizon a window lower).
+   */
+  readonly #horizons = new Map<number, { iterations: number; early: number }>();
+  /** The census's two draws: the mark (stencil 1 where it passes) and the count of the paths left unmarked. */
+  #census: { mark: GPURenderPipeline; count: GPURenderPipeline } | undefined;
   #slot = 0;
   #add: Promise<GPUComputePipeline> | undefined;
   #addPipeline: GPUComputePipeline | undefined;
@@ -191,7 +212,6 @@ export class TraceRoute {
       entries: [
         { binding: 0, visibility: F, texture: { sampleType: 'uint' as const, viewDimension: '2d-array' as const } },
         { binding: 1, visibility: F, buffer: { type: 'uniform' as const, hasDynamicOffset: true } },
-        { binding: 2, visibility: F, buffer: { type: 'uniform' as const, hasDynamicOffset: true } },
       ],
     });
     this.#censusModule = device.createShaderModule({ code: this.#staged.census });
@@ -201,14 +221,14 @@ export class TraceRoute {
     device.queue.writeBuffer(this.#censusK, 0, ks);
     this.#readback = device.createBuffer({
       label: 'voxel-pathtracer census',
-      size: 16,
+      size: 8,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     });
-    this.#censusTarget = device.createTexture({
-      label: 'voxel-pathtracer census',
-      size: [1, 1],
-      format: STATE,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    this.#queries = device.createQuerySet({ label: 'voxel-pathtracer census', type: 'occlusion', count: 1 });
+    this.#resolved = device.createBuffer({
+      label: 'voxel-pathtracer census query',
+      size: 8,
+      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
     });
   }
 
@@ -220,7 +240,14 @@ export class TraceRoute {
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.#addLayout, this.#sumsLayout] }),
       compute: { module: device.createShaderModule({ code: ADD }), entryPoint: 'add' },
     });
-    const stages = Object.keys(this.#modules) as Stage[],
+    const skipMarked: GPUDepthStencilState = {
+        format: MARK,
+        stencilFront: { compare: 'equal' },
+        stencilBack: { compare: 'equal' },
+        stencilReadMask: 1,
+        stencilWriteMask: 0,
+      },
+      stages = Object.keys(this.#modules) as Stage[],
       pipelines = await Promise.all(
         stages.map((stage) => {
           const finish = stage === 'finish',
@@ -244,19 +271,66 @@ export class TraceRoute {
                 : Array.from({ length: 8 }, () => ({ format: STATE as GPUTextureFormat })),
               ...(tables ? { constants: { TABLES: 1 } } : {}),
             },
+            // Every program of the loop skips the marked paths; `start` (which clears the marks) and `finish` draw all.
+            ...(finish || stage === 'start' ? {} : { depthStencil: skipMarked }),
           });
         }),
       ),
       add = await this.#add;
     this.#addPipeline = add;
-    this.#census ??= await device.createRenderPipelineAsync({
-      label: 'voxel-pathtracer census',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [this.#censusLayout] }),
-      vertex: { module: this.#censusModule, entryPoint: 'fill' },
-      fragment: { module: this.#censusModule, entryPoint: 'census', targets: [{ format: STATE }] },
-    });
+    if (!this.#census) {
+      const layout = device.createPipelineLayout({ bindGroupLayouts: [this.#censusLayout] }),
+        vertex = { module: this.#censusModule, entryPoint: 'fill' },
+        [mark, count] = await Promise.all([
+          device.createRenderPipelineAsync({
+            label: 'voxel-pathtracer census',
+            layout,
+            vertex,
+            fragment: { module: this.#censusModule, entryPoint: 'census', targets: [] },
+            depthStencil: {
+              format: MARK,
+              stencilFront: { compare: 'always', passOp: 'replace' },
+              stencilBack: { compare: 'always', passOp: 'replace' },
+              stencilReadMask: 1,
+              stencilWriteMask: 1,
+            },
+          }),
+          device.createRenderPipelineAsync({
+            label: 'voxel-pathtracer census count',
+            layout,
+            vertex,
+            depthStencil: {
+              format: MARK,
+              stencilFront: { compare: 'equal' },
+              stencilBack: { compare: 'equal' },
+              stencilReadMask: 1,
+              stencilWriteMask: 0,
+            },
+          }),
+        ]);
+      this.#census = { mark, count };
+    }
     const all = Object.fromEntries(stages.map((s, i) => [s, pipelines[i]])) as Record<Stage, GPURenderPipeline>;
     return { sums: all.finish, stages: all };
+  }
+
+  // An occlusion query set of at least `count` queries, with the buffers its results go through.
+  #querySet(count: number): GPUQuerySet {
+    if (this.#queries.count >= count) return this.#queries;
+    const device = this.#device;
+    for (const o of [this.#queries, this.#resolved, this.#readback]) o.destroy();
+    this.#queries = device.createQuerySet({ label: 'voxel-pathtracer census', type: 'occlusion', count });
+    this.#resolved = device.createBuffer({
+      label: 'voxel-pathtracer census query',
+      size: count * 8,
+      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+    });
+    this.#readback = device.createBuffer({
+      label: 'voxel-pathtracer census',
+      size: count * 8,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+    return this.#queries;
   }
 
   // Four sums targets of at least `width` x `height`, made again when `held` is smaller.
@@ -299,6 +373,13 @@ export class TraceRoute {
       w = Math.max(width, held?.width ?? 0),
       h = Math.max(height, held?.height ?? 0);
     for (const t of held?.textures.flat() ?? []) t.destroy();
+    held?.mark.destroy();
+    const mark = device.createTexture({
+      label: 'voxel-pathtracer finished paths',
+      size: [w, h],
+      format: MARK,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
     const textures = [...Array(this.#staged.pages).keys()].map(() =>
       [0, 1].map(() =>
         device.createTexture({
@@ -328,10 +409,11 @@ export class TraceRoute {
           entries: [
             { binding: 0, resource: t.createView({ dimension: '2d-array' }) },
             { binding: 1, resource: { buffer: this.#censusK, size: 16 } },
-            { binding: 2, resource: { buffer: this.#parts, size: 32 } },
           ],
         }),
       ),
+      mark,
+      markView: mark.createView(),
     };
     return this.#pages;
   }
@@ -382,13 +464,20 @@ export class TraceRoute {
   /**
    * One dispatch of `trace`: `count` samples of `width` x `rows` pixels, the path loop run for `maxBounces` (the
    * frame's), in parts of at most PART_PATHS paths, the sums kept under `key`; with `add`, the last submission also
-   * adds them into the image buffers (otherwise `add` does that later). Each part runs its loop window by window
-   * (loopWindows): before every window but the first a census of the part is copied out and read back with mapAsync,
-   * so the CPU waits for the GPU without stalling it, and once every path has finished the part records no more
-   * iterations. A finished path's programs only copy its state from one copy of each page to the other, and the
-   * iteration after it finished has written every page (vertex writes them all), so both copies hold its final state:
-   * `finish` reads the same values as after the whole loop. `check` runs before each window and may throw to give up
-   * (an aborted render, a disposed tracer); runs wait for one another. Resolves once the last submission is made.
+   * adds them into the image buffers (otherwise `add` does that later). `check` runs between windows and may throw to
+   * give up (an aborted render, a disposed tracer); runs wait for one another. Resolves once the last submission is
+   * made.
+   *
+   * Each part runs its loop WINDOW iterations at a time, a submission each. After every window a census marks, in a
+   * stencil, the paths that finished an iteration before: their programs only copy their state from one copy of each
+   * page to the other, and the iteration after a path finished has written every page (vertex writes them all), so
+   * both copies hold its final state, and every later program skips the marked paths by the stencil test without
+   * changing a value `finish` reads. Reading a census back takes the browser about a frame (WebGL2 makes query and
+   * fence results available only in a later task, measured at 15 ms in Chromium whatever the work), so the route does
+   * not wait for one per window: each part runs for the iterations the dispatch before needed (the horizon), every part
+   * back to back, and their last censuses are read together once all are submitted. A part with a path still running at
+   * the horizon makes the dispatch run again, reading a census after every window, which sets the horizon anew; the
+   * values are the same either way.
    */
   run(
     kernel: RouteKernel,
@@ -425,33 +514,104 @@ export class TraceRoute {
       if (this.#destroyed) throw new DOMException('The trace route was destroyed', 'AbortError');
     };
     live();
+    const limit = loopLimit(maxBounces),
+      // Test switch (browser-check's determinism case): every iteration of the loop recorded, as the loop without the
+      // early stop does, to prove the stop changes no value.
+      whole = (this.#device as unknown as { voxelTraceWholeLoop?: boolean }).voxelTraceWholeLoop === true,
+      dispatch = (adaptive: boolean, horizon: number) =>
+        this.#dispatch(kernel, inputs, width, rows, count, live, key, adaptive, horizon, limit);
+    if (whole) await dispatch(false, limit);
+    else {
+      const horizon = this.#horizons.get(maxBounces),
+        checked = horizon && (await dispatch(false, horizon.iterations));
+      if (!checked) {
+        // No horizon yet, or a path was still running at it: again, reading a census after every window.
+        const needed = (await dispatch(true, limit)) as { iterations: number };
+        this.#horizons.set(maxBounces, { iterations: needed.iterations, early: 0 });
+      } else if (horizon) {
+        const early = checked.early ? horizon.early + 1 : 0;
+        this.#horizons.set(
+          maxBounces,
+          early >= SHRINK ? { iterations: horizon.iterations - WINDOW, early: 0 } : { iterations: horizon.iterations, early },
+        );
+      }
+    }
+    if (add) {
+      const e = this.#device.createCommandEncoder({ label: 'voxel-pathtracer add' });
+      this.add(e, inputs, width, rows, key);
+      this.#device.queue.submit([e.finish()]);
+    }
+  }
+
+  /**
+   * Submits the dispatch's parts, each for at most `horizon` iterations. `adaptive`: after every window the census is
+   * read back (it goes to the GPU in its own submission, ahead of the window after it, and is read while that window
+   * runs) and the part stops at the first census that finds every path finished. Otherwise each part runs to the
+   * horizon, and the censuses at its last two window bounds are read once every part is submitted. Resolves to the
+   * horizon for the next dispatch (adaptive: the latest census point at which a part's paths had all finished, plus a
+   * window) and whether every part had finished a window early, or to undefined when a part still had a path running
+   * at `horizon` short of the loop's `limit`: its sums are not the loop's, and the dispatch must run again.
+   */
+  async #dispatch(
+    kernel: RouteKernel,
+    inputs: TraceInputs,
+    width: number,
+    rows: number,
+    count: number,
+    live: () => void,
+    key: number | string,
+    asked: boolean,
+    horizon: number,
+    limit: number,
+  ): Promise<{ iterations: number; early: boolean } | undefined> {
     const device = this.#device,
       staged = this.#staged,
       sums = this.#sumsTargets(this.#sums.get(key), width, rows),
       scratch = (this.#scratch = this.#sumsTargets(this.#scratch, width, rows)),
       groups = this.#bound(inputs),
       maxSide = device.limits.maxTextureDimension2D,
+      window = WINDOW,
       partRows = Math.max(1, Math.min(rows, Math.floor(PART_PATHS / width))),
       perPart = Math.max(1, Math.min(count, Math.floor(PART_PATHS / (width * partRows)))),
       sx = Math.max(1, Math.min(perPart, Math.floor(maxSide / width))),
       sy = Math.ceil(perPart / sx),
       pages = this.#paged(width * sx, partRows * sy),
-      windows = loopWindows(loopLimit(maxBounces)),
-      // Test switch (browser-check's determinism case): record every window whatever the census says, as the loop
-      // without the early stop does, to prove the stop changes no value.
-      whole = (device as unknown as { voxelTraceWholeLoop?: boolean }).voxelTraceWholeLoop === true,
+      parts = Math.ceil(rows / partRows) * Math.ceil(count / perPart),
+      // Short of the loop's limit, a part run to the horizon counts the paths left at its last two window bounds.
+      // More parts than a query set holds cannot count them, so they read their censuses as they go up to the loop's
+      // limit: stopping them at the horizon would cut paths still running there.
+      unchecked = horizon < limit && 2 * parts > MAX_QUERIES,
+      adaptive = asked || unchecked,
+      counting = !adaptive && horizon < limit,
+      // Adaptive: one census in flight. Otherwise two a part.
+      queries = this.#querySet(counting ? 2 * parts : 1),
       current = new Array<number>(staged.pages).fill(0),
       mask = () => current.reduce((m, c, p) => m | (c << p), 0);
+    if (unchecked) horizon = limit;
     this.#sums.set(key, sums);
-    let encoder: GPUCommandEncoder | undefined;
+    let encoder: GPUCommandEncoder | undefined,
+      part = 0,
+      // Adaptive: the latest census point at which a part had finished. Otherwise: the census point before the horizon.
+      needed = 0;
     const record = () => (encoder ??= device.createCommandEncoder({ label: 'voxel-pathtracer trace' })),
       submit = () => {
         if (encoder) device.queue.submit([encoder.finish()]);
         encoder = undefined;
+      },
+      // Whether any path was left at each of the first `n` queries (resolved, copied out and read with mapAsync).
+      read = async (n: number): Promise<boolean[]> => {
+        const e = record();
+        e.resolveQuerySet(queries, 0, n, this.#resolved, 0);
+        e.copyBufferToBuffer(this.#resolved, 0, this.#readback, 0, n * 8);
+        submit();
+        await this.#readback.mapAsync(GPUMapMode.READ, 0, n * 8);
+        const words = new Uint32Array(this.#readback.getMappedRange(0, n * 8).slice(0));
+        this.#readback.unmap();
+        return Array.from({ length: n }, (_, i) => (words[2 * i] | words[2 * i + 1]) !== 0);
       };
     for (let row0 = 0; row0 < rows; row0 += partRows) {
       const h = Math.min(partRows, rows - row0);
-      for (let s0 = 0; s0 < count; s0 += perPart) {
+      for (let s0 = 0; s0 < count; s0 += perPart, part++) {
         const n = Math.min(perPart, count - s0),
           slot = this.#slot,
           vw = width * Math.min(n, sx),
@@ -459,7 +619,8 @@ export class TraceRoute {
         this.#slot = (slot + 1) % PART_SLOTS;
         device.queue.writeBuffer(this.#parts, slot * SLOT, new Uint32Array([sx, s0, row0, h, n, vw, vh, 0]));
         const run = (stage: Stage, q = 0) => {
-          const read = this.#pageGroup(pages, mask());
+          const read = this.#pageGroup(pages, mask()),
+            loop = stage !== 'start';
           for (const page of staged.writes[stage]) {
             const pass = record().beginRenderPass({
               label: `voxel-pathtracer ${stage}`,
@@ -468,6 +629,7 @@ export class TraceRoute {
                 loadOp: 'load' as const,
                 storeOp: 'store' as const,
               })),
+              ...(loop ? { depthStencilAttachment: { view: pages.markView, stencilReadOnly: true } } : {}),
             });
             pass.setPipeline(kernel.stages[stage]);
             pass.setBindGroup(0, groups.draw);
@@ -481,31 +643,8 @@ export class TraceRoute {
           // A program reads the state before it, whichever pages it writes: flip them once all are written.
           for (const page of staged.writes[stage]) current[page] = 1 - current[page];
         };
-        run('start');
-        let it = 0;
-        for (const [j, iterations] of windows.entries()) {
-          if (j) {
-            // The census before iteration `it` (3 while a path has not finished before it, 0 once all have).
-            const e = record(),
-              pass = e.beginRenderPass({
-                label: 'voxel-pathtracer census',
-                colorAttachments: [
-                  { view: this.#censusTarget.createView(), loadOp: 'clear' as const, storeOp: 'store' as const },
-                ],
-              });
-            pass.setPipeline(this.#census as GPURenderPipeline);
-            pass.setBindGroup(0, pages.census[current[0]], [(it / STEP) * SLOT, slot * SLOT]);
-            pass.draw(3);
-            pass.end();
-            e.copyTextureToBuffer({ texture: this.#censusTarget }, { buffer: this.#readback }, [1, 1, 1]);
-            submit();
-            await this.#readback.mapAsync(GPUMapMode.READ, 0, 16);
-            const running = new Uint32Array(this.#readback.getMappedRange(0, 16))[0];
-            this.#readback.unmap();
-            live();
-            if (!running && !whole) break;
-          }
-          for (let k = 0; k < iterations; k++) {
+        const iterations = (count: number) => {
+          for (let k = 0; k < count; k++) {
             run('hit');
             run('vertex');
             run('surface');
@@ -516,8 +655,83 @@ export class TraceRoute {
             }
             run('post');
           }
-          it += iterations;
-        }
+        };
+        // The census before iteration `it`: marks the paths that finished an iteration before and, given a query,
+        // counts those left (an occlusion query, nonzero while any is).
+        const census = (it: number, query?: number) => {
+          const census = this.#census!,
+            pass = record().beginRenderPass({
+              label: 'voxel-pathtracer census',
+              colorAttachments: [],
+              depthStencilAttachment: { view: pages.markView, stencilLoadOp: 'load', stencilStoreOp: 'store' },
+              ...(query === undefined ? {} : { occlusionQuerySet: queries }),
+            });
+          pass.setViewport(0, 0, vw, vh, 0, 1);
+          pass.setScissorRect(0, 0, vw, vh);
+          pass.setBindGroup(0, pages.census[current[0]], [(it / STEP) * SLOT]);
+          pass.setPipeline(census.mark);
+          pass.setStencilReference(1);
+          pass.draw(3);
+          if (query !== undefined) {
+            pass.setPipeline(census.count);
+            pass.setStencilReference(0);
+            pass.beginOcclusionQuery(query);
+            pass.draw(3);
+            pass.endOcclusionQuery();
+          }
+          pass.end();
+        };
+        // A new part starts with no path marked.
+        record()
+          .beginRenderPass({
+            label: 'voxel-pathtracer marks',
+            colorAttachments: [],
+            depthStencilAttachment: {
+              view: pages.markView,
+              stencilClearValue: 0,
+              stencilLoadOp: 'clear',
+              stencilStoreOp: 'store',
+            },
+          })
+          .end();
+        run('start');
+        let it = Math.min(window, horizon);
+        iterations(it);
+        if (adaptive) {
+          let finished = false;
+          while (it < horizon) {
+            census(it, 0);
+            const at = it,
+              left = read(1),
+              more = Math.min(window, horizon - it);
+            // The window after the census runs while the census is read: when it finds every path finished, that
+            // window drew nothing (every path marked).
+            iterations(more);
+            it += more;
+            submit();
+            const running = (await left)[0];
+            live();
+            if (!running) {
+              needed = Math.max(needed, at);
+              finished = true;
+              break;
+            }
+          }
+          // A part that ran the whole loop needed all of it.
+          if (!finished) needed = horizon;
+        } else
+          for (;;) {
+            submit();
+            live();
+            if (it >= horizon) {
+              if (counting) census(it, 2 * part + 1);
+              break;
+            }
+            const more = Math.min(window, horizon - it);
+            census(it, counting && it + more >= horizon ? 2 * part : undefined);
+            iterations(more);
+            it += more;
+          }
         // The sums: this part's samples added to those of the parts before, read from `sums` and drawn into `scratch`.
         const e = record(),
           pass = e.beginRenderPass({
@@ -544,10 +758,21 @@ export class TraceRoute {
             { texture: sums.textures[k], origin: [0, row0, 0] },
             [width, h, 1],
           );
+        submit();
       }
     }
-    if (add) this.add(record(), inputs, width, rows, key);
-    submit();
+    if (adaptive) return { iterations: Math.min(limit, needed + window), early: false };
+    // A part run to the loop's limit always ends as the loop does.
+    if (!counting) return { iterations: horizon, early: false };
+    const left = await read(2 * parts);
+    live();
+    let early = true;
+    for (let i = 0; i < parts; i++) {
+      if (left[2 * i + 1]) return undefined;
+      if (left[2 * i]) early = false;
+    }
+    // Whether every part had finished a window early too (the horizon may come down a window).
+    return { iterations: horizon, early: early && horizon > window };
   }
 
   /** Adds the sums kept under `key` (a finished `run` of `width` x `rows` pixels) into the image buffers. */
@@ -566,6 +791,7 @@ export class TraceRoute {
     this.#destroyed = true;
     for (const t of [...this.#sums.values(), this.#scratch].flatMap((s) => s?.textures ?? [])) t.destroy();
     for (const t of this.#pages?.textures.flat() ?? []) t.destroy();
+    this.#pages?.mark.destroy();
     this.#sums.clear();
     this.#scratch = undefined;
     this.#pages = undefined;
@@ -573,6 +799,7 @@ export class TraceRoute {
     this.#parts.destroy();
     this.#censusK.destroy();
     this.#readback.destroy();
-    this.#censusTarget.destroy();
+    this.#resolved.destroy();
+    this.#queries.destroy();
   }
 }

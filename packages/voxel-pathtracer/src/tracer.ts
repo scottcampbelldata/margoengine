@@ -96,6 +96,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindingSize, in words
   TILE = 1024, // capture tile edge
+  COVERAGE_RAYS = 64, // a transparent capture's camera rays per pixel for alpha (8 x 8 strata in the kernel)
   APRON = 64, // capture tile margin while denoising (reach of five a-trous levels: 2 * (1 + 2 + 4 + 8 + 16) = 62)
   ATROUS = 5, // wavelet levels of the regular part (steps 1..16)
   CAUSTIC_LEVELS = 6, // and of the caustic part (steps 1..32)
@@ -251,6 +252,26 @@ interface View extends Targets {
 }
 
 let serial = 0;
+// Device loss, watched once per device for every tracer state on it. A reaction on `device.lost` cannot be taken
+// back, so one per tracer kept each disposed tracer, its GPU state and (on the WebGL2 layer) its buffers' CPU copies
+// reachable for as long as the device lived. The device's one reaction closes over this set only; a released state
+// leaves it.
+const lostWatch = new WeakMap<GPUDevice, { lost: boolean; states: Set<{ lost: boolean }> }>();
+const watchLost = (device: GPUDevice, state: { lost: boolean }) => {
+  let watch = lostWatch.get(device);
+  if (!watch) {
+    const w: { lost: boolean; states: Set<{ lost: boolean }> } = (watch = { lost: false, states: new Set() });
+    lostWatch.set(device, w);
+    void device.lost?.then(() => {
+      w.lost = true;
+      for (const s of w.states) s.lost = true;
+      w.states.clear();
+    });
+  }
+  if (watch.lost) state.lost = true;
+  else watch.states.add(state);
+};
+const unwatchLost = (device: GPUDevice, state: { lost: boolean }) => lostWatch.get(device)?.states.delete(state);
 // Khronos PBR Neutral tone mapper (Khronos specification, 2024), CPU twin of shared/display.js.
 const neutral = (c: number[]) => {
   const x = Math.min(c[0], c[1], c[2]),
@@ -890,9 +911,7 @@ export class VoxelPathTracer implements EnginePlugin {
     gpu.dummyRead = this.#buffer(gpu, 16, GPUBufferUsage.STORAGE);
     gpu.dummyHistory = [this.#texture(gpu, 1, 1), this.#texture(gpu, 1, 1)];
     gpu.capacity = 4;
-    void device.lost?.then(() => {
-      gpu.lost = true;
-    });
+    watchLost(device, gpu);
     this.#samples = 0;
     this.#epoch++;
     if (this.#status !== 'compiling') this.#newReady();
@@ -962,6 +981,7 @@ export class VoxelPathTracer implements EnginePlugin {
     const gpu = this.#gpu;
     if (!gpu) return;
     this.#gpu = undefined;
+    unwatchLost(gpu.device, gpu);
     gpu.routeReady?.destroy();
     for (const b of Object.values(gpu.buffers)) this.#destroy(b);
     this.#destroy(gpu.tables);
@@ -2057,7 +2077,8 @@ export class VoxelPathTracer implements EnginePlugin {
               frame,
               camera,
               [o.width, o.height, rx0, ry0],
-              [w, h, 0, 1],
+              // tile.w: the coverage kernel's rays per pixel (8 x 8 strata), a loop bound fxc cannot unroll.
+              [w, h, 0, COVERAGE_RAYS],
               o.seed,
               false,
               targets.caustics !== undefined,

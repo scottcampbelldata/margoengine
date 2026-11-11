@@ -34,31 +34,16 @@ export interface StagedTrace {
   /** Light kinds a sample runs `sample`, `shadow` and `gather` for (kinds past the shader's bound do nothing). */
   readonly kinds: number;
   /**
-   * The census program: one fragment whose first word is 3 while a path of the part has not finished before iteration
-   * `k` began, and 0 once every one has (compat.ts reads it back and stops the part's loop there).
+   * The census program: a fragment per path that passes (is not discarded) once the path finished before iteration
+   * `k - 1` began, so both copies of every page hold its final state. compat.ts draws it with stencil writes to mark
+   * those paths, which every later program then skips by the stencil test, and counts the paths left unmarked with an
+   * occlusion query to stop the part's loop once none is.
    */
   readonly census: string;
 }
 
 /** Iterations of the path loop for `maxBounces` (its `limit`, which the generator checks against the shader). */
 export const loopLimit = (maxBounces: number): number => maxBounces * 4 + 16 + (maxBounces + 1) * 16;
-
-/**
- * The path loop's iterations in windows, in order: 4, 4, 8, 16, 32, then 64 at a time (the last one shorter). Before
- * every window but the first the route reads its census back and stops once every path has finished (compat.ts), so a
- * part whose paths end early records few iterations, and one that runs the whole loop reads at most 24 censuses at 64
- * bounces. Every window but the last is a multiple of 4 iterations, so every census falls on one.
- */
-export function loopWindows(iterations: number): number[] {
-  const first = [4, 4, 8, 16, 32],
-    out: number[] = [];
-  for (let done = 0; done < iterations; ) {
-    const n = Math.min(first[out.length] ?? 64, iterations - done);
-    out.push(n);
-    done += n;
-  }
-  return out;
-}
 
 const LIMIT = 'let limit=f.config.x*4u+16u+(f.config.x+1u)*16u;';
 const RADIANCE = 'fn radiance(px:vec2u)->Path {';
@@ -599,19 +584,12 @@ ${unpackPath}${nonFields.map((d) => ` var ${d.name}:${d.type};\n`).join('')} ${S
     census = `@group(0) @binding(0) var zp0:texture_2d_array<u32>;
 struct ZCensus {k:u32,p0:u32,p1:u32,p2:u32}
 @group(0) @binding(1) var<uniform> zc:ZCensus;
-struct ZPart {sx:u32,s0:u32,row0:u32,rows:u32,n:u32,w:u32,h:u32,p2:u32}
-@group(0) @binding(2) var<uniform> zpart:ZPart;
 @vertex fn fill(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
  return vec4f(f32(i&1u)*4.0-1.0,f32(i>>1u)*4.0-1.0,0.0,1.0);
 }
-@fragment fn census()->@location(0) vec4u {
- for(var y=0u;y<zpart.h;y++){
-  for(var x=0u;x<zpart.w;x++){
-   let g=vec2i(vec2u(x,y));
-   if(${texel(word('z_fin'))}==0u||${texel(word('z_it'))}>=zc.k){return vec4u(3u,1u,0u,0u);}
-  }
- }
- return vec4u(0u,1u,0u,0u);
+@fragment fn census(@builtin(position) at:vec4f) {
+ let g=vec2i(at.xy);
+ if(${texel(word('z_fin'))}==0u||${texel(word('z_it'))}>=zc.k){discard;}
 }
 `;
   if (word('z_fin') >= 32 || word('z_it') >= 32) throw stale('the control words');

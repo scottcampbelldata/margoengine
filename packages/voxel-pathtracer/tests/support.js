@@ -14,6 +14,7 @@ Object.assign(globalThis, {
     UNIFORM: 64,
     STORAGE: 128,
     INDIRECT: 256,
+    QUERY_RESOLVE: 512,
   },
   GPUShaderStage: { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 },
   GPUMapMode: { READ: 1, WRITE: 2 },
@@ -99,6 +100,12 @@ export function fakeDevice({
     createShaderModule: (d) => ({ ...d, getCompilationInfo: async () => ({ messages: [] }) }),
     createComputePipelineAsync: async (d) => ({ ...d, kind: 'compute' }),
     createRenderPipelineAsync: async (d) => ({ ...d, kind: 'render' }),
+    querySets: [],
+    createQuerySet: (d) => {
+      const q = { ...d, destroyed: false, destroy: () => (q.destroyed = true) };
+      device.querySets.push(q);
+      return q;
+    },
     createBindGroup: (d) => {
       device.groups.push(d);
       for (const e of d.entries) {

@@ -1765,19 +1765,21 @@ fn radiance(px:vec2u)->Path {
 }
 
 // Transparent captures: the share of the pixel's camera rays (8 x 8 strata, through the lens and the shutter) that hit
-// the scene, into accum.w once the denoiser has read it.
+// the scene, into accum.w once the denoiser has read it. The host writes the 64 rays into f.tile.w: a loop bound the
+// compiler cannot see stays a loop on ANGLE Direct3D 11, where fxc unrolls a constant 64 around closest() and spends
+// more than 15 minutes compiling it (docs/known-bugs.md).
 @compute @workgroup_size(8,8) fn coverage(@builtin(global_invocation_id) gid:vec3u) {
  if(gid.x>=f.tile.x||gid.y>=f.tile.y){return;}
  let px=vec2u(gid.x+f.image.z,gid.y+f.image.w);
  var hits=0u;
- for(var s=0u;s<64u;s++){
+ for(var s=0u;s<f.tile.w;s++){
   rng=hash(((px.y*f.image.x+px.x)*0x9e3779b1u)^hash(s+hash(f.config.y)));
   motion=1.0;
   if((f.config.z&MOTION)!=0u){motion=1.0-f.weights.z*rand();}
   let ray=cameraRay(vec2f(px)+(vec2f(f32(s%8u),f32(s/8u))+vec2f(rand(),rand()))*0.125);
   if(dot(ray.d,ray.d)>0.0&&closest(ray.o,ray.d,0u,NONE).inst!=NONE){hits++;}
  }
- accum[gid.y*f.tile.x+gid.x].w=f32(hits)/64.0;
+ accum[gid.y*f.tile.x+gid.x].w=f32(hits)/f32(f.tile.w);
 }
 
 @compute @workgroup_size(8,8) fn ids(@builtin(global_invocation_id) gid:vec3u) {

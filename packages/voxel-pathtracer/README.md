@@ -502,27 +502,36 @@ then per loop iteration `hit`, `vertex`, `surface`, and `sample`, `shadow` and `
 `post`, and `finish`, which writes four `rgba32float` sums that a small kernel adds to the image. No program holds more
 than one traversal. Every statement runs once, in the same order and with the same random numbers; against the
 single-kernel route on ANGLE Vulkan, 345 of the 18,432 values of the `determinism` render differ, by 1 or 2 units in
-the last place (at most 2.0e-7 relative). The path's state lives between programs in `rgba32uint` pages, about 50 MB
-for a part of 32,768 paths. The CPU drives the loop: each part runs its iterations in windows of 4, 4, 8, 16, 32, then
-64, and before every window but the first a census of the part is read back with `mapAsync` (no synchronous GPU read);
-once every path of the part has finished, its remaining iterations are not recorded. Recording every window instead
-gives the same image bit for bit (`determinism`; `device.passes` in `@margoengine/webgl2-compat` counts the passes
-replayed). A tracer made again on the same device reuses the layer's compiled programs. The route is a lazy chunk
+the last place (at most 2.0e-7 relative). The path's state lives between programs in `rgba32uint` pages, about 200 MB
+for a part of 131,072 paths. The CPU drives the loop: each part runs 8 iterations a submission, and after each a
+census marks the paths that finished an iteration before in a stencil, which every later program tests, so finished
+paths cost no fragment work. A census is counted with an occlusion query; reading one back takes the browser about a
+frame (15 ms measured in Chromium, whatever the work), so only the first dispatch of a tracer reads one after every
+window; later dispatches run each part for the iterations the dispatch before needed and read all their parts' last
+censuses at once, and a part with a path still running there makes the dispatch run again the first way. Recording every
+iteration instead gives the same image bit for bit (`determinism`; `device.passes` in `@margoengine/webgl2-compat`
+counts the passes replayed). A tracer made again on the same device reuses the layer's compiled programs. The route is a lazy chunk
 (`src/compat.ts`) only the layer downloads, and the `trace` module stays the one source of the maths.
 
 Both ANGLE backends on Windows run it. On an RTX A6000 PC, ANGLE Direct3D 11 (the default) passes `npm run
-test:gpu:d3d11` (`traversal` 94.8 s, most of it the driver compiling the programs at their first draw; the 64-bounce,
-512-sample `analytic` furnace 124.1 s; `determinism` 1.9 s), with 18,432 of 18,432 values identical for the same seed,
-and ANGLE Vulkan runs the same rows (`analytic` 105.0 s). On this route the quick preview
+test:gpu:d3d11` (`traversal` 92.2 s, most of it the driver compiling the programs at their first draw; the 64-bounce,
+512-sample `analytic` furnace 31.6 s, 124.1 s before the stencil census; `determinism` 0.7 s), with 18,432 of 18,432
+values identical for the same seed, and ANGLE Vulkan runs the same rows. The whole `MARGO_COMPAT=1 npm run test:gpu`
+check (25 cases, 757 s of case time) passes on Direct3D 11 too: the `coverage` kernel of transparent renders takes its
+64-ray bound from the frame uniform, because with a constant bound around a traversal the driver's compiler unrolled the
+loop and its first compile never finished in 22 minutes; `transparent` now takes 89.4 s, most of it that compile, with
+the same image hashes as before. On this route the quick preview
 kernel is not compiled (on Direct3D 11 it took longer than the whole staged tracer), so frames show the raster image
 until `ready`. Disposing the engine while the programs still compile waits for the driver to finish the one it is on
-(29 s measured, `test:gpu:d3d11-dispose`); `docs/limits.md` has the numbers.
+(30.8 s measured, `test:gpu:d3d11-dispose`); `docs/limits.md` has the numbers.
 Frames before `ready` show the raster image, so nothing stops working in the meantime. In the viewport a frame starts a
 batch of `samplesPerFrame` samples that runs on its own and is added to the image (and counted in `stats.samples`) by
 the first frame after it lands; frames in between show the image as it was. Speed, diagnostic because other jobs ran:
-on ANGLE Vulkan a 320 x 240 batch of 4 samples took 820 to 930 ms, about 50 frames, set by the GPU work of the
-iterations, and a 1500 x 1100, 64-sample denoised capture 299.8 s (`docs/limits.md`). The single-program route this
-replaced, which never compiled on Direct3D 11, rendered that capture in 6.4 s against 2.3 s native and a 400 x 240
+on ANGLE Vulkan a 320 x 240 batch of 4 samples takes 123 to 135 ms after a tracer's first (357 ms), one census read a
+batch, against 894 to 979 ms and 46 reads before the stencil census (107 to 128 ms on Direct3D 11, against 930 ms); a
+1024 x 1024, 4-sample render 1.25 to 1.51 s against 9.2 to 9.3 s, the same image bit for bit (`docs/limits.md`). The
+single-program route this replaced, which never compiled on Direct3D 11, rendered a 1500 x 1100, 64-sample capture in
+6.4 s against 2.3 s native and a 400 x 240
 viewport frame in 24 ms against 9 ms.
 
 ## Captures, float images and picks

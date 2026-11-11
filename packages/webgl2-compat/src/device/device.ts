@@ -773,6 +773,9 @@ export class CompatQueue {
       }
       d.collect();
       d.flushPresents();
+      // WebGPU's submit hands the commands to the GPU; WebGL2 may hold them back until a later flush, so a query or
+      // copy submitted ahead of more work would only become available once that work finished too.
+      if (!d.destroyed) d.gl.flush();
     });
   }
 

@@ -5,6 +5,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inflateSync } from 'node:zlib';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
+import { setImmediate } from 'node:timers/promises';
 import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
@@ -681,6 +684,37 @@ test('a capture whose device is lost rejects with MargoError failed', async () =
   await settle();
   await assert.rejects(tracer.capture({ width: 8, height: 8, samples: 1 }), isMargo('failed'));
   tracer.dispose();
+});
+
+// Regression (2026-11-11): every tracer hung a reaction on its device's `lost` promise whose closure held the tracer
+// and its GPU state, so a disposed tracer, its buffers and (on the WebGL2 layer) their CPU copies lived as long as the
+// device. A page that made a tracer per check grew to 4.7 GB of JavaScript heap over 204 renders and stalled.
+test('a disposed tracer is collected while its device lives; a live tracer still sees the device lost', async () => {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc');
+  try {
+    const harness = fakeEngine(),
+      reference = await (async () => {
+        const h = await ready({}, harness);
+        h.frame();
+        await settle();
+        h.tracer.dispose();
+        return new WeakRef(h.tracer);
+      })();
+    for (let i = 0; i < 5 && reference.deref(); i++) {
+      await setImmediate();
+      gc();
+    }
+    assert.equal(reference.deref(), undefined, 'the disposed tracer is still reachable from its live device');
+    const { tracer, frame, device } = await ready({}, harness);
+    assert.ok(frame().length > 0, 'a live tracer draws');
+    device.lose();
+    await settle();
+    assert.deepEqual(frame(), [], 'after the device is lost the live tracer encodes nothing');
+    tracer.dispose();
+  } finally {
+    setFlagsFromString('--no-expose-gc');
+  }
 });
 
 test('the frame uniform carries the environment, lights and options the shader reads', async () => {

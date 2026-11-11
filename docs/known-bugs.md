@@ -38,6 +38,37 @@
   cascade near distance at a camera 13 cm from its target.
 - **Workaround in the guide:** scale a tiny model to a real size (loading-gltf.md, "The model is tiny or huge").
 
+### Per-object `device.lost` reactions keep disposed objects alive in several packages (found with the path tracer stall, 2026-11-11, open)
+
+- **Repro:** make and dispose an object below many times on one live device, then collect garbage: the disposed objects
+  stay reachable from the device's `lost` promise (a heap snapshot shows the path `GPUDevice.lost` -> PromiseReaction ->
+  closure context -> the object). `VoxelPathTracer` had the same defect and grew a test page to 4.7 GB of JavaScript heap
+  over 204 renders until it stalled; it now watches loss once per device (`packages/voxel-pathtracer/src/tracer.ts`,
+  test "a disposed tracer is collected while its device lives").
+- **Cause:** a reaction on `device.lost` cannot be removed, so a closure made per object (and the closure context it
+  shares with the object's other closures, which often holds `this`) lives as long as the device. Candidates read but not
+  yet measured: `packages/materials/src/built-material.ts` (per material and device, lines near 670, 897 and 1819),
+  `packages/toon/src/hatch-models.ts` (per model and device), `packages/xr/src/index.ts` (per XR),
+  `packages/inspector/src/textures.ts`, `packages/biomes/src/gpu-placement-flow-transport.ts` (per transport).
+  `packages/biomes/src/gpu.ts`, `packages/shader/src/compute.ts` and `packages/shared/frame-resources.js` already keep
+  one reaction per device.
+- **Fix to build:** one reaction per device over a set the objects leave on dispose (as biomes, shader and the path
+  tracer do), each with a collection test like the path tracer's.
+
+### Path tracer analytic furnace read low twice on the WebGL2 layer under a concurrent GPU load page (2026-11-10, open, not reproduced)
+
+- **Repro (not reproduced since):** `analytic` of `packages/voxel-pathtracer/tests/browser-check.mjs` on ANGLE Vulkan
+  while a second browser traced 1024 x 1024 viewport batches on the same RTX A6000 gave "clear glass" 0.8459 against 1
+  and "emissive media sigma 0.125" 9.83 against 10.11 once each, like paths cut short. The same case passed in 4 of 4
+  later loaded runs, in every full `MARGO_COMPAT=1 test:gpu` run on 2026-11-11 and alone; the failing logs were not kept.
+- **Cause:** not found. Ruled out by reading `packages/voxel-pathtracer/src/compat.ts`: renders and the viewport trace
+  share the route but run one after another; the learned horizon is checked by a census at the horizon in every part;
+  each occlusion query is held until its resolve reads it. Two flaws found on the way are fixed: dispatches of more than
+  2,048 parts were stopped at the horizon without that check (they now run adaptively to the loop's limit), and disposed
+  tracers were never collected (above), which put the page under heavy memory pressure. Still unchecked: the WebGL2
+  layer never reads `GL_OUT_OF_MEMORY`, so a texture or buffer the driver could not allocate would draw silently.
+- **Next:** rerun the loaded pair (`analytic` repeated beside a 1024 x 1024 viewport page) on the quiet machine with the
+  results kept; have the layer report `out-of-memory` from `gl.getError()` after its allocations.
 
 ### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
 
@@ -202,6 +233,18 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   before that, the preview-contract baker comparison failed on the A6000 (layer 134, native 133 at texel (3, 0)).
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
+
+### Fixed 2026-11-11: the path tracer's transparent render never compiled on Direct3D 11 (WebGL2 layer)
+
+- **Repro:** `transparent` of `packages/voxel-pathtracer/tests/browser-check.mjs` with `MARGO_COMPAT=1` on ANGLE
+  Direct3D 11, a fresh browser profile: the CPU sat in the driver's shader compiler with the GPU idle, and the case was
+  stopped at the 22 minute limit without finishing; the whole compat check never passed.
+- **Cause:** the `coverage` kernel in `packages/voxel-pathtracer/src/shaders.ts` looped a constant 64 times around a
+  traversal (`closest()`), and fxc unrolled it into 64 traversals.
+- **Fix:** the loop takes its bound from the frame uniform (`tile.w`, written as 64 by the tracer), so the program holds
+  one traversal; the same image hashes on WebGPU, and `transparent` passes in 89.4 s. Regression:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` ("layer-compiled kernels ... hold no constant-bound loop around
+  a traversal").
 
 ### Fixed 2026-11-10: weather machine stopped its schedule on a refused call and dropped time after 256 steps
 

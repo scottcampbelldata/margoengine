@@ -515,18 +515,23 @@ try {
     );
     assert.equal(r.identical, r.values);
     assert.ok(r.differentWithOtherSeed > r.values / 2);
-    // On the WebGL2 layer the route stops recording a part's path loop once a census read back finds every path
-    // finished, with no synchronous GPU read; the image is bit for bit the one of the whole loop (measured on ANGLE
-    // Vulkan, RTX A6000: 5,680 passes against 33,848, 0 stalls; the replay skip it replaces stalled 376 times).
+    // On the WebGL2 layer the route marks finished paths in a stencil (later programs skip them) and stops a part's
+    // path loop once a census finds every path finished, with no synchronous GPU read; the image is bit for bit the
+    // one of the whole loop. The first render reads a census after every window; the second (the same image, bit for
+    // bit) runs each part for the iterations the first needed and reads all its censuses at once: one read-back,
+    // where each window's read-back waited about a frame (pt-speed regression: 16 read-backs a render before).
     if (r.passes) {
-      const { stopped, whole, equal } = r.passes;
+      const { stopped, horizon, whole, equal } = r.passes;
       console.log(
-        `  layer passes: ${stopped.run} replayed (${whole.run} with the whole loop), stalls ${stopped.stalls} and ${whole.stalls}; ${equal}/${r.values} values equal`,
+        `  layer passes: ${stopped.run} replayed, ${horizon.run} on the horizon (${whole.run} with the whole loop), census read-backs ${stopped.reads} and ${horizon.reads}, stalls ${stopped.stalls}, ${horizon.stalls} and ${whole.stalls}; ${equal}/${r.values} values equal`,
       );
       assert.equal(equal, r.values, 'the early stop changes no value');
       assert.equal(stopped.stalls, 0, 'no synchronous GPU read');
+      assert.equal(horizon.stalls, 0, 'no synchronous GPU read on the horizon');
       assert.equal(whole.stalls, 0, 'no synchronous GPU read with the whole loop');
       assert.ok(stopped.run * 2 < whole.run, 'the stopped loop replays under half the passes');
+      assert.ok(horizon.run * 2 < whole.run, 'the loop on the horizon replays under half the passes');
+      assert.equal(horizon.reads, 1, 'a render on the horizon reads its censuses back once');
     }
     // Regression (lane FA, 2026-11-10): webgl2-compat made a new GL program for every pipeline of a rebuilt tracer and
     // left the old ones for the browser to delete at garbage collection, mid-render; on ANGLE Vulkan (NVIDIA 617.42)
