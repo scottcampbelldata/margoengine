@@ -6156,3 +6156,7 @@ cannot see it) and must fail through the sweeps. bias-browser.mjs (test:gpu:bias
 compressed, Vulkan linear and exact. Regression: blend-check.test.js (classification and the comparison on synthetic
 probes); on the Beelink features-browser.mjs passes with the self-test failing as required. No system or driver
 setting was changed (the AMD "Texture Filtering Quality" setting may control the compression; not tried).
+
+### Fixed: weather lens drops lost sub-cell precision far from the origin (2026-11-10)
+
+Repro: `node scripts/gpu-lock.mjs run --owner=weather -- node packages/weather/tests/parity-browser.mjs lens` on native WebGPU (RTX A6000) failed its unchanged 0.0001 CPU-oracle bound in the 2400 long-time cases at 0.000135468. Cause: the lens shader formed the full drop centre `(cell + offset) * spacing` before subtracting it from the sample, so f32 cancellation dropped the fractional offset bits. It now reduces the sample to its cell with `fma(-cell, spacing, q)` and subtracts only the fractional centre. Regression: the same parity run, native and `--compat`.

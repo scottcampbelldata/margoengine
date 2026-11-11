@@ -4860,3 +4860,7 @@ On the tested NVIDIA RTX A6000 / ANGLE D3D11, detaching the prior VAO element bi
 ### Batch 163 line work counts
 
 101 static line frames use one 112-byte frame upload. Independent butt/square segments without extensions use 6 vertices instead of 78, omitting only zero-area fan triangles. No timing or rival-speed claim. [Proof and scope](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).
+
+### Weather lens drop accuracy (2026-11-10)
+
+Lens drop cell-relative reduction passes the unchanged 4400 ordinary and 2400 long-time CPU-oracle cases on both backends; the long-time worst absolute error falls from a failing 0.000135 to 0.000051 native and 0.000053 compatibility. No assertion changed; no timing or all-input claim. Evidence: packages/weather/tests/parity-browser.mjs lens, with --compat; reproduce.md, "Weather lens".

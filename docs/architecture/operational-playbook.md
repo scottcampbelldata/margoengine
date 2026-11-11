@@ -2073,6 +2073,10 @@ buffer read by `firstInstance`, so the draws share one bind group. `Weather` rea
 changes. A one-thread compute step keeps the lens wetness on the GPU. Evidence: `features-check.mjs` weather-fx on a
 Radeon 680M at 4x and 1x. Missing: other GPUs, timing, cover finer than a texel.
 
+Lens drop precision (2026-11-10): the lens field reduces each sample to its own cell with `fma(-cell, spacing, q)` before
+forming the fractional drop centre, so f32 cancellation no longer drops sub-cell bits on large cell indices. Evidence:
+`parity-browser.mjs lens` native and `--compat`, long-time worst 0.000051 and 0.000053 under the unchanged 0.0001 bound.
+
 Sleet (`precipitation: 'sleet'`, 2026-11-07) is two `ParticleOverlay` draws in the weather's pass, rain then snow,
 each with its own uniform buffer (one uploaded buffer holds one draw's values within a submit) and the snow on its own
 hash seed, so the two never share spots. Evidence: `features-check.mjs` sleet on a Radeon 680M at 4x and 1x against

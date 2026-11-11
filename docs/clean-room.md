@@ -8721,3 +8721,7 @@ Batch 132 audit (lane N, 2026-11-10). "Read" means the page or specification tex
 ## Text bidi numbers (batch 132 audit, lane I, 2026-11-10)
 
 Read in full for this fix: Unicode Standard Annex #9, *Unicode Bidirectional Algorithm*, revision 52, https://www.unicode.org/reports/tr9/ (rules P2, W1 to W7, N0 to N2, I1 and I2, table 4 of bidirectional character types). `packages/text/src/layout.ts` now types European digits EN, Arabic-Indic digits and number signs AN, the separators ES and CS, terminators ET and Arabic-script letters AL from the first code point of a cluster, with the code point lists written from the annex's type descriptions and the Unicode character names (no bidi data file or other implementation read), then applies W2 to W7, N1 with numbers acting as R, and I1 and I2. Explicit embeddings, isolates and overrides (X1 to X10) are not implemented, and N0 stays the simplified bracket rule recorded before. tests/text.test.js holds the annex's own list example and four more cases.
+
+## Weather lens drop argument reduction (2026-11-10)
+
+Sources: Sylvie Boldo, Marc Daumas and Ren-Cang Li, *Formally Verified Argument Reduction with a Fused-Multiply-Add* (2007), https://arxiv.org/abs/0708.3722 ; W3C GPU for the Web Working Group, *WebGPU Shading Language* (2026), fma built-in, https://www.w3.org/TR/WGSL/#fma-builtin . The lens field reduces each sample to its own cell with one fma before forming the fractional drop centre, so the sub-cell bits survive large cell indices. No other implementation or companion code was read.

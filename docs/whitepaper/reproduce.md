@@ -4145,3 +4145,7 @@ After building packages, run scripts/material-wireframe-gpu-check.js with and wi
 ### Batch 163 line work counts
 
 See [the batch record](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work) for the build, deterministic work-count test, native/compat GPU commands and original-work controls. No benchmark runs are required.
+
+## Weather lens
+
+Build packages, then `node scripts/gpu-lock.mjs run --owner=weather-lens -- node packages/weather/tests/parity-browser.mjs lens` and the same with `--compat`. Both print the ordinary and long-time worst errors; each must stay at or below 0.0001.

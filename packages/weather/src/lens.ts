@@ -110,8 +110,10 @@ fn lens_field(p:vec2f,a:vec4f,b:vec4f)->vec3f {
    let c=cell+vec2f(f32(i),f32(j));let random=lens_lattice(c,n,k);
    let activation=smoothstep(random,random+0.12,a.x);
    let r=a.z*(0.55+0.45*lens_lattice(c,n,k+1u))*select(0.55,1.0,layer==1u);
-   let centre=(c+vec2f(0.2)+0.6*vec2f(lens_lattice(c,n,k+2u),lens_lattice(c+vec2f(17,0),n,k+2u)))*spacing;
-   let v=(q-centre)/r;let dome=max(0.0,1.0-dot(v,v));let head=smoothstep(0.0,0.18,dome);let length=b.y*4.0;
+   // Reduce to the cell before forming the sub-cell centre to retain its low bits.
+   let local=fma(-c,vec2f(spacing),q);
+   let centre=(vec2f(0.2)+0.6*vec2f(lens_lattice(c,n,k+2u),lens_lattice(c+vec2f(17,0),n,k+2u)))*spacing;
+   let v=(local-centre)/r;let dome=max(0.0,1.0-dot(v,v));let head=smoothstep(0.0,0.18,dome);let length=b.y*4.0;
    var trail=0.0;if(layer==1u&&v.y<0.0&&v.y> -1.0-length){trail=(1.0-smoothstep(0.08,0.22,abs(v.x)))*smoothstep(-1.0-length,-0.8-length,v.y);}
    result.x+=(v.x*sqrt(dome)*head+v.x*trail)*activation;result.y+=v.y*sqrt(dome)*head*activation;
    result.z=max(result.z,max(head,trail)*activation);
