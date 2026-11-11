@@ -33,8 +33,9 @@ export interface TerrainVirtualTextureOptions {
   /** Texels along each level's side: 256, 512, 1024, 2048 or 4096. Default 1024. */
   size?: number;
   /**
-   * Levels, 1 to 12. Level k's texels are 2^k texels of level 0 wide; ground past the coarsest level's reach (about
-   * `size * texel * 2^(levels - 2)` from the camera) draws with the terrain's own shader. Default 6.
+   * Levels, 1 to 12. Level k's texels are 2^k texels of level 0 wide. The coarsest level reaches `(size / 2 - 2) *
+   * texel * 2^(levels - 1)` from the camera (along X or Z, about `size * texel * 2^(levels - 2)`); over the outer 29% of
+   * that reach the cache fades into the terrain's own shader, which draws all ground past it. Default 6.
    */
   levels?: number;
   /**
@@ -118,7 +119,7 @@ fn terrainVirtualColor(position:vec3f,footprint:f32)->vec4f {
   let uv=position.xz/(e.z*e.w*exp2(a));
   var c=textureSampleLevel(terrainVirtualCache,terrainVirtualSampler,uv,i32(a),0.0).rgb;
   if(t>0.0){c=mix(c,textureSampleLevel(terrainVirtualCache,terrainVirtualSampler,uv*0.5,i32(a)+1,0.0).rgb,t);}
-  return vec4f(c,1.0-clamp((far-top)*2.0,0.0,1.0));
+  return vec4f(c,1.0-clamp((far-top-0.5)*2.0,0.0,1.0));
 }`;
   // A floating origin: the frame adds `map` (the terrain's origin and height offset, local) and `anchor` (xy: the shift
   // less the terrain's anchor, so local XZ plus it is world XZ less the anchor whatever the rebases, as the terrain's

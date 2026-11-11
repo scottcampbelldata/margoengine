@@ -585,7 +585,10 @@ roads on top, into a cache around the camera: clipmap levels of `size` texels, t
 twice as coarse, addressed toroidally, so a camera move bakes only the rows and columns it exposes and a still frame
 bakes nothing. The terrain's lit shader then reads its ground from the cache, one or two samples a pixel whatever the
 number of layers and decals, and draws with its own shader only where the cache does not reach or the ground is
-steeper than `steep` (the cache is baked top down). `declarations(group, binding)` and `entries(binding)` let any
+steeper than `steep` (the cache is baked top down). The coarsest level reaches `(size / 2 - 2) * texel *
+2^(levels - 1)` along X or Z (1,632 m at 1,024 texels of 5 cm and 7 levels); the cache fades into the terrain's own
+shader over the outer 29% of that reach (batch 132b, 2026-11-11: it used to fade from half the reach, so the outer half
+of the coarsest level was baked and never read). `declarations(group, binding)` and `entries(binding)` let any
 other material read the ground under it (`terrainVirtualColor(position, footprint)`), to blend a rock or a path into
 the terrain.
 
@@ -858,7 +861,9 @@ console.log(planet.altitude(engine.camera.position)); // metres above the ground
   4 px; `budget` 4 ms of patch building a frame (at least one patch; `Infinity` builds everything a view needs in one
   frame); `maxPatches` 2,048 on the GPU at once (about 24 KB each at resolution 32, so 50 MB; when every slot holds a
   patch the view uses, the planet keeps drawing the coarser parents where it wanted finer ones, never a hole, and
-  `stats.resident` equals `maxPatches`: raise it, up to 16,384, for more detail); `origin` a
+  `stats.resident` equals `maxPatches`: raise it, up to 16,384, for more detail; the patches share one vertex buffer
+  that must fit the device's `maxBufferSize`, 256 MiB by default, so 10,992 patches at resolution 32 and 2,992 at 64,
+  and `attach` throws `RangeError` past it, batch 132b); `origin` a
   `FloatingOrigin` to follow. Invalid values throw `RangeError` or `TypeError`.
 - Your own ground: `height(x, y, z, detail)` gets a unit direction from the centre (float64) and returns metres above
   `radius`; `detail` is the spacing of the vertices being built there, so a procedural height can skip finer detail.
@@ -1055,8 +1060,9 @@ engine.render({delta: 0});
   are skipped. A density that puts over 256 craters in one cell throws a `RangeError` that says to raise `dMin`.
 - `ridgeNoise({radius, relief, octaves, gain, frequency, seed})`: ridged multifractal noise between 0 and `relief`
   (Musgrave et al. 1989); defaults 8,000 m, 6 octaves, gain 2, 2 cycles around the planet.
-- `domainWarp(height, {radius, amplitude, frequency, levels, seed})`: reads `height` at positions shifted by up to
-  `amplitude` metres (default 100,000) by noise; `levels: 2` warps by a warped noise.
+- `domainWarp(height, {radius, amplitude, frequency, levels, seed})`: reads `height` at positions shifted by noise,
+  up to `amplitude` metres (default 100,000) along each axis, so up to sqrt(3) times it in all; `levels: 2` warps by a
+  warped noise, which moves a point no further.
 - `combine(heights, {mode, smooth})`: `'add'` (default), `'max'` or `'smoothMax'` (rounded joins, `smooth` 100 m).
 - `planetPreset('moon' | 'mars' | 'asteroid' | 'ice', {radius, seed})` and `planetPresetRadius(name)`: authored looks
   (numbers in [limits](../../docs/limits.md)), made for the body's own radius; pass the same `radius` to `PlanetTerrain`.

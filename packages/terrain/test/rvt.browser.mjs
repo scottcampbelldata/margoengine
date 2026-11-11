@@ -9,7 +9,7 @@
 // 3. a decal laid after the first frame shows red where it lies and nowhere else, and removing it restores the picture
 //    exactly; a road of decals draws too;
 // 4. another material reads the ground through `declarations` and `entries`: the decal's colour at its centre, no
-//    coverage past the cache.
+//    coverage past the cache, full coverage at 61% of the coarsest level's reach.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -292,14 +292,15 @@ await runSuite(
         },
         read: async (engine, rvt) => {
           const device = engine.gpu,
-            output = device.createBuffer({ size: 32, usage: 128 | 4 }),
-            readback = device.createBuffer({ size: 32, usage: 8 | 1 }),
+            output = device.createBuffer({ size: 48, usage: 128 | 4 }),
+            readback = device.createBuffer({ size: 48, usage: 8 | 1 }),
             module = device.createShaderModule({
               code: `${rvt.declarations(0, 0)}
-@group(0) @binding(3) var<storage,read_write> result:array<vec4f,2>;
+@group(0) @binding(3) var<storage,read_write> result:array<vec4f,3>;
 @compute @workgroup_size(1) fn main(){
   result[0]=terrainVirtualColor(vec3f(${spot[0]},0.0,${spot[1]}),0.05);
   result[1]=terrainVirtualColor(vec3f(${x0 + 30000},0.0,${z0}),0.05);
+  result[2]=terrainVirtualColor(vec3f(${x0 + 1000},0.0,${z0}),0.05);
 }`,
             }),
             pipeline = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } }),
@@ -313,7 +314,7 @@ await runSuite(
           pass.setBindGroup(0, group);
           pass.dispatchWorkgroups(1);
           pass.end();
-          encoder.copyBufferToBuffer(output, 0, readback, 0, 32);
+          encoder.copyBufferToBuffer(output, 0, readback, 0, 48);
           device.queue.submit([encoder.finish()]);
           await readback.mapAsync(1);
           const values = [...new Float32Array(readback.getMappedRange().slice(0))].map((v) => +v.toFixed(4));
@@ -340,6 +341,9 @@ await runSuite(
     const [cr, cg, cb, ca, , , , fa] = r.reader;
     assert.ok(Math.abs(cr - 1) < 0.02 && cg < 0.02 && cb < 0.02 && ca === 1, `the reader sees the decal: ${r.reader}`);
     assert.equal(fa, 0, 'no coverage past the cache');
+    // 1,000 m out is 61% of the coarsest level's reach ((512 - 2) * 0.05 * 2^6 = 1,632 m), inside the window it
+    // holds: full coverage. Before batch 132b the fade started at half the reach, and this read 0.42.
+    assert.equal(r.reader[11], 1, `the coarsest level covers its window: ${r.reader}`);
     await writeFile('test-results/terrain-rvt.json', JSON.stringify({ hardware, result }, null, 1));
     console.log('ok terrain rvt');
   },

@@ -224,3 +224,25 @@ test('a floating origin moves the planet with each rebase', () => {
   assert.equal(unsubscribed, 1);
   assert.throws(() => p.update(look([0, 0, 3 * R], [0, 0, 0]), [10, 10]), { name: 'MargoError', code: 'disposed' });
 });
+
+test("attach refuses patches whose vertex buffer passes the device's maxBufferSize (batch 132b)", () => {
+  // 16,384 patches of 65 x 65 vertices and skirts are 1.47 GB; before the check createBuffer only raised a GPU
+  // validation error and every later write and draw failed. A device with WebGPU's default 256 MiB limit:
+  const made = [];
+  const device = {
+    limits: { maxBufferSize: 268435456 },
+    createBuffer: (d) => (made.push(d.size), { size: d.size, destroy() {} }),
+    createBindGroupLayout: () => ({}),
+    createBindGroup: () => ({}),
+    queue: { writeBuffer() {} },
+  };
+  const engine = { gpu: device };
+  const big = new PlanetTerrain({ maxPatches: 16384, resolution: 64 });
+  assert.throws(() => big.setup(engine), /maxBufferSize \(268435456\); pass maxPatches at most 2992/);
+  assert.equal(big.owner, undefined);
+  assert.deepEqual(made, []);
+  const fits = new PlanetTerrain({ maxPatches: 2992, resolution: 64 });
+  fits.setup(engine);
+  assert.equal(made[0], 2992 * (65 * 65 + 4 * 65) * 20);
+  assert.ok(made[0] <= 268435456);
+});

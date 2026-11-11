@@ -201,7 +201,8 @@ test('domainWarp moves where the ground is read from by at most its amplitude, a
     assert.ok(Math.abs(same(x, y, z, 0) - base(x, y, z)) < 1e-9);
     const d = Math.abs(warped(x, y, z, 0) - base(x, y, z));
     if (d > 1) moved++;
-    // The slope of base is at most 1118 m per radian; two levels shift at most 2 * amplitude / radius radians.
+    // The slope of base is at most 1118 m per radian; each axis shifts at most amplitude / radius, so a point at most
+    // sqrt(3) * 0.05 = 0.087 radians at any level count (the bound below allows 0.1).
     assert.ok(d <= 1118 * 2 * 0.05 * 1.01 + 1e-6, `moved ${d}`);
   }
   assert.ok(moved > 2500);

@@ -68,7 +68,7 @@ export function ridgeNoise(options: RidgeNoiseOptions = {}): PlanetHeight {
 export interface DomainWarpOptions {
   /** Planet radius in metres, above 0. Default 6,371,000. */
   radius?: number;
-  /** Largest sideways shift of the ground in metres, 0 or more. Default 100,000. */
+  /** Largest shift of the ground along each axis in metres, 0 or more (sqrt(3) times it at most in all). Default 100,000. */
   amplitude?: number;
   /** Cycles of the warp around the planet's circumference, above 0. Default 8. */
   frequency?: number;
@@ -80,9 +80,10 @@ export interface DomainWarpOptions {
 
 /**
  * Reads `base` at positions moved sideways by noise, so straight features bend and craters stretch (Perlin and Hoffert
- * 1989). Heights are unchanged in size; only where they come from moves, by at most `amplitude` metres (twice with two
- * levels).
- * @throws RangeError on an invalid option.
+ * 1989). Heights are unchanged in size; only where they come from moves. Each axis moves by at most `amplitude`
+ * metres, so a point moves at most sqrt(3) times `amplitude`, with one level or two (the second level only reads the
+ * noise at the warped point).
+ * @throws TypeError on an invalid option.
  */
 export function domainWarp(base: PlanetHeight, options: DomainWarpOptions = {}): PlanetHeight {
   const { radius = 6371000, amplitude = 100000, frequency = 8, levels = 1, seed = 1 } = options;

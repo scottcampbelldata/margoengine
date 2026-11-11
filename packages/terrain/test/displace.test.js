@@ -19,7 +19,7 @@ const terrainOptions = (weights) => ({
     };
   },
 });
-function rig(weights, options = {}) {
+function rig(weights, options = {}, floating = false) {
   const gpu = mockGPU(),
     engine = {
       gpu: gpu.device,
@@ -28,7 +28,10 @@ function rig(weights, options = {}) {
       removePlugin() {},
       sceneOf: () => undefined,
     },
-    terrain = new Terrain(terrainOptions(weights)),
+    terrain = new Terrain({
+      ...terrainOptions(weights),
+      ...(floating ? { floatingOrigin: { origin: [0, 0, 0], onRebase: () => () => {} } } : {}),
+    }),
     materials = new TerrainMaterials(terrain, {
       textures: (device) => ({
         normals: device.createTexture({ size: [4, 4, 5], format: 'rgba8unorm', usage: 4 }),
@@ -126,4 +129,16 @@ test('shadows refuse surface maps that are not square and a power of two', () =>
     r.materials.setup(r.engine);
     assert.throws(() => r.displacement.setup(r.engine), /square, power-of-two/);
   }
+});
+
+test('with a floating origin every relief read takes the world phase, the self-shadow included (batch 132b)', () => {
+  const r = rig(false, {}, true),
+    code = r.displacement.shader(r.materials.shader(r.lit, 1), 1);
+  assert.ok(r.lit.includes('wrap:vec4f'), 'the rig has a floating origin');
+  const added = code.slice(0, code.indexOf('fn terrainDisplace(position'));
+  const reads = [...added.matchAll(/textureSample(?:Level|Grad)\(terrainPbrSurfaces,terrainSampler,([^,]+),/g)].map((m) => m[1]);
+  // terrainDisplaceRelief (the shadow's single-texel test and its start height) and terrainDisplaceHeight (the view ray).
+  assert.equal(reads.length, 2);
+  for (const uv of reads) assert.match(uv, /^\(xz\+layerRules\[layer\]\.wrap\.xz\)\*/, uv);
+  assert.match(added, /fract\(\(p\.xz\+layerRules\[layer\]\.wrap\.xz\)\*s\)/);
 });

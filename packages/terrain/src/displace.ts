@@ -356,6 +356,11 @@ export class TerrainDisplacement implements EnginePlugin, TerrainLighting {
           ? added
               .replace('fract(p.xz*s)', 'fract((p.xz+layerRules[layer].wrap.xz)*s)')
               .replace('xz*s,i32(layer)', '(xz+layerRules[layer].wrap.xz)*s,i32(layer)')
+              // The shadow's relief reads too (batch 132b: it read local XZ, so a rebase moved the self-shadow).
+              .replace(
+                'xz*layerRules[layer].params.x,i32(layer)',
+                '(xz+layerRules[layer].wrap.xz)*layerRules[layer].params.x,i32(layer)',
+              )
           : added) +
         source
           .replace(

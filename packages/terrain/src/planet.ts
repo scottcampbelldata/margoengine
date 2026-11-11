@@ -68,7 +68,11 @@ export interface PlanetTerrainOptions {
   screenError?: number;
   /** Milliseconds a frame may spend building patches, at least one patch a frame; 0 or more, Infinity for no limit. Default 4. */
   budget?: number;
-  /** Patches kept on the GPU at once, an integer 6 to 16,384 (about 24 KB each at resolution 32). Default 2,048. */
+  /**
+   * Patches kept on the GPU at once, an integer 6 to 16,384 (about 24 KB each at resolution 32). Default 2,048. They
+   * share one vertex buffer, which must fit the device's `maxBufferSize` (256 MiB unless the device asked for more):
+   * 10,992 patches at resolution 32, 2,992 at 64. `attach` throws RangeError past it.
+   */
   maxPatches?: number;
   /** A floating origin to follow: the planet's centre moves with each rebase. */
   origin?: PlanetOrigin;
@@ -712,13 +716,20 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
         this.#disposed ? 'disposed' : 'unsupported',
         'PlanetTerrain requires WebGPU and a live planet; attach a new PlanetTerrain to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
-    this.#engine = engine;
     this.#create(engine.gpu);
+    this.#engine = engine;
   }
 
   #create(device: GPUDevice): void {
+    const patch = this.#vertices * STRIDE,
+      limit = device.limits.maxBufferSize;
+    // Past the limit createBuffer only reports a validation error and every later write and draw fails.
+    if (this.maxPatches * patch > limit)
+      throw new RangeError(
+        `PlanetTerrain needs ${this.maxPatches * patch} bytes of patch vertices, above this device's maxBufferSize (${limit}); pass maxPatches at most ${Math.floor(limit / patch)} or a lower resolution`,
+      );
     this.#device = device;
-    this.#vertexBuffer = device.createBuffer({ size: this.maxPatches * this.#vertices * STRIDE, usage: 0x20 | 0x8 });
+    this.#vertexBuffer = device.createBuffer({ size: this.maxPatches * patch, usage: 0x20 | 0x8 });
     this.#instanceBuffer = device.createBuffer({ size: this.maxPatches * 16, usage: 0x20 | 0x8 });
     this.#indexBuffer = device.createBuffer({ size: Math.ceil(this.#indices.byteLength / 4) * 4, usage: 0x10 | 0x8 });
     const padded = new Uint16Array(this.#indexBuffer.size / 2);

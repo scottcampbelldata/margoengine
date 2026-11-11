@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15129089,
+  "total": 15129072,
   "history": [
     {
       "date": "2026-10-24",
@@ -8799,7 +8799,7 @@
     "@margoengine/core": 22467,
     "@margoengine/core/extension": 22756,
     "@margoengine/creative": 19368,
-    "@margoengine/creative/grass": 6379,
+    "@margoengine/creative/grass": 6362,
     "@margoengine/creative/grass-terrain": 1907,
     "@margoengine/creative/paint": 3329,
     "@margoengine/creative/paint-aniso": 4002,

@@ -664,6 +664,9 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
       ? 'let direction=normalize(position-planet.center.xyz);let geographic=vec2f(atan2(direction.z,direction.x)*57.295779513,asin(clamp(direction.y,-1.0,1.0))*57.295779513);let pyramid=vec2f((geographic.x+180.0)/360.0,(90.0-geographic.y)/180.0);'
       : `let geographic=position.xz;let pyramid=(geographic-vec2f(${bounds[0]},${bounds[1]}))/vec2f(${span[0]},${span[1]});`;
     const stride = 2 + this.#options.maxTiles;
+    // Mercator rows on a planet: the pyramid's geographic y is (90 - lat) / 180, so dy/dlat is 1 / pi per radian, and
+    // Mercator's (1 - ln(tan(pi / 4 + lat / 2)) / pi) / 2 has dy/dlat = sec(lat) / (2 pi): the gradients scale by
+    // sec(lat) / 2 (batch 132b; it was sec(lat), one mip level too coarse, unseen while tiles carry one level).
     // Bindings 98 (sampler), 99 (rules) and 100 + layer (up to 107), clear of the other terrain entries (test/bindings.test.js).
     let code = `@group(${group}) @binding(98) var imagerySampler:sampler;\n@group(${group}) @binding(99) var<storage,read> imageryRules:array<vec4f>;\n`;
     this.#layers.forEach((_, i) => {
@@ -673,7 +676,7 @@ export class TerrainImagery implements EnginePlugin, TerrainLighting, Disposable
     this.#layers.forEach((_, i) => {
       const at = i * stride;
       code += `{let box=imageryRules[${at}];let style=imageryRules[${at + 1}];var uv=pyramid;var sx=dx;var sy=dy;
-        if(style.w>0.5&&${this.#planet ? 'true' : 'false'}){let lat=clamp(geographic.y,-85.05112878,85.05112878)*0.01745329252;uv.y=(1.0-log(tan(0.7853981634+lat*0.5))/3.14159265359)*0.5;let scale=1.0/max(cos(lat),0.086);sx.y*=scale;sy.y*=scale;}
+        if(style.w>0.5&&${this.#planet ? 'true' : 'false'}){let lat=clamp(geographic.y,-85.05112878,85.05112878)*0.01745329252;uv.y=(1.0-log(tan(0.7853981634+lat*0.5))/3.14159265359)*0.5;let scale=0.5/max(cos(lat),0.086);sx.y*=scale;sy.y*=scale;}
         if(style.x>0.0&&all(geographic>=box.xy)&&all(geographic<=box.zw)){
           var slot=0;var tile=imageryRules[${at + 2}];var found=style.z<0.5;var smallest=2.0;
           if(style.z>0.5){for(var k=0;k<${this.#options.maxTiles};k++){let p=imageryRules[${at + 2}+k];if(p.z>0.0&&p.z<smallest&&all(uv>=p.xy)&&all(uv<=p.xy+p.zw)){slot=k;tile=p;smallest=p.z;found=true;}}}
