@@ -126,7 +126,8 @@ test('game modules reject bad inputs before allocating GPU resources', () => {
   );
   assert.throws(() => lights.setLights(Array(1025).fill({ position: [0, 0, 0], range: 1 })), /1,024/);
   for (const options of [
-    { capacity: 1000001 },
+    // 65,535 workgroups of 256 slots is the constructor's bound since cef4b052c2 (a device bounds it again at attach).
+    { capacity: 65_535 * 256 + 1 },
     { lifetime: [0, 1] },
     { bounce: 2 },
     { gravity: [NaN, 0, 0] },
