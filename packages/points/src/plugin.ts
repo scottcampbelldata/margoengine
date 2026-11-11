@@ -35,6 +35,7 @@ import {
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { compatibilityLevel } from '../../shared/compat.js';
+import { roundsFloatTargets } from './tier.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { copyExternal } from '../../shared/copy-external.js';
 import { alphaBlend, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
@@ -907,8 +908,9 @@ export class PointsPlugin implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!,
+        packed = edl && this.packedEdl(),
         module =
-          edl === 'alone'
+          edl === 'alone' || packed
             ? this.device!.createShaderModule({
                 code: packedDepthPoints(fogged ? foggedShader('point', material.blending === 'additive') : pointShader),
               })
@@ -918,7 +920,7 @@ export class PointsPlugin implements EnginePlugin {
       const targets: (GPUColorTargetState | null)[] = [
         edl === 'alone' ? null : { format: context.format, blend: this.blend(material.blending) },
       ];
-      if (edl) targets.push({ format: edl === 'alone' ? 'rgba8unorm' : 'r32float' });
+      if (edl) targets.push({ format: packed ? 'rgba8unorm' : 'r32float' });
       pipeline = this.device!.createRenderPipeline({
         layout: fogged ? this.fogResources().pointLayout : gpu.pointPipelineLayout,
         vertex: { module, entryPoint: 'vertex' },
@@ -1072,6 +1074,14 @@ export class PointsPlugin implements EnginePlugin {
    * The lighting pipelines of a target: one, or at the compatibility level, which has no `sample_index`, one per
    * sample of a multisampled target, its mask writing that sample alone.
    */
+  /**
+   * Whether the eye-dome depth goes out as its float's four bytes in rgba8unorm (exact): at the compatibility level,
+   * which multisamples no r32float, and on the WebGL2 layer below its full tier, which rounds r32float targets.
+   */
+  private packedEdl(): boolean {
+    return compatibilityLevel(this.device!) || roundsFloatTargets(this.device!);
+  }
+
   private edlPipelines(format: GPUTextureFormat, count: number): GPURenderPipeline[] {
     if (!compatibilityLevel(this.device!)) return [this.edlPipeline(format, count, null)];
     return Array.from({ length: count }, (_, sample) => this.edlPipeline(format, count, sample));
@@ -1101,24 +1111,25 @@ export class PointsPlugin implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!,
+        packed = sample !== null || this.packedEdl(),
         // Compare matching coverage samples; averaging empty samples invents depth steps.
         sampled = edlShader.replace('texture_2d<f32>', 'texture_multisampled_2d<f32>'),
+        base =
+          count === 1
+            ? edlShader
+            : sample !== null
+              ? sampled
+              : sampled.replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)'),
+        at = sample !== null ? String(sample) : count === 1 ? '0' : 'i32(sample)',
         module =
-          sample !== null
-            ? this.device!.createShaderModule({
-                code:
-                  (count === 1 ? edlShader : sampled).replace(
-                    /textureLoad\(depths,([pq]),0\)\.r/g,
-                    `unpackDepth(textureLoad(depths,$1,${sample}))`,
-                  ) + depthPacking,
-              })
-            : count === 1
-              ? gpu.edlModule
-              : this.device!.createShaderModule({
-                  code: sampled
-                    .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
-                    .replace(/textureLoad\(depths,([pq]),0\)/g, 'textureLoad(depths,$1,i32(sample))'),
-                });
+          !packed && count === 1
+            ? gpu.edlModule
+            : this.device!.createShaderModule({
+                code: packed
+                  ? base.replace(/textureLoad\(depths,([pq]),0\)\.r/g, `unpackDepth(textureLoad(depths,$1,${at}))`) +
+                    depthPacking
+                  : base.replace(/textureLoad\(depths,([pq]),0\)/g, `textureLoad(depths,$1,${at})`),
+              });
       pipeline = this.device!.createRenderPipeline({
         layout: count === 1 ? gpu.edlPipelineLayout : this.edlSampledLayout(),
         vertex: { module, entryPoint: 'vertex' },
@@ -1157,7 +1168,7 @@ export class PointsPlugin implements EnginePlugin {
     const texture = device.createTexture({
       size: [width, height],
       sampleCount,
-      format: compatibilityLevel(device) ? 'rgba8unorm' : 'r32float',
+      format: this.packedEdl() ? 'rgba8unorm' : 'r32float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     const view = texture.createView();

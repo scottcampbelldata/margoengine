@@ -14,7 +14,8 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { alphaBlend } from '../../shared/pass.js';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
-import { compatibilityLevel, compatTier, requireCompatTier } from '../../shared/compat.js';
+import { compatibilityLevel, requireCompatTier } from '../../shared/compat.js';
+import { roundsFloatTargets } from './tier.js';
 import { PointCloud } from './cloud.js';
 import { checkStorage } from './storage-limit.js';
 import { fillFrame } from './frame.js';
@@ -128,15 +129,6 @@ ${split ? 'struct Sums{@location(0) rg:vec4f,@location(1) ba:vec4f}' : ''}
   return ${split ? 'Sums(vec4f(c.rg,0.0,0.0),vec4f(c.b,w,0.0,0.0))' : 'vec4f(c,w)'};
 }
 `;
-
-/**
- * Whether the WebGL2 layer rounds this device's r32float targets: below its full tier it stores them as r16float, whose
- * rounding of the front depth (about 0.004 at a depth of 4) moves the blend window and so the weights of nearby discs.
- */
-function roundsFloatTargets(device: GPUDevice): boolean {
-  const tier = (device as { adapter?: { capabilities?: { tier?: string } } }).adapter?.capabilities?.tier;
-  return compatTier(device) === 'webgl2' && tier !== 'full';
-}
 
 /** Surfel shader: one disc per point, read from the same storage buffers as the point shader. */
 export const surfelShader: string = surfelCode(false);

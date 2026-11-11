@@ -128,7 +128,7 @@ Float colors default to `colorSpace: 'linear'`. Byte arrays are still read as 0.
 | `shape` | `'square'` | or `'round'` |
 | `vertexColors` | true | |
 | `shading` | `'flat'` | or `'sphere'` |
-| `edl` | false | On the WebGPU compatibility level it costs a second pass of the same draws and a draw per sample; the frame is the same. |
+| `edl` | false | On the WebGPU compatibility level it costs a second pass of the same draws and a draw per sample; the frame is the same. On the WebGL2 layer below its full tier the depth target is `rgba8unorm` holding the float's bytes, since that tier rounds `r32float`. |
 | `fog` | true | Fogged by the plugin's `setFog` (sprites too); false keeps the material clear |
 
 Sprites: `add({position, size, rotation, center, color, opacity, uv})`, `set(index, ...)`, `remove(index)` (moves the last sprite into the slot), `clear()`. `SpriteMaterial.rotation` adds to every sprite.

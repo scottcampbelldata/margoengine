@@ -243,6 +243,14 @@ export const PACKAGES = {
     VolumetricFog.attach(engine, { density: 0.05 });
   },
   'points surfels 4x': surfelScene,
+  // KB-L3a-edl: the eye-dome depth target is r32float, which the layer stores as r16float on its half-float tier and in
+  // 8 bits on its ldr tier; below the full tier it goes out packed into rgba8unorm, as at the compatibility level.
+  'points edl': edlScene,
+  'points edl 4x'(engine) {
+    scene(engine);
+    PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
+    edlScene(engine);
+  },
   'water spray 4x'(engine) {
     scene(engine);
     PostStack.attach(engine, [new Bloom({ strength: 0 }), new Tonemap()]);
