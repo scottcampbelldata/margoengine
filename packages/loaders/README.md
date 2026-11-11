@@ -231,8 +231,8 @@ model.dispose();
 `attributes.opacity` through `@margoengine/gltf-pro`. Group RGBA fills in only a missing channel; `baseColorFactor`
 multiplies the result, and any alpha below one draws blended. `parent`, `normals`, `roughness`, `metalness` and
 `doubleSided` work as in `createMeshes`; `unlit` uses the unlit material. It accepts triangle meshes of any size within `maxBytes`
-and at most 4096 parts (a part past 1,000,000 vertices, gltf-pro's primitive limit, becomes several primitives of one mesh, split as
-`toGeometries` splits), and refuses point clouds, malformed attributes, overlapping groups and data over
+and at most 4096 parts (a part past 262,144 vertices, gltf-pro's default `maxPartVertices`, becomes several primitives of one mesh, split as
+`toGeometries` splits, so gltf-pro draws each as made), and refuses point clouds, malformed attributes, overlapping groups and data over
 `maxBytes` before allocating GPU resources. `npm run test:render:browser` checks the colors on the GPU.
 
 ## Files that refer to other files

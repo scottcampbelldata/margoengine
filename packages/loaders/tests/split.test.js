@@ -172,11 +172,12 @@ test('createPBRMeshes renders a mesh past the gltf-pro primitive limit as one no
   });
   const colored = { ...big, colors: new Float32Array(big.positions.length).fill(0.5) };
   const model = createPBRMeshes(engine, colored);
-  assert.equal(model.primitives.length, 2);
+  // 1,212,201 vertices in parts of gltf-pro's default 262,144: each drawn as made, none split again by gltf-pro.
+  assert.equal(model.primitives.length, 5);
   assert.equal(
     model.primitives.reduce((sum, p) => sum + p.indices.length, 0),
     big.indices.length,
   );
-  assert.ok(model.primitives.every((p) => p.vertices.length / 20 <= 1_000_000));
+  assert.ok(model.primitives.every((p) => p.vertices.length / 20 <= 262_144 && !p.part));
   model.dispose();
 });

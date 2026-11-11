@@ -15,7 +15,9 @@ import {
   type GLTFImage,
   type GLTFDecoderHooks,
 } from './asset.js';
-import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial } from './index.js';
+import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial, type PBRPrimitive } from './index.js';
+import type { PrimitivePart } from './model.js';
+import { partLimit } from './parts.js';
 import { packed, primitiveDefs } from './pack.js';
 import type { GLTFStream, StreamMessage } from './stream.js';
 import type { GLTFTextureStream, GLTFTextureStreamOptions } from './texture-stream.js';
@@ -193,13 +195,15 @@ export function loadGLTFProgressive(
     worker: Worker | undefined,
     stream: GLTFStream | undefined,
     finished = false;
+  // Per primitive: its real material while textures load, and its key (glTF primitive). byKey: each key's newest part
+  // on each node (its placeholder until the geometry arrives); later parts go in right after it.
   let images: GLTFImage[] = [],
     settled: boolean[] = [],
-    real: PBRMaterial[] = [],
-    bare = new Set<number>(),
-    keys: number[] = [],
-    byKey: number[][] = [],
+    bare = new Set<PBRPrimitive>(),
+    byKey: PBRPrimitive[][] = [],
     local: number[][][] = [];
+  const real = new Map<PBRPrimitive, PBRMaterial>(),
+    keys = new Map<PBRPrimitive, number>();
   const received = new Set<number>(),
     pending = new Set<GPUBuffer>(),
     opening: Promise<void>[] = [],
@@ -209,7 +213,18 @@ export function loadGLTFProgressive(
     lastView = '',
     lastSent = -Infinity,
     scheduled = false,
-    limit = assetLimit;
+    limit = assetLimit,
+    partVertices = 0,
+    // Geometry messages not yet on the GPU, and the last step (set once 'done' came and its streams opened), which waits
+    // for them: a later part adds a primitive that may still need its textures.
+    uploading = 0,
+    last: (() => void) | undefined;
+  const settle = () => {
+    if (!last || uploading) return;
+    const run = last;
+    last = undefined;
+    run();
+  };
 
   const fail = (error: unknown) => {
     if (finished) return;
@@ -237,8 +252,9 @@ export function loadGLTFProgressive(
       eye = camera.position,
       cull = planes.some((v) => v !== 0),
       score = new Float64Array(byKey.length);
-    model!.primitives.forEach((p, i) => {
-      const [lo, hi] = local[keys[i]],
+    model!.primitives.forEach((p) => {
+      const key = keys.get(p)!,
+        [lo, hi] = local[key],
         m = p.node.matrix,
         c = [0, 1, 2].map(
           (r) =>
@@ -254,7 +270,7 @@ export function loadGLTFProgressive(
         for (let j = 0; j < 24; j += 4)
           if (planes[j] * c[0] + planes[j + 1] * c[1] + planes[j + 2] * c[2] + planes[j + 3] < -radius) visible = 0;
       const size = radius / Math.max(Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]) - radius, 1e-9);
-      score[keys[i]] = Math.max(score[keys[i]], visible + size / (1 + size));
+      score[key] = Math.max(score[key], visible + size / (1 + size));
     });
     return byKey
       .map((_, k) => k)
@@ -275,20 +291,22 @@ export function loadGLTFProgressive(
       throw error;
     }
   };
-  const rebuild = (list: number[]) => {
-    const out = setup(list.map((i) => model!.primitives[i])),
+  const rebuild = (list: PBRPrimitive[]) => {
+    const out = setup(list),
       resources = model!['resources'],
       cleanup = new Cleanup();
-    list.forEach((i, j) => {
-      const previous = resources[i];
+    list.forEach((p, j) => {
+      const i = model!.primitives.indexOf(p),
+        previous = resources[i];
       cleanup.run(() => previous.uniform.destroy()).run(() => previous.wireframe?.index.destroy());
       resources[i] = out[j];
     });
     cleanup.finish();
   };
   // One texture (upload + mips) per step: a throwaway setup with only map k fills the cache; the last step swaps the material.
-  const texture = (i: number) => {
-    const maps = real[i].maps;
+  const texture = (p: PBRPrimitive) => {
+    const material = real.get(p)!,
+      maps = material.maps;
     let k = 0;
     return () => {
       while (k < maps.length && !maps[k]) k++;
@@ -296,34 +314,40 @@ export function loadGLTFProgressive(
         const only = k++;
         setup([
           {
-            ...model!.primitives[i],
-            material: { ...real[i], maps: maps.map((m: unknown, j: number) => (j === only ? m : undefined)) },
+            ...p,
+            material: { ...material, maps: maps.map((m: unknown, j: number) => (j === only ? m : undefined)) },
           },
         ])[0].uniform.destroy();
         return false;
       }
-      model!.primitives[i].material = real[i];
-      rebuild([i]);
+      p.material = material;
+      rebuild([p]);
       emit('textures');
       return true;
     };
   };
   // Primitives whose every candidate image (fallback and extension sources) has settled can take their real material.
   const texturesReady = (all = false) => {
-    for (const i of bare) {
-      const sources = real[i].maps.flatMap((map) => {
+    for (const p of bare) {
+      const sources = real.get(p)!.maps.flatMap((map) => {
         const t = map && doc.textures?.[map.index];
         return t
           ? ([t.source, ...sourceKeys.map((k) => t.extensions?.[k]?.source)].filter(Number.isSafeInteger) as number[])
           : [];
       });
       if (all || sources.every((s: number) => settled[s])) {
-        bare.delete(i);
-        jobs.push(texture(i));
+        bare.delete(p);
+        jobs.push(texture(p));
       }
     }
   };
-  const geometry = (key: number, vertices: Float32Array, indices: Uint32Array, uvs?: Float32Array) => {
+  const geometry = (
+    key: number,
+    vertices: Float32Array,
+    indices: Uint32Array,
+    uvs?: Float32Array,
+    part?: PrimitivePart,
+  ) => {
     const uploads = [
       {
         data: vertices,
@@ -361,22 +385,50 @@ export function loadGLTFProgressive(
         cache.set(data, buffer!);
         pending.delete(buffer!);
       }
-      for (const i of byKey[key]) {
-        const p = model!.primitives[i];
-        old.add(p.vertices);
-        old.add(p.indices);
-        p.vertices = vertices;
-        p.indices = indices;
-        if (uvs) p.uvs = uvs;
+      if (part?.index) {
+        // A later part: a new primitive right after the key's newest part on each node, fields in plain-load order.
+        byKey[key] = byKey[key].map((after) => {
+          const made: PBRPrimitive = {
+            node: after.node,
+            nodeIndex: after.nodeIndex,
+            vertices,
+            indices,
+            definition: after.definition,
+            material: after.material,
+            weights: Float32Array.from(after.weights),
+            targetNames: after.targetNames,
+            ...(uvs ? { uvs } : {}),
+            part,
+          };
+          keys.set(made, key);
+          real.set(made, real.get(after)!);
+          // Still on its stand-in material (textures not swapped in yet): the part gets its own texture swap.
+          if (made.material !== real.get(made)) bare.add(made);
+          model!['insertPart'](after, made, setup([made])[0]);
+          return made;
+        });
+        texturesReady();
+      } else {
+        for (const p of byKey[key]) {
+          old.add(p.vertices);
+          old.add(p.indices);
+          p.vertices = vertices;
+          p.indices = indices;
+          if (uvs) p.uvs = uvs;
+          if (part) p.part = part;
+        }
+        rebuild(byKey[key]);
+        // Through the model, which counts buffers other models may share (PBRModel dropBuffer).
+        for (const data of old) {
+          const buffer = cache.get(data) as GPUBuffer | undefined;
+          if (buffer) model!['dropBuffer'](device(), buffer);
+        }
       }
-      rebuild(byKey[key]);
-      // Through the model, which counts buffers other models may share (PBRModel dropBuffer).
-      for (const data of old) {
-        const buffer = cache.get(data) as GPUBuffer | undefined;
-        if (buffer) model!['dropBuffer'](device(), buffer);
-      }
-      progress.primitivesLoaded++;
+      // A split primitive counts as loaded with its last part.
+      if (!part || part.index === part.count - 1) progress.primitivesLoaded++;
+      uploading--;
       emit('geometry');
+      settle();
       return true;
     };
   };
@@ -471,23 +523,25 @@ export function loadGLTFProgressive(
       limit,
       options.maxNodes,
     );
+    asset.partVertices = partVertices;
     (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches] = {};
     images = Array.from(doc.images ?? [], () => undefined);
     settled = images.map(() => false);
     progress.images = images.length;
     model = new PBRModel(instance, asset, images);
     byKey = defs.map(() => []);
-    keys = model.primitives.map((p, i) => {
+    for (const p of model.primitives) {
       const k = keyOf.get(p.definition)!;
-      byKey[k].push(i);
-      return k;
-    });
+      byKey[k].push(p);
+      keys.set(p, k);
+    }
     progress.primitives = byKey.filter((list) => list.length).length;
     // Until its images arrive a primitive draws with its material's factors only.
     const stripped = new Map<object, PBRMaterial>();
-    real = model.primitives.map((p, i) => {
+    for (const p of model.primitives) {
       const m = p.material;
-      if (!m.maps.some(Boolean)) return m;
+      real.set(p, m);
+      if (!m.maps.some(Boolean)) continue;
       if (!stripped.has(m))
         stripped.set(
           m,
@@ -508,9 +562,8 @@ export function loadGLTFProgressive(
           ),
         );
       p.material = stripped.get(m)!;
-      bare.add(i);
-      return m;
-    });
+      bare.add(p);
+    }
     engine.use(model);
     model.onDispose(() => abort(new DOMException('Model disposed while loading', 'AbortError')));
     void textures?.then((stream) => stream.attach(model!), fail);
@@ -543,7 +596,8 @@ export function loadGLTFProgressive(
       else if (m.type === 'geometry') {
         if (m.error) throw revive(m.error);
         received.add(m.key);
-        jobs.push(geometry(m.key, m.vertices!, m.indices!, m.uvs));
+        jobs.push(geometry(m.key, m.vertices!, m.indices!, m.uvs, m.part));
+        uploading++;
       } else if (m.type === 'image') {
         if (!Number.isInteger(m.index) || m.index < 0 || m.index >= images.length)
           throw new RangeError(
@@ -581,8 +635,11 @@ export function loadGLTFProgressive(
         // Streams still opening hold their primitives back until their smallest levels are on the GPU.
         void Promise.all(opening).then(() => {
           if (finished) return;
-          texturesReady(true);
-          jobs.push(finish(buffers, accessors));
+          last = () => {
+            texturesReady(true);
+            jobs.push(finish(buffers, accessors));
+          };
+          settle();
         });
       } else throw revive(m.error);
     } catch (error) {
@@ -592,6 +649,7 @@ export function loadGLTFProgressive(
   try {
     signal?.throwIfAborted();
     limit = downloadLimit(options.maxDownloadBytes);
+    partVertices = partLimit(options.maxPartVertices);
     const href = new URL(url, globalThis.location?.href).href;
     if (canUseWorker()) {
       worker = new Worker(workerURL(), { name: 'margoengine-progressive' });
@@ -616,6 +674,7 @@ export function loadGLTFProgressive(
         maxNodes: options.maxNodes,
         allowedURLs: options.allowedURLs,
         textures: !!textures,
+        maxPartVertices: partVertices,
       });
     } else
       import('./stream.js').then(({ GLTFStream }) => {
@@ -628,6 +687,7 @@ export function loadGLTFProgressive(
             options.maxNodes,
             options.allowedURLs,
             !!textures,
+            partVertices,
           )).run();
       }, fail);
   } catch (error) {

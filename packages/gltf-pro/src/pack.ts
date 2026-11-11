@@ -36,12 +36,17 @@ export function usesLaterUV(doc: GLTFDocument, p: GLTFPrimitive): boolean {
 export const packed = new WeakMap<object, readonly PreparedGeometry[]>();
 /**
  * Decode one primitive's accessors into gltf-pro's 80-byte vertices and uint32 indices (main thread or worker): one
- * element, or one per part when the primitive has more vertices than `asset.partVertices` (see parts.ts).
+ * element, or one per part when the primitive has more vertices than `asset.partVertices` (see parts.ts). With `each`,
+ * every element goes to `each` as soon as it is filled and none is kept (a stream holds one part at a time).
  */
-export function packPrimitive(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry[] {
+export function packPrimitive(
+  asset: GLTFAsset,
+  p: GLTFPrimitive,
+  each?: (geometry: PreparedGeometry) => void,
+): PreparedGeometry[] {
   compressedIndices(asset, p);
   try {
-    return pack(asset, p);
+    return pack(asset, p, each);
   } catch (error) {
     // Name the mesh and primitive (searched only on this error path), keeping the error's class.
     const meshes = asset.doc.meshes ?? [],
@@ -83,7 +88,7 @@ export function listIndices(v: Uint32Array, mode: number): Uint32Array {
   }
   return v;
 }
-function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry[] {
+function pack(asset: GLTFAsset, p: GLTFPrimitive, each?: (geometry: PreparedGeometry) => void): PreparedGeometry[] {
   const mode = p.mode ?? 4,
     per = mode === 0 ? 1 : mode < 4 ? 2 : 3;
   if (!Number.isInteger(mode) || mode < 0 || mode > 6)
@@ -283,16 +288,30 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry[] {
       uvs = uv2 || uv3 ? new Float32Array(count * 4) : undefined;
     for (let i = 0; i < count; i++) fill(vertices, i, i * 20);
     if (uvs) for (let i = 0; i < count; i++) fillLater(uvs, i, i * 4);
-    return [{ vertices, indices, ...topology, ...(uvs ? { uvs } : {}) }];
+    const whole = { vertices, indices, ...topology, ...(uvs ? { uvs } : {}) };
+    if (!each) return [whole];
+    each(whole);
+    return [];
   }
-  return plans.map(({ indices, vertexMap }, index) => {
-    const n = vertexMap.length,
+  const out: PreparedGeometry[] = [];
+  for (let index = 0; index < plans.length; index++) {
+    const { indices, vertexMap } = plans[index],
+      n = vertexMap.length,
       vertices = new Float32Array(n * 20),
       uvs = uv2 || uv3 ? new Float32Array(n * 4) : undefined;
     for (let k = 0; k < n; k++) fill(vertices, vertexMap[k], k * 20);
     if (uvs) for (let k = 0; k < n; k++) fillLater(uvs, vertexMap[k], k * 4);
-    return { vertices, indices, ...topology, ...(uvs ? { uvs } : {}), part: { index, count: plans.length, vertexMap } };
-  });
+    const part = {
+      vertices,
+      indices,
+      ...topology,
+      ...(uvs ? { uvs } : {}),
+      part: { index, count: plans.length, vertexMap },
+    };
+    if (each) each(part);
+    else out.push(part);
+  }
+  return out;
 }
 /** TEXCOORD_2 then TEXCOORD_3 of the vertices `vertexMap` names, four floats a vertex (a part's later UVs for a new material). */
 export function laterUVs(asset: GLTFAsset, p: GLTFPrimitive, vertexMap: Uint32Array): Float32Array | undefined {

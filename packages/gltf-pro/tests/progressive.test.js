@@ -34,6 +34,8 @@ const helmet = new Uint8Array(await asset('scifi-helmet.glb')),
   robot = new Uint8Array(await asset('robot-expressive.glb'));
 const grids = bigGLB({ segments: 256, meshes: 3 }),
   parts = bigGLB({ segments: 6, meshes: 3, instances: 12 }),
+  // Two 4,225-vertex grids: with maxPartVertices 1024 each loads as several parts.
+  splitGrids = bigGLB({ segments: 64, meshes: 2 }),
   external = split(bigGLB({ segments: 40, meshes: 2 }), 'external.bin');
 // A small grid GLB with its document changed by `edit` (the fuzz findings of launch gate 11a below).
 function editedGLB(edit) {
@@ -90,6 +92,7 @@ const files = {
   '/robot.glb': robot,
   '/grids.glb': grids,
   '/parts.glb': parts,
+  '/split.glb': splitGrids,
   '/external.gltf': Buffer.from(external.json),
   '/external.bin': external.bin,
 };
@@ -353,8 +356,10 @@ test('progressive wireframe replacement releases both edge and replacement resou
     );
   }));
 
-for (const [name, path, decoders] of [
+for (const [name, path, decoders, more = {}] of [
   ['SciFiHelmet (textured, tangents)', '/helmet.glb'],
+  ['SciFiHelmet split into parts of 1,024 vertices (textures swap in per part)', '/helmet.glb', undefined, { maxPartVertices: 1024 }],
+  ['2 grids split into parts of 1,024 vertices, streamed part by part', '/split.glb', undefined, { maxPartVertices: 1024 }],
   ['RobotExpressive (skins, morph targets, animations, many primitives)', '/robot.glb'],
   ['3 x 66k-vertex grids (one without normals; several range requests)', '/grids.glb'],
   ['grids drawn 12 times each through EXT_mesh_gpu_instancing', '/parts.glb', { instancing }],
@@ -368,11 +373,21 @@ for (const [name, path, decoders] of [
             a = await gpuEngine(),
             b = await gpuEngine(),
             stages = [];
-          const expected = await loadGLTF(a.engine, url, { decoders });
+          const expected = await loadGLTF(a.engine, url, { decoders, ...more });
           log.length = 0;
           const created = InProcessWorker.created;
-          const load = loadGLTFProgressive(b.engine, url, { decoders, onProgress: (p) => stages.push(p.stage) });
-          const model = await load.ready;
+          const counts = [];
+          let model;
+          const load = loadGLTFProgressive(b.engine, url, {
+            decoders,
+            ...more,
+            onProgress: (p) => {
+              stages.push(p.stage);
+              counts.push(model?.primitives.length);
+            },
+          });
+          model = await load.ready;
+          const boxes = model.primitives.length;
           // Ready: one box per primitive, spanning its POSITION accessor's min/max.
           assert.ok(model.primitives.every((p) => p.vertices.length === 24 * 20 && p.indices.length === 36));
           const position = model.asset.doc.accessors[model.primitives[0].definition.attributes.POSITION],
@@ -389,6 +404,13 @@ for (const [name, path, decoders] of [
           assert.deepEqual([stages[0], stages.at(-1)], ['ready', 'complete']);
           assertSameBytes(snapshot(model), snapshot(expected));
           assertSameBytes(gpu(model, b.draw), gpu(expected, a.draw));
+          if (more.maxPartVertices) {
+            // Parts arrive one by one: the model grows from one box per primitive to every part, a step at a time.
+            assert.ok(expected.primitives.length > 2 * boxes, `${expected.primitives.length} parts`);
+            assert.ok(expected.primitives.every((p) => p.part && p.vertices.length / 20 <= 1024));
+            const grown = new Set(counts.filter((n) => n > boxes && n < expected.primitives.length));
+            assert.ok(grown.size > 1, `model sizes while loading: ${[...new Set(counts)]}`);
+          }
           if (decoders) assert.ok(model.primitives.every((p) => p.instances?.count === 12));
           // Without range support each file is downloaded once; with ranges, about once (requests round to 256 KB blocks).
           const requests = log.filter((r) => r.path.endsWith(path) || r.path.endsWith('.bin'));

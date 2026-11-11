@@ -2722,7 +2722,12 @@ of static batches; an upload over the device binding throws naming `maxPartVerti
 (1,001,000 vertices: 4 parts, identical triangle multiset, 0.37% copied, BLEND order, points and lines, worker and prepared
 paths, refusals), exporters [split-primitive.test.js](../../packages/exporters/tests/split-primitive.test.js) and the lod
 autoLOD part test. Missing: GPU pixel equality against a pre-split reference and the 10M-triangle frame time on the
-A6000 and an iGPU (docs/work-lists/speed-phase.md); progressive streaming of parts over 1,000,000 vertices.
+A6000 and an iGPU (docs/work-lists/speed-phase.md). Progressive loads (2026-11-11) stream a split primitive part by part:
+the worker posts one message per part as it packs it, the first part replaces the placeholder box and each later one is
+inserted after the previous part on every node that uses the mesh (`PBRModel.insertPart`), so `complete` equals
+`loadGLTF` byte for byte ([progressive.test.js](../../packages/gltf-pro/tests/progressive.test.js), grids and a textured
+helmet at `maxPartVertices` 1,024, main thread and worker, with and without range requests). Steady-frame work is
+unchanged: one draw per part, as a plain load.
 
 ### 5. Stage GPU inventory registration (2026-11-10)
 

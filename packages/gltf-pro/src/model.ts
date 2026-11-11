@@ -2154,6 +2154,8 @@ export class PBRModel implements EnginePlugin {
   disposed = false;
   private readonly created: Mesh[] = [];
   private resources: DrawResource[] = [];
+  /** Each node's primitives in model order (its mesh source's list). */
+  private readonly byNode = new Map<Mesh, PBRPrimitive[]>();
   private textures: GPUTexture[] = [];
   private readonly gpuCache = new Map<unknown, GPUBuffer | GPUTexture | GPURenderPipeline>();
   private readonly inverse = new Float32Array(16);
@@ -2391,7 +2393,7 @@ export class PBRModel implements EnginePlugin {
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });
       // The primitives of each node, in one pass: nodes in first-primitive order, primitives in model order.
-      const byNode = new Map<PBRPrimitive['node'], PBRPrimitive[]>();
+      const byNode = this.byNode;
       for (const p of this.primitives) {
         const list = byNode.get(p.node);
         if (list) list.push(p);
@@ -2444,6 +2446,18 @@ export class PBRModel implements EnginePlugin {
       }
       throw error;
     }
+  }
+  /**
+   * @internal Progressive loading: puts `made`, the next part of `after`'s split primitive, right after `after` in model
+   * and draw order with its draw resource, so the finished model lists its parts as a plain load does.
+   */
+  private insertPart(after: PBRPrimitive, made: PBRPrimitive, resource: DrawResource): void {
+    const at = this.primitives.indexOf(after) + 1,
+      list = this.byNode.get(after.node)!;
+    this.primitives.splice(at, 0, made);
+    this.resources.splice(at, 0, resource);
+    list.splice(list.indexOf(after) + 1, 0, made);
+    this.gpuRevision++;
   }
   /** Current node transforms applied to bind-pose CPU positions. Does not perform GPU readback. */
   get bounds(): Float32Array {

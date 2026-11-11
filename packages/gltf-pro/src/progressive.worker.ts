@@ -17,6 +17,7 @@ scope.onmessage = ({ data }) => {
     maxNodes?: number;
     allowedURLs?: readonly string[];
     textures?: boolean;
+    maxPartVertices?: number;
   };
   if (Array.isArray(request.order)) {
     if (request.order.every(Number.isSafeInteger)) stream?.setOrder(request.order);
@@ -29,5 +30,6 @@ scope.onmessage = ({ data }) => {
       request.maxNodes,
       request.allowedURLs,
       request.textures === true,
+      request.maxPartVertices,
     )).run();
 };

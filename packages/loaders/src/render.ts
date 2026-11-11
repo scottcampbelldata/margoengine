@@ -4,8 +4,11 @@ import { SRGBToLinear } from '@margoengine/math/color';
 import type { CreateMeshesOptions } from './engine.js';
 import { splitTriangles, toGeometries } from './geometry.js';
 
-/** Vertices of one gltf-pro primitive (its packed geometry limit). */
-const PRIMITIVE_MAX_VERTICES = 1_000_000;
+/**
+ * Vertices of one part: gltf-pro's default `maxPartVertices` (20 MiB of 80-byte vertices, inside every storage binding,
+ * the WebGL2 layer's included), so gltf-pro draws each part as made here instead of splitting it again.
+ */
+const PRIMITIVE_MAX_VERTICES = 262_144;
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 
 /**

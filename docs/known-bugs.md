@@ -1,6 +1,15 @@
 # Known bugs and unverified features
 
 
+### gltf-pro extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
+
+- **Repro:** `MARGO_COMPAT=1 node packages/gltf-pro/scripts/test-extensions-browser.js` on the dev PC while 30 package
+  test suites ran beside it: "lights: the real EnvironmentTest" failed with `page.evaluate: Execution context was
+  destroyed`. Run alone, and the full check run again on the same build and on origin/main 519906bcf6, it passed.
+- **Cause:** not found. The page was replaced or its renderer exited after about 40 earlier checks on one page, under
+  heavy memory load; nothing in the failing check navigates. Next: record the renderer's exit reason and memory when
+  the context goes, so a repeat names the cause.
+
 ### Culling FrontToBack binds a whole core instance buffer (found with the core scale change, 2026-11-10, open)
 
 - **Repro:** more than 1,048,574 core meshes of one geometry on a device with WebGPU's default 128 MiB

@@ -375,9 +375,11 @@ bounds, and are cut greedily: shared vertices stay shared inside a part, and onl
 a 1,001,000-vertex grid). Blended primitives keep the file's triangle order. Each part is an ordinary `PBRPrimitive`
 with the same node, material and `definition`, and `part` says which it is; drawing, culling, picking,
 `@margoengine/exporters` (one primitive per part, same material) and `@margoengine/lod` levels (simplified as one
-surface, then split again) work part by part. Skinned and morphed primitives must fit one part;
-`loadGLTFProgressive` streams primitives of up to 1,000,000 vertices. Packed geometry still counts toward the decoded
-budget, 4x `maxDownloadBytes`.
+surface, then split again) work part by part. Skinned and morphed primitives must fit one part.
+`loadGLTFProgressive` takes `maxPartVertices` too and streams a split primitive part by part: the worker packs one part
+at a time, the first replaces the placeholder box and each later one is drawn as it arrives, so a scan fills in while it
+loads; once `complete` resolves the model equals a `loadGLTF` of the same file. Packed geometry still counts toward the
+decoded budget, 4x `maxDownloadBytes`.
 
 ```ts
 import {parseGLTFAsync} from 'margoengine/gltf-pro';
