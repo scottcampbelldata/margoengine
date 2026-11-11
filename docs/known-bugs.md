@@ -6149,3 +6149,7 @@ setting was changed (the AMD "Texture Filtering Quality" setting may control the
 ### Fixed: weather lens drops lost sub-cell precision far from the origin (2026-11-10)
 
 Repro: `node scripts/gpu-lock.mjs run --owner=weather -- node packages/weather/tests/parity-browser.mjs lens` on native WebGPU (RTX A6000) failed its unchanged 0.0001 CPU-oracle bound in the 2400 long-time cases at 0.000135468. Cause: the lens shader formed the full drop centre `(cell + offset) * spacing` before subtracting it from the sample, so f32 cancellation dropped the fractional offset bits. It now reduces the sample to its cell with `fma(-cell, spacing, q)` and subtracts only the fractional centre. Regression: the same parity run, native and `--compat`.
+
+### Fixed: stage viewer GPU check captured before the GPU had finished (2026-11-10)
+
+Repro: `node scripts/stage-viewer-gpu-check.js` under a loaded GPU could compare a capture taken while pipelines were still compiling or before the restored environment device was in use. Cause: the fixture (tests/stage-viewer.ts) waited a fixed number of animation frames, which does not establish pipeline readiness or completion of submitted work. It now waits for pipeline quiescence, `queue.onSubmittedWorkDone()` and the current environment device before every capture. Regression: tests/viewer-fixture-ready.test.js (runs the real fixture with the submitted-work fence held; fails on the old fixture).

@@ -4149,3 +4149,7 @@ See [the batch record](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work) f
 ## Weather lens
 
 Build packages, then `node scripts/gpu-lock.mjs run --owner=weather-lens -- node packages/weather/tests/parity-browser.mjs lens` and the same with `--compat`. Both print the ordinary and long-time worst errors; each must stay at or below 0.0001.
+
+## Stage viewer readiness
+
+`node --test --test-timeout=30000 tests/viewer-fixture-ready.test.js`, then under the GPU lock `node scripts/stage-viewer-gpu-check.js` native and with `MARGO_COMPAT=1`.

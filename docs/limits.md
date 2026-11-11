@@ -6882,3 +6882,7 @@ until it is first requested; editing or rebuilding anything an open page loaded 
 ### Weather lens drop accuracy (2026-11-10)
 
 LensDrops passes its existing 0.0001 absolute CPU/GPU bound over 4400 ordinary and 2400 long-time samples on native WebGPU and the WebGL2 compatibility layer after cell-relative reduction; long-time worst errors measured 0.000051 native and 0.000053 compatibility (RTX A6000). This is sampled evidence, not an all-input bound.
+
+### Stage viewer GPU check readiness (2026-11-10)
+
+The viewer check's captures wait for pipeline and submitted-work readiness, including the environment device after a restore; capture equality stays exact. No elapsed-time bound is claimed.

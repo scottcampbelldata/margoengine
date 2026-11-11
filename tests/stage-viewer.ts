@@ -1,5 +1,6 @@
 import { createStage } from '@margoengine/stage';
 import { engineRuntime } from '@margoengine/core/extension';
+import { waitForPipelines } from '../scripts/support/gpu-ready.js';
 import { addScene } from '@margoengine/stage/scene';
 import { addViewer, type Viewer, type ViewerOptions } from '@margoengine/stage/viewer';
 
@@ -8,6 +9,7 @@ import { addViewer, type Viewer, type ViewerOptions } from '@margoengine/stage/v
 type Page = {
   open(options: ViewerOptions): Promise<{ plugins: string[]; position: number[]; target: number[] }>;
   frames(count: number): Promise<void>;
+  ready(): Promise<void>;
   camera(): { position: number[]; target: number[] };
   look(position: [number, number, number]): Promise<void>;
   dropShadow(): Promise<void>;
@@ -35,8 +37,18 @@ const page: Page = {
       gpuErrors.push(event.error.message),
     );
     viewer = await addViewer(app, url, options);
-    await page.frames(10);
+    await page.ready();
     return { plugins: plugins(), ...page.camera() };
+  },
+  async ready() {
+    await waitForPipelines(
+      async () => {
+        app.engine.render();
+        await app.engine.gpu!.queue.onSubmittedWorkDone();
+        await new Promise(requestAnimationFrame);
+      },
+      { ready: () => !viewer.environment || viewer.environment.environment.device === app.engine.gpu },
+    );
   },
   async frames(count) {
     for (let i = 0; i < count; i++) await new Promise(requestAnimationFrame);
@@ -47,11 +59,11 @@ const page: Page = {
   },
   async look(position) {
     app.engine.camera.position = position;
-    await page.frames(5);
+    await page.ready();
   },
   async dropShadow() {
     viewer.shadows!.dispose();
-    await page.frames(30);
+    await page.ready();
   },
   async restore() {
     const before = app.engine.gpu!;
@@ -69,14 +81,22 @@ const page: Page = {
   // A saved scene with a real model under a moved parent: addScene's parenting on a real gltf-pro model.
   async scene() {
     app = await createStage('#scene', { backend: 'webgpu', onError: (error) => gpuErrors.push(String(error)) });
-    const level = await addScene(app, {
-        format: 'margo-save',
-        version: 1,
-        entities: [
-          { id: 'plinth', transform: { position: [5, 0, 0] }, components: { mesh: { shape: 'box', size: [1, 0.1, 1] } } },
-          { id: 'helmet', parent: 'plinth', transform: { position: [0, 1, 0] }, components: { mesh: url } },
-        ],
-      }, { base: location.href }),
+    const level = await addScene(
+        app,
+        {
+          format: 'margo-save',
+          version: 1,
+          entities: [
+            {
+              id: 'plinth',
+              transform: { position: [5, 0, 0] },
+              components: { mesh: { shape: 'box', size: [1, 0.1, 1] } },
+            },
+            { id: 'helmet', parent: 'plinth', transform: { position: [0, 1, 0] }, components: { mesh: url } },
+          ],
+        },
+        { base: location.href },
+      ),
       model = level.models.get('helmet')!;
     await page.frames(10);
     const bounds = [...model.bounds],
