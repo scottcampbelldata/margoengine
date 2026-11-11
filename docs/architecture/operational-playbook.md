@@ -1648,6 +1648,8 @@ Missing: a measured cost.
 
 **Device limits and large scenes (2026-11-10, Scott's approved core exception).** `GPURenderer.create` asks `requestDevice` for the adapter's `maxTextureArrayLayers`, `maxBufferSize` and `maxStorageBufferBindingSize`, at creation and on every restore (a restore runs `create` again), so a desktop adapter's larger buffers reach core and every package that reads `device.limits`; an adapter that offers only WebGPU's defaults gets the same device as before. Evidence: `tests/core-timestamp-feature.test.js` (stub adapters with default and larger limits, and a restore) and `packages/core/tests/scale.browser.mjs` (the real device's limits equal its adapter's, natively and on the WebGL2 layer). Work per steady frame is unchanged (a 300-mesh scene: same draws, bind groups, buffer writes and bytes). Missing: adapters other than the RTX A6000 and the layer on it.
 
+`Geometry` takes up to 11,184,810 vertices (it was 1,000,000), the most 24-byte interleaved vertices one buffer of the default 256 MiB `maxBufferSize` holds; the index buffer keeps its upload-time check against the device's `maxBufferSize`. Evidence: `packages/core/tests/vertex-cap.test.js` (the cap, one past it, and 1,000,001, which failed before) and the `vertices` case of `scale.browser.mjs` (a 1,212,201-vertex plane covers every pixel natively and on the WebGL2 layer). Missing: frame time at the cap (speed phase).
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |

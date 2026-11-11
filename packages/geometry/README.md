@@ -702,7 +702,7 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 - Polygon results are exact on a grid of 2^26 steps across the input, not in doubles: a vertex at a crossing moves by up to half a step, and features under two steps wide are dropped. A round join is a chain of chords, so a rounded outset is up to `arcTolerance` smaller than the true curve.
 - `sweepGeometry` turns frames smoothly, so a path with a sharp corner pinches the profile there: round the corner in the path. A profile wider than the path's bend folds through itself. `loftGeometry` holes are skinned by their order, so every section needs the same number of them and a hole's partner is the one in the same place in the list. Turning a section more than about 90 degrees from its neighbour twists the surface in a way `align` cannot undo.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
-- Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
+- Core's `Geometry` accepts up to 11,184,810 vertices (what one default 256 MiB vertex buffer holds), so `toGeometry` throws above that.
 
 ## Tests
 

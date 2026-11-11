@@ -82,6 +82,10 @@ Core asks the adapter for its own `maxBufferSize` and `maxStorageBufferBindingSi
 restore), not WebGPU's 256 MiB and 128 MiB defaults, so a desktop GPU's larger buffers are there for big meshes and
 instance counts. Read `engine.gpu.limits` for what this device allows.
 
+A `Geometry` holds up to 11,184,810 vertices: the most 24-byte vertices (position and normal) one buffer of WebGPU's
+default 256 MiB `maxBufferSize` holds, so a geometry that loads draws on every device. Its index buffer must fit the
+device's `maxBufferSize` too (67,108,864 indices on a default device).
+
 Growing keeps the old buffers until the new ones exist, so for that moment a batch holds both. A `Renderer` passed as
 `fallback` must do the same: `add` on a geometry it already holds replaces the storage, new first, and a throw keeps the
 old one. WebGPU reports a real out-of-memory later, as a device error on the next frame, not as a throw from this call.

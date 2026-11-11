@@ -444,7 +444,7 @@ The corrected driver measures 4,476 B min+gzip (previously 4,288 B; ceiling 4,44
 measures 36,916 B (previously 36,802 B; ceiling 36,802 to 36,916 B). These optional ceilings follow Scott's
 2026-11-10 ruling. The bytes retain complete missing-triangle rejection, finite boundary normals and safe GL
 resource disposal. Another split would add an artificial shader loader and divide resource ownership. The
-existing optional driver boundary stays intact; the CPU extractor does not load it. Core + stage is 24,630 B
+existing optional driver boundary stays intact; the CPU extractor does not load it. Core + stage is 24,664 B
 under its unchanged 25,000 B limit. Pixel bounds and timeouts are unchanged.
 
 ## A first WebGPU figure
@@ -1175,7 +1175,7 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
 
 LIC is a separate optional entry: 23,461 B minified gzip in the integrated build (24,165 B ceiling).
 This includes the same full-precision published colormap data as the other colour-bearing entries; the
-normalized pre-restoration measurement was 10,429 B. Core + stage remains 24,630 B combined gzip.
+normalized pre-restoration measurement was 10,429 B. Core + stage remains 24,664 B combined gzip.
 
 ## Stream tubes and ribbons
 

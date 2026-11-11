@@ -1,5 +1,14 @@
 # Known bugs and unverified features
 
+### Loaders still name 1,000,000 as the core vertex limit (found with the core scale change, 2026-11-10, open)
+
+- **Repro:** `toGeometry` of `@margoengine/loaders` on a 1,000,001-vertex mesh throws `1000001 vertices exceed the core
+  limit of 1000000`, while core's `Geometry` now takes up to 11,184,810 vertices.
+- **Cause:** `packages/loaders/src/geometry.ts` mirrors core's old cap in its exported `CORE_MAX_VERTICES`; the default
+  point-cloud `maxPoints` (`CORE_MAX_VERTICES / 6`) derives from it, so raising it changes how many points draw by default.
+- **Fix to build:** decide in loaders whether to follow the new core cap (and keep the point-cloud default at 166,666
+  points so frame cost does not change), or keep 1,000,000 as the loaders' own limit and say so in the message.
+
 ### OpenEXR chromaticities are read as sRGB (found with Rust finding R10, 2026-11-10, open)
 
 - **Repro:** an EXR whose `chromaticities` attribute names ACEScg (AP1) primaries and one pixel (1, 0, 0): `parseEXR`,

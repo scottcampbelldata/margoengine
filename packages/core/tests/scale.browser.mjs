@@ -3,6 +3,7 @@
 //   node scripts/gpu-lock.mjs run --owner=<you> --gpu=core-scale -- node packages/core/tests/scale.browser.mjs
 // - limits: the device core makes has its adapter's maxBufferSize and maxStorageBufferBindingSize, not WebGPU's
 //   256 MiB / 128 MiB defaults (before 2026-11-10 core asked only for maxTextureArrayLayers).
+// - vertices: a 1,212,201-vertex plane (over the old 1,000,000 cap) that fills the view covers every pixel.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ import { createServer } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
+import { decodePNG } from '../../../tests/support/png.js';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url)),
   results = join(root, 'test-results'),
@@ -30,7 +32,9 @@ const server = await createServer({
       configureServer(s) {
         s.middlewares.use('/core-scale', (_request, response) => {
           response.setHeader('Content-Type', 'text/html');
-          response.end('<!doctype html><body style="margin:0"><canvas style="display:block;width:64px;height:64px"></canvas>');
+          response.end(
+            '<!doctype html><body style="margin:0"><canvas style="display:block;width:64px;height:64px"></canvas>',
+          );
         });
       },
     },
@@ -51,12 +55,60 @@ const cases = {
       engine.dispose();
     }
   },
+  async vertices() {
+    const { Engine, Geometry, PbrMaterial } = await import('/packages/core/dist/index.js');
+    const side = 1100,
+      row = side + 1,
+      positions = new Float32Array(row * row * 3),
+      normals = new Float32Array(row * row * 3),
+      indices = new Uint32Array(side * side * 6);
+    for (let z = 0, v = 0; z < row; z++)
+      for (let x = 0; x < row; x++, v++) {
+        positions.set([(x / side) * 40 - 20, 0, (z / side) * 40 - 20], v * 3);
+        normals[v * 3 + 1] = 1;
+      }
+    for (let z = 0, i = 0; z < side; z++)
+      for (let x = 0; x < side; x++, i += 6) {
+        const a = z * row + x;
+        indices.set([a, a + row, a + 1, a + 1, a + row, a + row + 1], i);
+      }
+    const geometry = new Geometry(positions, normals, indices),
+      engine = await Engine.create(document.querySelector('canvas'), {
+        exactSize: [64, 64],
+        camera: { position: [0, 10, 0.001], target: [0, 0, 0] },
+      }),
+      errors = [];
+    engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+    window.mesh = engine.createMesh().setGeometry(geometry).setMaterial(new PbrMaterial({ color: '#ff8000' }));
+    window.frame = async (visible) => {
+      window.mesh.visible = visible;
+      engine.render();
+      await engine.gpu.queue.onSubmittedWorkDone();
+      return errors;
+    };
+    await window.frame(true);
+    return { vertices: geometry.vertices.length / 6, triangles: indices.length / 3, errors };
+  },
 };
 
+const shot = async (page) => decodePNG(await page.locator('canvas').screenshot());
 const checks = {
   limits({ device, adapter }) {
     assert.deepEqual(device, adapter, 'the device has its adapter limits');
     assert.ok(device.maxBufferSize >= 268435456 && device.maxStorageBufferBindingSize >= 134217728);
+  },
+  async vertices(result, page) {
+    assert.ok(result.vertices > 1_000_000);
+    assert.deepEqual(result.errors, []);
+    const drawn = await shot(page);
+    assert.deepEqual(await page.evaluate(() => window.frame(false)), []);
+    const empty = await shot(page);
+    let same = 0;
+    for (let k = 0; k < drawn.data.length; k += 4)
+      if (drawn.data[k] === empty.data[k] && drawn.data[k + 1] === empty.data[k + 1] && drawn.data[k + 2] === empty.data[k + 2])
+        same++;
+    result.uncovered = same;
+    assert.equal(same, 0, 'every pixel shows the plane');
   },
 };
 
@@ -74,7 +126,7 @@ try {
     if (compat) await page.addInitScript(compatShim);
     await page.goto(server.resolvedUrls.local[0] + 'core-scale');
     const result = await page.evaluate(`(${run.toString().replace(/^async \w+\(/, 'async function (')})()`);
-    checks[name](result);
+    await checks[name](result, page);
     assert.deepEqual(errors, [], name);
     console.log(JSON.stringify({ case: name, compat, ...result }));
     await page.close();

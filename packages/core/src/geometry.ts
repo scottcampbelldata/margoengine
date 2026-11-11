@@ -20,7 +20,9 @@ export function finite(values: ArrayLike<number>, size: number, label: string): 
 }
 
 /**
- * Indexed triangle mesh: empty, or 3 to 1,000,000 vertices of xyz positions (world units) and normals with triangle indices.
+ * Indexed triangle mesh: empty, or 3 to 11,184,810 vertices of xyz positions (world units) and normals with triangle indices.
+ * The cap is the most 24-byte vertices (position + normal) one buffer of WebGPU's default 256 MiB `maxBufferSize` holds;
+ * the index buffer must fit the device's `maxBufferSize` too (67,108,864 indices on a default device), checked on upload.
  * Throws TypeError for mismatched array lengths and RangeError for non-finite values or invalid counts or indices.
  */
 export class Geometry {
@@ -32,7 +34,7 @@ export class Geometry {
     const count = positions.length / 3;
     if (
       !Number.isInteger(count) ||
-      count > 1_000_000 ||
+      count > 11_184_810 ||
       (count === 0 ? indices.length !== 0 : count < 3 || !indices.length) ||
       indices.length % 3
     )

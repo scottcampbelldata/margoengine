@@ -1,16 +1,16 @@
 {
-  "commit": "29b4a5cea3",
+  "commit": "9fb5beacb9",
   "dirty": true,
   "browser": "msedge 157.0.4341.42 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-KLS0cRYl.js",
+      "file": "assets/dist-DW2HSpst.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_model-9pLtCHsW-KV7ZyMm3.js",
+        "_model-BdfnhR_L-CZOf_SVM.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -61,13 +61,13 @@
       ]
     },
     "../../../packages/gltf-pro/dist/compression-BEwrKYiN.js": {
-      "file": "assets/compression-BEwrKYiN-DYlc6qEy.js",
+      "file": "assets/compression-BEwrKYiN-EYMQbzOZ.js",
       "name": "compression-BEwrKYiN",
       "src": "../../../packages/gltf-pro/dist/compression-BEwrKYiN.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-Q9x4nW80-DJ5vDuBQ.js"
+        "_asset-Q9x4nW80-WgnG0mpd.js"
       ]
     },
     "../../../packages/gltf-pro/dist/dds.js": {
@@ -89,14 +89,14 @@
       ]
     },
     "../../../packages/gltf-pro/dist/index.js": {
-      "file": "assets/dist-DrGF0_TE.js",
+      "file": "assets/dist-BeVJTquy.js",
       "name": "dist",
       "src": "../../../packages/gltf-pro/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-9pLtCHsW-KV7ZyMm3.js",
-        "_asset-Q9x4nW80-DJ5vDuBQ.js",
+        "_model-BdfnhR_L-CZOf_SVM.js",
+        "_asset-Q9x4nW80-WgnG0mpd.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -122,7 +122,7 @@
       ]
     },
     "../../../packages/gltf-pro/dist/splats.js": {
-      "file": "assets/splats-C5H1nFS9.js",
+      "file": "assets/splats-D7ReYqbz.js",
       "name": "splats",
       "src": "../../../packages/gltf-pro/dist/splats.js",
       "isDynamicEntry": true,
@@ -136,12 +136,12 @@
       ]
     },
     "../../../packages/gltf/dist/index.js": {
-      "file": "assets/dist-wazJCoUY.js",
+      "file": "assets/dist-CNVwdiK6.js",
       "name": "dist",
       "src": "../../../packages/gltf/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
-        "_geometry-DP4OBCjY.js",
+        "_geometry-DkjIhA1v.js",
         "_extension-Bn1Wm_pY.js"
       ]
     },
@@ -152,22 +152,22 @@
       "isDynamicEntry": true
     },
     "../../../packages/splats/dist/data.js": {
-      "file": "assets/data-TysQEaHv.js",
+      "file": "assets/data-CilOmsa5.js",
       "name": "data",
       "src": "../../../packages/splats/dist/data.js",
       "isDynamicEntry": true,
       "imports": [
-        "_data-CPOiqXYy-TwGGbryT.js"
+        "_data-ej43E9WT-CDPRFb1z.js"
       ]
     },
-    "../../../packages/splats/dist/encode-L3VUclI6.js": {
-      "file": "assets/encode-L3VUclI6-B-UMy08h.js",
-      "name": "encode-L3VUclI6",
-      "src": "../../../packages/splats/dist/encode-L3VUclI6.js",
+    "../../../packages/splats/dist/encode-BsXxnHHx.js": {
+      "file": "assets/encode-BsXxnHHx-xZi4LX5U.js",
+      "name": "encode-BsXxnHHx",
+      "src": "../../../packages/splats/dist/encode-BsXxnHHx.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_data-CPOiqXYy-TwGGbryT.js"
+        "_data-ej43E9WT-CDPRFb1z.js"
       ],
       "dynamicImports": [
         "../../../packages/splats/dist/errors-BPm2c1ar.js"
@@ -183,7 +183,7 @@
       ]
     },
     "../../../packages/splats/dist/index.js": {
-      "file": "assets/dist-C2VGkvhw.js",
+      "file": "assets/dist-B5at-6iY.js",
       "name": "dist",
       "src": "../../../packages/splats/dist/index.js",
       "isDynamicEntry": true,
@@ -192,32 +192,32 @@
         "_extension-Bn1Wm_pY.js",
         "_preload-helper-CRzLMJPS.js",
         "_errors-BPm2c1ar-mpjgtJAk.js",
-        "_data-CPOiqXYy-TwGGbryT.js"
+        "_data-ej43E9WT-CDPRFb1z.js"
       ],
       "dynamicImports": [
         "../../../packages/splats/dist/compat-CDoDsXE8.js"
       ]
     },
-    "../../../packages/splats/dist/sog-j3Hy_MRC.js": {
-      "file": "assets/sog-j3Hy_MRC-D-3D618Z.js",
-      "name": "sog-j3Hy_MRC",
-      "src": "../../../packages/splats/dist/sog-j3Hy_MRC.js",
+    "../../../packages/splats/dist/sog-CdeBcNLg.js": {
+      "file": "assets/sog-CdeBcNLg-DWlNWTgJ.js",
+      "name": "sog-CdeBcNLg",
+      "src": "../../../packages/splats/dist/sog-CdeBcNLg.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-BPm2c1ar-mpjgtJAk.js",
-        "_data-CPOiqXYy-TwGGbryT.js",
+        "_data-ej43E9WT-CDPRFb1z.js",
         "_zip-C9cl7Ziq-BoJ0E_iH.js"
       ]
     },
-    "../../../packages/splats/dist/spz-CE8B9KX0.js": {
-      "file": "assets/spz-CE8B9KX0-CJdiFvhl.js",
-      "name": "spz-CE8B9KX0",
-      "src": "../../../packages/splats/dist/spz-CE8B9KX0.js",
+    "../../../packages/splats/dist/spz-pVMWTbjp.js": {
+      "file": "assets/spz-pVMWTbjp-OWf5PJpY.js",
+      "name": "spz-pVMWTbjp",
+      "src": "../../../packages/splats/dist/spz-pVMWTbjp.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
         "_errors-BPm2c1ar-mpjgtJAk.js",
-        "_data-CPOiqXYy-TwGGbryT.js",
+        "_data-ej43E9WT-CDPRFb1z.js",
         "_zip-C9cl7Ziq-BoJ0E_iH.js"
       ],
       "dynamicImports": [
@@ -230,8 +230,8 @@
       "src": "../../../packages/splats/dist/zstd-CsYgdoCI.js",
       "isDynamicEntry": true
     },
-    "_asset-Q9x4nW80-DJ5vDuBQ.js": {
-      "file": "assets/asset-Q9x4nW80-DJ5vDuBQ.js",
+    "_asset-Q9x4nW80-WgnG0mpd.js": {
+      "file": "assets/asset-Q9x4nW80-WgnG0mpd.js",
       "name": "asset-Q9x4nW80",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
@@ -247,17 +247,17 @@
         "../../../packages/gltf-pro/dist/optimize-7SEzNA23.js"
       ]
     },
-    "_data-CPOiqXYy-TwGGbryT.js": {
-      "file": "assets/data-CPOiqXYy-TwGGbryT.js",
-      "name": "data-CPOiqXYy",
+    "_data-ej43E9WT-CDPRFb1z.js": {
+      "file": "assets/data-ej43E9WT-CDPRFb1z.js",
+      "name": "data-ej43E9WT",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
         "_errors-BPm2c1ar-mpjgtJAk.js"
       ],
       "dynamicImports": [
-        "../../../packages/splats/dist/spz-CE8B9KX0.js",
-        "../../../packages/splats/dist/sog-j3Hy_MRC.js",
-        "../../../packages/splats/dist/encode-L3VUclI6.js"
+        "../../../packages/splats/dist/spz-pVMWTbjp.js",
+        "../../../packages/splats/dist/sog-CdeBcNLg.js",
+        "../../../packages/splats/dist/encode-BsXxnHHx.js"
       ]
     },
     "_errors-BPm2c1ar-mpjgtJAk.js": {
@@ -282,8 +282,8 @@
         "_version-YYhCZP03.js"
       ]
     },
-    "_geometry-DP4OBCjY.js": {
-      "file": "assets/geometry-DP4OBCjY.js",
+    "_geometry-DkjIhA1v.js": {
+      "file": "assets/geometry-DkjIhA1v.js",
       "name": "geometry",
       "imports": [
         "_version-YYhCZP03.js"
@@ -293,15 +293,15 @@
       "file": "assets/meshopt-D0I6gboe.js",
       "name": "meshopt"
     },
-    "_model-9pLtCHsW-KV7ZyMm3.js": {
-      "file": "assets/model-9pLtCHsW-KV7ZyMm3.js",
-      "name": "model-9pLtCHsW",
+    "_model-BdfnhR_L-CZOf_SVM.js": {
+      "file": "assets/model-BdfnhR_L-CZOf_SVM.js",
+      "name": "model-BdfnhR_L",
       "imports": [
         "_version-YYhCZP03.js",
         "_extension-Bn1Wm_pY.js",
         "_preload-helper-CRzLMJPS.js",
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-Q9x4nW80-DJ5vDuBQ.js",
+        "_asset-Q9x4nW80-WgnG0mpd.js",
         "_shader-CCcD92m2-CZ5F82XH.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-D-u4lFVe.js"
@@ -341,13 +341,13 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-Ck0NkEUI.js",
+      "file": "assets/index-D0jRferE.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_geometry-DP4OBCjY.js",
+        "_geometry-DkjIhA1v.js",
         "_preload-helper-CRzLMJPS.js"
       ],
       "dynamicImports": [
@@ -366,8 +366,8 @@
       "encoding": "identity",
       "transferred": 969,
       "raw": 719,
-      "gzip": 412,
-      "brotli": 261
+      "gzip": 410,
+      "brotli": 260
     },
     {
       "path": "assets/version-YYhCZP03.js",
@@ -379,15 +379,6 @@
       "brotli": 526
     },
     {
-      "path": "assets/geometry-DP4OBCjY.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 2369,
-      "raw": 3908,
-      "gzip": 1999,
-      "brotli": 1806
-    },
-    {
       "path": "assets/preload-helper-CRzLMJPS.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -397,13 +388,22 @@
       "brotli": 682
     },
     {
-      "path": "assets/index-Ck0NkEUI.js",
+      "path": "assets/geometry-DkjIhA1v.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 2374,
+      "raw": 3913,
+      "gzip": 2004,
+      "brotli": 1810
+    },
+    {
+      "path": "assets/index-D0jRferE.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 26825,
-      "raw": 64335,
-      "gzip": 26443,
-      "brotli": 23318
+      "transferred": 26853,
+      "raw": 64429,
+      "gzip": 26471,
+      "brotli": 23350
     },
     {
       "path": "model.glb",
@@ -424,25 +424,25 @@
       "brotli": 113
     },
     {
-      "path": "assets/dist-wazJCoUY.js",
+      "path": "assets/dist-CNVwdiK6.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 7646,
+      "transferred": 7647,
       "raw": 19292,
-      "gzip": 7274,
-      "brotli": 6509
+      "gzip": 7275,
+      "brotli": 6501
     }
   ],
   "total": {
     "requests": 8,
-    "transferred": 41980,
-    "raw": 92317,
-    "gzip": 38092,
-    "brotli": 33574
+    "transferred": 42014,
+    "raw": 92416,
+    "gzip": 38124,
+    "brotli": 33601
   },
   "notFetched": [
     {
-      "path": "assets/asset-Q9x4nW80-DJ5vDuBQ.js",
+      "path": "assets/asset-Q9x4nW80-WgnG0mpd.js",
       "raw": 32622
     },
     {
@@ -458,16 +458,16 @@
       "raw": 1134
     },
     {
-      "path": "assets/compression-BEwrKYiN-DYlc6qEy.js",
+      "path": "assets/compression-BEwrKYiN-EYMQbzOZ.js",
       "raw": 4131
     },
     {
-      "path": "assets/data-CPOiqXYy-TwGGbryT.js",
-      "raw": 21305
+      "path": "assets/data-CilOmsa5.js",
+      "raw": 335
     },
     {
-      "path": "assets/data-TysQEaHv.js",
-      "raw": 335
+      "path": "assets/data-ej43E9WT-CDPRFb1z.js",
+      "raw": 21285
     },
     {
       "path": "assets/dds-DRFH9eka.js",
@@ -478,19 +478,19 @@
       "raw": 17754
     },
     {
+      "path": "assets/dist-B5at-6iY.js",
+      "raw": 27157
+    },
+    {
+      "path": "assets/dist-BeVJTquy.js",
+      "raw": 978
+    },
+    {
       "path": "assets/dist-BPVfzREQ.js",
       "raw": 7049
     },
     {
-      "path": "assets/dist-C2VGkvhw.js",
-      "raw": 27157
-    },
-    {
-      "path": "assets/dist-DrGF0_TE.js",
-      "raw": 978
-    },
-    {
-      "path": "assets/dist-KLS0cRYl.js",
+      "path": "assets/dist-DW2HSpst.js",
       "raw": 76605
     },
     {
@@ -502,7 +502,7 @@
       "raw": 58456
     },
     {
-      "path": "assets/encode-L3VUclI6-B-UMy08h.js",
+      "path": "assets/encode-BsXxnHHx-xZi4LX5U.js",
       "raw": 10578
     },
     {
@@ -534,8 +534,8 @@
       "raw": 7135
     },
     {
-      "path": "assets/model-9pLtCHsW-KV7ZyMm3.js",
-      "raw": 151297
+      "path": "assets/model-BdfnhR_L-CZOf_SVM.js",
+      "raw": 151089
     },
     {
       "path": "assets/optimize-7SEzNA23-BesG8gNH.js",
@@ -546,7 +546,7 @@
       "raw": 37755
     },
     {
-      "path": "assets/sog-j3Hy_MRC-D-3D618Z.js",
+      "path": "assets/sog-CdeBcNLg-DWlNWTgJ.js",
       "raw": 11597
     },
     {
@@ -554,11 +554,11 @@
       "raw": 2872
     },
     {
-      "path": "assets/splats-C5H1nFS9.js",
+      "path": "assets/splats-D7ReYqbz.js",
       "raw": 4104
     },
     {
-      "path": "assets/spz-CE8B9KX0-CJdiFvhl.js",
+      "path": "assets/spz-pVMWTbjp-OWf5PJpY.js",
       "raw": 4292
     },
     {
