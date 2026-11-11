@@ -41,6 +41,10 @@ const fileOf = (path) =>
   files[path] ??
   (/^\/cache-files\/tile\/\d+$/.test(path) ? Buffer.alloc(10, Number(path.split('/').pop()) & 255) : undefined);
 let released = false;
+// While set, the server drops the connection of every service-worker file request: a real network failure that the
+// worker sees, on every browser (see the service worker step below for why the browser's offline mode is not used).
+let unreachable = false;
+const dropped = [];
 const held = [];
 const releaseBody = () => {
   released = true;
@@ -75,6 +79,10 @@ const server = await createServer({
           }
           const body = fileOf(path);
           if (!body) return next();
+          if (unreachable && request.url.startsWith('/packages/cache/test/sw-files/')) {
+            dropped.push({ path, range: request.headers.range });
+            return request.socket.destroy();
+          }
           const range = request.headers.range;
           log.push({ path, range, etag: request.headers['if-none-match'] });
           response.setHeader('etag', etag);
@@ -308,13 +316,18 @@ try {
   assert.equal(await call('serviceWorkerReady', 2), true);
   const replacementWorker = await call('workerProof', 'identity');
   assert.notEqual(replacementWorker, originalWorker, 'a distinct worker instance reopens IndexedDB');
-  await context.setOffline(true);
+  // The network fails under the worker: the server drops every connection. Playwright's Firefox offline mode
+  // (context.setOffline) cancels a page request before the service worker sees it, so no fetch event reaches the
+  // worker there and the page gets a NetworkError (KB-FF2); a dropped connection is the same failure on every browser.
+  unreachable = true;
   before = log.length;
   const serviceOffline = await call('serviceWorkerRange', 'bytes=1000-2999');
+  unreachable = false;
   assert.deepEqual(serviceOffline, serviceCold, 'a restarted service worker reopens its persisted ranges offline');
-  assert.equal(log.length, before);
-  report.serviceWorker = { cold: serviceCold, offline: serviceOffline, restarted: true };
-  await context.setOffline(false);
+  assert.equal(log.length, before, 'no byte came from the server');
+  // Browsers retry an idempotent request on a reset connection a varying number of times, so only "at least one".
+  assert.ok(dropped.length >= 1, 'the worker tried the network (its revalidation) and it failed');
+  report.serviceWorker = { cold: serviceCold, offline: serviceOffline, dropped: dropped.length, restarted: true };
 
   assert.deepEqual(errors, []);
   mkdirSync(results, { recursive: true });
