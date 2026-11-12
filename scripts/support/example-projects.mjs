@@ -20,6 +20,7 @@ export const EXAMPLE_FOLDERS = [
   'gallery',
   'molten-words',
   'quickstart',
+  'test-pages',
   'usdz-loader',
   'webxr-orbit',
   'xr-device-check',

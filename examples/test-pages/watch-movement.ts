@@ -13,7 +13,7 @@ import { Tonemap } from '@margoengine/tonemap';
 import { createStage } from 'margoengine';
 
 // ============================================================================
-// 1. 100% PROCEDURAL HDR STUDIO ENVIRONMENT & 1K MACHINED NORMAL MAPS
+// 1. 100% PROCEDURAL HDR STUDIO ENVIRONMENT & 512 PX MACHINED NORMAL MAPS
 // ============================================================================
 
 function createProceduralStudioHDR(width = 256, height = 128) {
@@ -198,7 +198,7 @@ class GeometryBuilder {
   }
 
   /**
-   * Adds a chamfered ring or toothed involute gear ring centered at (cx, cy, cz).
+   * Adds a chamfered ring or toothed gear ring centered at (cx, cy, cz).
    */
   addChamferedRing(opts: {
     cx?: number;
@@ -225,7 +225,7 @@ class GeometryBuilder {
 
     const outerRadiusAt = (theta: number) => {
       if (teeth <= 0 || toothDepth <= 0) return baseOuterR;
-      // Smooth trapezoid/involute profile
+      // Smooth trapezoid profile (a tanh-shaped sine, not a true involute)
       const s = Math.sin(theta * teeth);
       const shaped = Math.tanh(s * 2.4) / Math.tanh(2.4);
       return baseOuterR + toothDepth * (shaped * 0.5 + 0.5);
@@ -330,7 +330,7 @@ class GeometryBuilder {
   }
 
   /**
-   * Builds a complete skeletonized CNC involute gear wheel with chamfered teeth, spokes, central boss, and jewel bore.
+   * Builds a complete skeletonized CNC gear wheel with chamfered teeth, spokes, central boss, and jewel bore.
    */
   addSkeletonGear(opts: { pitchR: number; teeth: number; thickness: number; spokes: number; boreR?: number }) {
     const moduleSize = (opts.pitchR * 2) / opts.teeth;
@@ -402,11 +402,11 @@ interface SubAssemblySpec {
 const SUB_ASSEMBLIES: SubAssemblySpec[] = [
   {
     key: 'sapphire_bezel',
-    label: 'Fluted Titanium Bezel & Domed Sapphire',
+    label: 'Fluted Titanium Bezel & Sapphire Ring',
     shortPin: '01 · Sapphire & Bezel',
     category: 'CRYSTAL · IOR 1.77 + CLEARCOAT',
     description:
-      'CNC-fluted Grade 5 titanium outer case ring with 60 applied rose-gold indices and a domed sapphire crystal rendered with physical transmission and specular clearcoat.',
+      'CNC-fluted titanium outer case ring with 60 applied titanium indices and a flat sapphire chapter ring rendered with physical transmission and specular clearcoat.',
     basePos: [0, 0.22, 0],
     explodeVec: [0, 0.68, 0],
     calloutElbow: [145, -52],
@@ -416,9 +416,9 @@ const SUB_ASSEMBLIES: SubAssemblySpec[] = [
     key: 'geneva_bridge',
     label: 'Côtes de Genève Upper Chronograph Bridge',
     shortPin: '02 · Geneva Bridge',
-    category: 'BRIDGE · 1K STRIPES NORMAL MAP',
+    category: 'BRIDGE · 512 PX STRIPES NORMAL MAP',
     description:
-      'Rhodium-plated brass bridge spanning cleanly above the gear train on outer perimeter pillars, with procedural Côtes de Genève normal maps and synthetic ruby jewel bearings.',
+      'Rhodium bridge spanning above the gear train on two outer pillars, with a procedural Côtes de Genève normal map and a ruby jewel cap.',
     basePos: [0, 0.16, 0],
     explodeVec: [0, 0.38, 0],
     calloutElbow: [-145, -42],
@@ -426,11 +426,11 @@ const SUB_ASSEMBLIES: SubAssemblySpec[] = [
   },
   {
     key: 'balance_escapement',
-    label: '4 Hz Glucydur Balance Wheel & Breguet Overcoil',
+    label: '4 Hz Balance Wheel & Concentric Hairspring',
     shortPin: '03 · 4 Hz Balance Wheel',
     category: 'ESCAPEMENT · 28,800 VPH OSCILLATOR',
     description:
-      'High-frequency balance wheel with gold timing weights and a breathing concentric hairspring oscillating horizontally in-plane at 4.0 Hz with zero vertical bridge interference.',
+      'Rose-gold balance wheel with 16 timing weights and four concentric hairspring rings, oscillating in its horizontal plane at 4.0 Hz.',
     basePos: [-0.36, 0.04, 0.34],
     explodeVec: [-0.28, 0.18, 0.28],
     calloutElbow: [-140, 22],
@@ -441,9 +441,9 @@ const SUB_ASSEMBLIES: SubAssemblySpec[] = [
     key: 'center_chrono_wheel',
     label: '18K Rose-Gold Great Wheel & Sweeping Hands',
     shortPin: '04 · Center Great Wheel',
-    category: 'GEAR TRAIN · 48 INVOLUTE TEETH',
+    category: 'GEAR TRAIN · 48 TEETH',
     description:
-      'Skeletonized 48-tooth involute center wheel with 6 chamfered spokes, circular satin normal map, and coaxial chronograph hands locked mathematically to the drive train.',
+      'Skeletonized 48-tooth center wheel with 6 chamfered spokes, circular satin normal map, and coaxial chronograph hands locked mathematically to the drive train.',
     basePos: [0, -0.01, 0],
     explodeVec: [0, 0.02, 0],
     calloutElbow: [145, -8],
@@ -467,11 +467,11 @@ const SUB_ASSEMBLIES: SubAssemblySpec[] = [
   },
   {
     key: 'sculpted_mainplate',
-    label: 'Engine-Turned Mainplate & Ruby Chatons',
+    label: 'Mainplate & Case Lugs',
     shortPin: '06 · Sculpted Mainplate',
     category: 'CHASSIS · ANISOTROPIC TITANIUM',
     description:
-      'Multi-tiered CNC-milled titanium baseplate with recessed gear wells, gold-mounted ruby chatons, and 12 fluted perimeter lugs grounded by separable-Gaussian ContactShadows.',
+      'Two-tier titanium baseplate with a nested counter-wheel and 4 case lugs, grounded by separable-Gaussian ContactShadows.',
     basePos: [0, -0.14, 0],
     explodeVec: [0, -0.44, 0],
     calloutElbow: [-140, 56],
@@ -493,14 +493,14 @@ const CHAPTERS: ChapterConfig[] = [
   {
     kicker: 'CHAPTER 01 · CALIBRE M900',
     headlineHtml: 'Mathematical Horology.<br /><strong>Built From Pure Code.</strong>',
-    lead: 'Every chamfered involute gear tooth, skeletonized spoke, Côtes de Genève bridge, Breguet hairspring, and sapphire crystal is synthesized procedurally in TypeScript with 1K normal maps and HDR studio IBL.',
+    lead: 'Every chamfered gear tooth, skeletonized spoke, Côtes de Genève bridge, hairspring, and sapphire ring is synthesized procedurally in TypeScript with 512 px normal maps and HDR studio IBL.',
     camPos: [1.32, 1.52, 2.35],
     camTarget: [-0.05, 0.0, 0.0],
     explode: 0,
     highlightKey: null,
   },
   {
-    kicker: 'CHAPTER 02 · INVOLUTE GEAR TRAIN',
+    kicker: 'CHAPTER 02 · GEAR TRAIN',
     headlineHtml: 'Exact Pitch Tangency.<br /><strong>Zero Tooth Clipping.</strong>',
     lead: 'The 48-tooth rose-gold center wheel and 32-tooth rhodium barrel wheel sit at exact pitch-circle tangency (R1 + R2 = 0.65) with locked angular velocity ω₂ = -(48/32)ω₁.',
     camPos: [0.68, 0.82, 1.05],
@@ -511,7 +511,7 @@ const CHAPTERS: ChapterConfig[] = [
   {
     kicker: 'CHAPTER 03 · 4 HZ BALANCE & RUBY',
     headlineHtml: '28,800 Beats Per Hour.<br /><strong>In-Plane Coaxial Clearance.</strong>',
-    lead: 'Inspect the oscillating Glucydur balance wheel, concentric hairspring coils, and corundum ruby jewel bearing—rotating strictly in its horizontal deck beneath the arched Geneva bridge.',
+    lead: 'Inspect the oscillating balance wheel and its concentric hairspring rings, rotating in their horizontal deck beneath the Geneva bridge and its ruby jewel cap.',
     camPos: [-0.75, 0.72, 0.98],
     camTarget: [-0.28, 0.05, 0.26],
     explode: 0.08,
@@ -519,8 +519,8 @@ const CHAPTERS: ChapterConfig[] = [
   },
   {
     kicker: 'CHAPTER 04 · EXPLODED CAD STACK',
-    headlineHtml: 'Six Coaxial Decks.<br /><strong>Full Vertical Disassembly.</strong>',
-    lead: 'Slide the disassembly control or click any floating 3D engineering callout to separate all six horological decks along their vertical spindle axes with live GPU Jump-Flood outlines.',
+    headlineHtml: 'Six Decks.<br /><strong>Full Disassembly.</strong>',
+    lead: 'Slide the disassembly control or click any floating 3D engineering callout to separate all six horological decks along their explode paths, with live GPU Jump-Flood outlines.',
     camPos: [1.68, 1.24, 2.78],
     camTarget: [-0.06, 0.1, 0.0],
     explode: 1.0,
@@ -633,7 +633,7 @@ async function main() {
   });
   PostStack.attach(stage.engine, [ssao, bloom, tonemap]);
 
-  // 3. Procedural 1K Normal Maps & Luxury Horological PBR Materials
+  // 3. Procedural 512 px Normal Maps & Luxury Horological PBR Materials
   const genevaNormal = createGenevaStripesNormalMap(512);
   const radialNormal = createRadialBrushedNormalMap(512);
 
@@ -765,7 +765,7 @@ async function main() {
   const meshBridgeRuby = createMesh(stage.engine, bRuby.toMeshGeometry(), rubyJewelMat);
   meshBridgeRuby.root.setParent(meshBridge.root);
 
-  // --- Assembly 3: 4 Hz Glucydur Balance Wheel, Timing Weights & Concentric Hairspring ---
+  // --- Assembly 3: 4 Hz Balance Wheel, Timing Weights & Concentric Hairspring ---
   const b3 = new GeometryBuilder();
   b3.addChamferedRing({ innerR: 0.24, outerR: 0.29, height: 0.042, bevel: 0.009, segs: 120 });
   b3.addChamferedRing({ innerR: 0.018, outerR: 0.065, height: 0.06, bevel: 0.01, segs: 48 });
@@ -778,7 +778,7 @@ async function main() {
     const a = (w / 16) * Math.PI * 2;
     b3.addBox(Math.cos(a) * 0.305, 0, -Math.sin(a) * 0.305, 0.028, 0.024, 0.022, a);
   }
-  // Concentric Breguet hairspring rings
+  // Concentric hairspring rings
   for (let c = 1; c <= 4; c++) {
     const r = 0.075 + c * 0.032;
     b3.addChamferedRing({
@@ -1064,7 +1064,7 @@ async function main() {
       partDescEl.textContent =
         'Click any gear wheel, bridge, balance assembly, or sapphire bezel on the 3D movement to isolate its GPU Jump-Flood outline and inspect its procedural geometry.';
       specGeoEl.textContent = `${totalVertices.toLocaleString()} / ${totalTriangles.toLocaleString()}`;
-      specTexEl.textContent = '1K Geneva + Satin';
+      specTexEl.textContent = '512 px Geneva + Satin';
     }
   }
 

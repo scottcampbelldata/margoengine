@@ -19,6 +19,7 @@
     "gallery/*.ts",
     "molten-words/*.ts",
     "quickstart/*.ts",
+    "test-pages/*.ts",
     "usdz-loader/*.ts",
     "webxr-orbit/*.ts",
     "xr-device-check/*.ts"

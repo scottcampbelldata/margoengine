@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CHRONO-IX · Calibre M900 — 100% Procedural CNC Horology in Margo Engine</title>
+  <title>Watch movement test page</title>
   <style>
     :root {
       --bg: #06080d;
@@ -592,7 +592,7 @@
 <body>
   <div id="loader-overlay">
     <div class="loader-ring"></div>
-    <div class="loader-text" id="loader-status">Synthesizing CNC Involute Gears &amp; Procedural 1K Normal Maps…</div>
+    <div class="loader-text" id="loader-status">Synthesizing CNC Gears &amp; Procedural 512 px Normal Maps…</div>
   </div>
 
   <canvas id="viewport"></canvas>
@@ -612,7 +612,7 @@
 
       <nav class="chapter-tabs" aria-label="Showcase Chapters">
         <button class="chapter-btn active" data-chapter="0">01 · Calibre Overview</button>
-        <button class="chapter-btn" data-chapter="1">02 · Involute Gear Train</button>
+        <button class="chapter-btn" data-chapter="1">02 · Gear Train</button>
         <button class="chapter-btn" data-chapter="2">03 · 4 Hz Balance &amp; Ruby</button>
         <button class="chapter-btn" data-chapter="3">04 · Exploded CAD Stack</button>
       </nav>
@@ -633,7 +633,7 @@
           Mathematical Horology.<br /><strong>Built From Pure Code.</strong>
         </h1>
         <p class="lead" id="chapter-lead">
-          Every chamfered involute gear tooth, skeletonized spoke, Côtes de Genève bridge, Breguet hairspring, and sapphire crystal is synthesized procedurally in TypeScript with 1K normal maps and HDR studio IBL.
+          Every chamfered gear tooth, skeletonized spoke, Côtes de Genève bridge, hairspring, and sapphire ring is synthesized procedurally in TypeScript with 512 px normal maps and HDR studio IBL.
         </p>
 
         <div class="studio-controls">
@@ -681,7 +681,7 @@
           </div>
           <div class="spec-cell">
             <div class="spec-label">Surface Finish</div>
-            <div class="spec-val" id="spec-tex">1K Geneva + Satin</div>
+            <div class="spec-val" id="spec-tex">512 px Geneva + Satin</div>
           </div>
           <div class="spec-cell">
             <div class="spec-label">Escapement Beat</div>
@@ -697,7 +697,7 @@
 
     <footer class="bottom-bar">
       <div class="pipeline-tags">
-        <span class="pipeline-tag"><strong>Geometry:</strong> 100% Procedural Chamfered Involute Gears + Skeleton Bridges</span>
+        <span class="pipeline-tag"><strong>Geometry:</strong> 100% Procedural Chamfered Gears + Skeleton Bridges</span>
         <span class="pipeline-tag"><strong>Materials:</strong> @margoengine/materials (Anisotropy · Clearcoat · Transmission)</span>
         <span class="pipeline-tag"><strong>Post:</strong> 32-Tap SSAO · Bloom · PBR Neutral Tonemap · ContactShadows</span>
       </div>
@@ -705,6 +705,6 @@
     </footer>
   </div>
 
-  <script type="module" src="./chronometer-landing.ts"></script>
+  <script type="module" src="./watch-movement.ts"></script>
 </body>
 </html>
