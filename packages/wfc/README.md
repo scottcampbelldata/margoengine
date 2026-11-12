@@ -202,7 +202,7 @@ coded failed. Cached outputs are copies. Storage grows with visited chunks; clea
 it. Failed or aborted calls commit nothing. The world seed defaults to 1; solveChunk takes backend auto, attempts 4 and
 signal absent. No hidden eviction, caller-authored boundary rules or caller repair is required.
 
-Rust/Wasm SIMD is selected for eligible sets because it was faster in every paired round on both the 192x192 open and 64x64x4 parity fixtures, with identical output hashes and work counts. The seven rounds interleave three runs per implementation and compare per-round minima. This is loaded SCOTT-DEV evidence, not a release speed claim; wider/weighted cases retain TypeScript because the measured Rust path supports only <=32 unit-weight IDs. See docs/whitepaper/results/batch-69-heap.json.
+Rust/Wasm SIMD is selected for eligible sets because it was faster in every paired round on both the 192x192 open and 64x64x4 parity fixtures, with identical output hashes and work counts. The seven rounds interleave three runs per implementation and compare per-round minima. This is evidence from a loaded development machine, not a release speed claim; wider/weighted cases retain TypeScript because the measured Rust path supports only <=32 unit-weight IDs. See docs/whitepaper/results/batch-69-heap.json.
 
 ## Worker solving (optional wfc/worker, 1,331 B min+gzip)
 

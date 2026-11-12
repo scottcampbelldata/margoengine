@@ -108,7 +108,7 @@ The outside-reference test renders all 123 primitives of Khronos MetalRoughSpher
 camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.7865498860677083 on the recorded
 RTX A6000; the WebGL2 compatibility layer measures 1.7865447998046875. Native WebGL2 rejects PBR with code
 `unsupported`. These are measured error ceilings, not visual parity. The unresolved picture loss, full
-settings, source hashes and coverage are in [batch 160 reproduction](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
+settings, source hashes and coverage are in [reproduction steps](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
 From a built checkout, with the outside reference PNG already captured:
 
 ```sh
@@ -600,7 +600,7 @@ Read against the two extensions' READMEs on the Khronos glTF repository as of 20
 - A fixture is a clustered point light with its profile resampled for its node, so it can aim anywhere, uplights included. The beam runs down the node's -Z. `multiplier` and `color` scale it as the extension says; `color` clamps to 0 to 1.
 - `.ies` files read through `parseIES`: types B and C, as the extension requires. Type A, which it leaves optional, is refused.
 - A cube face reads as the sRGB decode of rgb / alpha with its rows swapped, which is how the one real file reads: projected onto spherical harmonics, only that reading gives every l = 1 and l = 2 coefficient the file states its sign (the extension's "flipped about its vertical axis" would get six or more wrong). `Environment` prefilters its own mips from mip 0, so the file's lower mips are not read, and its own irradiance comes from the same cube: `irradianceCoefficients` stays in `lights.imageLight` as data.
-- `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES`, `placeIESLights` (the fixtures and aimed profiles for a list of lights, given each node's world matrix) and `rotateCube` are the steps between. Fixtures share an aimed profile only when they use the same parsed profile and point the same way (batch 132: two unnamed profiles of one LM-63 format once shared the first one's beam).
+- `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES`, `placeIESLights` (the fixtures and aimed profiles for a list of lights, given each node's world matrix) and `rotateCube` are the steps between. Fixtures share an aimed profile only when they use the same parsed profile and point the same way (two unnamed profiles of one LM-63 format once shared the first one's beam).
 
 Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their nodes were when applied, and at most 16 fixtures differ in profile or aim.
 

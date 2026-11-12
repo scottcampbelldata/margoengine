@@ -246,7 +246,7 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
 The optional `installTiers()` permits half-float and LDR devices while retaining the
 same WGSL renderer. `install()` still defaults to the full tier. The device entry
 and the scoped package scenes below are validated. Remaining package coverage is
-tracked as batch 273 follow-up T273-COVERAGE in [limits.md](../../docs/limits.md);
+tracked as follow-up T273-COVERAGE in [limits.md](../../docs/limits.md);
 this release piece makes no package-wide parity claim.
 
 ```ts
@@ -507,14 +507,14 @@ twice. A helper call with sampling nested in its arguments now calls a copy of t
 shader with no nesting is translated as before. Regression: the `nestedSampling` case of test/features.html (five
 nesting forms, native against the layer) and test/glsl.test.js (no helper inside its own arguments).
 
-Driver workaround (2026-11-10, lane I): Chrome on ANGLE's Metal back end drops the first draw through a framebuffer
+Driver workaround (2026-11-10): Chrome on ANGLE's Metal back end drops the first draw through a framebuffer
 after the WebGL2 context's canvas was shown with `transferToImageBitmap` when that framebuffer's texture was uploaded to
 since its last draw, with no GL error. Scatter-tier dispatches refresh a buffer's word texture (R32UI, 4,096 x 8,192 words; a buffer past 128 MiB gets as many
 as it needs, one draw each, so a storage binding reaches `maxStorageBufferBindingSize`, 1 GiB at 8,192) with such an upload, so
 on a Mac the second and later frames of a compute pass lost their stores. The device now attaches each cached
 framebuffer again on its first use after every shown frame (one re-attach and status check per framebuffer and frame,
 no new GL objects). Raw repro: `node test/metal-dropped-draw-repro.mjs`; regression: `scatterAfterWrite` in
-test/compute.html; details in docs/known-bugs.md "Batch 132 audit: animation". `CompatQueue.writeBuffer` also carries
+test/compute.html; details in the animation audit entry in docs/known-bugs.md. `CompatQueue.writeBuffer` also carries
 the mark `Symbol.for('margoengine.writeBuffer.copiesInput')`: it copies its input before it returns and never changes
 it, so @margoengine/animation keeps its upload caches on this queue.
 

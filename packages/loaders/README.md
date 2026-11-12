@@ -152,7 +152,7 @@ const parts = toGeometries(mesh, {normals: 'flat'}); // core Geometries of at mo
 
 Options (defaults): `weld: false`, `maxTriangles: 16,000,000`, `maxVertices: 8,000,000` (checked before allocating, so a short file cannot claim millions; the output has three vertices per triangle before welding, so the default `maxVertices` admits 2,666,666 triangles: pass `maxVertices: 3 * triangles` for more), `signal` (aborts with a `LoaderError` of code `'aborted'`, checked every 16,384 triangles). A binary file is recognised by its length (`84 + 50 * triangles`), so binary files whose header starts with `solid` still work; otherwise text starting with `solid` is read as ASCII, several solids in one file are concatenated, and keywords are case-insensitive. Errors are `LoaderError`s: `'truncated'` (data shorter than the header says; pass the whole file), `'syntax'`, `'limit'` (raise `maxTriangles` or `maxVertices`), `'header'`, `'aborted'`. The Materialise Magics color variant and per-facet colors in ASCII files are not read.
 
-The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loader.
+The repository's speed matrix (`docs/whitepaper`) measures this loader.
 
 ## Real files
 

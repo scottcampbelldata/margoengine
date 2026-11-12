@@ -6,7 +6,7 @@
 //   node scripts/readme-entries.mjs --shrink   rewrites the known list down to what is still undocumented
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import test from 'node:test';
 import { undocumentedEntries } from '../scripts/readme-entries.mjs';
 
@@ -76,4 +76,56 @@ test('the command finder reads workspace flags and ignores prose', () => {
   assert.deepEqual(commandsOf('npm run build:packages: then'), [{ script: 'build:packages', workspace: undefined }]);
   assert.deepEqual(commandsOf('npm install @margoengine/core'), []);
   assert.deepEqual(commandsOf('npm --prefix x run dev'), []);
+});
+
+// Package READMEs and package guides speak to a user of the package: no work-tracking labels (batch numbers, lanes,
+// work lists, machine names, "needs Scott"), whose meaning lives in the maintainers' notes. Say the plain fact instead.
+// Paths and link targets that merely contain "batch-NNN" are real file names and are not matched (no space or capital).
+const internalLabels = [
+  /\bbatch \d{2,}/i,
+  /\bother lanes\b/i,
+  /\blane [A-Z]\d?\b/,
+  /\bcodex-/i,
+  /\blist[ -][2-9]\b/i,
+  /\bwork lists?\b/i,
+  /\bAMD GPU hunt\b/,
+  /\bBeelink\b/,
+  /\bneeds? Scott\b/i,
+  /(?<!-)\bScott(?:'s)?\b(?! Campbell\b)/,
+  /\bSCOTT-DEV\b/,
+  /\bhelper [A-Z]\d?\b/,
+];
+// Files the open cleanup pull request edits; its owner clears them. Remove each entry once its labels are gone.
+const labelsOwnedElsewhere = new Set([
+  'packages/biomes/docs/roads-and-paths.md',
+  'packages/clustered/README.md',
+  'packages/mcp/README.md',
+  'packages/post/README.md',
+  'packages/terrain/README.md',
+  'packages/tonemap/README.md',
+  'packages/voxel/README.md',
+]);
+
+test('package READMEs and guides carry no internal work-tracking labels', () => {
+  const docs = [];
+  for (const folder of folders) {
+    const base = join('packages', folder);
+    if (existsSync(join(root, base, 'README.md'))) docs.push(join(base, 'README.md'));
+    const guides = join(root, base, 'docs');
+    if (existsSync(guides)) for (const name of readdirSync(guides)) if (name.endsWith('.md')) docs.push(join(base, 'docs', name));
+  }
+  const found = [];
+  for (const file of docs) {
+    const path = file.split(sep).join('/');
+    if (labelsOwnedElsewhere.has(path)) continue;
+    readFileSync(join(root, file), 'utf8')
+      .split(/\r?\n/)
+      .forEach((line, index) => {
+        for (const label of internalLabels) {
+          const match = label.exec(line);
+          if (match) found.push(`${path}:${index + 1}: "${match[0]}"`);
+        }
+      });
+  }
+  assert.deepEqual(found, [], `internal labels in package docs, reword as plain facts:\n${found.join('\n')}`);
 });
