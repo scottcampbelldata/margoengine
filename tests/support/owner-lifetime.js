@@ -223,7 +223,7 @@ export class LifetimeObserver {
 // from the second disposal to the third.
 export const lifecycleCases = ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached', 'cycles'];
 export async function exerciseLifetime(fixture, adapter, { target = 'secondary', mode = 'direct' } = {}) {
-  const observer = new LifetimeObserver(), token = {}, peerToken = {}, dependencyToken = {}, hosts = [];
+  const observer = new LifetimeObserver(), token = {}, peerToken = {}, dependencyToken = {}, warmToken = {}, hosts = [];
   let handle, peer;
   observer.watchEvents();
   try {
@@ -236,6 +236,27 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     observer.watchEngine(foreign.engine, peerToken);
     observer.watchScene(foreign.engine.scene, peerToken);
     const dependency = (fn) => observer.scope(dependencyToken, fn);
+    // A fixture with `warmUp` (its reason) uses a fixed set a package makes once per device on first use and keeps for
+    // the device's life, such as materials' 1x1 default textures. It is attached, drawn and disposed once on each
+    // device, in a scene of its own, before anything is measured and again after a device loss, so that set counts
+    // against no owner. Every measured attach comes after it: a leak or growth per attach still fails.
+    const warmUp = (h) => fixture.warmUp && observer.hold(warmToken, async () => {
+      const e = h.engine, warm = e.createScene('owner-lifetime:warm-up');
+      let pending;
+      const scope = { name: 'owner-lifetime:warm-up', setup() {
+        pending = fixture.create({ engine: e, scene: warm, host: h, dependency: (fn) => fn() });
+      } };
+      warm.use(scope);
+      warm.removePlugin(scope.name);
+      const made = await pending;
+      if (made.plugin && !e.sceneOf(made.plugin)) warm.use(made.plugin);
+      const view = { id: 'owner-lifetime:warm-up', scene: warm, camera: e.camera, viewport: [0, 0, 64, 32], pixels: true };
+      await h.render([view]);
+      made.dispose();
+      await made.cleanup?.();
+      warm.dispose();
+    });
+    for (const h of hosts) await warmUp(h);
     let pendingPeer;
     const peerScope = { name: 'owner-lifetime:peer', setup() {
       pendingPeer = observer.scope(peerToken, () => fixture.create({ engine: foreign.engine,
@@ -336,6 +357,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     }
     if (mode === 'loss-attached') {
       await host.lose(observer);
+      await warmUp(host);
       await render();
       for (const plugin of installed) invariant(engine.sceneOf(plugin) === scene, 'restore retains the owner');
     }
@@ -355,7 +377,10 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
       const replacements = installed.map((p) => ({ name: p.name, setup() {} }));
       for (const replacement of replacements) scene.use(replacement);
       handle.dispose();
-      if (mode === 'loss-detached') await host.lose(observer);
+      if (mode === 'loss-detached') {
+        await host.lose(observer);
+        await warmUp(host);
+      }
       const executions = observer.executionCounts.get(token) ?? 0;
       // Check the detached graph alone; the peer still has its own live passes.
       await host.render(views);

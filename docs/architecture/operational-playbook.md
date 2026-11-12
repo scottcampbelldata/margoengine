@@ -7905,5 +7905,7 @@ checked. The shared harness (`tests/support/owner-lifetime.js`) runs every entry
 through dispose, detach, scene and engine disposal, device loss attached and detached, and `cycles` (three more
 attaches and disposals, GPU objects alive must not grow), and fails on a leaked listener, GPU object or `onFrame`
 callback, `engine.views` left changed, a pass still running after disposal or a same-name plugin in the other scene
-removed. Each new check has a deliberate-defect test in `tests/owner-lifetime.test.js`. Details and the revert proofs:
-docs/integration-fixtures.md.
+removed. Each new check has a deliberate-defect test in `tests/owner-lifetime.test.js`. An entry that uses a fixed set
+a package makes once per device on first use (materials' 1x1 default textures) sets `warmUp` to its reason: the
+harness uses that set up once per device before measuring and after a device loss, never a waiver for a leak per
+attach. Details and the revert proofs: docs/integration-fixtures.md.

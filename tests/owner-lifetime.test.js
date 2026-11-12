@@ -75,6 +75,33 @@ for (const fault of ['registration', 'listeners', 'resources', 'viewport', 'scis
     finally { adapter.close(); }
   });
 
+// A fixed per-device set made on first use and kept for the device's life (materials' 1x1 default textures): the
+// warm-up keeps it off the first owner, in every case and after a device loss; a buffer per attach still fails.
+for (const variant of ['no-warm-up', 'warm-up', 'warm-up-leak'])
+  test(`per-device first-use set: ${variant}`, { timeout: 30000 }, async () => {
+    const adapter = await nodeLifetimeAdapter();
+    const defaults = new WeakMap();
+    const fixture = { name: `device-set-${variant}`, warmUp: variant !== 'no-warm-up' && 'fixed per-device set',
+      create({ engine }) {
+        let leak;
+        const plugin = { name: 'device-set', setup() {
+          if (!defaults.has(engine.gpu)) defaults.set(engine.gpu, engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM }));
+          if (variant === 'warm-up-leak') leak = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM });
+        }, dispose() {
+          engine.sceneOf(this)?.removePlugin(this.name);
+          void leak;
+        } };
+        return { plugin, dispose: () => plugin.dispose() };
+      } };
+    try {
+      if (variant === 'warm-up') {
+        for (const mode of ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached', 'cycles'])
+          for (const target of ['secondary', 'default'])
+            if (target === 'secondary' || mode !== 'scene') await exerciseLifetime(fixture, adapter, { mode, target });
+      } else await assert.rejects(exerciseLifetime(fixture, adapter), /leaked GPU/);
+    } finally { adapter.close(); }
+  });
+
 test('listener observation respects duplicate identity, capture, once and AbortSignal', () => {
   const observer = new LifetimeObserver(), target = new EventTarget(), owner = {}, callback = () => {};
   observer.watchEvents();

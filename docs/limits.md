@@ -48,9 +48,10 @@
   itself on device restore by design, so the attached device-loss case cannot hold for it.
 - `TAAUpscale` draws one full-canvas view and throws on the harness's two views by design; its scene detach is
   covered by `packages/taa/test/scene-owner.test.js`.
-- `OIT` addMesh: the copy's material makes materials' 1x1 default textures on first use on a device and keeps them for
-  the device's life (a fixed set, not a growth); the harness counts them against the first owner, so addMesh stays out
-  (its scene routing is covered by `packages/oit/test/scene.test.js`).
+- A fixture marked `warmUp` (`OIT.addMesh`: materials' 1x1 default textures, made once per device on first use and
+  kept for the device's life) is attached, drawn and disposed once on each device before the measured attach and again
+  after a device loss, so that fixed set counts against no owner. A set that a package's `onDeviceRestored` makes
+  eagerly under the owner would still be charged to it; a leak or growth per attach still fails.
 - `LayerCompositor` (pixel) runs with a hidden layer: a visible layer draws under the target's default viewport with a
   scissor narrower than the view's (the camera rectangle), pixel-correct but not the exact view viewport and scissor
   the harness requires of each draw.

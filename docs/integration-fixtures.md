@@ -13,7 +13,7 @@ AGENTS.md runs it for every changed package.
 
 `export async function fixtures(load)` returns a list of entries. `load('../dist/<entry>.js')` imports the package's
 own built entries (the browser leaf loads them by plain URL, so class and brand checks see one module instance). Each
-entry is `{ name, visible?, viewDraws?, create(ctx) }`; `create` returns a handle:
+entry is `{ name, visible?, viewDraws?, warmUp?, create(ctx) }`; `create` returns a handle:
 
 - `plugin`: the registration under test. When `create` leaves it unattached, the harness attaches it with
   `scene.use(plugin)`.
@@ -21,6 +21,14 @@ entry is `{ name, visible?, viewDraws?, create(ctx) }`; `create` returns a handl
 - `dependencies`: caller-owned plugins `create` installed through `ctx.dependency(fn)` (an Environment, an Animation).
 - `check({ phase, host, views })`: optional package assertions after each render and after disposal.
 - `cleanup()`: releases what the caller owns (meshes, models, its own textures), after the leak checks.
+
+`warmUp` (a reason string) is for an entry that uses a fixed set a package makes once per device on first use and
+keeps for the device's life, such as materials' 1x1 default textures under `OIT.addMesh`. The harness attaches, draws
+and disposes the entry once on each device, in a scene of its own, before measuring and again after a device loss, so
+that set counts against no owner. Without it, all 13 `OIT.addMesh` cases fail "no leaked GPU buffers"; with it they
+pass, and a deliberate leak in `addMesh` still fails all 13 (a buffer made per call: "no leaked GPU buffers"; the copy
+never destroyed: "releases its registration"). `tests/owner-lifetime.test.js` holds the same three cases on a fake
+per-device set.
 
 `ctx` is `{ engine, scene, host, dependency }`. `create` runs inside a setup of `scene`, so `engine.use` and
 `X.attach(engine)` join `scene`, as they do for an app. Meshes and textures the caller owns are made inside
