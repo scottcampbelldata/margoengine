@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15182947,
+  "total": 15186623,
   "history": [
     {
       "date": "2026-10-24",
@@ -8705,6 +8705,12 @@
       "commit": "13b5d6ab2",
       "reason": "batch 132b html: HTMLTexture bind group per pipeline and sRGB decode on HDR targets (html/texture 4,766 to 4,911 B, texture-gl 6,455 to 6,602 B, html 7,287 to 7,296 B; docs/limits.md)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "f00a0e55e",
+      "reason": "webgl2-compat +187 B: audit A2 bug fixes, clear-by-draw rounding to the format steps (drawnClear) and the layer's own one-argument atan (_atan helper)",
+      "grew": 1
     }
   ],
   "items": {
@@ -10009,7 +10015,7 @@
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
-    "@margoengine/webgl2-compat": 116098,
+    "@margoengine/webgl2-compat": 119774,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 85772,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,

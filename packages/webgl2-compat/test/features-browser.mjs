@@ -126,7 +126,7 @@ try {
       assert.deepEqual(compressedFailures(native.result, compat.result, scope), [], `${name}: compressed mip blend: not native's LOD through the driver's blend`);
       lines.push(`${name}: same LOD as native (nearest-mip sweeps), each blended texel the driver's own blend at it, the rest same as native`);
     } else if (name === 'inverseTrig') {
-      // The layer's acos, asin and atan2 within 1e-5 of float64 over the whole domain on every GPU (Scott's ruling,
+      // The layer's acos, asin, atan2 and atan within 1e-5 of float64 over the whole domain on every GPU (Scott's ruling,
       // 2026-11-11: the layer emits its own where the driver's miss it, as on ANGLE D3D11). Native is reported.
       // The largest error and where: sweep, index in it, and the pixel (input or inputs, results).
       const worst = (r) => {
@@ -134,7 +134,12 @@ try {
           at = null;
         for (let p = 0; p < r.length; p += 4) {
           const row = Math.floor(p / 4 / 4096); // the sweep
-          const errors = row < 3 ? [r[p + 1] - Math.acos(r[p]), r[p + 2] - Math.asin(r[p])] : [r[p + 2] - Math.atan2(r[p], r[p + 1])];
+          const errors =
+            row < 3
+              ? [r[p + 1] - Math.acos(r[p]), r[p + 2] - Math.asin(r[p])]
+              : row === 3
+                ? [r[p + 2] - Math.atan2(r[p], r[p + 1])]
+                : [r[p + 1] - Math.atan(r[p])];
           for (const e of errors) {
             const size = Number.isNaN(e) ? Infinity : Math.abs(e);
             if (size > max) {
@@ -145,9 +150,9 @@ try {
         }
         return { max, at };
       };
-      assert.equal(compat.result.length, 2048 * 8 * 4, 'inverseTrig values');
+      assert.equal(compat.result.length, 2048 * 10 * 4, 'inverseTrig values');
       const layer = worst(compat.result);
-      assert.ok(layer.max <= 1e-5, `inverseTrig: the layer's acos, asin or atan2 is ${layer.max} off at ${JSON.stringify(layer.at)}`);
+      assert.ok(layer.max <= 1e-5, `inverseTrig: the layer's acos, asin, atan2 or atan is ${layer.max} off at ${JSON.stringify(layer.at)}`);
       lines.push(`${name}: the layer within ${layer.max.toExponential(2)} of float64 over the whole domain, native ${worst(native.result).max.toExponential(2)}`);
     } else if (name === 'halfExport') {
       // WGSL leaves an inexact narrowing to either neighbour, so native may store either half; the layer stores what

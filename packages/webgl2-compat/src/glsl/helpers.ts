@@ -123,6 +123,8 @@ export const HELPERS: Readonly<Record<string, Helper>> = {
     source: `float _atan2(float y, float x) { float ax = abs(x), ay = abs(y), hi = max(ax, ay); float r = _atanu(hi > 0.0 ? min(ax, ay) / hi : 0.0); if (ay > ax) r = 1.5707964 - r; if ((floatBitsToUint(x) & 0x80000000u) != 0u) r = 3.1415927 - r; return (floatBitsToUint(y) & 0x80000000u) != 0u ? -r : r; }`,
     deps: ['_atanu'],
   },
+  // atan(x) is atan2(x, 1): the octant reduction takes 1 / |x| past 1, where the D3D11 built-in was 1.16e-5 off.
+  _atan: { source: `float _atan(float x) { return _atan2(x, 1.0); }`, deps: ['_atan2'] },
   _asin: { source: `float _asin(float x) { return _atan2(x, sqrt((1.0 - x) * (1.0 + x))); }`, deps: ['_atan2'] },
   _acos: { source: `float _acos(float x) { return _atan2(sqrt((1.0 - x) * (1.0 + x)), x); }`, deps: ['_atan2'] },
 };

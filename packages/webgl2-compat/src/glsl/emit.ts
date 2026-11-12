@@ -170,8 +170,9 @@ interface EmitOptions {
   /** Bytes a uniform block may hold (MAX_UNIFORM_BLOCK_SIZE); a larger uniform buffer reads from a data texture. */
   readonly uniformBlockSize?: number;
   /**
-   * acos, asin and atan2 call the layer's own (helpers `_acos`, `_asin`, `_atan2`), for a driver whose built-ins miss
-   * 1e-5 (src/device/inverse-trig.ts). Default false: GLSL's built-ins.
+   * acos, asin, atan and atan2 call the layer's own (helpers `_acos`, `_asin`, `_atan`, `_atan2`), for a driver whose
+   * built-ins miss 1e-5 (src/device/inverse-trig.ts). Default false: GLSL's built-ins. atan joined on 2026-11-12: the
+   * Radeon 680M's one-argument atan under ANGLE D3D11 is 1.16e-5 off over [-8, 8] (native WebGPU 1.4e-7).
    */
   readonly accurateInverseTrig?: boolean;
 }
@@ -1789,7 +1790,7 @@ export class StageEmitter {
       unpack2x16snorm: 'unpackSnorm2x16',
       unpack2x16unorm: 'unpackUnorm2x16',
     };
-    if (this.options.accurateInverseTrig && (name === 'acos' || name === 'asin' || name === 'atan2'))
+    if (this.options.accurateInverseTrig && (name === 'acos' || name === 'asin' || name === 'atan' || name === 'atan2'))
       return name === 'atan2'
         ? this.componentwise('_atan2', result, a[0], a[1], t0, storeOf(args[1].type))
         : this.mapped(`_${name}`, a[0], t0, result);

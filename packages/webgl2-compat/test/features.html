@@ -610,7 +610,8 @@ const cases = {
   /**
    * acos, asin and atan2 over their whole domain, each pixel (input, results) in float32, 4096 values a sweep over two
    * rows of 2048: sweep 0 x from -1 to 1 in 4095 even steps, sweep 1 the 4096 largest float32 values up to 1, sweep 2 their negatives, sweep 3 atan2 around the
-   * circle at magnitudes 1e-30, 1 and 1e30 (and the axes and zeros first). features-browser.mjs checks every result
+   * circle at magnitudes 1e-30, 1 and 1e30 (and the axes and zeros first), sweep 4 the one-argument atan over [-16, 16)
+   * (added 2026-11-12: the 680M's was 1.16e-5 off there while the layer left it the built-in). features-browser.mjs checks every result
    * against float64 to 1e-5. Regression for the Radeon 680M under ANGLE D3D11, whose acos(0) is 1.5707288: the layer
    * calls its own functions there (src/device/inverse-trig.ts).
    */
@@ -631,9 +632,14 @@ const cases = {
       let r = select(select(1e30, 1.0, i % 3u == 1u), 1e-30, i % 3u == 0u);
       var yx = r * vec2f(sin(angle), cos(angle));
       if (i < 12u) { yx = edges[i]; }
-      return vec4f(yx.x, yx.y, atan2(yx.x, yx.y), 0.0);
+      if (kind == 3u) { return vec4f(yx.x, yx.y, atan2(yx.x, yx.y), 0.0); }
+      // Sweep 4: the one-argument atan over [-16, 16) in steps of 1 / 128, then the largest magnitudes and zeros.
+      var x = (f32(i) - 2048.0) / 128.0;
+      var ends = array<f32, 4>(3e38, -3e38, 1e-30, -0.0);
+      if (i < 4u) { x = ends[i]; }
+      return vec4f(x, atan(x), 0.0, 0.0);
     }`;
-    return shade(device, { w: 2048, h: 8, code });
+    return shade(device, { w: 2048, h: 10, code });
   },
 
   async halfExport(device) {

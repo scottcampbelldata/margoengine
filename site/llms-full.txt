@@ -10889,6 +10889,10 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   compatibility mode with the workaround. Regression: `features-browser.mjs` `inverseTrig` (the whole domain against
   float64 to 1e-5: 2.86e-7 on the 680M; without the workaround it fails, atan2(-0, -1) reads +pi), and
   `test/inverse-trig.test.js`.
+- **Follow-up (audit A2, 2026-11-12):** the one-argument atan stayed the driver's built-in, and it is 1.16e-5 off over
+  [-8, 8] on the 680M (native WebGPU 1.4e-7), past the same 1e-5. Where the probe flags the driver, atan is now the
+  layer's `_atan` (atan2 of x and 1). Regressions: `inverseTrig` sweep 4 (atan over [-16, 16) and its extremes, fails
+  without the change) and `test/inverse-trig.test.js`.
 
 ### Fixed 2026-11-11: in WebKit a check's first run could be the previous document's, at 300 x 150 (KB-L4-W1)
 

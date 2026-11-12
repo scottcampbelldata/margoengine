@@ -25,12 +25,13 @@ struct U { a: vec4f, b: vec3f, s: f32 }
 const fragment = (accurateInverseTrig) =>
   translateWGSL({ vertex: { source: SOURCE }, fragment: { source: SOURCE }, accurateInverseTrig }).fragment.source;
 
-test('the option calls the layer\'s acos, asin and atan2 for scalars and vectors; atan stays GLSL\'s', () => {
+// The one-argument atan stayed GLSL's until 2026-11-12: on the Radeon 680M under ANGLE D3D11 it was 1.16e-5 off over
+// [-8, 8] (features-browser.mjs inverseTrig, sweep 4), past the 1e-5 the rest meet.
+test('the option calls the layer\'s acos, asin, atan and atan2 for scalars and vectors', () => {
   const on = fragment(true);
-  for (const call of ['_acos(', '_asin(', '_atan2(', 'atan(']) assert.ok(on.includes(call), call);
-  assert.ok(!/(?<![_\w])acos\(|(?<![_\w])asin\(/.test(on), 'no built-in acos or asin is left');
-  assert.equal(on.match(/(?<![_\w])atan\(/g).length, 1, 'only the one-argument atan stays the built-in');
-  for (const name of ['_atanu', '_atan2', '_asin', '_acos']) assert.equal(on.split(`${name}(float`).length, 2, `${name} once`);
+  for (const call of ['_acos(', '_asin(', '_atan2(', '_atan(']) assert.ok(on.includes(call), call);
+  assert.ok(!/(?<![_\w])(acos|asin|atan)\(/.test(on), 'no built-in acos, asin or atan is left');
+  for (const name of ['_atanu', '_atan2', '_atan', '_asin', '_acos']) assert.equal(on.split(`${name}(float`).length, 2, `${name} once`);
 });
 
 test('without the option the shader is unchanged: GLSL built-ins, no helpers', () => {
@@ -68,6 +69,7 @@ function atan2(y, x) {
 }
 const root = (x) => f(Math.sqrt(f(f(1 - x) * f(1 + x))));
 const asin = (x) => atan2(x, root(x));
+const atan = (x) => atan2(x, 1);
 const acos = (x) => atan2(root(x), x);
 
 const bits = new Float32Array(1),
@@ -120,6 +122,18 @@ test('atan2 stays within 1e-6 in every octant, at every magnitude, and keeps the
   assert.ok(worst < 1e-6, `largest error ${worst}`);
   for (const [y, x] of [[0, 1], [-0, 1], [0, -1], [-0, -1], [0, 0], [-0, -0], [1, 0], [-1, -0]])
     assert.ok(Object.is(atan2(y, x), f(Math.atan2(y, x))), `atan2(${y}, ${x})`);
+});
+
+test('atan stays within 1e-6 at every magnitude and keeps the sign of zero', () => {
+  let worst = 0;
+  for (let b = 0; b < 0x7f800000; b += 4093) {
+    const x = fromBits(b);
+    worst = Math.max(worst, Math.abs(atan(x) - Math.atan(x)), Math.abs(atan(-x) - Math.atan(-x)));
+  }
+  assert.ok(worst < 1e-6, `largest error ${worst}`);
+  assert.ok(Object.is(atan(-0), -0) && Object.is(atan(0), 0));
+  assert.equal(atan(Infinity), f(Math.PI / 2));
+  assert.ok(Math.abs(atan(1) - Math.PI / 4) < 1e-7);
 });
 
 test('the probe flags the ANGLE Direct3D 11 results and passes accurate ones', () => {
