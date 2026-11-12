@@ -10285,6 +10285,23 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
   part-metal surface moves: the visual baselines and the batch 160 proofs that hold such surfaces are re-recorded on the
   dev PC (baselines are per machine), and core's site is a core change (Scott's call).
 
+### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
+
+- **Repro:** on the Beelink, with two other helpers testing, `decoders test:browser` (packages/decoders/scripts/test-browser.js)
+  failed once with page console errors only: `WebSocket connection to 'ws://127.0.0.1:61962/?token=...' failed: ...
+  net::ERR_NO_BUFFER_SPACE`, then `ws://127.0.0.1:0/` `net::ERR_UNSAFE_PORT` and `[vite] failed to connect to websocket`.
+  Every decoder check passed; it passes alone. Not AMD and not time.
+- **Cause:** the script starts its Vite dev server with `server: { port: 0 }` and HMR on, which the test never uses.
+  Windows refused the socket (WSAENOBUFS: the machine was out of socket buffer space), Vite's client then retried on the
+  configured port 0, which Chromium refuses, and the test counts every console error. The same pattern (a Vite
+  `createServer` with HMR on) is in the browser scripts of audio, bvh, controls (3), creative, decoders (4), environment,
+  exporters (3), html, labels, lines, loaders (2), mesh-edit, mixer, physics (2), points, post (4), taa (8) and text (3);
+  `scripts/browser.js` keeps its socket on purpose (it counts full reloads).
+- **Fix (not landed):** `server: { host: '127.0.0.1', port: 0, hmr: false, watch: null }` as cache's, the README runner's
+  and the visual suites' servers have, with a root check that every package browser script's Vite server turns HMR off.
+  Blocked on this machine: a decoders change runs decoders' AVIF and Draco `cargo test`, which need the MSVC linker
+  (machines.md); the fix and its check go together, so they land on the dev PC or after Build Tools are installed here.
+
 ### Fixed 2026-11-12: Radeon 680M, biomes flythrough on the WebGL2 layer took 0.5 to 0.75 s a frame (AMD GPU hunt row 34)
 
 - **Repro:** on the Beelink (Radeon 680M, Chromium with ANGLE D3D11),
