@@ -10,6 +10,8 @@ import { pathToFileURL } from 'node:url';
 
 const root = join(import.meta.dirname, '..');
 const knownFile = join(root, 'scripts/support/readme-entries-known.json');
+// The umbrella and the kit packages only forward the member packages' entries, which those READMEs document.
+const FACADES = new Set(['margoengine', 'game', 'viz', 'react-kit', 'web']);
 
 /** Every undocumented subpath: { folder: ['./sub', ...] }. The root entry, wildcards and package.json are skipped. */
 export function undocumented() {
@@ -17,7 +19,7 @@ export function undocumented() {
   for (const folder of readdirSync(join(root, 'packages')).sort()) {
     const pkgFile = join(root, 'packages', folder, 'package.json'),
       readme = join(root, 'packages', folder, 'README.md');
-    if (!existsSync(pkgFile) || !existsSync(readme) || folder === 'margoengine') continue;
+    if (!existsSync(pkgFile) || !existsSync(readme) || FACADES.has(folder)) continue;
     const pkg = JSON.parse(readFileSync(pkgFile, 'utf8')),
       text = readFileSync(readme, 'utf8'),
       missing = Object.keys(pkg.exports ?? {}).filter((key) => {
