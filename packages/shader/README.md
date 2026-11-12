@@ -220,7 +220,7 @@ browser (palette, typed constants, dragged wires), draws the material it makes a
 rebuild after a retyped number, no rebuild after a node move, undo and redo, and that an incomplete or ill-typed graph keeps
 the last valid material on screen.
 
-## Noise (`@margoengine/shader/noise`, +2.0 kB min+gzip over the root entry)
+## Noise (`@margoengine/shader/noise`, 5.5 kB min+gzip on its own)
 
 ```ts
 import {createStage} from 'margoengine';
@@ -318,7 +318,7 @@ createMesh(stage.engine, planeGeometry(2, 2), rock);
 
 `node packages/shader/test/utils-check.mjs` (real GPU, under the GPU lock) runs the maths nodes and all 13 blend modes over 256 random inputs against JavaScript formulas, and reads the rest back from a wall: each normal map direction in both frames, a known slope through `bumpNormal`, both projections of `triplanar`, `parallaxUV` against the depth worked out by hand for a flat and a sloped field at 45 degrees, `matcapUV` against `MatcapMaterial` on a sphere, and a panorama's top and bottom rows.
 
-## Read back one dispatch (`@margoengine/shader/readback`, +1.0 kB min+gzip over the root entry)
+## Read back one dispatch (`@margoengine/shader/readback`, 8.8 kB min+gzip on its own)
 
 `ComputePass` runs every frame while attached. For a one-off result on the CPU (an editor tool, a bake, a test),
 `computeReadback` runs a body once and resolves with a copy of a storage buffer:
@@ -914,7 +914,7 @@ of 255 over 5,225 pixels, is hidden pixel for pixel behind a core box and drawn 
 `setAttribute` update it, device restoration redraws identical pixels, and an attached plugin with nothing visible or a
 removed one leaves every pixel unchanged.
 
-## Screen effects (`@margoengine/shader/effects`, +1.1 kB min+gzip over the root entry)
+## Screen effects (`@margoengine/shader/effects`, 8.6 kB min+gzip on its own)
 
 Ready-made `NodePass` effects for a PostStack, each with live `uniforms` (`effect.uniforms.darkness.value = 0.5`). LDR by
 default (after tonemapping, on display colour); `{kind: 'hdr'}` runs one on linear light before the display effect.
@@ -961,7 +961,7 @@ pi / 12 px^2 per dot and loses its outer half where a dot meets its cell's side,
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output.
 
-Size (min + gzip, Rolldown, peers external): whole package 18.0 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass, 16.8 kB before the input nodes); `NodeMaterial` with colour nodes only, 8.4 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
+Size (min + gzip, as `examples/package-benchmarks/entry-sizes.mjs` measures it and `examples/package-benchmarks/results/entry-sizes.json` records it: each entry bundled on its own, peers external, so the figures overlap): root entry 18.7 kB; `NodeMaterial` with colour nodes only, 8.6 kB (post, compute, texture and statement code tree-shake away).
 
 Apache-2.0. Optional, tree-shakable package; peers `@margoengine/core`, `@margoengine/materials` and `@margoengine/gltf-pro` (^0.1.0 || ^1.0.0).
 
