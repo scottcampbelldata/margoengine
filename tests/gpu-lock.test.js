@@ -3,6 +3,7 @@ process.env.MARGO_SPEED_PHASE = 'active';
 // scripts/gpu-lock.mjs: `run` passes arguments exactly as given (spaces and quotes survive, on Windows too, where cmd.exe
 // starts it); the nested marker covers only the lock being held, so a GPU test inside a different lock still takes the
 // GPU lock; and the reader/writer rules: shared slots, an exclusive request that waits without starving, stale holders.
+import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

@@ -2,6 +2,7 @@
 process.env.MARGO_SPEED_PHASE = 'active';
 // scripts/gpu-lock.mjs never lets anything hang while holding or waiting: a hold limit that ends the command's whole
 // process tree and frees the lock, a heartbeat lease a waiter can reclaim past, a wait limit that names the holder.
+import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -148,6 +149,42 @@ test('a holder that called acquire() itself and hangs in a synchronous loop is e
   } finally {
     // Whatever failed above, a spinning holder must not outlive the test (it kept the test file from ending at all).
     if (child && child.exitCode === null && child.signalCode === null) killTree(child.pid);
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+// Regression KB-FL1 (2026-11-11): the test above failed once in a parallel root run ("the hung holder is still
+// running"). On Windows the heartbeat waits for its starter to exit before it ends the holder, and it asked for the
+// starter by pid. Windows gives a freed pid to the next new process within seconds when many start, and a live
+// stranger at that pid held the kill back for a whole minute (measured: 60.7 s). The starter's exit is now the end of
+// the heartbeat's stdin pipe, which no other process can fake. Here the test holds that pipe, as the starter does,
+// and a live stranger's pid stands in for the reused one.
+test('a heartbeat waits for its starter by the starter pipe, not by a pid another process may have taken', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-starter-')),
+    lock = join(folder, 'gpu.lock'),
+    file = join(lock, 'shared', 'holder.json'),
+    nap = () => spawn(process.execPath, ['-e', 'setTimeout(()=>{},120000)'], { stdio: 'ignore' });
+  const holder = nap(),
+    stranger = nap();
+  let beat;
+  try {
+    mkdirSync(join(lock, 'shared'), { recursive: true });
+    writeFileSync(file, JSON.stringify({ owner: 'holder', token: 't', pid: holder.pid, beats: true, maxMinutes: 0.01 }));
+    const ended = new Promise((done) => holder.on('exit', done));
+    beat = spawn(
+      process.execPath,
+      ['scripts/gpu-lock.mjs', 'beat', file, 't', String(holder.pid), String(Date.now()), String(stranger.pid)],
+      { stdio: ['pipe', 'ignore', 'ignore'], env: { ...process.env, MARGO_GPU_LOCK: lock, ...FAST } },
+    );
+    // fixed-wait: past the deadline and grace while the starter (this pipe) is open; it can only pass wrongly.
+    assert.equal(await settled(ended, 1500), 'waiting', 'the holder is not ended while its starter runs');
+    beat.stdin.end(); // the starter exits; the stranger at its pid lives on
+    await bounded(ended, 20_000, 'the kill waited on the stranger at the starter pid');
+    await waitUntil(() => !existsSync(file), 'the entry is removed');
+  } finally {
+    for (const child of [holder, stranger, beat])
+      if (child && child.exitCode === null && child.signalCode === null) killTree(child.pid);
+    await waitUntil(() => [holder, stranger, beat].every((c) => !c || c.exitCode !== null || c.signalCode !== null), 'all ended');
     rmSync(folder, { recursive: true, force: true });
   }
 });

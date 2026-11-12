@@ -1,5 +1,6 @@
 // check:merge side by side (list row 55.13): the scheduler, what it reads a suite's shared things from, the plan it runs
 // (the serial plan's set, nothing dropped) and the comparison with a serial run. No GPU: tiny fake jobs and processes.
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

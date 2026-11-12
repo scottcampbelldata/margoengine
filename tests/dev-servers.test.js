@@ -149,6 +149,7 @@ test('the root dev server watches only what it serves, so three demo tabs open a
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { freePort, killTree, probe } from '../scripts/support/dev-server-probe.mjs';
+import { endTree } from '../scripts/support/shutdown.mjs';
 
 function fixture(source) {
   const dir = mkdtempSync(join(tmpdir(), 'margo-probe-'));
@@ -214,6 +215,66 @@ test('the probe fails a server that exited while another process answered on its
     assert.ok(problems.some((p) => /exited 1 during the probe, so another process answered/.test(p)), problems.join('\n'));
   } finally {
     await new Promise((done) => other.close(done));
+  }
+});
+
+// Regression KB-FL3 (2026-11-11): in a parallel root run the clean-server test above failed with EPERM removing the
+// server's folder. The probe ended the server with taskkill and returned at once, but taskkill returns while the
+// process is still dying and holding the folder it ran in. The probe now waits for its `end` (endTree, which waits
+// until the tree is gone). The end of the kill is held back here, so the order is the same every run.
+test('the probe returns only after the server tree has been ended, not when taskkill returns', { timeout: 60_000 }, async () => {
+  const dir = fixture(serverSource("console.log('Local: ready');")),
+    port = await freePort(),
+    killStarted = Promise.withResolvers(),
+    finishKill = Promise.withResolvers();
+  let returned = false;
+  try {
+    const probing = probe({
+      command: process.execPath,
+      args: ['server.mjs', String(port)],
+      cwd: dir,
+      page: `http://127.0.0.1:${port}/`,
+      settleMs: 200,
+      listenLimitMs: 10_000,
+      limitMs: 30_000,
+      end: async (pid) => {
+        const left = await endTree(pid);
+        killStarted.resolve();
+        await finishKill.promise;
+        return left;
+      },
+    }).then((result) => ((returned = true), result));
+    await killStarted.promise;
+    // fixed-wait: long enough for a probe that does not wait to return; it can only pass wrongly, never fail wrongly.
+    await new Promise((done) => setTimeout(done, 200));
+    assert.equal(returned, false, 'the probe returned while the server was still being ended');
+    finishKill.resolve();
+    assert.deepEqual((await probing).problems, []);
+  } finally {
+    finishKill.resolve();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a server tree the probe could not end is a problem', { timeout: 60_000 }, async () => {
+  const dir = fixture(serverSource("console.log('Local: ready');")),
+    port = await freePort();
+  let pid;
+  try {
+    const { problems } = await probe({
+      command: process.execPath,
+      args: ['server.mjs', String(port)],
+      cwd: dir,
+      page: `http://127.0.0.1:${port}/`,
+      settleMs: 200,
+      listenLimitMs: 10_000,
+      limitMs: 30_000,
+      end: async (server) => ((pid = server), [server]),
+    });
+    assert.ok(problems.some((p) => p === `processes ${pid} still running after the kill`), problems.join('\n'));
+  } finally {
+    if (pid) await endTree(pid);
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

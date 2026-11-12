@@ -1,6 +1,7 @@
 // KB-GL1: `gpu-lock run` refused browser checks whose file names carry no GPU word (ERR_GPU_COMMAND_NOT_GPU), so
 // helpers ran them outside the lock and 8 GPU users were seen at once against the 5-slot cap. A node script that opens
 // a browser, itself or through its own relative imports, is a GPU leaf; `run` admits it, and each one holds a slot.
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

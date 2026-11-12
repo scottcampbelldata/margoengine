@@ -1,6 +1,7 @@
 // GPU suites share the GPU (scripts/gpu-lock.mjs), so two of them can want the same fixed port at once: the second
 // one's server waits for the port (listenWhenFree in scripts/browser.js) instead of failing with "Port N is already in
 // use", which the first real two-suite run under shared slots hit (sky and shader both on 5211).
+import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer as createNetServer } from 'node:net';

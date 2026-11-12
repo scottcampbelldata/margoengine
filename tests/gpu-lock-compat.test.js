@@ -3,6 +3,7 @@ process.env.MARGO_SPEED_PHASE = 'active';
 // scripts/gpu-lock.mjs against the one-holder lock it replaced (tests/fixtures/gpu-lock-v1.mjs), which agents in older
 // worktrees still run on the same folder: each waits for the other, both ways, and they take turns. Also which commands
 // count as benchmarks (exclusive), and a custom lock's hold limit.
+import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

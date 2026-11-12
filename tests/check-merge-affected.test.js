@@ -1,6 +1,7 @@
 // The affected-GPU logic behind `npm run check:merge` (scripts/support/affected-gpu.mjs, scripts/check-merge.mjs):
 // dependents, the triggers that fall back to the full run, unknown files, and that a documents-only change skips every
 // GPU step of the real step list.
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

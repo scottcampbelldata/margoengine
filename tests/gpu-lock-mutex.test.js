@@ -1,3 +1,4 @@
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { basename, dirname, join } from 'node:path';

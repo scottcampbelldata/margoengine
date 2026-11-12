@@ -6,6 +6,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
+import { endTree } from './shutdown.mjs';
 
 /** A line that names a problem. The lines of a clean Vite, Next.js or Node server never match. */
 export const BAD_LINE = /\(!\)|\berror\b|\bwarn(ing)?\b|⚠|failed|cannot find|could not resolve|not found|no matching export|deprecat/i;
@@ -76,10 +77,12 @@ function referencedUrls(text, base, html) {
 
 /**
  * @param {{command: string, args: string[], cwd: string, env?: object, page: string, tcpPort?: number, host?: string,
- *   insecure?: boolean, listenLimitMs?: number, limitMs?: number, settleMs?: number}} options
- *   `page` is the full first URL (or '' for a server with no web page: it must then give `tcpPort`).
+ *   insecure?: boolean, listenLimitMs?: number, limitMs?: number, settleMs?: number,
+ *   end?: (pid: number) => Promise<number[]>}} options
+ *   `page` is the full first URL (or '' for a server with no web page: it must then give `tcpPort`). `end` ends the
+ *   server's tree and resolves to the pids still running (default: endTree, which waits until they are gone).
  */
-export async function probe({ command, args, cwd, env = process.env, page, tcpPort, host = '127.0.0.1', insecure = false, listenLimitMs = 60_000, limitMs = 120_000, settleMs = 6_000 }) {
+export async function probe({ command, args, cwd, env = process.env, page, tcpPort, host = '127.0.0.1', insecure = false, listenLimitMs = 60_000, limitMs = 120_000, settleMs = 6_000, end = endTree }) {
   const lines = [];
   const problems = [];
   const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
@@ -121,7 +124,12 @@ export async function probe({ command, args, cwd, env = process.env, page, tcpPo
     problems.push(error instanceof Error ? error.message : String(error));
   } finally {
     clearTimeout(deadline);
-    killTree(child);
+    // taskkill returns while the server is still dying and holds the folder it ran in: a caller that removed that
+    // folder at once failed with EPERM under load (KB-FL3). Return only once the whole tree has gone.
+    if (child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
+      const left = await end(child.pid);
+      if (left.length) problems.push(`processes ${left.join(', ')} still running after the kill`);
+    }
   }
   for (const line of lines) if (BAD_LINE.test(line)) problems.push(`output: ${line.trim().slice(0, 240)}`);
   return { problems, lines };

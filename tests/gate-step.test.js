@@ -1,6 +1,7 @@
 // scripts/gate-step.mjs: a gate step's own time limit does not count time spent queued for the GPU, and a hard overall
 // limit remains. Regression (sweep L6b, 2026-11-11): `timeout 1500 npm run check:readme-run` ran out while the step only
 // waited for a gpu-lock slot (all 5 busy) and never ran a README.
+import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';

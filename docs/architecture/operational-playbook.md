@@ -1204,6 +1204,15 @@ eventual reclaim, unchanged defaults, invalid values and the hard-limit cap;
 distinction between pipeline-creation work and queue execution described by the
 W3C GPU for the Web Working Group, [WebGPU](https://www.w3.org/TR/webgpu/#dom-gpudevice-createcomputepipelineasync)
 (2026). It does not change Windows' watchdog or any correctness deadline.
+On Windows the heartbeat is started through a starter process that exits at once,
+so `taskkill /T` on the holder cannot reach it, and it ends an overrunning holder
+only after the starter has gone. Since 2026-11-11 (KB-FL1) it learns that from the
+end of a stdin pipe the starter alone writes, not from the starter's pid: Windows
+reuses pids within seconds when many processes start, and a stranger at that pid
+held the kill back for a minute (`tests/gpu-lock-limits.test.js`). Root tests of the
+lock import `tests/support/gpu-lock-env.js` first, so the lane's own `MARGO_GPU_`
+settings never reach them and a fixture without a lock of its own never touches
+the real one (`tests/gpu-lock-env.test.js`).
 The detached heartbeat uses the checkout cwd, and ticket completion waits for
 the owner to close its Windows handles before returning, so a command's temporary
 directory can be removed after completion (30-second owner drain bound).

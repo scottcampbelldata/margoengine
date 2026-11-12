@@ -5,6 +5,7 @@
 // it and released after, and a timing test that would share a step with other checks fails the plan. And a failed
 // biomes check on the Intel laptop sat until the runner killed it at 600 s: a failed check now exits at once with its
 // own error, its teardown bounded and reported beside it.
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

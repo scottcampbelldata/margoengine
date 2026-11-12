@@ -2,6 +2,7 @@
 // checks kept there (post-effects-gpu.mjs, volumetric-gpu.mjs --no-timing) were refused for the whole build phase.
 // A script now declares itself a correctness check in its header; timing runs stay exclusive and stay refused while
 // scripts/speed-phase.json defers them. Fake lock folders only; the children never touch a GPU.
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

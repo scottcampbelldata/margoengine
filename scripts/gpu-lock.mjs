@@ -657,12 +657,13 @@ const describe = (entry) =>
     ? `${entry.owner} (${entry.mode ?? 'exclusive'}${entry.takenAt ? `, since ${entry.takenAt}` : ''}${entry.command ? `, running: ${entry.command}` : ''})`
     : 'an unlabelled holder';
 
-const spawnBeat = (verb, args) =>
+// `stdin` 'pipe' gives the heartbeat a pipe from its starter (see beat-start).
+const spawnBeat = (verb, args, stdin = 'ignore') =>
   spawn(process.execPath, [import.meta.filename, verb, ...args], {
     // The independent heartbeat must not pin a GPU command's temporary working directory after release.
     cwd: resolve(import.meta.dirname, '..'),
     detached: true,
-    stdio: 'ignore',
+    stdio: [stdin, 'ignore', 'ignore'],
     windowsHide: true,
     env: { ...process.env, MARGO_GPU_LOCK: lockDir },
   }).unref();
@@ -884,10 +885,26 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const own = process.argv.slice(2, process.argv.indexOf('--') < 0 ? undefined : process.argv.indexOf('--'));
   exitOnHelp(USAGE, own);
   if (verb === 'status') console.log(JSON.stringify(status()));
-  else if (verb === 'beat-start') spawnBeat('beat', [...rest, String(process.pid)]);
-  else if (verb === 'beat') {
+  else if (verb === 'beat-start') {
+    // The heartbeat's stdin is a pipe whose only writer is this process, so its end tells the heartbeat this process
+    // has exited: the one sign that cannot come from another process (see `starterLive` below). Exit at once; the
+    // pipe would otherwise keep this process running.
+    spawnBeat('beat', [...rest, String(process.pid)], 'pipe');
+    process.exit(0);
+  } else if (verb === 'beat') {
     // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms> [<starter pid>]
     const [file, token, parent, deadline, starter] = rest;
+    // Whether the Windows starter still runs. Asking for its pid was wrong: Windows hands a freed pid to the next new
+    // process within seconds when many start (a parallel test run), and a live stranger at that pid held the kill of
+    // an overrunning holder back for a whole minute (KB-FL1). The starter is the only writer of this stdin pipe, so
+    // its end (or no pipe at all) means the starter has gone.
+    let starterLive = Boolean(starter);
+    if (starterLive) {
+      const gone = () => {
+        starterLive = false;
+      };
+      process.stdin.on('end', gone).on('close', gone).on('error', gone).resume();
+    }
     const original = read(file);
     const activity = new GpuActivity({
       bornBefore: original?.requestedAt ?? Date.now(),
@@ -906,7 +923,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       if (Date.now() > Number(deadline) + grace) {
         // While the starter lives this process is still in the holder's tree. It exits as soon as it has started this
         // one; the bound is for its pid having gone to another process.
-        if (starter && alive(Number(starter)) && Date.now() < Number(deadline) + grace + MIN) return;
+        if (starterLive && Date.now() < Number(deadline) + grace + MIN) return;
         killTree(Number(parent));
         rmSync(file, { force: true });
         try {
@@ -935,7 +952,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           },
           terminate: async (tracked) => {
             // A Windows starter must have exited before terminating our original ancestor.
-            if (starter && alive(Number(starter)))
+            if (starterLive)
               throw new Error('ERR_GPU_MONITOR_STARTER_LIVE: cannot safely reclaim while starter lives');
             await terminateGpuTree(tracked);
           },

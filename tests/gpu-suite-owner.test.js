@@ -1,3 +1,4 @@
+import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';

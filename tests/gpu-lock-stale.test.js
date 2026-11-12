@@ -4,6 +4,7 @@
 // in seconds. The holder had released its entry between the waiter's read and its stat; the failed stat left the beat
 // time at 0. Any other stat failure (EPERM or EBUSY on Windows while the file is held) took the same path and removed a
 // live, beating holder.
+import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
