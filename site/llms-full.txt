@@ -10216,6 +10216,22 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
 
 # Known bugs and unverified features
 
+### Fixed 2026-11-11: the gpu-lock heartbeat knew its holder only by pid (KB-FL4)
+
+- **Bug (found by reading, not seen):** the heartbeat in `scripts/gpu-lock.mjs` asked whether its holder was alive by pid. A
+  holder that died without releasing, whose pid the system gave to a new process before the next beat (15 s), looked
+  alive: the heartbeat kept its dead entry fresh until the hold limit, then ran `taskkill /T` (or a group kill) on the
+  stranger now at that pid. Same class as KB-FL1.
+- **Fix:** the holder gives the heartbeat a pipe it alone writes, as the heartbeat's fd 3; on Windows the starter passes it
+  on. The pipe ends when the holder exits however it ends, so its end drops the entry and nothing is killed. Process start
+  times were the other option; reading one takes a process per beat on Windows and macOS and has a clock tick of
+  resolution on Linux, while the pipe works the same on all three and cannot be faked.
+- **Regression:** "a dead holder whose pid a stranger now has: its entry is dropped and the stranger is never killed" in
+  `tests/gpu-lock-limits.test.js` (through the starter on every platform; the old code kept the entry fresh to the limit).
+- **KB-FL5, found in the same run:** `tests/check-fixed-waits.test.js` was red on main. The 120-frame settle loop that
+  686df9f96d added to `packages/lighting2d/tests/browser-check.js` waits by count on purpose (core counts device losses per
+  120 drawn frames) and had no `// fixed-wait:` reason. It carries one now; no wait changed and the baseline stays 0.
+
 ### Fixed 2026-11-11 (tooling sweep L4): comment-driven bundler closure, a wall-clock bound, stale llms files, a bare EPIPE
 
 - **KB-L4-cma:** the affected-package scanner (`scripts/support/affected-gpu.mjs`) counted a path named in a source comment

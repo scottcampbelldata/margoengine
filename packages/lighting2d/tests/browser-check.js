@@ -100,6 +100,7 @@ const frame = () => instance.render({ delta: 0 });
 // times"). This page loses the device on purpose four times, so after each of the first three it draws 120 frames, as
 // a page would between real losses (scripts/device-recreation-soak.mjs does the same).
 const settle = () => {
+  // fixed-wait: core counts losses per 120 drawn frames, so the count of frames is the point, not readiness
   for (let f = 0; f < 120; f++) frame();
 };
 

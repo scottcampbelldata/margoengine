@@ -158,7 +158,8 @@ test('a holder that called acquire() itself and hangs in a synchronous loop is e
 // starter by pid. Windows gives a freed pid to the next new process within seconds when many start, and a live
 // stranger at that pid held the kill back for a whole minute (measured: 60.7 s). The starter's exit is now the end of
 // the heartbeat's stdin pipe, which no other process can fake. Here the test holds that pipe, as the starter does,
-// and a live stranger's pid stands in for the reused one.
+// and a live stranger's pid stands in for the reused one. It holds the holder pipe (fd 3, KB-FL4) open throughout,
+// as a live holder does.
 test('a heartbeat waits for its starter by the starter pipe, not by a pid another process may have taken', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-starter-')),
     lock = join(folder, 'gpu.lock'),
@@ -174,7 +175,7 @@ test('a heartbeat waits for its starter by the starter pipe, not by a pid anothe
     beat = spawn(
       process.execPath,
       ['scripts/gpu-lock.mjs', 'beat', file, 't', String(holder.pid), String(Date.now()), String(stranger.pid)],
-      { stdio: ['pipe', 'ignore', 'ignore'], env: { ...process.env, MARGO_GPU_LOCK: lock, ...FAST } },
+      { stdio: ['pipe', 'ignore', 'ignore', 'pipe'], env: { ...process.env, MARGO_GPU_LOCK: lock, ...FAST } },
     );
     // fixed-wait: past the deadline and grace while the starter (this pipe) is open; it can only pass wrongly.
     assert.equal(await settled(ended, 1500), 'waiting', 'the holder is not ended while its starter runs');
@@ -185,6 +186,44 @@ test('a heartbeat waits for its starter by the starter pipe, not by a pid anothe
     for (const child of [holder, stranger, beat])
       if (child && child.exitCode === null && child.signalCode === null) killTree(child.pid);
     await waitUntil(() => [holder, stranger, beat].every((c) => !c || c.exitCode !== null || c.signalCode !== null), 'all ended');
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+// Regression KB-FL4 (2026-11-11, found by reading): the heartbeat asked for its holder by pid. A holder that died
+// without releasing, whose pid the system gave to a new process before the next beat, looked alive: the heartbeat kept
+// its dead entry fresh until the hold limit and then ran taskkill /T on the stranger now at that pid. The holder now
+// gives the heartbeat a pipe it alone writes (passed through the Windows starter); the pipe's end is the holder's
+// exit. Here the test is the holder: it holds that pipe, and a live stranger's pid stands in for the reused one. The
+// starter path is used on every platform, so the pass-through the Windows heartbeat relies on is tested everywhere.
+test('a dead holder whose pid a stranger now has: its entry is dropped and the stranger is never killed', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-holder-')),
+    lock = join(folder, 'gpu.lock'),
+    file = join(lock, 'shared', 'holder.json'),
+    stranger = spawn(process.execPath, ['-e', 'setTimeout(()=>{},120000)'], { stdio: 'ignore' }),
+    deadline = Date.now() + 6_000,
+    old = new Date(Date.now() - 60_000);
+  let starter;
+  try {
+    mkdirSync(join(lock, 'shared'), { recursive: true });
+    writeFileSync(file, JSON.stringify({ owner: 'holder', token: 't', pid: stranger.pid, beats: true, maxMinutes: 0.1 }));
+    utimesSync(file, old, old);
+    starter = spawn(
+      process.execPath,
+      ['scripts/gpu-lock.mjs', 'beat-start', file, 't', String(stranger.pid), String(deadline)],
+      { stdio: ['ignore', 'ignore', 'ignore', 'pipe'], env: { ...process.env, MARGO_GPU_LOCK: lock, ...FAST } },
+    );
+    await waitUntil(() => !existsSync(file) || statSync(file).mtimeMs > old.getTime() + 1_000, 'the first beat');
+    starter.stdio[3].destroy(); // the holder dies; the stranger at its pid lives on
+    await waitUntil(() => !existsSync(file), 'the dead holder entry is dropped, not kept fresh');
+    assert.ok(Date.now() < deadline, 'the entry went when the holder did, before its hold limit');
+    // fixed-wait: past the hold limit and its grace, when a heartbeat that still trusted the pid would kill.
+    await sleep(Math.max(0, deadline - Date.now()) + Number(FAST.MARGO_GPU_GRACE_MS) + 1_500);
+    assert.ok(alive(stranger.pid), 'the stranger at the reused pid is never killed');
+  } finally {
+    for (const child of [stranger, starter])
+      if (child && child.exitCode === null && child.signalCode === null) killTree(child.pid);
+    await waitUntil(() => [stranger, starter].every((c) => !c || c.exitCode !== null || c.signalCode !== null), 'all ended');
     rmSync(folder, { recursive: true, force: true });
   }
 });

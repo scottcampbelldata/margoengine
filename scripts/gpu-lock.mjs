@@ -54,6 +54,7 @@ import {
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Socket } from 'node:net';
 import { Worker } from 'node:worker_threads';
 import { exitOnHelp } from './support/help.mjs';
 import { speedEnabled } from './support/speed-phase.mjs';
@@ -657,16 +658,20 @@ const describe = (entry) =>
     ? `${entry.owner} (${entry.mode ?? 'exclusive'}${entry.takenAt ? `, since ${entry.takenAt}` : ''}${entry.command ? `, running: ${entry.command}` : ''})`
     : 'an unlabelled holder';
 
-// `stdin` 'pipe' gives the heartbeat a pipe from its starter (see beat-start).
-const spawnBeat = (verb, args, stdin = 'ignore') =>
-  spawn(process.execPath, [import.meta.filename, verb, ...args], {
+// The heartbeat's fd 3 is the holder pipe: a pipe whose only writer is the holder (see `holderLive` in the beat verb).
+// On Windows the starter in between passes its own fd 3 on, and gives the heartbeat a stdin pipe of its own as well.
+const spawnBeat = (verb, args, stdio) => {
+  const child = spawn(process.execPath, [import.meta.filename, verb, ...args], {
     // The independent heartbeat must not pin a GPU command's temporary working directory after release.
     cwd: resolve(import.meta.dirname, '..'),
     detached: true,
-    stdio: [stdin, 'ignore', 'ignore'],
+    stdio,
     windowsHide: true,
     env: { ...process.env, MARGO_GPU_LOCK: lockDir },
-  }).unref();
+  });
+  child.unref();
+  return child;
+};
 
 // Starts the process that keeps a holder's entry fresh and ends the holder if it overruns. It is separate from the holder
 // because a holder busy in a long synchronous call (spawnSync) cannot refresh anything itself.
@@ -674,8 +679,17 @@ const spawnBeat = (verb, args, stdin = 'ignore') =>
 // too, and that closed the job object Node keeps its children in, which ended the taskkill. Whether taskkill reached the
 // holder first was a race (about 2 runs in 100 on a busy machine: the holder ran on past its limit, and on all runs the
 // heartbeat died before it could write gpu-lock-timeouts.log). So a starter that exits at once stands between them.
+// The returned pipe is the holder's end of the holder pipe. It never keeps this process running, closes when this
+// process exits however it ends, and is closed by release.
 function startHeartbeat(file, token, deadline) {
-  spawnBeat(process.platform === 'win32' ? 'beat-start' : 'beat', [file, token, String(process.pid), String(deadline)]);
+  const pipe = spawnBeat(process.platform === 'win32' ? 'beat-start' : 'beat', [file, token, String(process.pid), String(deadline)], [
+    'ignore',
+    'ignore',
+    'ignore',
+    'pipe',
+  ]).stdio[3];
+  pipe.unref();
+  return pipe;
 }
 
 /**
@@ -744,9 +758,10 @@ export async function acquire({
   const unmark = () => marker && rmSync(marker, { force: true });
   const take = (file) => {
     unmark();
-    startHeartbeat(file, token, Date.now() + maxMinutes * MIN);
+    const holderPipe = startHeartbeat(file, token, Date.now() + maxMinutes * MIN);
     const release = () => {
       if (read(file)?.token === token) rmSync(file, { force: true });
+      holderPipe.destroy();
       if (existsSync(lockDir)) {
         const unlock = tryMutex();
         if (unlock) {
@@ -889,7 +904,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // The heartbeat's stdin is a pipe whose only writer is this process, so its end tells the heartbeat this process
     // has exited: the one sign that cannot come from another process (see `starterLive` below). Exit at once; the
     // pipe would otherwise keep this process running.
-    spawnBeat('beat', [...rest, String(process.pid)], 'pipe');
+    spawnBeat('beat', [...rest, String(process.pid)], ['pipe', 'ignore', 'ignore', 3]);
     process.exit(0);
   } else if (verb === 'beat') {
     // The heartbeat process: node gpu-lock.mjs beat <entry file> <token> <holder pid> <deadline ms> [<starter pid>]
@@ -905,6 +920,30 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       };
       process.stdin.on('end', gone).on('close', gone).on('error', gone).resume();
     }
+    // Whether the holder still runs, by the same sign. Asking for its pid was wrong in the same way (KB-FL4): a holder
+    // that died without releasing, whose pid went to a new process before the next beat, looked alive, so this kept
+    // its dead entry fresh until the hold limit and then ran taskkill /T on the stranger at that pid. Process start
+    // times were the other way to tell them apart, but reading one needs a process per beat on Windows and macOS and
+    // has a clock tick of resolution on Linux; the holder pipe needs nothing and cannot be faked. Its end means the
+    // holder has gone: its entry is dropped and nothing is killed. A pipe that cannot be read says nothing about the
+    // holder, so this stops beating without touching the entry, which the lease then reclaims; it never kills by pid.
+    let holderLive = true;
+    const holderGone = () => {
+      if (!holderLive) return;
+      holderLive = false;
+      if (read(file)?.token === token) rmSync(file, { force: true });
+      process.exit(0);
+    };
+    const unknown = () => process.exit(0);
+    try {
+      new Socket({ fd: 3, readable: true, writable: false })
+        .on('end', holderGone)
+        .on('close', holderGone)
+        .on('error', unknown)
+        .resume();
+    } catch {
+      unknown();
+    }
     const original = read(file);
     const activity = new GpuActivity({
       bornBefore: original?.requestedAt ?? Date.now(),
@@ -916,10 +955,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const tick = () => {
       const entry = read(file);
       if (!entry || entry.token !== token) process.exit(0); // released
-      if (!alive(Number(parent))) {
-        rmSync(file, { force: true });
-        process.exit(0);
-      }
+      if (!holderLive || !alive(Number(parent))) holderGone();
       if (Date.now() > Number(deadline) + grace) {
         // While the starter lives this process is still in the holder's tree. It exits as soon as it has started this
         // one; the bound is for its pid having gone to another process.

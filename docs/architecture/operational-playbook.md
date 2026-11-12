@@ -1237,6 +1237,12 @@ held the kill back for a minute (`tests/gpu-lock-limits.test.js`). Root tests of
 lock import `tests/support/gpu-lock-env.js` first, so the lane's own `MARGO_GPU_`
 settings never reach them and a fixture without a lock of its own never touches
 the real one (`tests/gpu-lock-env.test.js`).
+The heartbeat knows its holder the same way (KB-FL4): the holder gives it a pipe
+it alone writes, as the heartbeat's fd 3 (the Windows starter passes it on). The
+pipe's end is the holder's exit, so a dead holder's entry is dropped at once and
+nothing is killed, even when a new process has taken the holder's pid; before,
+the heartbeat kept such an entry fresh to the hold limit and then ran
+`taskkill /T` on that stranger (`tests/gpu-lock-limits.test.js`).
 The detached heartbeat uses the checkout cwd, and ticket completion waits for
 the owner to close its Windows handles before returning, so a command's temporary
 directory can be removed after completion (30-second owner drain bound).
