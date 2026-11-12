@@ -8855,3 +8855,17 @@ Smith, Image Compositing Fundamentals, Microsoft Technical Memo 4 (1995), http:/
 for premultiplied colour and its inverse (divide by a non-zero alpha); IEC 61966-2-1:1999 for the sRGB decode. Design
 from these: upload the region as held and as a premultiplied canvas copy, decide the alpha state on the GPU from any
 texel where they differ, convert in f32 in a draw. No foreign source read.
+
+## KB3240: glTF metal/dielectric diffuse weight (2026-11-12)
+
+Source: Khronos Group, *glTF 2.0 Specification*, version 2.0.1, Appendix B "BRDF
+Implementation" (metal_brdf, dielectric_brdf and material = mix(dielectric_brdf,
+metal_brdf, metallic)), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html, read from
+its AsciiDoc source https://github.com/KhronosGroup/glTF/blob/main/specification/2.0/Specification.adoc.
+Compared with Christophe Schlick, *An Inexpensive BRDF Model for Physically-based
+Rendering* (Computer Graphics Forum 13(3), 1994), https://doi.org/10.1111/1467-8659.1330233,
+for the Fresnel term the mix interpolates. Expanding the mix: the specular parts sum to
+Schlick at f0 = mix(0.04, base, metallic) exactly, while the diffuse keeps (1 - metallic)
+times 1 minus the dielectric Fresnel; weighting it by 1 minus the mixed Fresnel is not
+an identity. The Sample Viewer was used only as a black-box picture; its source was not
+read. No other engine's code was read.

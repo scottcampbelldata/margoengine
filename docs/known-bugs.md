@@ -3965,7 +3965,7 @@ No known open defect in tested zone selection, overlap, wet routing, tail preser
 No known open defect in tested first-order routing, quaternion/listener orientation, buffer playback and teardown paths. Initial browser fixture reused a plugin name for two independent contexts; unique fixture names now exercise both without changing assertions. Node fetch received HTTP 403 from the audio host; curl retrieved the published file and its MD5 matches Zenodo metadata. This was transport setup, not an engine error. Unsupported conventions/orders and the stereo-decoder/XR evidence limits are explicit in limits.md.
 
 
-### Batch 160 metallic-roughness picture loss (open)
+### Batch 160 metallic-roughness picture loss (cause fixed 2026-11-12, KB3240; silhouette residual open)
 
 The README execution check also exposed a missing example asset: pointer-show.glb was not provided,
 so the generic replacement had no camera and viewGLTFCamera correctly rejected it. The package now
@@ -3993,6 +3993,25 @@ is established by this first job; the environment/Cornell jobs remain outstandin
 Lane G reran the complete frozen scene on both backends without capturing a
 new reference or changing a budget. Both integer gates pass with the same
 MAEs above; the measured picture loss remains open.
+
+Cause found (KB3240, 2026-11-12): the flat sphere interiors carried most of the loss
+(flat absolute 750,003 with signed -684,221: Margo darker) and it grew with metallic.
+Inverting PBR Neutral, the smooth-column diffuse ratio Margo/viewer was 0.50, 0.62,
+0.72, 0.82, 0.92, 1.02 for metallic 5/6 down to 0, which is 1 - F0(metallic) over
+1 - 0.04: gltf-pro's direct light weighted the diffuse by 1 minus the Fresnel at the
+metal-mixed F0. glTF 2.0 Appendix B defines material = mix(dielectric_brdf,
+metal_brdf, metallic), where only the dielectric has a diffuse lobe, weighted by
+1 minus the dielectric Fresnel; the specular sum is exactly Schlick at the mixed F0.
+The physical variant already did this; the base direct light now does too (the IOR
+extension sets its dielectric F0). MAE 0.6997248331705729 (WebGPU) and
+0.7010663350423177 (WebGL2 compatibility, measured after 3adffdee03 rounds the
+compatibility colour exports to the nearest binary16), absolute 550,286 and 551,341; flat
+absolute 161,063 (signed -22,877), edge 389,223 of 550,286. The budgets are
+re-recorded at these lower values (stricter, both backends). The rest is mostly
+silhouette and edge antialiasing and stays open. Environment, Cornell area and point
+proofs are unchanged (their scenes are metallic 0 or 1). Regression:
+packages/gltf-pro/tests/metal-dielectric-mix.test.js (fails on the old weight). The
+same weight is open in other packages: see the bug-sweep rows named in that commit.
 
 ### Batch 160 clearcoat picture loss (open)
 

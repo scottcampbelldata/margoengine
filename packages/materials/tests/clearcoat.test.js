@@ -10,8 +10,8 @@ import { materialQuad } from '../../../tests/support/materials-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
-// gltf-pro's base shader since KB5875a (edcb6debb7, height-correlated Smith G2); the root tests took it then.
-const baselineShader = 'bdf7de1e862e4f56fe0db5ad6a0213d66d78d88afe29f9546fe52a1101834390';
+// gltf-pro's base shader since KB3240 (direct diffuse keeps the dielectric Fresnel weight); was bdf7de1e...834390 (KB6016c).
+const baselineShader = '9a0544b943b39c68a254f23b383d5118ae41ef819e77c4d6abf21625b239b5dc';
 
 test('clearcoat maps upload retained Node pixels and generate their sampler mip chain', async () => {
   const image = { width: 2, height: 2, data: new Uint8Array(16).fill(127) };

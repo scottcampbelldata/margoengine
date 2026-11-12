@@ -2026,7 +2026,7 @@ LIM-561 and LIM-562 additionally require format round trips (rgba8unorm, bgra8un
 
 | Claim | Evidence | Scope |
 | --- | --- | --- |
-| All-pixel RGB MAE 1.7865498860677083 against a Khronos Sample Viewer picture; compatibility WebGL2 1.7865447998046875 (re-recorded 2026-11-11 from 1.837511698404948 / 1.837506612141927) | [Raw result](results/batch-160-metallic-roughness.json), `scripts/reference-rendering/run.mjs`, `tests/reference-rendering.test.js` | RTX A6000, Edge 157, 512 x 512, all 123 sample-model primitives, 4x MSAA, matched embedded camera/sun, no IBL; measured loss, not physical equivalence. Native WebGL2 explicitly rejects PBR. Integer absolute/squared/max budgets equal the recorded measurements. |
+| All-pixel RGB MAE 0.6997248331705729 against a Khronos Sample Viewer picture; compatibility WebGL2 0.7010663350423177 (2026-11-12, KB3240: diffuse weighted by the dielectric Fresnel as in glTF Appendix B, compatibility measured after the binary16 export rounding of 3adffdee03; 1.7865498860677083 / 1.7865447998046875 before, re-recorded 2026-11-11 from 1.837511698404948 / 1.837506612141927) | [Raw result](results/batch-160-metallic-roughness.json), `scripts/reference-rendering/run.mjs`, `tests/reference-rendering.test.js` | RTX A6000, Edge 157, 512 x 512, all 123 sample-model primitives, 4x MSAA, matched embedded camera/sun, no IBL; measured loss, not physical equivalence. Native WebGL2 explicitly rejects PBR. Integer absolute/squared/max budgets equal the recorded measurements. |
 
 ## Wasm CSP diagnostics (2026-11-09)
 

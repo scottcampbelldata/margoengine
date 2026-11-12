@@ -9,9 +9,10 @@ process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const baseline = await readFile(new URL('../tests/fixtures/pbr-before-naming.wgsl', import.meta.url), 'utf8');
 // Re-recorded 2026-11-11: the fixture's Smith line follows the base shader to the height-correlated G2 (KB5875a), and
 // its D line to the float32-safe |n x h|^2 + a2 nh^2 denominator (KB6016c).
+// Re-recorded 2026-11-12: its direct diffuse weight follows the base shader to 1 - the dielectric Fresnel (KB3240).
 assert.equal(
   createHash('sha256').update(baseline).digest('hex'),
-  'f9a8517a10a1c10dd72309690e158de4fec040c56ec0fabd150de026810df491',
+  '0ae71f21c8fad5a6840e00713e098edde07ed88c588e741e208e8a3d06a9e5f2',
 );
 const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5198 }),
   errors = [];

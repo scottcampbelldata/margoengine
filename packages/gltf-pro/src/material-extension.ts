@@ -201,7 +201,11 @@ function dielectricIor(code: string): string {
       'unsupported',
       'PBR shader IOR target missing: the Surface struct or its 0.04 F0; use matching @margoengine/gltf-pro and materials versions',
     );
-  return code.replace(struct, 'struct Surface {$1, f0:vec3f}').replaceAll(fixed, 'mix(s.f0,s.base.rgb,s.metal)');
+  // The direct diffuse keeps 1 - the dielectric Fresnel (glTF Appendix B), whose F0 the IOR sets too.
+  return code
+    .replace(struct, 'struct Surface {$1, f0:vec3f}')
+    .replaceAll(fixed, 'mix(s.f0,s.base.rgb,s.metal)')
+    .replaceAll('let dielectric=vec3f(0.04);', 'let dielectric=s.f0;');
 }
 
 /**

@@ -15,7 +15,7 @@
     },
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
     "browserName": "chromium",
-    "browserVersion": "157.0.4341.42",
+    "browserVersion": "157.0.4341.46",
     "requestedChannel": "msedge",
     "launchArgs": [],
     "powerPreference": "high-performance",
@@ -35,15 +35,15 @@
   },
   "metrics": {
     "pixels": 262144,
-    "absolute": 1405000,
-    "square": 31145748,
+    "absolute": 550286,
+    "square": 14592612,
     "max": 254,
-    "mae": 1.7865498860677083,
-    "rmse": 6.2931603012436,
-    "foreground": 41598,
-    "foregroundAbsolute": 1405000,
-    "foregroundMae": 11.258554097152107,
-    "changed": 40701
+    "mae": 0.6997248331705729,
+    "rmse": 4.307605564375897,
+    "foreground": 41611,
+    "foregroundAbsolute": 550286,
+    "foregroundMae": 4.408177324906075,
+    "changed": 37716
   },
   "compat": {
     "family": "metallic-roughness",
@@ -57,12 +57,12 @@
         "vendor": "margo-webgl2",
         "architecture": "webgl2",
         "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-        "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
         "fallback": false
       },
       "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
       "browserName": "chromium",
-      "browserVersion": "157.0.4341.42",
+      "browserVersion": "157.0.4341.46",
       "requestedChannel": "msedge",
       "launchArgs": [],
       "powerPreference": "high-performance",
@@ -71,6 +71,12 @@
       "compat": true
     },
     "margo": {
+      "adapter": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      },
       "backend": "webgpu",
       "draws": 123,
       "primitives": 123,
@@ -79,19 +85,19 @@
     },
     "nativeWebGL2": {
       "code": "unsupported",
-      "message": "PBRModel requires WebGPU; use a browser that supports it"
+      "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
     },
     "metrics": {
       "pixels": 262144,
-      "absolute": 1404996,
-      "square": 31145742,
+      "absolute": 551341,
+      "square": 14592293,
       "max": 254,
-      "mae": 1.7865447998046875,
-      "rmse": 6.293159695077975,
-      "foreground": 41598,
-      "foregroundAbsolute": 1404996,
-      "foregroundMae": 11.258522044329053,
-      "changed": 40701
+      "mae": 0.7010663350423177,
+      "rmse": 4.30755848117774,
+      "foreground": 41611,
+      "foregroundAbsolute": 551341,
+      "foregroundMae": 4.41662861583075,
+      "changed": 37808
     }
   },
   "viewer": {

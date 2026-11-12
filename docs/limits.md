@@ -1874,8 +1874,9 @@ Core plus stage remains 23,837 B gzip.
 
 The metallic-roughness test covers the entire 123-primitive Khronos textureless sphere model with a
 fixed camera/sun, no IBL and 4x MSAA, at 512 x 512 on the RTX A6000 only. The full-frame RGB byte MAE
-ceiling is exactly the measured 1.7865498860677083 on WebGPU and 1.7865447998046875 on the WebGL2
-compatibility layer (re-recorded 2026-11-11, see "Batch 160 budgets re-recorded" below); max channel error is 254. Foreground errors and integer sum budgets are recorded in
+ceiling is exactly the measured 0.6997248331705729 on WebGPU and 0.7010663350423177 on the WebGL2
+compatibility layer (lowered 2026-11-12 by KB3240, the dielectric diffuse weight of the glTF metal/dielectric
+mix; 1.7865498860677083 and 1.7865447998046875 before); max channel error is 254. Foreground errors and integer sum budgets are recorded in
 whitepaper/results/batch-160-metallic-roughness.json. Native WebGL2 rejects PBR explicitly.
 This is an open image-quality loss, not proof of physically accurate materials or other devices. Frozen
 reference PNGs remain outside the repository; CI unit tests validate the comparison contract and record,

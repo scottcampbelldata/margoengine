@@ -292,7 +292,7 @@ test('compiled and baseline materials have isolated pipelines and mutable factor
     const baseline = s.draws.at(-1);
     assert.equal(
       digest(baseline.pipeline.vertex.module.code),
-      'bdf7de1e862e4f56fe0db5ad6a0213d66d78d88afe29f9546fe52a1101834390',
+      '9a0544b943b39c68a254f23b383d5118ae41ef819e77c4d6abf21625b239b5dc',
     );
     const extension = nodeMaterial(graph());
     s.model.primitives[0].extension = extension;

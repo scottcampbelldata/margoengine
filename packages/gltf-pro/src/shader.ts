@@ -15,6 +15,8 @@ import { volumeScatterWgsl } from '../../shared/volume-scatter.js';
 // Direct light: glTF 2.0 specification Appendix B (GGX D: Walter et al. 2007, eq. 33; Smith G: eq. 34; Fresnel:
 // Schlick 1994; dielectric F0 0.04 = IOR 1.5). Hemisphere ambient (ground (0.35, 0.3, 0.25) to sky 1 by n.y / 2 + 1/2,
 // specular weight f0 x 0.5): a Margo design choice.
+// Appendix B mixes material = mix(dielectric_brdf, metal_brdf, metallic): the specular sum is Schlick at the mixed f0,
+// and the diffuse belongs to the dielectric alone, so it keeps 1 - the dielectric Fresnel, not 1 - fresnel (KB3240).
 const lightingTerms = /* wgsl */ `fn hemisphere_ambient(s:Surface)->vec3f {
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal);
   let hemisphere=mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0));
@@ -29,8 +31,8 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=s.roughness*s.roughness; let a2=a*a; let d=${/* @__PURE__ */ ggxDOf('s.n', 'h')};
   let g=${smithGCorrelated};
-  let f0=mix(vec3f(0.04),s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
-  return ((1-fresnel)*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
+  let dielectric=vec3f(0.04); let f0=mix(vec3f(0.04),s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-vh,5.0);
+  return ((1-(dielectric+(1-dielectric)*pow(1-vh,5.0)))*(1-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
 }
 `;
 // Minimum perceptual roughness 0.045 (the s.roughness clamp): Filament design document (published engine standard).
@@ -593,7 +595,10 @@ const physicalEdits = (sample: (name: string) => string, bindings: string): [str
   ...transmittedDiffuse,
   // KHR_materials_specular: the weight scales F90 too, and the base keeps one number for all channels.
   ['let fresnel=f0+(1-f0)*pow(1-vh,5.0);', 'let fresnel=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);'],
-  ['return ((1-fresnel)*(1-s.metal)', 'return ((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'],
+  [
+    'return ((1-(dielectric+(1-dielectric)*pow(1-vh,5.0)))*(1-s.metal)',
+    'return ((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)',
+  ],
   [
     '@fragment fn fragment(',
     `${directVisibility}\n${dielectricFresnelWGSL}fn ggx(n:vec3f,v:vec3f,l:vec3f,r:f32)->f32 {

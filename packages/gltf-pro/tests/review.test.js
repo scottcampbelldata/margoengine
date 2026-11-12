@@ -18,9 +18,11 @@ test('named base lighting keeps all prior resources and optional lighting splice
   // The fixture is the base shader as it was before the naming review, with one later change: its Smith line moved to
   // the height-correlated G2 with the base shader on 2026-11-11 (KB5875a, Heitz 2014), so the naming proof still
   // compares like with like. Before that the hash was 55d97b19f64633a459972ca528268598c48f5a751df47f598152ee110c446c86.
+  // On 2026-11-12 its direct diffuse weight moved with the base shader to 1 - the dielectric Fresnel (KB3240, glTF
+  // Appendix B); before that the hash was f9a8517a10a1c10dd72309690e158de4fec040c56ec0fabd150de026810df491.
   assert.equal(
     createHash('sha256').update(before).digest('hex'),
-    'f9a8517a10a1c10dd72309690e158de4fec040c56ec0fabd150de026810df491',
+    '0ae71f21c8fad5a6840e00713e098edde07ed88c588e741e208e8a3d06a9e5f2',
   );
   assert.match(pbrShader, /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f/);
   assert.match(pbrShader, /let direct=direct_light\(s,v,l\)/);
