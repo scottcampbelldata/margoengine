@@ -1,7 +1,8 @@
 // Real-GPU checks of post's newer effects against closed forms (post-effects.html). Run after npm run build:packages,
-// holding the GPU lock:  node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/post-effects-gpu.mjs [--only=gtao]
+// holding the GPU lock:  node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/post-effects-gpu.mjs [--only=gtao] [--record]
 // gpu-lock: correctness
-// Each section writes examples/package-benchmarks/results/<section>-gpu.json; frames go to test-results/post-*.png.
+// Each section writes its report to test-results/post-<section>-gpu.json; only --record writes the tracked record
+// examples/package-benchmarks/results/<section>-gpu.json (post-effects-output.mjs). Frames go to test-results/post-*.png.
 //
 // gtao: GTAO's occlusion of the ambient light (linear: the frame with GTAO over the frame with it disabled, direct light
 //   off) against the cosine-weighted visibility of a point on a floor where a plane through it closes the hemisphere to
@@ -33,10 +34,11 @@
 //   at the mirrored centre). 4x and 1x; no black (NaN) pixels.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
+import { sectionReport } from './post-effects-output.mjs';
 
 const only = process.argv
   .find((a) => a.startsWith('--only='))
@@ -627,8 +629,10 @@ try {
     const report = await section();
     await page.evaluate(() => window.check.teardown());
     assert.deepEqual(pageErrors, []);
-    writeFileSync(`examples/package-benchmarks/results/${name}-gpu.json`, JSON.stringify(report, null, 1) + '\n');
-    console.log(`${name}: passed; wrote examples/package-benchmarks/results/${name}-gpu.json`);
+    const out = sectionReport(name);
+    mkdirSync('test-results', { recursive: true });
+    writeFileSync(out.path, JSON.stringify(report, null, 1) + '\n');
+    console.log(`${name}: passed; wrote ${out.path}`);
   }
 } finally {
   await context.close();
