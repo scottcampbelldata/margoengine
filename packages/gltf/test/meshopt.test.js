@@ -231,3 +231,28 @@ test('a file with nothing compressed passes through', async () => {
     engine.dispose();
   }
 });
+
+// Batch 132b: the README's placeholder buffer is `{ "byteLength": n }` with no URI; the `fallback` tag is optional
+// ("may be tagged"). An untagged placeholder whose every view is compressed threw "Truncated glTF buffer".
+test('an untagged URI-less placeholder buffer under compressed views loads', async () => {
+  const { engine } = await headlessEngine();
+  try {
+    const input = file();
+    delete input.doc.buffers[1].extensions;
+    const model = await load(engine, input);
+    assert.deepEqual(vertexData(model.meshes[0].geometry).positions, [...positions]);
+    model.dispose();
+    // loadGLTF as well (it handed every URI-less buffer the GLB chunk or an empty array).
+    const doc = structuredClone(input.doc);
+    doc.buffers[0].uri = 'data.bin';
+    const get = async (url) => new Response(String(url).endsWith('.gltf') ? JSON.stringify(doc) : input.bytes),
+      loaded = await loadGLTF(engine, 'https://example.test/m.gltf', { fetch: get, extensions: [meshopt] });
+    assert.deepEqual(vertexData(loaded.meshes[0].geometry).positions, [...positions]);
+    loaded.dispose();
+    // A URI-less buffer that an uncompressed view reads is still missing data.
+    input.doc.bufferViews.push({ buffer: 1, byteLength: 4 });
+    await assert.rejects(load(engine, input), /Truncated glTF buffer/);
+  } finally {
+    engine.dispose();
+  }
+});

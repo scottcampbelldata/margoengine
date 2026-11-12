@@ -10,7 +10,9 @@ const NAME = 'EXT_mesh_gpu_instancing',
   invalid = (what: string) =>
     new TypeError(`Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`);
 
-// TRANSLATION and SCALE may be float or, under KHR_mesh_quantization, any integer form; ROTATION float or normalized signed.
+// The EXT_mesh_gpu_instancing README allows FLOAT TRANSLATION and SCALE and FLOAT or normalized BYTE or SHORT ROTATION;
+// KHR_mesh_quantization's tables do not name instance attributes. This also reads integer TRANSLATION and SCALE
+// (as quantizing exporters write them), decoded as the accessor says, without requiring either extension.
 const scalar = (a: GLTFAccessor) => a.type === 'VEC3' && [5126, 5120, 5121, 5122, 5123].includes(a.componentType),
   turn = (a: GLTFAccessor) =>
     a.type === 'VEC4' && (a.componentType === 5126 || (a.normalized === true && [5120, 5122].includes(a.componentType)));

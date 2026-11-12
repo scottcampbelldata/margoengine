@@ -12,7 +12,7 @@ import { GLB_BIN, checkBinChunk, glbChunks, isGLB } from '../../shared/glb.js';
 import { entry, integer, readAccessor } from './accessor.js';
 
 const limit = 64 * 1024 * 1024;
-import type { GLTFBuffer, GLTFDocument as Document, GLTFNode, GLTFPrimitive } from '../../shared/gltf.js';
+import type { GLTFDocument as Document, GLTFNode, GLTFPrimitive } from '../../shared/gltf.js';
 const isObject = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value);
 // Malformed UTF-8 or JSON is a named error, not the TextDecoder's TypeError or JSON.parse's SyntaxError.
 function text(data: Uint8Array): string {
@@ -190,11 +190,24 @@ export interface GLTFOptions {
    */
   allowedURLs?: readonly string[];
 }
-// A buffer only an extension's data stands in for, such as a meshopt fallback: the file loads without its bytes.
-const stands = (def: GLTFBuffer, extensions: readonly GLTFExtension[]): boolean =>
-  extensions.some((extension) =>
-    extension.handles.some((name) => (def.extensions?.[name] as { fallback?: unknown } | undefined)?.fallback === true),
-  );
+// A buffer only an extension's data stands in for, such as a meshopt fallback: the file loads without its bytes. Tagged
+// (`fallback: true`), or a URI-less placeholder (EXT_meshopt_compression, "Fallback buffers": the tag is optional) that
+// only views carrying a loaded extension's own source read.
+const handled = (extensions: readonly GLTFExtension[], object: { extensions?: Record<string, unknown> } | undefined) =>
+  extensions.some((extension) => extension.handles.some((name) => object?.extensions?.[name] !== undefined));
+const stands = (doc: Document, i: number, extensions: readonly GLTFExtension[], present: boolean): boolean => {
+  const def = doc.buffers![i];
+  if (
+    extensions.some((extension) =>
+      extension.handles.some(
+        (name) => (def.extensions?.[name] as { fallback?: unknown } | undefined)?.fallback === true,
+      ),
+    )
+  )
+    return true;
+  const views = (doc.bufferViews ?? []).filter((view) => view.buffer === i);
+  return !present && def.uri === undefined && views.length > 0 && views.every((view) => handled(extensions, view));
+};
 function open(
   input: string | object | ArrayBuffer | ArrayBufferView,
   suppliedBuffers: Array<ArrayBuffer | ArrayBufferView>,
@@ -205,7 +218,9 @@ function open(
   let total = 0;
   const buffers = (doc.buffers ?? []).map((def, i) => {
     const length = integer(def.byteLength, 'buffer length', 1);
-    if (stands(def, extensions)) return new Uint8Array();
+    // An empty supplied buffer (loadGLTF's for a stand-in) is no data.
+    if (stands(doc, i, extensions, (suppliedBuffers[i]?.byteLength ?? 0) > 0 || (i === 0 && !!binary && !def.uri)))
+      return new Uint8Array();
     const data = suppliedBuffers[i]
       ? bytes(suppliedBuffers[i])
       : def.uri
@@ -492,8 +507,9 @@ export async function loadGLTF(
     { doc, binary } = container(glb ? data : text(data));
   validate(doc, maxNodes, extensions);
   const buffers = [];
-  for (const def of doc.buffers ?? []) {
-    if (!def.uri || stands(def, extensions)) buffers.push(binary ?? new Uint8Array());
+  for (const [i, def] of (doc.buffers ?? []).entries()) {
+    if (stands(doc, i, extensions, i === 0 && !def.uri && !!binary)) buffers.push(new Uint8Array());
+    else if (!def.uri) buffers.push(binary ?? new Uint8Array());
     else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {
       const data = embedded(def.uri);
       total += data.length;
