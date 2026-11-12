@@ -103,11 +103,36 @@ Codec authorities compared: Valentin Haenel, *Bloscpack: a compressed lightweigh
 
 Independent binary tools produced 17 numcodecs compressed fixtures plus a Python LZ4/xxHash Java-framing fixture. Python numcodecs/Pillow independently decode the public scientific regions: all 32,768 IDR and N5 samples match exactly; the existing JPEG decoder differs from Pillow by at most one sample value on the hemibrain region. Yuriy A. Reznik et al., *Efficient Fixed-Point Approximations of the 8x8 Inverse Discrete Cosine Transform* (2007), https://www.reznik.org/papers/SPIE07_MPEG-C_IDCT.pdf explains implementation precision variation; this is a recorded comparison, not a JPEG conformance certification or exact JPEG parity claim. Lossless sample assertions remain exact. Source URLs, licences and object SHA-256 hashes are retained in each fixture manifest and THIRD-PARTY-NOTICES.md.
 
+## KB3148e: linear-light layers in the exact, peeled, moment and float32 passes (2026-11-12)
+
+Sources read (papers and specifications only, no companion, sample or rival source code): Thomas Porter and Tom Duff,
+*Compositing Digital Images*, SIGGRAPH 1984 (the over operator, applied here to decoded values); IEC 61966-2-1:1999
+(sRGB transfer); Larry Gritz and Eugene d'Eon, *The Importance of Being Linear*, GPU Gems 3, chapter 24, 2007
+(why blend in linear light); Jason C. Yang, Justin Hensley, Holger Grun and Nicolas Thibieroz, *Real-Time Concurrent
+Linked List Construction on the GPU*, EGSR 2010 (per-pixel lists, resolved layer by layer); Cass Everitt, *Interactive
+Order-Independent Transparency*, 2001 (peeled layers composited far to near); Cedrick Muenstermann, Stefan Krumpen,
+Reinhard Klein and Christoph Peters, *Moment-Based Order-Independent Transparency*, I3D 2018; Morgan McGuire and Louis
+Bavoil, *Weighted Blended Order-Independent Transparency*, JCGT 2013; Chris Wyman, *Exploring and Expanding the
+Continuum of OIT Algorithms*, HPG 2016, https://research.nvidia.com/publication/2016-06_exploring-and-expanding-continuum-oit-algorithms
+(collect, then resolve); Marilena Maule, Joao Comba, Rafael Torchelsen and Rui Bastos, *A survey of raster-based
+transparency techniques*, Computers and Graphics 35(6), 2011, https://doi.org/10.1016/j.cag.2011.07.006; W3C *WebGPU*
+and *WGSL* (instance_index counts from firstInstance; colour attachment bytes per sample).
+
+Compared one linear composite of the whole list per pixel (needs the scene depth, which is not bindable, to drop layers
+behind opaque surfaces), a ping-pong of two colour targets per layer (the same copy per layer, plus a second target),
+and a snapshot per layer index. Chose the snapshot: the hardware depth and sample-mask test per layer stays as it was,
+display layers keep their exact hardware blend, and only frames with a linear layer pay. The weighted passes reuse
+OIT's KB3148d composite. The alpha sign as the linear flag, the mark channels and the per-index split are Margo's own.
+
+Note on the Bavoil and Myers citation in "Batch 190 job 1" and "job 2" below (checked 2026-11-12 for the bug sweep):
+the link is the whitepaper PDF in the `doc` folder of NVIDIA's OpenGL SDK 10 dual depth peeling sample. Those records
+state that only that document was read, not the sample's source files beside it; KB3148e does not use it.
+
 ## Batch 190 job 2: float32 weighted accumulation
 
 Research combined: Morgan McGuire and Louis Bavoil, *Weighted Blended Order-Independent Transparency*, JCGT 2(2), 2013, [equations 7 to 10 and precision discussion](https://jcgt.org/published/0002/02/09/paper-lowres.pdf); Louis Bavoil and Kevin Myers, *Order Independent Transparency with Dual Depth Peeling*, 2008, [weighted-average and blending discussion](https://developer.download.nvidia.com/SDK/10/opengl/src/dual_depth_peeling/doc/DualDepthPeeling.pdf); W3C GPU for the Web Working Group, *WebGPU*, 2026, [float32-blendable and plain colour format capabilities](https://www.w3.org/TR/webgpu/#plain-color-formats); Khronos WebGL Working Group, *EXT_float_blend*, 2019, [float32 blend enablement](https://registry.khronos.org/webgl/extensions/EXT_float_blend/). Papers and specifications only, no companion or rival source code.
 
-`oit/precise` keeps the existing OIT weight/coverage equations, replacing four half-float sums with four scalar R32F targets. The format table rules out multisampled RGBA32F, so scalar R32F preserves both 1x and 4x scene coverage. The composite reads/averages the samples before dividing the weighted colour sum by the weight sum, equivalent to the original resolved targets. Revealage remains R16F. Explicit unfilterable bindings avoid requiring float32 filtering. Native devices explicitly request float32-blendable; full WebGL2 devices use the existing public EXT_float_blend capability. Analytic emissive-intensity tests prove bright stacked transport and show the old half-float saturation side by side, with ordinary radiance and MSAA edges compared to OIT. Existing CC0 Khronos GlassVaseFlowers exercises PBR shading. No new external asset, code or benchmark.
+`oit/precise` keeps the existing OIT weight/coverage equations, replacing four half-float sums with four scalar R32F targets. The format table rules out multisampled RGBA32F, so scalar R32F preserves both 1x and 4x scene coverage. The composite reads/averages the samples before dividing the weighted colour sum by the weight sum, equivalent to the original resolved targets. Revealage remains R16F (RG16F since KB3148e, the second channel marking linear-light layers). Explicit unfilterable bindings avoid requiring float32 filtering. Native devices explicitly request float32-blendable; full WebGL2 devices use the existing public EXT_float_blend capability. Analytic emissive-intensity tests prove bright stacked transport and show the old half-float saturation side by side, with ordinary radiance and MSAA edges compared to OIT. Existing CC0 Khronos GlassVaseFlowers exercises PBR shading. No new external asset, code or benchmark.
 
 ## Batch 190 job 1: texture depth peeling
 

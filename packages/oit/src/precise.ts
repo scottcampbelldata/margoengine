@@ -7,7 +7,7 @@ import { compatTier, requireCompatTier } from '../../shared/compat.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
-import { TransparentPass, pbrLayer } from './pass.js';
+import { TransparentPass, linearComposite, pbrLayer } from './pass.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -25,15 +25,17 @@ const add: GPUBlendState = {
   color: { srcFactor: 'one', dstFactor: 'one' },
   alpha: { srcFactor: 'one', dstFactor: 'one' },
 };
+// Revealage in .r; .g is the mark of `blendSpace: 'linear'` layers (KB3148e), cleared to 1 and multiplied to 0 by one.
 const surface = (group: number) => /* wgsl */ `
+override margoLinear:bool=false;
 struct MargoTransparent {
-  @location(0) r:f32, @location(1) g:f32, @location(2) b:f32, @location(3) weight:f32, @location(4) reveal:f32
+  @location(0) r:f32, @location(1) g:f32, @location(2) b:f32, @location(3) weight:f32, @location(4) reveal:vec2f
 }
 @group(${group}) @binding(120) var<uniform> margoOIT:vec4f;
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
   let a=clamp(color.a,0.0,1.0); let d=max(depth*margoOIT.x,1e-4);
   let w=a*clamp(10.0/pow(d,6.0),0.01,1000.0);
-  return MargoTransparent(color.r*w,color.g*w,color.b*w,w,a);
+  return MargoTransparent(color.r*w,color.g*w,color.b*w,w,vec2f(a,select(0.0,1.0,margoLinear)));
 }
 `;
 const composite = (samples: number) => /* wgsl */ `
@@ -51,6 +53,21 @@ ${[0, 1, 2, 3, 4].map((i) => `@group(0) @binding(${i}) var map${i}:${samples > 1
 }
 `;
 
+// KB3148e: the pixels a linear layer touched, after the composite above, in linear light over the snapshot; the mark is
+// the share of samples no linear layer covered.
+const compositeLinear = (samples: number) =>
+  linearComposite(
+    [0, 1, 2, 3, 4]
+      .map((i) => `@group(0) @binding(${i}) var map${i}:${samples > 1 ? 'texture_multisampled_2d' : 'texture_2d'}<f32>;`)
+      .join('\n'),
+    `var sum=vec4f(0.0); var reveal=vec2f(0.0);
+  for(var s=0;s<${samples};s+=1){
+    sum+=vec4f(${[0, 1, 2, 3].map((i) => `textureLoad(map${i},q,${samples > 1 ? 's' : '0'}).r`).join(',')});
+    reveal+=textureLoad(map4,q,${samples > 1 ? 's' : '0'}).rg;
+  }
+  let avg=sum.rgb/max(sum.a,${samples}.0*1e-5); let cover=1.0-reveal.x/${samples}.0; let mark=reveal.y/${samples}.0;`,
+  );
+
 /**
  * Weighted transparency with four R32F accumulation channels instead of half-float sums. The weighting and coverage
  * match OIT; bright stacked layers no longer overflow at 65504. Five render targets and float32 blending are required.
@@ -63,7 +80,7 @@ export class PreciseOIT extends TransparentPass {
   readonly targets: readonly GPUColorTargetState[] = [
     ...[0, 1, 2, 3].map(() => ({ format: 'r32float' as const, blend: add })),
     {
-      format: 'r16float',
+      format: 'rg16float',
       blend: {
         color: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
         alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
@@ -127,7 +144,7 @@ export class PreciseOIT extends TransparentPass {
       label: 'oit:precise:accumulate',
       colorAttachments: this.views.map((view, i) => ({
         view,
-        clearValue: i === 4 ? [1, 0, 0, 0] : [0, 0, 0, 0],
+        clearValue: i === 4 ? [1, 1, 0, 0] : [0, 0, 0, 0],
         loadOp: 'clear',
         storeOp: 'store',
       })),
@@ -160,33 +177,44 @@ export class PreciseOIT extends TransparentPass {
     const scale = this.depthScale ?? Math.hypot(...c.camera.position.map((p, i) => p - c.camera.target[i]));
     this.values[0] = 1 / (scale || 1);
     this.binding = writeUniform(device, this.uniform!, this.values, c.view ?? c);
+    let scene: GPUTextureView | undefined;
     try {
       if (!this.drawModels(c)) return;
+      // The colour before the composite, for the pixels a linear layer touched (copied only when one drew).
+      scene = (this.scene as (() => GPUTextureView) | undefined)?.();
     } finally {
       this.binding = undefined;
+      this.scene = undefined;
     }
-    const key = c.format + samples;
-    let pipeline = this.pipelines.get(key);
-    if (!pipeline) {
-      const module = device.createShaderModule({ code: composite(samples) });
-      const layout = device.createBindGroupLayout({
-        entries: this.views.map((_, binding) => ({
-          binding,
-          visibility: 2,
-          texture: { sampleType: 'unfilterable-float', multisampled: samples > 1 },
-        })),
-      });
-      this.pipelines.set(
-        key,
-        (pipeline = device.createRenderPipeline({
-          label: 'oit:precise:composite',
-          layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-          vertex: { module, entryPoint: 'vertex' },
-          fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: alphaBlend }] },
-          multisample: { count: samples },
-        })),
-      );
-    }
+    const made = (linear: boolean): GPURenderPipeline => {
+      const key = c.format + samples + (linear ? 'l' : '');
+      let pipeline = this.pipelines.get(key);
+      if (!pipeline) {
+        const module = device.createShaderModule({ code: (linear ? compositeLinear : composite)(samples) });
+        const layout = device.createBindGroupLayout({
+          entries: [
+            ...this.views.map((_, binding) => ({
+              binding,
+              visibility: 2,
+              texture: { sampleType: 'unfilterable-float' as const, multisampled: samples > 1 },
+            })),
+            ...(linear ? [{ binding: 9, visibility: 2, texture: { sampleType: 'unfilterable-float' as const } }] : []),
+          ],
+        });
+        this.pipelines.set(
+          key,
+          (pipeline = device.createRenderPipeline({
+            label: linear ? 'oit:precise:composite-linear' : 'oit:precise:composite',
+            layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+            vertex: { module, entryPoint: 'vertex' },
+            fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: linear ? undefined : alphaBlend }] },
+            multisample: { count: samples },
+          })),
+        );
+      }
+      return pipeline;
+    };
+    const pipeline = made(false);
     let group = this.groups.get(pipeline);
     if (!group)
       this.groups.set(
@@ -204,14 +232,33 @@ export class PreciseOIT extends TransparentPass {
     out.setPipeline(pipeline);
     out.setBindGroup(0, group);
     out.draw(3);
+    if (scene) {
+      const linear = made(true);
+      let held = this.linearGroup;
+      if (held?.view !== scene || held.pipeline !== linear)
+        this.linearGroup = held = {
+          view: scene,
+          pipeline: linear,
+          group: device.createBindGroup({
+            layout: linear.getBindGroupLayout(0),
+            entries: [...this.views.map((resource, binding) => ({ binding, resource })), { binding: 9, resource: scene }],
+          }),
+        };
+      out.setPipeline(linear);
+      out.setBindGroup(0, held.group);
+      out.draw(3);
+    }
     out.end();
   }
+  /** The linear composite's group: the five targets and the snapshot (KB3148e). */
+  private linearGroup?: { view: GPUTextureView; pipeline: GPURenderPipeline; group: GPUBindGroup };
   protected release(): void {
     for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
     this.views = [];
     this.size = '';
     this.groups.clear();
+    this.linearGroup = undefined;
   }
   protected freeDevice(): void {
     this.release();

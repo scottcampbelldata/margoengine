@@ -1,26 +1,40 @@
 <!doctype html><html><head><meta charset="utf-8"><style>canvas{width:8px;height:8px}</style></head><body><script type="module">
-// Browser side of linear-check.mjs (KB3148d): a 50% red surface (linear 0.5) over black, one or two layers, through OIT
-// (plain or `blending`), blendSpace display or linear, set before the first frame or after it (late), as a materials
-// mesh or a glTF primitive. Counts the OIT pass's begin() calls: a layer left on the sorted path never opens it.
+// Browser side of linear-check.mjs (KB3148d, KB3148e): a 50% red surface (linear 0.5) over black, one or two layers,
+// through OIT (plain or `blending`), ExactOIT, MomentOIT, PeelOIT or PreciseOIT, blendSpace display or linear, set
+// before the first frame or after it (late), as a materials mesh or a glTF primitive; 'mixed' is a linear layer in front
+// of a display one. Counts the pass's begin() calls: a layer left on the sorted path never opens it.
 import {Engine} from '/packages/core/dist/index.js';
 import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
 import {extendedMaterials} from '/packages/gltf-pro/dist/extended.js';
 import {UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
 import {OIT} from '/packages/oit/dist/index.js';
+import {ExactOIT} from '/packages/oit/dist/exact.js';
+import {MomentOIT} from '/packages/oit/dist/moments.js';
+import {PeelOIT} from '/packages/oit/dist/peel.js';
+import {PreciseOIT} from '/packages/oit/dist/precise.js';
 import {instancedGLTF} from '/tests/support/instanced-gltf.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 const errors=[];
-window.linearOIT=async()=>{
+// ExactOIT's list starts with room for 2 fragments a pixel and grows after a frame that found it short; two 4x quads leave
+// 144 fragments in 64 pixels (the diagonal's pixels hold both triangles), so the late cases' first frame would drop some.
+const passes={
+ oit:(e)=>OIT.attach(e),blending:(e)=>OIT.attach(e,{blending:true}),exact:(e)=>ExactOIT.attach(e,{pool:4}),
+ moments:(e)=>MomentOIT.attach(e,{depthRange:[0.5,2]}),peel:(e)=>PeelOIT.attach(e),precise:(e)=>PreciseOIT.attach(e),
+};
+window.linearOIT=async(names)=>{
  const quad=(z)=>({positions:[-1,-1,z,1,-1,z,1,1,z,-1,1,z],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
  const rows=[];
- const cases=[[1,'display'],[1,'linear'],[1,'linear',true],[2,'linear'],[2,'display'],[2,'linear',true],[1,'linear',false,true],[2,'linear',true,true]];
- for(const blending of [false,true]) for(const samples of [1,4]) for(const [layers,space,late,gltf] of cases){
+ const cases=[[1,'display'],[1,'linear'],[1,'linear',true],[2,'linear'],[2,'display'],[2,'linear',true],[1,'linear',false,true],[2,'linear',true,true],[2,'mixed']];
+ for(const pass of names) for(const samples of [1,4]) for(const [layers,space,late,gltf] of cases){
+  // A linear layer in front of a display one is order-dependent per pixel: only the per-layer passes keep it.
+  if(space==='mixed'&&pass!=='exact'&&pass!=='peel')continue;
   const canvas=document.body.appendChild(document.createElement('canvas'));
-  const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
+  const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]},...(pass==='precise'?{features:['float32-blendable']}:{})});
   engine.gpu.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
   try{
    engine.scene.background='#000000';engine.lighting.radiance.fill(0);
-   const oit=OIT.attach(engine,{blending});
+   let oit;
+   try{oit=passes[pass](engine);}catch(error){rows.push({pass,samples,layers,space,refused:error.code??String(error)});continue;}
    let taken=0;const begin=oit.begin.bind(oit);oit.begin=()=>{taken++;return begin();};
    let set;
    if(gltf){
@@ -32,9 +46,10 @@ window.linearOIT=async()=>{
     oit.add(model);
     set=(v)=>{for(const p of model.primitives)p.material.renderState={blendSpace:v};};
    }else{
-    const material=new UnlitMaterial({color:[0.5,0,0],opacity:0.5,transparent:true});
-    for(let i=0;i<layers;i++)oit.add(createMesh(engine,quad(-i*0.1),material));
-    set=(v)=>{material.blendSpace=v;};
+    const near=new UnlitMaterial({color:[0.5,0,0],opacity:0.5,transparent:true});
+    const far=space==='mixed'?new UnlitMaterial({color:[0.5,0,0],opacity:0.5,transparent:true}):near;
+    for(let i=0;i<layers;i++)oit.add(createMesh(engine,quad(-i*0.1),i?far:near));
+    set=(v)=>{near.blendSpace=v==='mixed'?'linear':v;};
    }
    if(!late)set(space);
    const frame=async()=>{engine.render({culling:false,samples});await engine.gpu.queue.onSubmittedWorkDone();};
@@ -42,7 +57,7 @@ window.linearOIT=async()=>{
    let before;
    if(late){before=canvas.toDataURL('image/png');set(space);}
    await waitForPipelines(frame);taken=0;await frame();
-   rows.push({blending,samples,layers,space,late:!!late,gltf:!!gltf,taken,png:canvas.toDataURL('image/png'),before});
+   rows.push({pass,samples,layers,space,late:!!late,gltf:!!gltf,taken,png:canvas.toDataURL('image/png'),before});
    oit.dispose();
   }finally{engine.dispose();canvas.remove();}
  }

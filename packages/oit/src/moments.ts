@@ -17,7 +17,7 @@ import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode, type SurfaceTransparency } from '../../shared/pass.js';
-import { TransparentPass, pbrLayer } from './pass.js';
+import { TransparentPass, linearComposite, pbrLayer } from './pass.js';
 
 export type { TransparentPass };
 
@@ -71,14 +71,16 @@ fn margoHalf(v:vec4f)->vec4f {
 // step apart (vfx-check.mjs, splats added in either order, 1 of 255). Two halves sum the same either way. The rounding
 // is done on the bits, to nearest even: under Chrome on that Mac, quantizeToF16 and a pack2x16float round trip left the
 // value as it was.
+// A `blendSpace: 'linear'` layer (KB3148e) adds 1 to the optical target's free fourth channel: the composite's mark.
 const sums = (group: number) => /* wgsl */ `
+override margoLinear:bool=false;
 struct MargoTransparent {@location(0) moments:vec4f, @location(1) optical:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 ${warp}
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
   let tau=-log(1.0-clamp(color.a,0.0,0.999)); let a=margoAngle(margoWarp(depth)); var o:MargoTransparent;
   o.moments=margoHalf(tau*vec4f(cos(a),sin(a),cos(2.0*a),sin(2.0*a)));
-  o.optical=margoHalf(tau*vec4f(1.0,cos(3.0*a),sin(3.0*a),0.0)); return o;
+  o.optical=margoHalf(tau*vec4f(1.0,cos(3.0*a),sin(3.0*a),0.0)); o.optical.w=select(0.0,1.0,margoLinear); return o;
 }
 `;
 // Algorithm 2 with m = 3, in complex numbers held as vec2f. The moments b1..b3 (b0 = 1 after dividing by the optical
@@ -90,6 +92,7 @@ fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
 // nearer than x0 count whole, x0 itself a quarter (the paper's overestimation), points in the wrapping zone in
 // proportion (Equation 6, with its piecewise-linear psi).
 const shade = (group: number) => /* wgsl */ `
+override margoLinear:bool=false;
 struct MargoTransparent {@location(0) color:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 @group(${group}) @binding(${BINDING + 1}) var margoMoments:texture_2d<f32>;
@@ -169,6 +172,13 @@ const composite = /* wgsl */ `
 }
 `;
 
+// KB3148e: the pixels a linear layer touched, after the composite above, in linear light over the snapshot. At a 4x edge
+// the resolved mark is the mean count of linear layers per sample.
+const compositeLinear = linearComposite(
+  '@group(0) @binding(0) var colorMap:texture_2d<f32>;\n@group(0) @binding(1) var opticalMap:texture_2d<f32>;',
+  'let a=textureLoad(colorMap,q,0); let o=textureLoad(opticalMap,q,0); let avg=a.rgb/max(a.a,1e-5); let cover=1-exp(-o.r); let mark=clamp(1-o.a,0.0,1.0);',
+);
+
 /** The formats of the three targets, in the order `targets` makes them. */
 const formats: readonly GPUTextureFormat[] = ['rgba16float', 'rgba16float', 'rgba16float'];
 
@@ -222,6 +232,7 @@ export class MomentOIT extends TransparentPass {
       { binding: BINDING + 2, resource: this.views[1] },
     ],
     begin: () => (this.shading ??= this.open('oit:shade', [2], [[0, 0, 0, 0]])),
+    linearLayers: (scene) => this.linearLayers(scene),
   };
 
   static attach(engine: EngineKernel, options?: MomentOITOptions): MomentOIT {
@@ -347,6 +358,7 @@ export class MomentOIT extends TransparentPass {
     this.values[1] = -1 - this.values[0] * Math.log(near);
     // A second view in the same frame gets its own copy of the uniform.
     this.binding = writeUniform(device, this.uniform!, this.values, c.view ?? c);
+    let scene: GPUTextureView | undefined;
     try {
       if (!this.drawModels(c)) return;
       this.context = c;
@@ -359,8 +371,11 @@ export class MomentOIT extends TransparentPass {
         this.shading = undefined;
         this.context = undefined;
       }
+      // The colour before the composite, for the pixels a linear layer touched (copied only when one drew).
+      scene = (this.scene as (() => GPUTextureView) | undefined)?.();
     } finally {
       this.binding = undefined;
+      this.scene = undefined;
     }
     const key = c.format + samples;
     let pipeline = this.pipelines.get(key);
@@ -397,7 +412,45 @@ export class MomentOIT extends TransparentPass {
     out.setPipeline(pipeline);
     out.setBindGroup(0, group);
     out.draw(3);
+    if (scene) {
+      let linear = this.pipelines.get(key + 'l');
+      if (!linear) {
+        const module = device.createShaderModule({ code: compositeLinear });
+        this.pipelines.set(
+          key + 'l',
+          (linear = device.createRenderPipeline({
+            label: 'oit:composite-linear',
+            layout: 'auto',
+            vertex: { module, entryPoint: 'vertex' },
+            fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
+            multisample: { count: samples },
+          })),
+        );
+      }
+      out.setPipeline(linear);
+      out.setBindGroup(0, this.linearGroup(linear, scene));
+      out.draw(3);
+    }
     out.end();
+  }
+  private linearGroups?: { view: GPUTextureView; pipeline: GPURenderPipeline; group: GPUBindGroup };
+  /** The linear composite's group: colour, optical depth and the snapshot. */
+  private linearGroup(pipeline: GPURenderPipeline, view: GPUTextureView): GPUBindGroup {
+    let held = this.linearGroups;
+    if (held?.view !== view || held.pipeline !== pipeline)
+      this.linearGroups = held = {
+        view,
+        pipeline,
+        group: this.device!.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: this.views[2] },
+            { binding: 1, resource: this.views[1] },
+            { binding: 9, resource: view },
+          ],
+        }),
+      };
+    return held.group;
   }
   protected release(): void {
     for (const t of this.textures) retire(this.device!, t);
@@ -405,6 +458,7 @@ export class MomentOIT extends TransparentPass {
     this.views = [];
     this.size = '';
     this.groups.clear();
+    this.linearGroups = undefined;
   }
   protected freeDevice(): void {
     this.release();

@@ -320,8 +320,8 @@ paint.dispose();
   full-target copy before each such mesh (the native glass snapshot); its instances do not blend over one another. It
   takes effect from the frame after a mesh first draws with it. On an HDR target (Bloom, tonemapping) every blend is
   linear already. Added to an `OIT` pass (`@margoengine/oit`) such a mesh stays order-independent and its pixels
-  composite in linear light there (KB3148d); `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` keep it on the sorted
-  path for now (KB3148e).
+  composite in linear light there (KB3148d); `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` take it the same way
+  (KB3148e).
 
 ```ts
 import {Engine} from 'margoengine/core';

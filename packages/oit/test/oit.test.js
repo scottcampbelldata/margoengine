@@ -91,7 +91,8 @@ test('precise accumulation keeps all four sums in float32 at 1x and 4x without a
         ['r32float', samples],
         ['r32float', samples],
         ['r32float', samples],
-        ['r16float', samples],
+        // Revealage in r, the linear-layer mark in g (KB3148e).
+        ['rg16float', samples],
       ],
     );
     const module = of(log, 'module').find((e) => e[2].code.includes('var map0:'))[2].code;
@@ -737,29 +738,62 @@ test("KB3148d: a blendSpace 'linear' material joins the OIT pass, marked, and it
     }
 });
 
-test('KB3148d: passes without linear layers leave a linear material on the sorted path, and the display path has no mark draw', async () => {
-  for (const Pass of [ExactOIT, MomentOIT]) {
-    const { engine, model, frame } = await scene(1),
-      oit = Pass.attach(engine);
-    model.primitives[1].material.renderState = { blendSpace: 'linear' };
+test("KB3148e: ExactOIT, MomentOIT, PeelOIT and PreciseOIT take blendSpace 'linear' layers, marked, and composite them in linear light from the snapshot", async () => {
+  // The pass that composites (label); per: how many such passes a linear frame has; drawn: draws in each of them.
+  const cases = [
+    ['ExactOIT', ExactOIT, 'oit:resolve', 8, 2, "'if(c.a>0.0){discard;} c=overLinear("],
+    ['PeelOIT', PeelOIT, 'oit:peel:resolve', 10, 2, "'if(color.a>=0.0){discard;} color=overLinear("],
+    ['MomentOIT', MomentOIT, 'oit:composite', 1, 2, 'let mark=clamp(1-o.a,0.0,1.0);'],
+    ['PreciseOIT', PreciseOIT, 'oit:precise:composite', 1, 2, 'let mark=reveal.y/'],
+  ];
+  for (const [title, Pass, label, per, drawn, wgsl] of cases)
+    for (const samples of [1, 4]) {
+      const name = `${title} ${samples}x`;
+      const { engine, model, gpu, frame } = await scene(samples);
+      gpu.device.features.add('float32-blendable');
+      const oit = Pass.attach(engine);
+      model.primitives[1].material.renderState = { blendSpace: 'linear' };
+      oit.add(model);
+      const first = frame(0),
+        marked = of(first, 'renderPipeline').filter((e) => e[2].fragment?.constants?.margoLinear === 1);
+      // The linear primitive is taken: its pipelines (MomentOIT: the sums and the shading draw) mark it.
+      assert.equal(marked.length, Pass === MomentOIT ? 2 : 1, `${name}: the linear primitive is marked`);
+      // The recorder's buffers do not map: ExactOIT's fragment count read stays pending.
+      if (oit.readback) oit.readback.mapAsync = () => new Promise(() => {});
+      // The scene's transmission primitive already holds the native glass capture, so the snapshot is there at once.
+      await null;
+      const next = frame(1),
+        labels = of(next, 'beginRenderPass').map((e) => e[1].label),
+        at = labels.flatMap((l, i) => (l === label ? [i] : []));
+      assert.equal(at.length, per, `${name}: composite passes`);
+      for (const i of at) assert.equal(labels[i - 1], 'native-glass:copy', `${name}: a snapshot right before each`);
+      const start = next.findIndex((e) => e[0] === 'beginRenderPass' && e[1].label === label),
+        inside = next.slice(start + 1, next.findIndex((e, i) => i > start && e[0] === 'pass.end'));
+      assert.equal(inside.filter((e) => e[0] === 'pass.draw').length, drawn, `${name}: display then linear draw`);
+      const code = [...of(first, 'module'), ...of(next, 'module')].map((e) => e[2].code).join('\n');
+      assert.ok(code.includes('fn overLinear('), `${name}: the over operator on decoded values`);
+      assert.ok(code.includes(wgsl.replace(/^'/, '')), `${name}: linear pixels only`);
+      oit.dispose();
+      engine.dispose();
+    }
+  // Without a linear layer: one composite pass, no snapshot before it, as before.
+  for (const [title, Pass, label] of cases) {
+    const { engine, model, gpu, frame } = await scene(4);
+    gpu.device.features.add('float32-blendable');
+    const oit = Pass.attach(engine);
     oit.add(model);
-    const log = frame(0);
+    frame(0);
+    if (oit.readback) oit.readback.mapAsync = () => new Promise(() => {});
+    await null;
+    const log = frame(1),
+      labels = of(log, 'beginRenderPass').map((e) => e[1].label);
+    assert.equal(labels.filter((l) => l === label).length, 1, `${title}: one composite pass`);
+    assert.notEqual(labels[labels.indexOf(label) - 1], 'native-glass:copy', `${title}: no snapshot`);
     assert.ok(
       !of(log, 'renderPipeline').some((e) => e[2].fragment?.constants?.margoLinear !== undefined),
-      `${Pass.name}: no linear mark`,
+      `${title}: no linear mark`,
     );
     oit.dispose();
     engine.dispose();
   }
-  const { engine, model, frame } = await scene(4),
-    oit = OIT.attach(engine);
-  oit.add(model);
-  frame(0);
-  await null;
-  const log = frame(1);
-  assert.equal(inPass(log, 'oit:composite').filter((e) => e[0] === 'pass.draw').length, 1);
-  const labels = of(log, 'beginRenderPass').map((e) => e[1].label);
-  assert.notEqual(labels[labels.indexOf('oit:composite') - 1], 'native-glass:copy', 'no snapshot without a linear layer');
-  oit.dispose();
-  engine.dispose();
 });

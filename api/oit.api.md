@@ -17,7 +17,6 @@ export class OIT extends TransparentPass {
     declarations(group: number): string;
     surface(group: number): string;
     bindings(): GPUBindGroupEntry[];
-    linearLayers(scene?: () => GPUTextureView): void;
     begin(): GPURenderPassEncoder;
     protected render(c: Context): void;
     protected release(): void;
@@ -65,11 +64,13 @@ abstract class TransparentPass implements EnginePlugin, PBRTransparency, Surface
     readonly effects: Map<TransparentEffect, () => void>;
     protected context?: Context;
     protected pass?: GPURenderPassEncoder;
+    protected scene?: () => GPUTextureView;
     constructor(order: number);
     add(model: PBRModel): () => void;
     ready(): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    linearLayers(scene?: () => GPUTextureView): void;
     abstract declarations(group: number): string;
     abstract bindings(): GPUBindGroupEntry[];
     abstract surface(group: number): string;

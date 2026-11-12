@@ -12,7 +12,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode } from '../../shared/pass.js';
-import { TransparentPass, pbrLayer } from './pass.js';
+import { TransparentPass, linearLight, pbrLayer } from './pass.js';
 import { compatTier, compatibilityLevel } from '../../shared/compat.js';
 
 export type { TransparentPass };
@@ -47,8 +47,10 @@ const BINDING = 120;
 const NODE_BYTES = 16;
 // A node is colour and alpha as four halves, depth, then the next node with the coverage mask in the top 4 bits
 // (WebGPU has 1 or 4 samples). Slot 0 means the end of a list, and the word after the last pixel counts fragments.
+// A `blendSpace: 'linear'` layer (KB3148e) stores its alpha negated: alpha is at least 1/1024, so the sign is free.
 const LINK = 0x0fffffff;
 const surface = (group: number) => /* wgsl */ `
+override margoLinear:bool=false;
 struct MargoTransparent {@location(0) unused:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4u;
 @group(${group}) @binding(${BINDING + 1}) var<storage,read_write> margoHeads:array<atomic<u32>>;
@@ -60,7 +62,7 @@ fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
     let slot=atomicAdd(&margoHeads[margoOIT.y],1u)+1u;
     if(slot<margoOIT.z){
       let p=vec2u(clip.xy); let next=atomicExchange(&margoHeads[p.y*margoOIT.x+p.x],slot); let c=min(color.rgb,vec3f(65504.0));
-      margoNodes[slot]=vec4u(pack2x16float(c.rg),pack2x16float(vec2f(c.b,a)),bitcast<u32>(clip.z),next|(margoCoverage<<28u));
+      margoNodes[slot]=vec4u(pack2x16float(c.rg),pack2x16float(vec2f(c.b,select(a,-a,margoLinear))),bitcast<u32>(clip.z),next|(margoCoverage<<28u));
     }
   }
   return o;
@@ -109,11 +111,14 @@ fn nearer(a:vec4u,b:vec4u)->bool {
   }
 }
 `;
-// Instance k draws layer layers-1-k: back to front. A shorter list discards the far instances.
-const resolve = (layers: number) => /* wgsl */ `
+// Instance k draws layer layers-1-k: back to front. A shorter list discards the far instances. `kind` 0 draws every
+// layer with the hardware blend on encoded values; with a linear layer in the frame (KB3148e), 1 draws the display layers
+// of one index that way and 2 its linear ones with blending off, over the snapshot taken right before that index.
+const resolve = (layers: number, kind: number) => /* wgsl */ `
 @group(0) @binding(0) var<uniform> u:vec4u;
 @group(0) @binding(1) var<storage,read> heads:array<u32>;
 @group(0) @binding(2) var<storage,read> nodes:array<vec4u>;
+${kind === 2 ? '@group(0) @binding(3) var sceneMap:texture_2d<f32>;' + linearLight : ''}
 struct Layer {@builtin(position) position:vec4f, @location(0) @interpolate(flat) index:u32}
 struct Result {@location(0) color:vec4f, @builtin(frag_depth) depth:f32, @builtin(sample_mask) mask:u32}
 @vertex fn vertex(@builtin(vertex_index) i:u32,@builtin(instance_index) k:u32)->Layer {
@@ -123,8 +128,9 @@ struct Result {@location(0) color:vec4f, @builtin(frag_depth) depth:f32, @builti
   let p=vec2u(v.position.xy); var slot=heads[p.y*u.x+p.x];
   for(var k=0u;k<v.index&&slot!=0u;k+=1u){slot=nodes[slot].w&${LINK}u;}
   if(slot==0u){discard;}
-  let n=nodes[slot];
-  return Result(vec4f(unpack2x16float(n.x),unpack2x16float(n.y)),bitcast<f32>(n.z),n.w>>28u);
+  let n=nodes[slot]; var c=vec4f(unpack2x16float(n.x),unpack2x16float(n.y));
+  ${['c.a=abs(c.a);', 'if(c.a<0.0){discard;}', 'if(c.a>0.0){discard;} c=overLinear(vec4f(c.rgb,-c.a),textureLoad(sceneMap,vec2i(v.position.xy),0));'][kind]}
+  return Result(c,bitcast<f32>(n.z),n.w>>28u);
 }
 `;
 
@@ -285,10 +291,13 @@ export class ExactOIT extends TransparentPass {
       bytes = (c.width * c.height + 1) * 4,
       device = c.device;
     c.encoder.clearBuffer(this.heads!, 0, bytes);
+    let scene: (() => GPUTextureView) | undefined;
     try {
       if (!this.drawModels(c)) return;
+      scene = this.scene;
     } finally {
       this.binding = undefined;
+      this.scene = undefined;
     }
     if (!this.mapping && !this.copied) {
       c.encoder.copyBufferToBuffer(this.heads!, bytes - 4, this.readback!, 0, 4);
@@ -317,32 +326,66 @@ export class ExactOIT extends TransparentPass {
     compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     compute.end();
     const format = c.descriptor.depthStencil!.format,
-      key = c.format + samples + format;
-    let pipeline = this.pipelines.get(key);
-    if (!pipeline) {
-      const module = device.createShaderModule({ code: resolve(this.layers) });
-      this.pipelines.set(
-        key,
-        (pipeline = device.createRenderPipeline({
+      pipeline = (kind: number): GPURenderPipeline => {
+        const key = c.format + samples + format + kind;
+        let made = this.pipelines.get(key);
+        if (!made) {
+          const module = device.createShaderModule({ code: resolve(this.layers, kind) });
+          this.pipelines.set(
+            key,
+            (made = device.createRenderPipeline({
+              label: 'oit:resolve',
+              layout: 'auto',
+              vertex: { module, entryPoint: 'vertex' },
+              fragment: {
+                module,
+                entryPoint: 'fragment',
+                targets: [{ format: c.format, blend: kind === 2 ? undefined : alphaBlend }],
+              },
+              depthStencil: { format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+              multisample: { count: samples },
+            })),
+          );
+        }
+        return made;
+      },
+      open = () => {
+        const out = c.encoder.beginRenderPass({
           label: 'oit:resolve',
-          layout: 'auto',
-          vertex: { module, entryPoint: 'vertex' },
-          fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: alphaBlend }] },
-          depthStencil: { format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
-          multisample: { count: samples },
-        })),
-      );
+          colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+          depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
+        });
+        applyView(out, c);
+        return out;
+      },
+      group = (p: GPURenderPipeline, more: GPUBindGroupEntry[] = []) =>
+        device.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [...entries, ...more] });
+    if (!scene) {
+      const out = open(),
+        all = pipeline(0);
+      out.setPipeline(all);
+      out.setBindGroup(0, group(all));
+      out.draw(3, this.layers);
+      out.end();
+      return;
     }
-    const out = c.encoder.beginRenderPass({
-      label: 'oit:resolve',
-      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-      depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
-    });
-    applyView(out, c);
-    out.setPipeline(pipeline);
-    out.setBindGroup(0, device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries }));
-    out.draw(3, this.layers);
-    out.end();
+    // KB3148e: index by index, far to near, each over a snapshot of the colour the farther indices left.
+    const display = pipeline(1),
+      linear = pipeline(2),
+      displayGroup = group(display);
+    let linearGroup: GPUBindGroup | undefined;
+    for (let k = 0; k < this.layers; k++) {
+      const view = scene(),
+        out = open();
+      linearGroup ??= group(linear, [{ binding: 3, resource: view }]);
+      out.setPipeline(display);
+      out.setBindGroup(0, displayGroup);
+      out.draw(3, 1, 0, k);
+      out.setPipeline(linear);
+      out.setBindGroup(0, linearGroup);
+      out.draw(3, 1, 0, k);
+      out.end();
+    }
   }
   protected release(): void {
     retire(this.device!, this.heads);

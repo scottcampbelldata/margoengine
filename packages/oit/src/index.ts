@@ -152,8 +152,6 @@ export class OIT extends TransparentPass {
   private readonly blendedPipelines = new Map<string, GPURenderPipeline[]>();
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup>();
   private readonly linearPipelines = new Map<string, GPURenderPipeline>();
-  /** This frame's scene snapshot source, set when a `blendSpace: 'linear'` layer drew (KB3148d). */
-  private scene?: () => GPUTextureView;
   private linearGroup?: { view: GPUTextureView; pipeline: GPURenderPipeline; group: GPUBindGroup };
 
   static attach(engine: EngineKernel, options?: OITOptions): OIT {
@@ -194,10 +192,6 @@ export class OIT extends TransparentPass {
   /** @internal gltf-pro transparency hook. */
   bindings(): GPUBindGroupEntry[] {
     return [{ binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } }];
-  }
-  /** @internal gltf-pro transparency hook: a `blendSpace: 'linear'` layer drew this frame (KB3148d). */
-  linearLayers(scene?: () => GPUTextureView): void {
-    if (scene) this.scene = scene;
   }
   /** @internal gltf-pro transparency hook: the accumulation pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {

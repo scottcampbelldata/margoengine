@@ -5,7 +5,7 @@ import { engineRuntime, type PassContext } from '@margoengine/core/extension';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode } from '../../shared/pass.js';
-import { TransparentPass, pbrLayer } from './pass.js';
+import { TransparentPass, linearLight, pbrLayer } from './pass.js';
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -18,25 +18,30 @@ export interface PeelOITOptions {
   order?: number;
 }
 
+// A `blendSpace: 'linear'` layer (KB3148e) stores its alpha negated.
 const surface = (group: number) => /* wgsl */ `
+override margoLinear:bool=false;
 struct MargoTransparent {@location(0) color:vec4f, @location(1) depth:f32}
 @group(${group}) @binding(120) var margoPrevious:texture_2d<f32>;
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
   let previous=textureLoad(margoPrevious,vec2i(clip.xy),0).r;
   if(color.a<=0.0 || clip.z>=previous){discard;}
-  return MargoTransparent(vec4f(color.rgb,clamp(color.a,0.0,1.0)),clip.z);
+  let a=clamp(color.a,0.0,1.0); return MargoTransparent(vec4f(color.rgb,select(a,-a,margoLinear)),clip.z);
 }
 `;
-const resolve = /* wgsl */ `
+// `kind` as ExactOIT's resolve: 0 every layer with the hardware blend, then with a linear layer in the frame 1 the display
+// layers of one peel that way and 2 its linear ones with blending off over the snapshot taken right before it (KB3148e).
+const resolve = (kind: number) => /* wgsl */ `
 @group(0) @binding(0) var colorMap:texture_2d<f32>;
 @group(0) @binding(1) var depthMap:texture_2d<f32>;
+${kind === 2 ? '@group(0) @binding(2) var sceneMap:texture_2d<f32>;' + linearLight : ''}
 struct Result {@location(0) color:vec4f, @builtin(frag_depth) depth:f32}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
   return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);
 }
 @fragment fn fragment(@builtin(position) p:vec4f)->Result {
-  let q=vec2i(p.xy); let color=textureLoad(colorMap,q,0);
-  if(color.a<=0.0){discard;}
+  let q=vec2i(p.xy); var color=textureLoad(colorMap,q,0);
+  ${['if(color.a==0.0){discard;} color.a=abs(color.a);', 'if(color.a<=0.0){discard;}', 'if(color.a>=0.0){discard;} color=overLinear(vec4f(color.rgb,-color.a),textureLoad(sceneMap,q,0));'][kind]}
   return Result(color,textureLoad(depthMap,q,0).r);
 }
 `;
@@ -67,6 +72,8 @@ export class PeelOIT extends TransparentPass {
   private layer = 0;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup[]>();
+  /** The snapshot the linear resolve groups read. */
+  private groupScene?: GPUTextureView;
 
   static attach(engine: EngineKernel, options?: PeelOITOptions): PeelOIT {
     const value = new PeelOIT(options);
@@ -140,61 +147,105 @@ export class PeelOIT extends TransparentPass {
       colorAttachments: [{ view: this.first!, clearValue: [2, 0, 0, 0], loadOp: 'clear', storeOp: 'store' }],
     });
     clear.end();
-    const peel: Context = {
-      ...c,
-      depth: this.nearest!,
-      descriptor: { ...c.descriptor, multisample: { count: 1 }, depthStencil: { format: 'depth32float' } },
-    };
-    for (this.layer = 0; this.layer < this.layers; this.layer++) {
-      if (!this.drawModels(peel)) return;
+    // The peels draw in the frame's own context, so what is kept per context (the native glass capture a linear layer
+    // reads, KB3148e) is found; only the depth target and the pipeline state they draw with change, and come back after.
+    const { depth, descriptor } = c;
+    let scene: (() => GPUTextureView) | undefined;
+    c.depth = this.nearest!;
+    c.descriptor = { ...descriptor, multisample: { count: 1 }, depthStencil: { format: 'depth32float' } };
+    try {
+      for (this.layer = 0; this.layer < this.layers; this.layer++) {
+        if (!this.drawModels(c)) return;
+        scene ??= this.scene;
+      }
+    } finally {
+      c.depth = depth;
+      c.descriptor = descriptor;
+      this.scene = undefined;
     }
-    const samples = c.descriptor.multisample?.count ?? 1,
-      format = c.descriptor.depthStencil!.format,
-      key = c.format + samples + format;
-    let pipeline = this.pipelines.get(key);
-    if (!pipeline) {
-      const module = device.createShaderModule({ code: resolve });
-      const layout = device.createBindGroupLayout({
-        entries: [0, 1].map((binding) => ({ binding, visibility: 2, texture: { sampleType: 'unfilterable-float' } })),
-      });
-      this.pipelines.set(
-        key,
-        (pipeline = device.createRenderPipeline({
+    const samples = descriptor.multisample?.count ?? 1,
+      format = descriptor.depthStencil!.format,
+      pipeline = (kind: number, view?: GPUTextureView): [GPURenderPipeline, GPUBindGroup[]] => {
+        const key = c.format + samples + format + kind;
+        let made = this.pipelines.get(key);
+        if (!made) {
+          const module = device.createShaderModule({ code: resolve(kind) });
+          const layout = device.createBindGroupLayout({
+            entries: (kind === 2 ? [0, 1, 2] : [0, 1]).map((binding) => ({
+              binding,
+              visibility: 2,
+              texture: { sampleType: 'unfilterable-float' as const },
+            })),
+          });
+          this.pipelines.set(
+            key,
+            (made = device.createRenderPipeline({
+              label: 'oit:peel:resolve',
+              layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+              vertex: { module, entryPoint: 'vertex' },
+              fragment: {
+                module,
+                entryPoint: 'fragment',
+                targets: [{ format: c.format, blend: kind === 2 ? undefined : alphaBlend }],
+              },
+              depthStencil: { format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+              multisample: { count: samples },
+            })),
+          );
+        }
+        let groups = this.groups.get(made);
+        if (!groups || (view && this.groupScene !== view)) {
+          if (view) this.groupScene = view;
+          this.groups.set(
+            made,
+            (groups = this.colors.map((color, i) =>
+              device.createBindGroup({
+                layout: made!.getBindGroupLayout(0),
+                entries: [
+                  { binding: 0, resource: color },
+                  { binding: 1, resource: this.depths[i] },
+                  ...(view ? [{ binding: 2, resource: view }] : []),
+                ],
+              }),
+            )),
+          );
+        }
+        return [made, groups];
+      },
+      open = (): GPURenderPassEncoder => {
+        const out = c.encoder.beginRenderPass({
           label: 'oit:peel:resolve',
-          layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-          vertex: { module, entryPoint: 'vertex' },
-          fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: alphaBlend }] },
-          depthStencil: { format, depthWriteEnabled: false, depthCompare: 'greater-equal' },
-          multisample: { count: samples },
-        })),
-      );
+          colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+          depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
+        });
+        applyView(out, c);
+        return out;
+      };
+    if (!scene) {
+      const [all, groups] = pipeline(0),
+        out = open();
+      out.setPipeline(all);
+      for (let i = this.layers - 1; i >= 0; i--) {
+        out.setBindGroup(0, groups[i]);
+        out.draw(3);
+      }
+      out.end();
+      return;
     }
-    let groups = this.groups.get(pipeline);
-    if (!groups)
-      this.groups.set(
-        pipeline,
-        (groups = this.colors.map((view, i) =>
-          device.createBindGroup({
-            layout: pipeline!.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: view },
-              { binding: 1, resource: this.depths[i] },
-            ],
-          }),
-        )),
-      );
-    const out = c.encoder.beginRenderPass({
-      label: 'oit:peel:resolve',
-      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-      depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
-    });
-    applyView(out, c);
-    out.setPipeline(pipeline);
+    // KB3148e: peel by peel, far to near, each over a snapshot of the colour the farther peels left.
+    const [display, displayGroups] = pipeline(1);
     for (let i = this.layers - 1; i >= 0; i--) {
-      out.setBindGroup(0, groups[i]);
+      const view = scene(),
+        [linear, linearGroups] = pipeline(2, view),
+        out = open();
+      out.setPipeline(display);
+      out.setBindGroup(0, displayGroups[i]);
       out.draw(3);
+      out.setPipeline(linear);
+      out.setBindGroup(0, linearGroups[i]);
+      out.draw(3);
+      out.end();
     }
-    out.end();
   }
   protected release(): void {
     for (const t of this.textures) retire(this.device!, t);
@@ -204,6 +255,7 @@ export class PeelOIT extends TransparentPass {
     this.first = this.nearest = undefined;
     this.size = '';
     this.groups.clear();
+    this.groupScene = undefined;
   }
   protected freeDevice(): void {
     this.release();

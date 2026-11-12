@@ -91,7 +91,8 @@ Limits:
 
 A material with `blendSpace: 'linear'` (materials `Material.blendSpace`, glTF Pro `renderState: {blendSpace: 'linear'}`)
 goes into the pass like any other transparent material, so it stays order-independent and mixes in linear light on a
-display-encoded canvas. Both `OIT` and `OIT` with `blending` take it.
+display-encoded canvas. Every pass here takes it: `OIT` (plain and `blending`), `ExactOIT`, `MomentOIT`, `PeelOIT` and
+`PreciseOIT`.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -113,24 +114,35 @@ and, after the usual composite, redraws only the marked pixels with blending off
 2013) composited with the over operator (Porter and Duff 1984) on linear values, sRGB transfer per IEC 61966-2-1 (why
 linear: Gritz and d'Eon, "The Importance of Being Linear", GPU Gems 3, 2007). With `blending`, the dimming of tints
 applies to the decoded scene as well, and added light is summed after the encode. A pixel half covered at a 4x edge
-mixes the two results by its mark.
+mixes the two results by its mark. `MomentOIT` marks in its optical-depth target's fourth channel and `PreciseOIT` in a
+second revealage channel (`rg16float`), and both redraw the same way from their own average and coverage.
 
-Measured on the RTX A6000, native WebGPU and the WebGL2 layer, 1x and 4x MSAA, plain and `blending`, materials meshes
-and glTF (`packages/oit/test/gpu/linear-check.mjs`): 50 % red (linear 0.5) over black reads 137 of 255 for one layer and
-165 for two, the sorted linear values; `'display'` reads 94 and 141 as before.
+`ExactOIT` and `PeelOIT` keep every layer of a pixel apart, so they composite a linear layer exactly where it sits: the
+layer stores its alpha negated, and in a frame where one drew the resolve goes one layer index at a time, far to near.
+Each index takes a snapshot of the colour so far, draws its display layers with the usual hardware blend, then its
+linear ones with blending off, `encode(decode(layer) * alpha + decode(snapshot) * (1 - alpha))`, the over operator on
+linear values. A linear layer in front of a display one therefore reads as sorted blending would (measured 150 of 255).
+
+Measured on the RTX A6000, native WebGPU and the WebGL2 layer, 1x and 4x MSAA, every pass (`ExactOIT` only natively,
+it refuses the layer by design), materials meshes and glTF (`packages/oit/test/gpu/linear-check.mjs`): 50 % red (linear
+0.5) over black reads 137 of 255 for one layer and 165 for two, the sorted linear values; `'display'` reads 94 and 141 as
+before.
 
 Limits:
 
-- A pixel that any linear layer covers composites all its layers in linear light, display ones included: the pass keeps
-  one average per pixel. The average itself is taken on encoded colours and decoded once, which is exact for one layer
+- Weighted passes (`OIT`, `MomentOIT`, `PreciseOIT`): a pixel that any linear layer covers composites all its layers in
+  linear light, display ones included: the pass keeps one average per pixel. The average itself is taken on encoded colours and decoded once, which is exact for one layer
   and for layers of one colour, and adds to the weighted blend's own approximation when layers of different colours meet.
 - Takes effect from the frame after a model first draws the option: until the native glass capture joins the frame
   graph, the layer composites as a display layer. On an HDR target (Bloom, tonemapping) every layer is linear already
   and no mark, copy or draw is added.
-- Cost only when a linear layer drew: one full-target copy (4x: a resolve too) and one more full-screen draw. Pixels
-  without a linear layer are untouched by that draw, so their values are those of the plain composite.
-- `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` do not take linear layers yet: such a material stays on the
-  sorted path there, blended in linear light but not order-independent (docs/known-bugs.md, KB3148e).
+- Cost only when a linear layer drew: for the weighted passes one full-target copy (4x: a resolve too) and one more
+  full-screen draw; pixels without a linear layer are untouched by that draw, so their values are those of the plain
+  composite. `ExactOIT` and `PeelOIT` take one copy and one render pass per kept layer instead of one resolve pass
+  (`layers`: 8 and 10 by default), so keep `layers` near what the scene needs. Frames without a linear layer cost what
+  they did. `PreciseOIT`'s revealage is `rg16float`, 2 bytes per pixel and sample more than before.
+- At a 4x edge the snapshot is the resolved colour, so a linear layer's covered samples blend over the pixel's average,
+  as the sorted linear path does. `MomentOIT`'s mark there is the mean count of linear layers per sample.
 
 ## Exact layers (`ExactOIT`)
 

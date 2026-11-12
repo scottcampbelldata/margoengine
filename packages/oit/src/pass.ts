@@ -21,6 +21,33 @@ export const pbrLayer = `fn margoTransparent(color:vec4f,i:Out)->MargoTransparen
 }
 `;
 
+/**
+ * KB3148e: sRGB transfer (IEC 61966-2-1) for the linear-light layers of the exact, peeled, moment and float32 passes,
+ * and the over operator on linear values (Porter and Duff 1984): what a sorted `blendSpace: 'linear'` draw does, one
+ * layer over the colour drawn so far.
+ */
+export const linearLight = /* wgsl */ `
+fn decode(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
+fn encode(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
+fn overLinear(c:vec4f,d:vec4f)->vec4f {return vec4f(encode(decode(c.rgb)*c.a+decode(d.rgb)*(1-c.a)),c.a+d.a*(1-c.a));}
+`;
+/**
+ * KB3148e: the composite of a weighted pass (moments, float32) over the pixels a linear layer touched, blending off.
+ * `body` sets `avg` (encoded average colour), `cover` (coverage) and `mark` (1 where no linear layer drew).
+ */
+export const linearComposite = (maps: string, body: string) => /* wgsl */ `
+${maps}
+@group(0) @binding(9) var sceneMap:texture_2d<f32>;
+${linearLight}
+@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);}
+@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
+  let q=vec2i(p.xy); ${body}
+  if(mark>=1.0){discard;}
+  let d=textureLoad(sceneMap,q,0); let light=overLinear(vec4f(avg,cover),d);
+  return vec4f(mix(light.rgb,avg*cover+d.rgb*(1-cover),mark),light.a);
+}
+`;
+
 /** The part of an order-independent pass that `oit.add(model)` and `addMesh` work on: `OIT`, `ExactOIT` and `MomentOIT`. */
 export abstract class TransparentPass implements EnginePlugin, PBRTransparency, SurfaceTransparency {
   readonly name = 'oit:' + serial++;
@@ -35,6 +62,8 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
   readonly effects = new Map<TransparentEffect, () => void>();
   protected context?: Context;
   protected pass?: GPURenderPassEncoder;
+  /** This frame's scene snapshot source, set when a `blendSpace: 'linear'` layer drew (KB3148d, KB3148e). */
+  protected scene?: () => GPUTextureView;
 
   constructor(order: number) {
     if (!Number.isFinite(order) || order <= 0) throw new RangeError('OIT order must be > 0');
@@ -85,6 +114,13 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
       },
     });
   }
+  /**
+   * @internal gltf-pro transparency hook: a `blendSpace: 'linear'` layer drew this frame; `scene` copies the colour drawn
+   * so far into the native glass snapshot and returns it (absent until the capture joins the frame graph).
+   */
+  linearLayers(scene?: () => GPUTextureView): void {
+    if (scene) this.scene = scene;
+  }
   /** @internal gltf-pro transparency hook. */
   abstract declarations(group: number): string;
   /** @internal gltf-pro transparency hook. */
@@ -108,6 +144,7 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
   protected drawModels(c: Context): boolean {
     this.context = c;
     this.pass = undefined;
+    this.scene = undefined;
     try {
       for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);
       for (const effect of this.effects.keys()) effect.drawTransparent(c, this);

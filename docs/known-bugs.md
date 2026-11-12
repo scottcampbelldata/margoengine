@@ -3722,12 +3722,20 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
     encode(decode(average) * (1 - revealage) + decode(scene) * revealage). Measured on the RTX A6000, native WebGPU and
     the WebGL2 layer, 1x and 4x, plain and `blending`, materials and glTF: 137 and 165 (display 94 and 141). Regression:
     `packages/oit/test/gpu/linear-check.mjs`, `packages/oit/test/oit.test.js` (KB3148d tests).
-- **Open (KB3148e): `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` do not take `blendSpace: 'linear'` layers**
-  (`packages/oit/src/exact.ts`, `moments.ts`, `peel.ts`, `precise.ts`). Repro: `ExactOIT.attach(engine).add(mesh)` with
-  `Material.blendSpace = 'linear'`; the mesh draws on the sorted path (linear light, not order-independent). Cause:
-  these passes implement no `linearLayers` hook; each blends its layers in encoded values in its own resolve, which
-  would need the per-layer decode and the scene snapshot `OIT` now uses. Pinned by `packages/oit/test/oit.test.js`
-  ("passes without linear layers").
+- **Fixed 2026-11-12 (KB3148e): `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` did not take `blendSpace: 'linear'`
+  layers** (`packages/oit/src/exact.ts`, `moments.ts`, `peel.ts`, `precise.ts`). Repro: `ExactOIT.attach(engine).add(mesh)`
+  with `Material.blendSpace = 'linear'`; the mesh drew on the sorted path (linear light, not order-independent). Cause:
+  these passes implemented no `linearLayers` hook; each blended its layers in encoded values in its own resolve. Now the
+  hook lives on the shared base class. `ExactOIT` and `PeelOIT` store a linear layer's alpha negated and, in a frame
+  where one drew, resolve index by index far to near: the display layers of an index with the hardware blend, its linear
+  ones with blending off over a snapshot of the colour so far, so a linear layer in front of a display one keeps its
+  order. `MomentOIT` (optical target `.a`) and `PreciseOIT` (revealage now `rg16float`, `.g`) mark the pixels and redraw
+  them after their composite in linear light, as `OIT` does. `PeelOIT` peels in the frame's own context (only the depth
+  target and pipeline state swapped, then restored), so per-context state such as the native glass capture is found.
+  Measured on the RTX A6000, native WebGPU and the WebGL2 layer (`ExactOIT` refuses there by design), 1x and 4x,
+  materials and glTF, set before and after the first frame: 137 and 165 (display 94 and 141), a linear layer over a
+  display one 150 under `ExactOIT` and `PeelOIT`. Regression: `packages/oit/test/gpu/linear-check.mjs` (fails on the old
+  source: "the layers drew in the order-independent pass"), `packages/oit/test/oit.test.js` (KB3148e test).
   - Regression: `packages/materials/test/native-glass-browser.mjs` (`linearBlend`: materials and glTF, set before the
     first frame and after it), `packages/materials/test/render-state.test.js`.
 

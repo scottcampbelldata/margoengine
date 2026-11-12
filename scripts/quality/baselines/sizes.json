@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15161045,
+  "total": 15163365,
   "history": [
     {
       "date": "2026-10-24",
@@ -8657,6 +8657,12 @@
       "commit": "ff6796ee13",
       "reason": "KB5289b: MToon UV-animated cut-outs cast, pick and cut at the animated UV (shared/caster.js animatedDepth joins the caster, picking, contact-shadow and TAA velocity shaders that can draw a moving cut-out; a lazy split would add a fetch before the first shadow, pick, contact-shadow or velocity frame of any model, for 100 to 300 B gzip per entry); webgl2-compat/glsl 43287 to 43700 B gzip measured: a separate copy of each sampling helper per nesting depth, so ANGLE Direct3D 11 never runs one inside its own arguments (it read the wrong texture); a lazy split of the transpiler would add a request to every shader compile",
       "grew": 13
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "e96361a0d6",
+      "reason": "KB3148e: ExactOIT, MomentOIT, PeelOIT and PreciseOIT take blendSpace linear layers (sRGB decode/encode and over-in-linear WGSL, per-index linear resolve for exact and peel, linear composite pipeline and group for moments and precise): exact 4820 to 5200, moments 5512 to 5888, peel 3293 to 3515, precise 4033 to 4352 B gzip; not split, as KB3148d measured a lazy import() split of the same composite larger than inline (4466 against 4376 B)",
+      "grew": 4
     }
   ],
   "items": {
@@ -9322,13 +9328,13 @@
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/netcode/webtransport": 1819,
-    "@margoengine/oit": 4632,
+    "@margoengine/oit": 4631,
     "@margoengine/oit/depth": 2004,
-    "@margoengine/oit/exact": 4820,
+    "@margoengine/oit/exact": 5456,
     "@margoengine/oit/meshes": 747,
-    "@margoengine/oit/moments": 5512,
-    "@margoengine/oit/peel": 3293,
-    "@margoengine/oit/precise": 4033,
+    "@margoengine/oit/moments": 6144,
+    "@margoengine/oit/peel": 3771,
+    "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 61380,
     "@margoengine/physics base (without Rapier solver JavaScript)": 20430,
