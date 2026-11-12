@@ -1,5 +1,23 @@
 # Known bugs and unverified features
 
+### Open 2026-11-12: sciviz bricks weight-model bound depends on the GPU's sin (AMD GPU hunt R7 row 42)
+
+- **Repro:** on the Beelink (Radeon 680M), `node packages/sciviz/tests/bricks-browser.mjs` (sciviz `test:browser`
+  step 2), native WebGPU: "each hardware-filtered march stays within the 8-bit weight model of exact filtering" fails
+  with bound 3 and hardware 4 on both marches (whole 701, bricked 700 of 172,800 pixels differ from exact, at most 4
+  levels), in the sweep and alone. Every other brick check passes, exact against exact included.
+- **Cause:** the bound, not the filter. The check takes as its bound the largest difference the test-only weight model
+  (filter mode 2: every axis weight one 1/256 step off, the sign from `fract(sin(dot(x, k)) * 43758.5453)`) makes
+  from exact filtering. The sin arguments reach about 5,000 radians, where WGSL sets no accuracy, so the sign pattern
+  is the GPU's own: on the 680M it matches a double-precision CPU evaluation at only 51 to 53% of 262,144 positions
+  (sin off by up to 3.6e-4). One random pattern's largest difference is the bound: 8 (whole) and 3 (bricked) on the
+  RTX A6000, 3 at most on the 680M. The 680M filter is closer to exact than the A6000's (4 against 6); it fails only
+  because its pattern of the model moved the picture less.
+- **Fix to build (needs Scott):** a model whose sign pattern is the same on every GPU (an integer hash of a quantized
+  position, the march's own float positions differ in the last bits between GPUs), with the bound measured again on
+  the dev PC and here; or a bound that is the worst over the model, not one sample of it. Either changes what the
+  check accepts, so it waits for Scott's ruling; the bound is not raised here.
+
 ### Open in core only: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
 
 - **What:** glTF 2.0 Appendix B defines material = mix(dielectric_brdf, metal_brdf, metallic); only the dielectric has a
