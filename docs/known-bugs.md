@@ -181,6 +181,18 @@ Repro: GPU-locked `node scripts/reference-rendering/cornell.mjs --decompose`, an
 
 Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`, then with --compat (add --capture-decomposition to regenerate the hash-checked CUDA Mitsuba references). The frozen direct-only MAE 2.9175338745117188 (native) is measured against Mitsuba principled with full visibility. Decomposition (KB3563, 2026-11-11, RTX A6000): `node scripts/reference-rendering/environment.mjs [--compat] --decompose` compares the frozen Margo picture with four more Mitsuba 3.9.1 pictures from scripts/reference-rendering/mitsuba-environment-decompose.py (cuda_ad_rgb, 1024 spp, hash-checked, frozen in whitepaper/results/batch-160-environment-decomposition.json and pinned by tests/reference-environment.test.js). Of the native direct absolute 2,294,442: 128-spp reference noise 41,414 (1.8 %); scene visibility (other spheres occlude the environment, which split-sum IBL cannot see) 983,219 (42.9 %); Mitsuba principled against the glTF appendix B BRDF (Burley diffuse, its own specular mapping) 251,899 (11.0 %); Margo's deliberate multiple-scattering compensation and the diffuse that keeps the energy neither specular term reflects (Fdez-Aguera 2019), against single-scattering glTF, 532,957 (23.2 %). Against the split-sum model with its directional albedo terms integrated exactly per pixel, 484,953 remain (21.1 %): 445,796 on silhouette edges (MSAA against a box-filtered reference) and 39,157 (1.7 %) over flat areas with a signed sum of -3,965, so the LUT, SH irradiance and prefiltered cube add no measurable bias in this furnace. Compatibility rows are within 60 of these. Accepted difference: the two large shares are the documented IBL model (no scene visibility; multiple scattering on purpose) and the reference BSDF, not a package defect; no budget or setting moved. Docs: docs/limits.md (batch 160 job 7). Sources: Karis 2013, "Real Shading in Unreal Engine 4", SIGGRAPH course notes (split-sum scale and bias); Fdez-Aguera 2019, "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting", JCGT 8(1), https://www.jcgt.org/published/0008/01/03/paper.pdf; Heitz, Hanika, d'Eon and Dachsbacher 2016, "Multiple-Scattering Microfacet BSDFs with the Smith Model", ACM TOG 35(4), https://doi.org/10.1145/2897824.2925943; Walter, Marschner, Li and Torrance 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR; Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), https://jcgt.org/published/0003/02/03/ (height-correlated Smith); Heitz 2018, "Sampling the GGX Distribution of Visible Normals", JCGT 7(4), https://jcgt.org/published/0007/04/01/; Burley 2012, "Physically-Based Shading at Disney", SIGGRAPH course notes (the principled diffuse that Mitsuba principled follows); Khronos glTF 2.0 specification, appendix B (BRDF implementation), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; Jakob et al. 2022, Mitsuba 3, https://mitsuba-renderer.org.
 
+### Height-correlated Smith G2 is too dark on smooth surfaces at grazing angles (found 2026-11-11, open, KB-G2guard)
+
+- **Repro:** visual:check voxel-night-high at 29d79d3774 against its parent b19009b802: 3,536 pixels of the distant
+  night water darker, up to 5 levels, while every other change of that commit is brighter.
+- **Cause:** `smithGCorrelated` (packages/shared/light-terms.js, also in `ggxNamed` and core's copy since edcb6debb7)
+  divides by `max(den, 0.0001)` with den = nl sqrt(a2 + (1 - a2) nv^2) + nv sqrt(a2 + (1 - a2) nl^2). On a smooth
+  surface at grazing angles den falls far below 1e-4 (a2 = 1e-6, nl = nv = 0.001: den 2.8e-6), so G2 comes out 0.02
+  against 0.71 exact and 0.69 for the separable G it replaced. den is never below 2 nl nv, so a floor near the
+  smallest normal float is enough to stop 0/0 at nl = a2 = 0.
+- **Effect:** voxel-night-high keeps its old baseline and fails visual:check until this is fixed (docs/limits.md,
+  KB2224b). Core's copy is a core change: Scott's call.
+
 ### Fixed 2026-11-11: a BatchedMesh over 262,144 vertices threw, so the batched-mesh demo never got ready (KB-VIS-bm)
 
 - **Repro:** `npm run visual:check -- --only=batched-mesh`: both views waited 120 s for the ready signal and failed;
@@ -2876,6 +2888,9 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   profile's (`flight-helmet` lens mean 72.8 against 11.5 of 255, `LightsPunctualLamp` up to 79 levels, the same commit's), and `gameplay-sandbox`
   at abadfb455 on Edge 156 is bit-identical to the Edge 157 profile. The near-black `flight-helmet` lenses were an asset defect that
   6f0836ee3 exposed, fixed since: the demo GLBs' lens base colour had been composited over black when written as JPEG.
+  Fixed 2026-11-11 (KB2224b): the Edge 157 profile was recorded after these three, and the 40 views that later failed were
+  bisected to ten named deliberate commits and re-recorded, except voxel-night-high (open, KB-G2guard above); the
+  per-commit proof is in docs/limits.md "Site and demo visual baselines re-recorded".
 - **Playwright WebKit sometimes drops to 20 or 30 FPS after navigating in the same tab.** `examples/voxel-sandbox`, `quality=high`, 1920 x 1000, 60 Hz display:
   in chains of five same-tab loads, 7 of 30 loads ran at 30 FPS, then the rate came back by itself on a later load. Never on the first load of a browser (0 of 11 chains),
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU

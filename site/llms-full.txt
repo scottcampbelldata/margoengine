@@ -4860,6 +4860,42 @@ Pass on DirectionalLight and MorphStressTest throughout, so they keep their base
 differences were single pixels of 1 level (noise floor). Reproduce: `node scripts/visual-regression.js --only=khronos`
 at a commit and its parent, then compare `test-results/visual/*.actual.png`.
 
+## Site and demo visual baselines re-recorded (2026-11-11, KB2224b)
+
+Scott's ruling ("Yes, re-record" after deliberate renderer changes). `npm run visual:check -- --runs=1` failed 40 site
+and demo views of the Edge 157 profile (`tests/visual/profiles/nvidia-ampere-msedge-157`), recorded at `d9fa86e5bc`
+(flight-helmet at `b6865f6d83`). Two of them, batched-mesh-high and -phone, first timed out; that was a bug, fixed in
+`6d86148633` (KB-VIS-bm, docs/known-bugs.md). Every one of the 40 was bisected on the RTX A6000, Edge 157.0.4341.46: all
+40 views were captured at `d9fa86e5bc` (bit-identical to the baselines, so today's Edge moved nothing) and at the newest
+main, then every commit range whose ends differed was halved until each change sat on one commit, which was captured
+beside its parent. Pictures were compared pixel by pixel, bit-exact. Ten commits moved a view; no other commit of the
+1,970 moved any (an eleventh, `379431fcb8`, landed while the baselines were recorded):
+
+| Commit | What it changes | Views it moved | Size of the change |
+| --- | --- | --- | --- |
+| `efb2565884` | demo helmet lens colour (before the flight-helmet baseline) | flight-helmet x3 | already in its baseline |
+| `0fd6733f5a` | the meadow phone label corrected to the DPR 1 phone tier | windy-meadow-phone | 381 pixels, the label text |
+| `da12bd07e1` | core uploads the unit light direction | split-screen, minimap, dof (high, light) | 1 or 2 pixels, 1 level |
+| `40e6f183dc` | GGX lobe width kept when cosTheta rounds to one | flight-helmet-high | 1 pixel, 1 level |
+| `65098f33fe` | area-filter, alpha-weighted mip chains | flight-helmet x3, animation-formats x2 | at most 607 pixels, 1 level |
+| `f3af757782` | directional shadows hold at any model scale (texel-scaled bias and normal offset) | night-citadel, gameplay-sandbox, voxel overview/ground x6, voxel-night, voxel-shapes, character-animation, batched-mesh, clipping-planes | shadow edges, at most 51 levels, 8.4% of pixels |
+| `edcb6debb7` | height-correlated Smith G2 in core and gltf-pro (KB5875a) | 32 views | brighter, at most 13 levels; under 0.1% of changed pixels darker, by 1 level |
+| `bc82057e40` | SSAO reads full-precision view depth (KB1900) | flight-helmet high, light | at most 3 levels |
+| `29d79d3774` | height-correlated Smith G2 in clustered, materials, terrain, voxel (KB6016) | night-citadel x3, voxel overview/ground x6, voxel-night, voxel-shapes | brighter, at most 5 levels outside night-citadel's 1-level darker pixels and voxel-night |
+| `049b4107ef` | a blurred DOF edge spreads to both sides of its outline (KB1843) | dof x3 | at most 111 levels, 2.9% of pixels, at the card edges |
+| `379431fcb8` | GGX D keeps float32 precision on smooth surfaces (KB6016c) | dof high and light, split-screen-phone, voxel-ground-light, windy-meadow-light | 1 to 7 pixels, 1 level; its pictures are bit-identical to the new baselines |
+
+Re-recorded with `npm run visual:update -- --only=<39 views> --runs=4` at `520f675532`; apart from the `379431fcb8` pixels the new baselines are
+bit-identical to the bisect's newest-main pictures (`037eb3c95f`, batched-mesh with the KB-VIS-bm fix), so no later commit moved them;
+noise was 0 on every view, no tolerance was raised, and visual:check passes all 39 at `520f675532`.
+
+Not re-recorded: voxel-night-high. At `29d79d3774` 3,536 of its changed pixels are darker, by up to 5 levels, on the
+distant water. The height-correlated G2's `max(den, 0.0001)` guard undercuts G2 on a smooth surface at grazing angles
+(at a2 = 1e-6 and nl = nv = 0.001 it gives 0.02 against 0.71), so G2 falls below the separable term it replaced. That is
+a defect, listed in docs/known-bugs.md; the view keeps its old baseline and fails until the guard is fixed.
+Reproduce: `node scripts/visual-regression.js --only=<view>` at a commit and at its parent, then compare
+`test-results/visual/*.actual.png`.
+
 ## Batch 160 budgets re-recorded (2026-11-11, accepted differences)
 
 Scott's ruling of 2026-11-11 ("Yes, re-record"): the batch 160 reference-rendering budgets in
@@ -10400,6 +10436,18 @@ Repro: GPU-locked `node scripts/reference-rendering/cornell.mjs --decompose`, an
 
 Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`, then with --compat (add --capture-decomposition to regenerate the hash-checked CUDA Mitsuba references). The frozen direct-only MAE 2.9175338745117188 (native) is measured against Mitsuba principled with full visibility. Decomposition (KB3563, 2026-11-11, RTX A6000): `node scripts/reference-rendering/environment.mjs [--compat] --decompose` compares the frozen Margo picture with four more Mitsuba 3.9.1 pictures from scripts/reference-rendering/mitsuba-environment-decompose.py (cuda_ad_rgb, 1024 spp, hash-checked, frozen in whitepaper/results/batch-160-environment-decomposition.json and pinned by tests/reference-environment.test.js). Of the native direct absolute 2,294,442: 128-spp reference noise 41,414 (1.8 %); scene visibility (other spheres occlude the environment, which split-sum IBL cannot see) 983,219 (42.9 %); Mitsuba principled against the glTF appendix B BRDF (Burley diffuse, its own specular mapping) 251,899 (11.0 %); Margo's deliberate multiple-scattering compensation and the diffuse that keeps the energy neither specular term reflects (Fdez-Aguera 2019), against single-scattering glTF, 532,957 (23.2 %). Against the split-sum model with its directional albedo terms integrated exactly per pixel, 484,953 remain (21.1 %): 445,796 on silhouette edges (MSAA against a box-filtered reference) and 39,157 (1.7 %) over flat areas with a signed sum of -3,965, so the LUT, SH irradiance and prefiltered cube add no measurable bias in this furnace. Compatibility rows are within 60 of these. Accepted difference: the two large shares are the documented IBL model (no scene visibility; multiple scattering on purpose) and the reference BSDF, not a package defect; no budget or setting moved. Docs: docs/limits.md (batch 160 job 7). Sources: Karis 2013, "Real Shading in Unreal Engine 4", SIGGRAPH course notes (split-sum scale and bias); Fdez-Aguera 2019, "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting", JCGT 8(1), https://www.jcgt.org/published/0008/01/03/paper.pdf; Heitz, Hanika, d'Eon and Dachsbacher 2016, "Multiple-Scattering Microfacet BSDFs with the Smith Model", ACM TOG 35(4), https://doi.org/10.1145/2897824.2925943; Walter, Marschner, Li and Torrance 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR; Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), https://jcgt.org/published/0003/02/03/ (height-correlated Smith); Heitz 2018, "Sampling the GGX Distribution of Visible Normals", JCGT 7(4), https://jcgt.org/published/0007/04/01/; Burley 2012, "Physically-Based Shading at Disney", SIGGRAPH course notes (the principled diffuse that Mitsuba principled follows); Khronos glTF 2.0 specification, appendix B (BRDF implementation), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; Jakob et al. 2022, Mitsuba 3, https://mitsuba-renderer.org.
 
+### Height-correlated Smith G2 is too dark on smooth surfaces at grazing angles (found 2026-11-11, open, KB-G2guard)
+
+- **Repro:** visual:check voxel-night-high at 29d79d3774 against its parent b19009b802: 3,536 pixels of the distant
+  night water darker, up to 5 levels, while every other change of that commit is brighter.
+- **Cause:** `smithGCorrelated` (packages/shared/light-terms.js, also in `ggxNamed` and core's copy since edcb6debb7)
+  divides by `max(den, 0.0001)` with den = nl sqrt(a2 + (1 - a2) nv^2) + nv sqrt(a2 + (1 - a2) nl^2). On a smooth
+  surface at grazing angles den falls far below 1e-4 (a2 = 1e-6, nl = nv = 0.001: den 2.8e-6), so G2 comes out 0.02
+  against 0.71 exact and 0.69 for the separable G it replaced. den is never below 2 nl nv, so a floor near the
+  smallest normal float is enough to stop 0/0 at nl = a2 = 0.
+- **Effect:** voxel-night-high keeps its old baseline and fails visual:check until this is fixed (docs/limits.md,
+  KB2224b). Core's copy is a core change: Scott's call.
+
 ### Fixed 2026-11-11: a BatchedMesh over 262,144 vertices threw, so the batched-mesh demo never got ready (KB-VIS-bm)
 
 - **Repro:** `npm run visual:check -- --only=batched-mesh`: both views waited 120 s for the ready signal and failed;
@@ -13095,6 +13143,9 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   profile's (`flight-helmet` lens mean 72.8 against 11.5 of 255, `LightsPunctualLamp` up to 79 levels, the same commit's), and `gameplay-sandbox`
   at abadfb455 on Edge 156 is bit-identical to the Edge 157 profile. The near-black `flight-helmet` lenses were an asset defect that
   6f0836ee3 exposed, fixed since: the demo GLBs' lens base colour had been composited over black when written as JPEG.
+  Fixed 2026-11-11 (KB2224b): the Edge 157 profile was recorded after these three, and the 40 views that later failed were
+  bisected to ten named deliberate commits and re-recorded, except voxel-night-high (open, KB-G2guard above); the
+  per-commit proof is in docs/limits.md "Site and demo visual baselines re-recorded".
 - **Playwright WebKit sometimes drops to 20 or 30 FPS after navigating in the same tab.** `examples/voxel-sandbox`, `quality=high`, 1920 x 1000, 60 Hz display:
   in chains of five same-tab loads, 7 of 30 loads ran at 30 FPS, then the rate came back by itself on a later load. Never on the first load of a browser (0 of 11 chains),
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU

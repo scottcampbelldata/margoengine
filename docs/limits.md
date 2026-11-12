@@ -1904,6 +1904,42 @@ Pass on DirectionalLight and MorphStressTest throughout, so they keep their base
 differences were single pixels of 1 level (noise floor). Reproduce: `node scripts/visual-regression.js --only=khronos`
 at a commit and its parent, then compare `test-results/visual/*.actual.png`.
 
+## Site and demo visual baselines re-recorded (2026-11-11, KB2224b)
+
+Scott's ruling ("Yes, re-record" after deliberate renderer changes). `npm run visual:check -- --runs=1` failed 40 site
+and demo views of the Edge 157 profile (`tests/visual/profiles/nvidia-ampere-msedge-157`), recorded at `d9fa86e5bc`
+(flight-helmet at `b6865f6d83`). Two of them, batched-mesh-high and -phone, first timed out; that was a bug, fixed in
+`6d86148633` (KB-VIS-bm, docs/known-bugs.md). Every one of the 40 was bisected on the RTX A6000, Edge 157.0.4341.46: all
+40 views were captured at `d9fa86e5bc` (bit-identical to the baselines, so today's Edge moved nothing) and at the newest
+main, then every commit range whose ends differed was halved until each change sat on one commit, which was captured
+beside its parent. Pictures were compared pixel by pixel, bit-exact. Ten commits moved a view; no other commit of the
+1,970 moved any (an eleventh, `379431fcb8`, landed while the baselines were recorded):
+
+| Commit | What it changes | Views it moved | Size of the change |
+| --- | --- | --- | --- |
+| `efb2565884` | demo helmet lens colour (before the flight-helmet baseline) | flight-helmet x3 | already in its baseline |
+| `0fd6733f5a` | the meadow phone label corrected to the DPR 1 phone tier | windy-meadow-phone | 381 pixels, the label text |
+| `da12bd07e1` | core uploads the unit light direction | split-screen, minimap, dof (high, light) | 1 or 2 pixels, 1 level |
+| `40e6f183dc` | GGX lobe width kept when cosTheta rounds to one | flight-helmet-high | 1 pixel, 1 level |
+| `65098f33fe` | area-filter, alpha-weighted mip chains | flight-helmet x3, animation-formats x2 | at most 607 pixels, 1 level |
+| `f3af757782` | directional shadows hold at any model scale (texel-scaled bias and normal offset) | night-citadel, gameplay-sandbox, voxel overview/ground x6, voxel-night, voxel-shapes, character-animation, batched-mesh, clipping-planes | shadow edges, at most 51 levels, 8.4% of pixels |
+| `edcb6debb7` | height-correlated Smith G2 in core and gltf-pro (KB5875a) | 32 views | brighter, at most 13 levels; under 0.1% of changed pixels darker, by 1 level |
+| `bc82057e40` | SSAO reads full-precision view depth (KB1900) | flight-helmet high, light | at most 3 levels |
+| `29d79d3774` | height-correlated Smith G2 in clustered, materials, terrain, voxel (KB6016) | night-citadel x3, voxel overview/ground x6, voxel-night, voxel-shapes | brighter, at most 5 levels outside night-citadel's 1-level darker pixels and voxel-night |
+| `049b4107ef` | a blurred DOF edge spreads to both sides of its outline (KB1843) | dof x3 | at most 111 levels, 2.9% of pixels, at the card edges |
+| `379431fcb8` | GGX D keeps float32 precision on smooth surfaces (KB6016c) | dof high and light, split-screen-phone, voxel-ground-light, windy-meadow-light | 1 to 7 pixels, 1 level; its pictures are bit-identical to the new baselines |
+
+Re-recorded with `npm run visual:update -- --only=<39 views> --runs=4` at `520f675532`; apart from the `379431fcb8` pixels the new baselines are
+bit-identical to the bisect's newest-main pictures (`037eb3c95f`, batched-mesh with the KB-VIS-bm fix), so no later commit moved them;
+noise was 0 on every view, no tolerance was raised, and visual:check passes all 39 at `520f675532`.
+
+Not re-recorded: voxel-night-high. At `29d79d3774` 3,536 of its changed pixels are darker, by up to 5 levels, on the
+distant water. The height-correlated G2's `max(den, 0.0001)` guard undercuts G2 on a smooth surface at grazing angles
+(at a2 = 1e-6 and nl = nv = 0.001 it gives 0.02 against 0.71), so G2 falls below the separable term it replaced. That is
+a defect, listed in docs/known-bugs.md; the view keeps its old baseline and fails until the guard is fixed.
+Reproduce: `node scripts/visual-regression.js --only=<view>` at a commit and at its parent, then compare
+`test-results/visual/*.actual.png`.
+
 ## Batch 160 budgets re-recorded (2026-11-11, accepted differences)
 
 Scott's ruling of 2026-11-11 ("Yes, re-record"): the batch 160 reference-rendering budgets in
