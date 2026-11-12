@@ -1,3 +1,4 @@
+import { ready } from './page-harness';
 import { OrbitControls } from '@margoengine/controls';
 import type { Mesh, Vec3 } from '@margoengine/core';
 import { Environment, EnvironmentLighting } from '@margoengine/environment';
@@ -1328,6 +1329,8 @@ async function main() {
   window.addEventListener('pagehide', () => stage.dispose(), { once: true });
 }
 
-main().catch((err) => {
-  console.error(err);
-});
+ready(
+  main().catch((err) => {
+    console.error(err);
+  }),
+);
