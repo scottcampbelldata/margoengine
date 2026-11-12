@@ -3,6 +3,8 @@
 // fetches is answered with a real sample of that format. An example passes when nothing threw, no promise was left rejected
 // and the GPU reported no validation error. One that fails and is not on the known list fails the check, and so does a known
 // entry that now passes or names an example that is gone, so the list (scripts/support/readme-run-known.json) only ever shrinks.
+// An example that needs hardware no test machine has (an XR headset) is skipped by id, with the hardware named
+// (scripts/support/readme-run-skip.json); the report counts it as skipped, never as passed.
 // A step of check:merge, whole in the full check, never in verify or a gate before the push; verify's
 // tests/run-readme-examples.test.js does check that every known entry still names an example, as a README edit renames one. It holds one
 // shared GPU slot, and the GPU lock ends its whole process tree at LIMIT_MINUTES.
@@ -33,6 +35,7 @@ import { closeAll, endTree, traceShutdown } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
 import { headlessReference } from './support/headless-readme.mjs';
 import { readmeFixture, readmeNodeEnv, serveSample } from './support/readme-assets.mjs';
+import { writeReadmeRigs } from './support/readme-humanoid.mjs';
 import { finishLiveExample, observeLiveExample, serveLiveLink, usesLiveLink } from './support/readme-live.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
@@ -41,6 +44,7 @@ const root = resolve(import.meta.dirname, '..'),
   scratchBase = join(root, 'test-results/readme-run'),
   scratch = join(scratchBase, `run-${process.pid}`),
   knownFile = join(root, 'scripts/support/readme-run-known.json'),
+  skipFile = join(root, 'scripts/support/readme-run-skip.json'),
   reportFile = join(root, 'test-results/readme-run-report.json'),
   option = (name) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3),
   NODE_LIMIT = 30_000,
@@ -74,6 +78,19 @@ export function claimScratch(base, pid = process.pid, alive = isAlive) {
   const folder = join(base, `run-${pid}`);
   mkdirSync(join(folder, 'page'), { recursive: true });
   return folder;
+}
+
+/**
+ * The examples never run, by id, each with the hardware it needs: its reason starts `hardware:`. Anything that fails
+ * for another reason belongs on the known list, which only shrinks.
+ * @throws Error for a reason that names no hardware.
+ */
+export function readSkips(file = skipFile) {
+  const skips = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
+  for (const [id, reason] of Object.entries(skips))
+    if (typeof reason !== 'string' || !/^hardware: \S/.test(reason))
+      throw new Error(`${id}: a skipped example names the hardware it needs ("hardware: ..."); put any other failure on the known list`);
+  return skips;
 }
 
 /** What the examples of a package are, by id: `{ id, name, code }`. */
@@ -635,16 +652,23 @@ async function run() {
     examples = pickExamples(collectExamples(packages), { only, packages: named, ids: failedBefore }),
     part = Boolean(only || named),
     known = existsSync(knownFile) ? JSON.parse(readFileSync(knownFile, 'utf8')) : {},
+    skips = readSkips(),
     samples = sampleFiles(),
     results = new Map();
   claimScratch(scratchBase);
-  for (const example of examples) for (const name of namedFiles(example.code)) readmeFixture(name);
+  const unknownSkips = part ? [] : Object.keys(skips).filter((id) => !examples.some((example) => example.id === id));
+  for (const example of examples)
+    if (Object.hasOwn(skips, example.id)) results.set(example.id, { result: 'skip', reason: skips[example.id] });
+  const runnable = examples.filter(({ id }) => !results.has(id));
+  for (const example of runnable) for (const name of namedFiles(example.code)) readmeFixture(name);
   samples.byExtension.set('.glb', { path: modelWithClips(join(scratch, 'clips.glb')), size: 0 });
   samples.staticModel = await staticModel(join(scratch, 'static.glb'));
-  await eachLimited(nodeTurns(examples.filter(({ code }) => placeOf(code) !== 'page')), NODE_JOBS, async (turn) => {
+  // The rigging examples' characters, made here (scripts/support/readme-humanoid.mjs), found by their file names.
+  for (const [name, path] of await writeReadmeRigs(scratch)) samples.byName.set(name, { path, size: 0 });
+  await eachLimited(nodeTurns(runnable.filter(({ code }) => placeOf(code) !== 'page')), NODE_JOBS, async (turn) => {
     for (const example of turn) results.set(example.id, await runInNode(example, samples));
   });
-  const forPage = examples.filter(({ id, code }) => placeOf(code) !== 'node' && results.get(id)?.result !== 'pass');
+  const forPage = runnable.filter(({ id, code }) => placeOf(code) !== 'node' && results.get(id)?.result !== 'pass');
   if (forPage.length) {
     const pages = await startPages(samples, examples);
     try {
@@ -670,7 +694,8 @@ async function run() {
   if (last) for (const entry of last) if (!results.has(entry.id)) report.push(entry);
   const { failed, fresh, gone } = judge(report, known, Boolean(part || last)),
     passed = report.filter(({ result }) => result === 'pass').length,
-    inNode = report.filter(({ result, place }) => result === 'pass' && place === 'node').length;
+    inNode = report.filter(({ result, place }) => result === 'pass' && place === 'node').length,
+    skipped = report.filter(({ result }) => result === 'skip').length;
   if (!part) writeFileSync(reportFile, `${JSON.stringify(report, null, 1)}\n`);
   if (process.argv.includes('--shrink') && !part && !last) {
     writeFileSync(
@@ -682,10 +707,11 @@ async function run() {
   }
   for (const { id, place, reason } of fresh) console.error(`${id} (${place}): ${reason}`);
   for (const id of gone) console.error(goneLine(id, report));
+  for (const id of unknownSkips) console.error(`${id}: no such example, still on the skip list (scripts/support/readme-run-skip.json)`);
   console.log(
-    `${passed} of ${report.length} examples ran: ${inNode} in Node, ${passed - inNode} in a page; ${failed.length} failed, ${fresh.length} not on the known list`,
+    `${passed} of ${report.length - skipped} examples ran: ${inNode} in Node, ${passed - inNode} in a page; ${failed.length} failed, ${fresh.length} not on the known list; ${skipped} skipped for hardware`,
   );
-  if (fresh.length || gone.length) process.exitCode = 1;
+  if (fresh.length || gone.length || unknownSkips.length) process.exitCode = 1;
 }
 
 async function main() {

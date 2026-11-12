@@ -196,6 +196,21 @@ test('a model with nothing to drive is told so, and bad settings are refused', a
   face[Symbol.dispose]();
 });
 
+// A second face on one model collided with the first's engine plugin name: core's bare "Invalid plugin" TypeError.
+test('one face per model: a second is refused by name until the first is disposed', async (t) => {
+  const f = foxWithNames(['ARKit_jawOpen', 'Mouth_Open']),
+    { animation } = await host(t, f.doc, f.buffers),
+    first = addFace(animation, { smoothing: 0 });
+  assert.throws(() => addFace(animation, { map: { jawOpen: 'Mouth_Open' } }), {
+    code: 'state',
+    message: /already has a face from addFace; dispose that face/,
+  });
+  first.dispose();
+  const second = addFace(animation, { map: { jawOpen: 'Mouth_Open' } });
+  assert.ok(second.matched.includes('jawOpen'));
+  second.dispose();
+});
+
 test('Seed-san: tracker frames drive a real avatar through its expressions', async (t) => {
   const bytes = new Uint8Array(file('vrm/Seed-san.vrm')),
     chunks = glbChunks(bytes),

@@ -11,6 +11,7 @@ import {
   namedFiles,
   nodeTurns,
   pickExamples,
+  readSkips,
   placeOf,
   runInNode,
   runInPage,
@@ -488,6 +489,26 @@ test('a run starting never deletes the files of a run still going in the same ch
     assert.deepEqual(readdirSync(folder), ['page']);
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('the skip list holds only examples that need hardware, and each names one the READMEs still hold', () => {
+  const skips = readSkips(),
+    ids = new Set(collectExamples(workspacePackages()).map(({ id }) => id));
+  assert.deepEqual(
+    Object.keys(skips).filter((id) => !ids.has(id)),
+    [],
+    'a renamed skipped example: put its new id in scripts/support/readme-run-skip.json',
+  );
+  const folder = mkdtempSync(join(tmpdir(), 'readme-skip-')),
+    file = join(folder, 'skip.json');
+  try {
+    writeFileSync(file, JSON.stringify({ 'a/readme-1': 'flaky on this machine' }));
+    assert.throws(() => readSkips(file), /names the hardware it needs/);
+    writeFileSync(file, JSON.stringify({ 'a/readme-1': 'hardware: a MIDI keyboard' }));
+    assert.deepEqual(readSkips(file), { 'a/readme-1': 'hardware: a MIDI keyboard' });
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
   }
 });
 

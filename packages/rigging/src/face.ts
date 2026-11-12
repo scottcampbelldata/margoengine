@@ -255,12 +255,15 @@ export interface FaceHandle {
   [Symbol.dispose](): void;
 }
 
+// Models with a live face: two faces would write the same morph targets, and their engine plugins share one name.
+const faced = new WeakSet<object>();
+
 /**
  * Drives a character's face from a tracker: call `push` with each tracker frame, at the tracker's own rate. Morph
  * targets are found on every mesh of the model by the names in `extras.targetNames`, so head, teeth and lashes move
  * together; pass `map` for other names, or `vrm` for an avatar. A driven morph target belongs to this: a clip's track
  * on it is overwritten.
- * @throws MargoError when nothing on the model matches, RangeError for bad settings.
+ * @throws MargoError (code `state`) when nothing on the model matches or the model already has a live face; RangeError for bad settings.
  */
 export function addFace(animation: Animator['animation'], options: AddFaceOptions = {}): FaceHandle {
   const mapper = new FaceMapper(options),
@@ -301,6 +304,8 @@ export function addFace(animation: Animator['animation'], options: AddFaceOption
     mapper.update(delta);
     apply();
   };
+  if (faced.has(model))
+    throw new MargoError('state', 'This model already has a face from addFace; dispose that face before adding another');
   const name = `face:${model.root.id}`;
   let remove: (() => void) | null;
   if (animator) remove = animator.addSolver(update);
@@ -310,7 +315,9 @@ export function addFace(animation: Animator['animation'], options: AddFaceOption
     // The scene it was attached to, not whichever scene is active when it stops.
     remove = () => engine.sceneOf(plugin)?.removePlugin(name);
   }
+  faced.add(model);
   const stop = (): void => {
+    if (remove) faced.delete(model);
     remove?.();
     remove = null;
     unsubscribe?.();

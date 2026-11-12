@@ -1,11 +1,3 @@
 {
-  "ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55": "sample: RangeError: Unknown animator clip \"GetUpFromBack\"; use a clip name from animation.clips",
-  "rigging/readme-corrective-shapes-margoengine-ri-ff3e5c": "sample: RangeError: Invalid morph target/weight; pass a morph target index the node has and a finite weight, on a live Animation",
-  "rigging/readme-face-tracking-margoengine-riggin-8fff06": "sample: MargoError: This model has no morph target named like a face shape; pass map, or vrm for an avatar",
-  "rigging/readme-face-tracking-margoengine-riggin-f62f83": "sample: MargoError: This model has no morph target named like a face shape; pass map, or vrm for an avatar",
-  "rigging/readme-ik-chains-with-pole-targets-marg-138226": "sample: RangeError: IK chain joint -1 is not one of the 26 bones; pass a valid index",
-  "rigging/readme-retarget-presets-margoengine-rig-9101f3": "sample: RangeError: Retarget source naming is not recognised; pass from (mixamo, godot, roblox, margo or humanoid)",
-  "rigging/readme-spring-bones-and-jiggle-margoeng-a41e82": "sample: RangeError: Spring center must be the chain's first joint or an ancestor of it",
-  "rigging/readme-vrm-avatars-margoengine-rigging-009c8e": "sample: RangeError: This VRM is invalid; fix it: humanoid bone leftUpperLeg is required; humanoid bone leftLowerLeg is required; humanoid bone leftFoot is required; hum",
-  "xr/readme-ar-hit-testing-f7eedf": "example: MargoError: Native WebGPU XR bindings are unavailable; desktop rendering remains active. Use a browser with XRGPUBinding or request an inline session."
+  "ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55": "sample: RangeError: Unknown animator clip \"GetUpFromBack\"; use a clip name from animation.clips"
 }

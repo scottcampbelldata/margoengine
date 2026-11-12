@@ -1,3 +1,12 @@
+### Section 5 evidence: README runner test character and hardware skips (bug sweep L6b, KB1867c, 2026-11-11)
+
+check:readme-run makes an original humanoid character per run (`scripts/support/readme-humanoid.mjs`, written from the
+glTF 2.0 and VRM 1.0 specifications) and serves it under the rigging examples' file names, so those examples run as
+written and find bones by name. An example that needs hardware no test machine has is listed in
+`scripts/support/readme-run-skip.json` with a reason that must start `hardware:`; the runner counts it as skipped,
+never as passed, and a skip that names no example fails a whole run. Evidence: tests/readme-humanoid.test.js,
+tests/run-readme-examples.test.js. Missing: the AR hit-testing example on a real headset (KB1867b).
+
 ### Section 5 evidence: volumetric fog integration on the WebGL2 layer's GPU (bug sweep L6b, KB5663a, 2026-11-11)
 
 The layer runs a compute entry point on the GPU only when every store writes the invocation's own texel; VolumetricFog's

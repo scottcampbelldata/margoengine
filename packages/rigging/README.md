@@ -99,13 +99,16 @@ import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
 import { Animator } from 'margoengine/animator';
 import { addIKChain, type AnimatorIKChain } from 'margoengine/rigging/ik';
+import { detectSkeleton, humanoidBones } from 'margoengine/rigging/retarget';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/character.glb');
 const animator = Animator.attach(Animation.attach(model), { initial: 'idle', states: { idle: 'Idle' } });
-const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
+// Bones by name: Mixamo (any mixamorig prefix), Godot, Roblox R15 or humanoid names, whichever the rig uses.
+const names = model.asset.doc.nodes!.map((n) => n.name ?? '');
+const bone = humanoidBones(names, detectSkeleton(names)?.preset ?? 'humanoid'); // humanoid bone -> node index
 const reach: AnimatorIKChain = {
-  joints: [node('LeftArm'), node('LeftForeArm'), node('LeftHand')], // each the child of the one before
+  joints: [bone.get('leftUpperArm')!, bone.get('leftLowerArm')!, bone.get('leftHand')!], // each the child of the one before
   target: [0.4, 1.3, 0.5], // world space; write into it every frame
   pole: [0.3, 1.2, -0.6], // the elbow bends toward this point
   weight: 1, // 0 keeps the animated pose
@@ -207,24 +210,29 @@ for (let frame = 0; frame < 60; frame++) {
 }
 ```
 
-On a character, joints and collider nodes are glTF node indices:
+On a character, joints and collider nodes are glTF node indices; find them by name:
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
+import { detectSkeleton, humanoidBones } from 'margoengine/rigging/retarget';
 import { addSpringBones } from 'margoengine/rigging/springs';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/character.glb');
 const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk'}});
+const names = model.asset.doc.nodes!.map((n) => n.name ?? '');
+const bone = humanoidBones(names, detectSkeleton(names)?.preset ?? 'humanoid'); // head, chest and the rest
+const node = (name: string) => names.indexOf(name); // the model's own extra bones
+const head = bone.get('head')!;
 const hair = addSpringBones(animator, {
   chains: [
-    { joints: [15, 16, 17], stiffness: 1.5, drag: 0.4, gravity: 0.3, center: 8 }, // measured against the head
-    { joints: [21], tail: [0, -0.06, 0], stiffness: 0.8 }, // an earring: one joint and an end point
+    { joints: [node('Hair1'), node('Hair2'), node('Hair3')], stiffness: 1.5, drag: 0.4, gravity: 0.3, center: head }, // measured against the head
+    { joints: [node('LeftEarring')], tail: [0, -0.06, 0], stiffness: 0.8 }, // an earring: one joint and an end point
   ],
-  colliders: [{ node: 8, radius: 0.09 }, { node: 5, tail: [0, 0.3, 0], radius: 0.12 }],
-  jiggles: [{ joint: 30, frequency: 3, damping: 0.3, limit: 0.03 }], // lags and wobbles in place
+  colliders: [{ node: head, radius: 0.09 }, { node: bone.get('upperChest')!, tail: [0, 0.3, 0], radius: 0.12 }],
+  jiggles: [{ joint: node('Belly'), frequency: 3, damping: 0.3, limit: 0.03 }], // lags and wobbles in place
 });
 hair.reset(); // after moving the character by hand
 hair[Symbol.dispose]();
@@ -290,18 +298,26 @@ Read `avatar.meta` before you use someone's avatar: it is the author's own state
 Pass an `Animator` from `margoengine/animator` as `animator` and the avatar runs inside its frame, after your clips, in the order the specification recommends: look-at, expressions, then spring bones. With none, it runs by itself as an engine plugin. `update(delta)` runs one frame by hand. Dispose the avatar before its `Animation`; disposing the model stops the avatar by itself.
 
 ```ts
+import { splitGLB } from 'margoengine/exporters';
+import { detectSkeleton, humanoidBones } from 'margoengine/rigging/retarget';
 import { createVRM, readVRM, writeVRM } from 'margoengine/rigging/vrm';
 const rigged = new Uint8Array(await (await fetch('/rigged.glb')).arrayBuffer()); // any .glb with a skin
+const { json } = splitGLB(rigged);
+const nodes = json.nodes as { name?: string; mesh?: number }[],
+  meshes = json.meshes as { extras?: { targetNames?: string[] } }[];
+const names = nodes.map((n) => n.name ?? '');
+const face = names.indexOf('Face'); // the node of the mesh with the face shapes
+const blink = meshes[nodes[face].mesh!].extras?.targetNames?.indexOf('eyeBlinkLeft') ?? -1;
 const out = writeVRM(
   rigged,
   createVRM({
     name: 'Scout',
     authors: ['Sam'],
-    bones: { hips: 1, spine: 2, head: 3 /* and the rest of VRM_REQUIRED_BONES */ },
-    expressions: { preset: { blink: { morphTargetBinds: [{ node: 3, index: 0, weight: 1 }] } } },
+    bones: humanoidBones(names, detectSkeleton(names)?.preset ?? 'humanoid'), // every humanoid bone the names give
+    expressions: { preset: { blink: { morphTargetBinds: [{ node: face, index: blink, weight: 1 }] } } },
   }),
 ); // a .vrm
-console.log(readVRM(out).humanoid.humanBones.head?.node); // 3
+console.log(readVRM(out).humanoid.humanBones.head?.node === names.indexOf('mixamorig:Head')); // true for a Mixamo rig
 ```
 
 | Name | Meaning |
@@ -407,13 +423,19 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import { addCorrectives } from 'margoengine/rigging/correctives';
+import { detectSkeleton, humanoidBones } from 'margoengine/rigging/retarget';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/character.glb');
 const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk'}});
-// On a model with an elbow at node 12 and a morph target 3 on the mesh at node 2.
+// The mesh node, its sculpted morph target and the elbow joint, all by name.
+const doc = model.asset.doc,
+  names = doc.nodes!.map((n) => n.name ?? '');
+const body = names.indexOf('Body');
+const target = (doc.meshes![doc.nodes![body].mesh!].extras as { targetNames: string[] }).targetNames.indexOf('LeftElbowFix');
+const joint = humanoidBones(names, detectSkeleton(names)?.preset ?? 'humanoid').get('leftLowerArm')!;
 const s = Math.sin(1);
 const elbow = addCorrectives(animator, {
-  shapes: [{ node: 2, target: 3, joint: 12, pose: [s, 0, 0, Math.cos(1)], curve: 'smooth' }], // full at two radians
+  shapes: [{ node: body, target, joint, pose: [s, 0, 0, Math.cos(1)], curve: 'smooth' }], // full at two radians
 });
 elbow.dispose(); // shapes back to 0
 ```
@@ -518,7 +540,8 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 const url = '/avatar.vrm';
 const animation = Animation.attach(await loadGLTF(engine, url));
 const avatar = addVRM(animation, readVRM(new Uint8Array(await (await fetch(url)).arrayBuffer())));
-addFace(animation, { map: { jawOpen: 'Mouth_Open', eyeBlinkLeft: ['Blink_L', 'Lash_L'] } });
+const byName = addFace(animation, { map: { jawOpen: 'Mouth_Open', eyeBlinkLeft: ['Blink_L', 'Lash_L'] } });
+byName.dispose(); // one face per model: dispose it before adding another
 addFace(animation, { vrm: avatar }); // or a VRM avatar: drives its preset expressions
 ```
 
@@ -531,7 +554,7 @@ addFace(animation, { vrm: avatar }); // or a VRM avatar: drives its preset expre
 | `vrm` | none | Drive this avatar's expressions rather than morph targets. |
 | `animator` | none | Run inside this `Animator`; with none, run as an engine plugin. |
 
-`FaceMapper` is the same thing as plain data, with no engine: `push(frame)`, `update(delta)`, `get(shape)`, `values`. `vrmFaceExpressions(get)` gives the VRM presets: what both eyes share goes to `blink` and the rest to `blinkLeft` and `blinkRight`, the eyes' mean to the look presets, `jawOpen`, `mouthPucker`, `mouthFunnel`, the mouth's lower lip and stretch to `aa`, `ou`, `oh`, `ih`, `ee`, and smile, frown, brow and wide eyes to `happy`, `sad`, `angry` and `surprised`. No tracker value stands for `relaxed`. A driven morph target belongs to the face: a clip's track on it is overwritten.
+`FaceMapper` is the same thing as plain data, with no engine: `push(frame)`, `update(delta)`, `get(shape)`, `values`. `vrmFaceExpressions(get)` gives the VRM presets: what both eyes share goes to `blink` and the rest to `blinkLeft` and `blinkRight`, the eyes' mean to the look presets, `jawOpen`, `mouthPucker`, `mouthFunnel`, the mouth's lower lip and stretch to `aa`, `ou`, `oh`, `ih`, `ee`, and smile, frown, brow and wide eyes to `happy`, `sad`, `angry` and `surprised`. No tracker value stands for `relaxed`. A driven morph target belongs to the face: a clip's track on it is overwritten. A model has one face at a time: a second `addFace` throws `MargoError` code `state` until the first is disposed.
 
 ARKit is a trademark of Apple Inc. MediaPipe is a trademark of Google LLC. Live Link Face is a product of Epic Games, Inc. Margo is not affiliated with them. The 52 names are Apple's published `ARFaceAnchor.BlendShapeLocation` identifiers.
 
@@ -565,6 +588,16 @@ applyKeyframeClip(walk, Animation.attach(godotHero), 0.5);
 | `alignRest` | `true` | Turn the target's reference pose to the source's, bone by bone. `false` keeps the target's own rest pose (both rigs already stand alike). |
 
 Target bones with no source bone (a Godot `Root`, Roblox's `HumanoidRootPart`, fingers a source lacks) map to `''` and stay at rest; the humanoid bones among them are listed in `unmapped`. Roblox R15 has no neck, shoulders, toes or fingers, so clips from it leave those at rest. Both rigs' model spaces must face the same way (glTF: +z forward, the figure's left at +x). `humanoidBones(names, preset)` gives the humanoid bone -> index map for your own tools, and `HUMANOID_BONES` lists every humanoid bone, parents first. An unrecognised naming throws a `RangeError` that asks for `from` or `to`.
+
+## Test character
+
+The examples above run as written against an original test character the README runner makes
+(`scripts/support/readme-humanoid.mjs`): a skinned figure of boxes with Mixamo-named bones (`/character.glb`,
+`/rigged.glb`, `/mixamo-walk.glb`) or Godot humanoid-profile names (`/godot-hero.glb`), the 52 ARKit face shapes,
+elbow and shoulder correctives, `Hair1` to `Hair3`, `LeftEarring` and `Belly` bones, and `Idle` and `Walk` clips;
+`/avatar.vrm` is the same figure as a VRM 1.0 avatar with face shapes under other names (`Mouth_Open`, `Blink_L`,
+`Blink_R`, `Lash_L`). Mixamo is a trademark of Adobe Inc. and Godot of the Godot Foundation; Margo is not affiliated
+with them and uses only their published bone names.
 
 ## Sources
 
