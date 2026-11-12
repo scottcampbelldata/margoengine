@@ -13,7 +13,7 @@ const reviewed = {
   TransformStore: 'handle api bind',
   FrameGraph: 'passes owner executing',
   GPURenderer:
-    'frame attachments msaa resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed canvas device context format pipeline descriptor renderFrame attach holdColor clears',
+    'frame attachments msaa resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings frameId failure deviceLost resources variants groups uniform bindGroup culledGroup culled disposed canvas device context format pipeline descriptor renderFrame attach holdColor clears',
 };
 
 function walk(node, visit) {

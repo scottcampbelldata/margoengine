@@ -11,7 +11,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Demos](#demos) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 24,843 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,844 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Build something in 5 minutes
@@ -342,7 +342,7 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,843 B | 61,333 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,844 B | 61,347 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as

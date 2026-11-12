@@ -2544,7 +2544,9 @@ innermost `out-of-memory` error scope, else as `uncapturederror` after frames ha
 KB6434). An out-of-memory `uncapturederror` reaches core's listener only from an allocation made outside a scope; core then
 reports it once through `engine.onError` (coded `failed`, help `gpu-lost`) and destroys the device, so the frames do nothing
 until the ordinary restore rebuilds every batch and plugin; later errors from the same device are not reported again. Other
-uncaptured errors (validation) still fail every frame with the coded fault. Optional packages scope their own allocations
+uncaptured errors (validation) fail the next frame once with the coded fault (`failed`, help `gpu-lost`), then clear, so frames after
+it draw (2026-11-11; before, every later frame threw it until `rebootDevice()`): `engine.start()` stops its loop on
+that frame and reports the fault once through `engine.onError`, as for any frame error, and a new `start()` draws. Optional packages scope their own allocations
 (`packages/shared/error-scope.js` `scoped`) and leave them unused until the device confirms them, so a failure there stays in
 the package: `CulledMeshes` draws the affected meshes unculled until the next restore. `Shadows` and `VirtualShadows`
 make their maps outside error scopes on purpose (KB6434b, KB-C34g): receivers bind them in the first frame after an

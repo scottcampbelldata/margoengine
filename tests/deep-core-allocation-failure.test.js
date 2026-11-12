@@ -11,6 +11,7 @@ const ROOMY = 1 << 30;
 
 globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256 };
 globalThis.GPUTextureUsage ??= { RENDER_ATTACHMENT: 16 };
+globalThis.GPUOutOfMemoryError ??= class GPUOutOfMemoryError extends Error {};
 
 /** A canvas's one context, whichever renderer configures it: `device` is the device the canvas draws from. */
 const fakeContext = () => {
@@ -586,7 +587,6 @@ test('Scene.dispose finishes when a plugin throws, and the error reaches the cal
 // have used the object. Core used to keep that as a fault every later frame threw (engine.start() stopped its loop)
 // until something else restored the device. It now reports the failure once and rebuilds the device.
 test('an out-of-memory uncaptured error is reported once and the device is rebuilt; frames go on', async () => {
-  globalThis.GPUOutOfMemoryError ??= class GPUOutOfMemoryError extends Error {};
   const gpu = makeGpu({ losable: true }),
     next = makeGpu(),
     engine = new Engine(canvas(gpu.context), await TransformStore.create(16), gpu.renderer, undefined, null),
@@ -617,14 +617,59 @@ test('an out-of-memory uncaptured error is reported once and the device is rebui
   }
 });
 
-test('an uncaptured validation error still stops the frames with a coded fault', async () => {
+// Bug (2026-11-11): an uncaptured error that is not out-of-memory (a validation error from any code using
+// engine.gpu) was kept as a fault that every later frame threw, for good: engine.start() stopped its loop and a new
+// start() hit the same stale fault, until rebootDevice(). It is now thrown by the next frame only, then cleared.
+test('an uncaptured validation error fails the next frame once with a coded fault; later frames draw', async () => {
   const gpu = makeGpu({ losable: true }),
     engine = new Engine(canvas(gpu.context), await TransformStore.create(16), gpu.renderer, undefined, null);
   try {
+    engine.createMesh().setGeometry(triangle());
+    assert.deepEqual(draw(engine, gpu), [1]);
     gpu.fire(Object.assign(new Error('Invalid bind group'), { name: 'GPUValidationError' }));
-    assert.throws(() => engine.render({ culling: false }), /Invalid bind group/);
+    assert.throws(
+      () => draw(engine, gpu),
+      (error) => error.code === 'failed' && /Invalid bind group/.test(error.message),
+    );
+    assert.deepEqual(draw(engine, gpu), [1], 'the frame after the failed one draws');
+    assert.deepEqual(draw(engine, gpu), [1], 'and so does the one after it');
     assert.equal(gpu.device.destroyed, false, 'a validation error does not rebuild the device');
   } finally {
     engine.dispose();
+  }
+});
+
+test('the frame loop reports an uncaptured validation error once, and start() draws again', async () => {
+  const gpu = makeGpu({ losable: true }),
+    engine = new Engine(canvas(gpu.context), await TransformStore.create(16), gpu.renderer, undefined, null),
+    errors = [],
+    frames = [],
+    raf = globalThis.requestAnimationFrame,
+    caf = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = (callback) => frames.push(callback);
+  globalThis.cancelAnimationFrame = () => {};
+  const tick = (time) => {
+    gpu.draws.length = 0;
+    frames.shift()?.(time);
+    return [...gpu.draws];
+  };
+  engine.onError = (error) => errors.push(error);
+  try {
+    engine.createMesh().setGeometry(triangle());
+    engine.start({ culling: false });
+    assert.deepEqual(tick(16), [1]);
+    gpu.fire(Object.assign(new Error('Invalid bind group'), { name: 'GPUValidationError' }));
+    assert.deepEqual(tick(32), [], 'the failed frame draws nothing');
+    assert.equal(errors.length, 1, 'reported once');
+    assert.match(String(errors[0].message), /Invalid bind group/);
+    assert.equal(frames.length, 0, 'the loop stops on the error, as on any frame error');
+    engine.start({ culling: false });
+    assert.deepEqual(tick(48), [1], 'a new start() draws instead of throwing the stale fault');
+    assert.deepEqual(tick(64), [1]);
+    assert.equal(errors.length, 1, 'nothing reported again');
+  } finally {
+    engine.dispose();
+    globalThis.requestAnimationFrame = raf;
+    globalThis.cancelAnimationFrame = caf;
   }
 });

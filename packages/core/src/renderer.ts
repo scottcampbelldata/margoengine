@@ -298,7 +298,8 @@ export class GPURenderer implements Renderer {
   private readonly clears = new Map<string, GPURenderPipeline>();
   private readonly bindings: GPUBindGroupEntry[] = [];
   private frameId = 0;
-  private lost?: Error;
+  /** The last uncaptured error that is not out of memory: the next frame throws it, once. */
+  private failure?: Error;
   private memory?: Error;
   private deviceLost = false;
   private readonly resources = new Map<
@@ -447,7 +448,7 @@ export class GPURenderer implements Renderer {
         this.memory = fault('failed', `GPU out of memory: ${error.message}`, 'gpu-lost');
         this.deviceLost = true;
         device.destroy();
-      } else this.lost = fault('failed', error.message, 'gpu-lost');
+      } else this.failure = fault('failed', error.message, 'gpu-lost');
     });
   }
 
@@ -512,6 +513,9 @@ export class GPURenderer implements Renderer {
         this.onLost?.(error);
         return;
       }
+      // A frame that throws threw the pending uncaptured error first, if there was one: that frame reports it, and no
+      // later one does. Uncaptured errors arrive in a task of their own, never inside a frame, so none is lost here.
+      this.failure = undefined;
       throw error;
     }
   }
@@ -523,7 +527,7 @@ export class GPURenderer implements Renderer {
     delta: number,
     view?: ViewDraw,
   ): void {
-    if (this.lost) throw this.lost;
+    if (this.failure) throw this.failure;
     const target = view?.target,
       { width, height } = target?.color ?? this.canvas,
       format = target?.color.format ?? this.format,

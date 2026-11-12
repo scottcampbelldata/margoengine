@@ -152,7 +152,7 @@ export const entries = [
     ],
     cause:
       'The browser lost the GPU device (driver reset, tab in the background too long, GPU process crash), or WebGPU reported an uncaptured validation error, or a GPU allocation made outside an error scope ran out of memory.',
-    fix: 'Core recreates the device itself; recreate textures your code owns (view `target`s) in `onDeviceRestored`. Core restores at most 3 times in a row: a fourth loss before 120 frames have drawn since the last one reports `failed` once and asks for no new device, so reload the page. A validation error names the GPU object at fault: fix the call that created it. An out-of-memory error is reported once and core rebuilds the device as after a loss; if it repeats, ask for smaller textures, buffers or instance counts.',
+    fix: 'Core recreates the device itself; recreate textures your code owns (view `target`s) in `onDeviceRestored`. Core restores at most 3 times in a row: a fourth loss before 120 frames have drawn since the last one reports `failed` once and asks for no new device, so reload the page. A validation error names the GPU object at fault: fix the call that created it. Core throws it from the next frame only, then clears it: `engine.start()` stops its loop on that frame and reports it once through `engine.onError`, and a new `start()` draws again. An out-of-memory error is reported once and core rebuilds the device as after a loss; if it repeats, ask for smaller textures, buffers or instance counts.',
   },
   {
     id: 'reentrancy',
