@@ -1,5 +1,14 @@
 # Claims and evidence
 
+This file maps every public number and claim about Margo Engine to the committed evidence behind it and the command
+that reproduces it. Start with [Headline numbers](#headline-numbers) and the
+[size comparison with other engines](#smallest-core-measured-2026-11-10). No speed claim against another engine is
+made ([Speed compared with three.js](#speed-compared-with-threejs)).
+[Not yet backed by a committed result](#not-yet-backed-by-a-committed-result) lists what is still open, and
+[Design envelope](#design-envelope-docslimitsmd) has one row for each limit in [docs/limits.md](../limits.md)
+(LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
+first: each names its scope, its evidence file and how to reproduce it.
+
 - Batch 170 vfx: a steady frame of 100,000 live particles sends 224 bytes to the GPU in one write; three.quarks 0.17.1
   marks 4,800,000 bytes of instance attributes for upload. Work evidence only, no speed claim.
   [Scope, rival count and reproduction](batch-170-vfx.md).
@@ -671,7 +680,7 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 24,209 B gzip (59,802 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage`, record at `f8d15ee8b`, which lags; `npm run measure:size` printed 23,626 B and 58,443 B with the core speed changes of 2026-11-07) | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 24,848 B gzip (61,345 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage`, record at `0e71a9024`, dirty: false); `npm run measure:size` printed the same on main at `38ce7fbaa` (2026-11-12) | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
@@ -688,7 +697,7 @@ Sizes are gzip bytes of the bundled, minified output of each engine, installed f
 
 | Engine | Version | (a) minimal lit-box scene, gzip B | (b) whole package, gzip B | WebGPU / WebGL2 | PBR | Lights |
 | --- | --- | --- | --- | --- | --- | --- |
-| Margo (`createStage` + box) | 1.0.0, main at 7c2d18a60 | 24,130 | 24,204 | WebGPU / fallback is a separate package | yes | yes |
+| Margo (`createStage` + box) | main at 38ce7fbaa (2026-11-12) | 24,775 | 24,848 | WebGPU / fallback is a separate package | yes | yes |
 | ClayGL | 1.3.0 | 81,424 | 113,711 | no / yes (WebGL1 and 2) | yes | yes |
 | Hilo3d | 1.19.1 | 112,039 | 111,842 | no / yes (WebGL1 and 2) | yes | yes |
 | three.js, WebGLRenderer | 0.187.0 | 130,100 | 186,538 | no / yes | yes | yes |
@@ -699,9 +708,11 @@ Sizes are gzip bytes of the bundled, minified output of each engine, installed f
 | Babylon.js, WebGPUEngine | 9.35.0 | 497,381 (startup 355,304) | same as above | yes / no | yes | yes |
 | Filament | 1.53.4 | not measured | 35,982 JS + 1,969,736 Wasm | yes / yes | yes | yes |
 
-Margo against the next smallest in row (a): 3.4 times smaller than ClayGL, 5.4 times smaller than three.js WebGLRenderer, 9.0 times smaller than three.js WebGPURenderer.
+Today (2026-11-12, main at `38ce7fbaa`): the Margo row was measured again with the same build call (the `bundleBytes` call of `scripts/measure-size.js`, nothing external); the rival rows are from 2026-11-10 and did not change version.
 
-Margo's own figures on main: `npm run measure:size` prints 24,209 B gzip (59,802 B raw) for core + stage, the number in the README. The comparison script bundles the same stage entry with its own copy of the build call and prints 24,204 B (5 B less, from its separate install), 24,130 B for row (a) and 24,204 B for row (b).
+Margo against the next smallest in row (a): 3.3 times smaller than ClayGL, 5.3 times smaller than three.js WebGLRenderer, 8.8 times smaller than three.js WebGPURenderer.
+
+Margo's own figures on main: `npm run measure:size` prints 24,848 B gzip (61,345 B raw) for core + stage, the number in the README. The comparison bundles the umbrella entry with the same build call and gets 24,775 B for row (a) and 24,848 B for row (b).
 
 Stated differences:
 
@@ -722,7 +733,7 @@ and commit.
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Core 21,431 B (52,756 raw), core + stage 22,815 B (56,578 raw), 2,185 B under the gate | `entry-sizes.json` at the item 53.2 dynamic instances landing (2026-10-29, dirty: false) | PROVEN |
+| engine | Core 22,225 B (53,470 raw), core + stage 24,848 B (61,345 raw), 152 B under the gate | `entry-sizes.json` (record `0e71a9024`, dirty: false); `npm run measure:size` on main at `38ce7fbaa` (2026-11-12) | PROVEN |
 | engine | 102 packages (none published to npm yet); `npm i margoengine`; kit sizes (game 307,012, viz 277,396, web 155,058 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
 | engine | Starter first frames: web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
 | engine | 6,498 tests, 6,496 pass, 2 skipped (Node 26.12, `01836c27`) | `examples/package-benchmarks/results/test-count.json` | PROVEN |
@@ -786,7 +797,7 @@ backs them yet:
 
 | ID | Claim | Evidence | Command | Status | Note |
 | --- | --- | --- | --- | --- | --- |
-| LIM-001 | "core plus the stage facade is 24,848 B gzip"; the build fails at 25,000 bytes; core alone is 22,225 B of its 22,226 B cap (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage.gzip` 24432, `packages["@margoengine/core"]["."].gzip` 21828, at the commit the record names); `scripts/build-modern.js` (`CORE_ONLY_CEILING`); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves with changes to core; the record names its commit. |
+| LIM-001 | "core plus the stage facade is 24,848 B gzip"; the build fails at 25,000 bytes; core alone is 22,225 B of its 22,226 B cap (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage.gzip` 24848, `packages["@margoengine/core"]["."].gzip` 22225, at the commit the record names); `scripts/build-modern.js` (`CORE_ONLY_CEILING`); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves with changes to core; the record names its commit. |
 | LIM-002 | Entities: "8,388,608 slots (2^23)", starts at `capacity` (default 1,024) and doubles; `RangeError: Capacity` / `Capacity: 1..8388608`; a failed growth leaves the store as it was (docs/limits.md, Scale) | `packages/core/src/kernel.ts` (`create`, `grow`), `engine.ts` `createMesh` and `Engine.create` (`capacity ?? 1024`); `tests/core-dirty-transforms.test.js` asserts `/Capacity/` at 2^23 + 1 and growth from 1,024 (in verify) | `node --test tests/core-dirty-transforms.test.js` | PROVEN | See also S-04. |
 | LIM-003 | "352.1 B of kernel memory per slot at 1,048,576 slots (351 B by layout)" (docs/limits.md, Scale) | `examples/package-benchmarks/parts/results-scale-node.json` (`kernelBytesPerSlot` 352.1 at 1,000,012 entities; Node 24, AC, quiet-gated at 8% CPU, not diagnostic); layout in `packages/kernel/src/lib.rs` (86 float columns + 7 flag bytes) | `node --expose-gc examples/package-benchmarks/parts/scale-node.mjs` | PROVEN | - |
 | LIM-004 | "a static kernel tick costs 3.3 ms at 100,006 entities, 20.2 ms at 499,992 and 41.5 ms at 1,000,012"; "about 41 ns per entity per frame even when nothing moves"; above 1,048,576 slots "not measured" (docs/limits.md, Scale) | Same JSON (`tickStaticMs` 3.328 / 20.153 / 41.461); 41.461 ms / 1,000,012 = 41 ns | same | PROVEN | Node CPU timings, same Wasm as the browser, fake renderer. |

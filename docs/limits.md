@@ -1,5 +1,13 @@
 # Design envelope
 
+This page lists the engine's limits: every hard boundary, where it starts, what you see when you reach it and the
+package or tool that takes you past it. The reference tables are [Scale](#scale), [Rendering](#rendering),
+[Geometry](#geometry), [Entities](#entities), [Copies of a model](#copies-of-a-model) and [Platform](#platform)
+(tested hardware and browsers are in Platform). The paragraphs just above Scale say how to read their "Starts at"
+column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
+notes one change's size or behaviour and its evidence. Every number has a row in
+[whitepaper/claims.md](whitepaper/claims.md).
+
 - Batch 170 stats: accepted difference in drawing against stats.js 0.17.0. Margo redraws a 120-sample frame-time
   line and four text rows each 150 ms (7,617 canvas commands in 10 s at 60 Hz); stats.js scrolls a bar graph with
   one image copy per frame (6,090 commands). Command counts are not costs. Both do nothing while idle.

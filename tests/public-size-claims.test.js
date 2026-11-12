@@ -21,7 +21,9 @@ const WINDOW = 110;
 function sizeClaims(text, file, phrase) {
   const found = [];
   // Markup reads as prose once tags are gone: "<dt>24,209 B gzip</dt><dd>Core plus" becomes one sentence.
-  const prose = (line = '') => line.replace(/<\/d[td]><d[td][^>]*>/g, ' ').replace(/<[^>]+>/g, '');
+  // Table cells too: "<td>61,345</td><td>24,848</td>" must not read as the one number 61,34524,848.
+  const prose = (line = '') =>
+    line.replace(/<\/(?:d[td]|t[dh])>\s*<(?:d[td]|t[dh])[^>]*>/g, ' ').replace(/<[^>]+>/g, '');
   const lines = text.split('\n');
   lines.forEach((line, index) => {
     // A wrapped paragraph puts the figure on the next line ("The core and the stage" / "together measure 24,630"), so
@@ -55,6 +57,8 @@ test('every core + stage size in the public docs equals what measure:size prints
   const allowed = new Set([raw, gzip, 25_000, core.raw, core.gzip, CORE_ONLY_CEILING]);
 
   const files = ['README.md', 'docs/README.md', 'docs/start-here.md', 'docs/api-overview.md', 'site/index.html'];
+  // Bug (2026-11-12): the engine whitepaper page said 21,974 B in six places while the build measured 24,848 B.
+  files.push('site/whitepaper/engine.html');
   for (const entry of readdirSync(new URL('../docs/guides/', import.meta.url)))
     if (entry.endsWith('.md')) files.push(`docs/guides/${entry}`);
   for (const entry of readdirSync(new URL('../packages/', import.meta.url), { withFileTypes: true }))
@@ -74,6 +78,8 @@ test('every core + stage size in the public docs equals what measure:size prints
   for (const [file, pattern] of [
     ['docs/limits.md', /^Margo is a small WebGPU engine/],
     ['docs/whitepaper/claims.md', /^\| LIM-001 \|/],
+    ['docs/whitepaper/claims.md', /^\| Core \+ stage is /],
+    ['docs/whitepaper/claims.md', /^\| Core \+ stage is /],
   ]) {
     const lines = read(file).split('\n');
     const at = lines.findIndex((line) => pattern.test(line));
@@ -84,6 +90,16 @@ test('every core + stage size in the public docs equals what measure:size prints
       claims.push(...sizeClaims(lead, file, phrase).map((claim) => ({ ...claim, line: at + 1 })));
   }
   assert.ok(claims.length >= 8, `the scan found ${claims.length} size claims`);
+
+  // Bug (2026-11-12): the engine comparison table's Margo row stayed at 24,204 B (and "1.0.0") after core grew. Its
+  // whole-package column (b) is the umbrella's main entry, which bundles to the core + stage figure.
+  const row = read('docs/whitepaper/claims.md')
+    .split('\n')
+    .find((line) => line.startsWith('| Margo (`createStage` + box) |'));
+  assert.ok(row, 'claims.md still has the Margo row of the engine size comparison');
+  const cells = row.split('|').map((cell) => cell.trim());
+  claims.push({ file: 'docs/whitepaper/claims.md', line: 0, value: cells[4] });
+  assert.match(cells[2], /^main at [0-9a-f]{7,}/, 'the Margo row names the commit it was measured at');
 
   const stale = claims.filter((claim) => !allowed.has(digits(claim.value)));
   assert.deepEqual(

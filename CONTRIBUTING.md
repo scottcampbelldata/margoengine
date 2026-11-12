@@ -6,7 +6,7 @@ Thanks for taking a look. Bug reports, fixes, docs and new examples are all welc
 
 You need Node.js 24.18+ to work in this repository (its tests use `using` declarations, and the React unit tests rely
 on Node 24's node:test mock.module timing) and [Git LFS](https://git-lfs.com). End users: Node 22.12 or newer (tested
-on 22.12 and the latest 22.x, 24.18 and 26). The node-compat job in `.github/workflows/ci.yml` checks that on 22.12.0, the latest 22.x and 26: the
+on 22.12 and the latest 22.x, 24.18 and 26). The end-user proof checks that on 22.12.0, the latest 22.x and 26: the
 packages build, pack, install in a clean project, import (every exports entry), type-check their README examples, run
 the consumer program and the packed browser test, and build with Vite, webpack, Next.js, Rollup and esbuild. Shipped
 code may not use a JavaScript or Node API that Node 22.12 lacks without a feature test (`npm run check:node-apis`).
@@ -14,7 +14,7 @@ To run that proof locally, put a Node 22 first on PATH and run `npm run modern:t
 `npm run modern:test:bundlers`.
 
 The unit tests of the packages that run code in Node also run on Node 22.12.0 and the latest 22.x, with the same
-assertions (CI job "node22 unit tests (Node-run packages)", `npm run test:node22` after `npm run build:packages`).
+assertions (`npm run test:node22` after `npm run build:packages`).
 `scripts/node22-packages.json` lists them with one reason each: the command line tools (margo-convert, create-margo,
 the mcp server), the netcode and voxel-net servers and what they import, save's Node adapter, the format parsers and
 exporters, the WGSL and shader tooling, and the packages of game and geometry logic that use no GPU or DOM. The React
@@ -53,8 +53,10 @@ npm run api:check
 npm run measure:size
 ```
 
-`.github/workflows/ci.yml` holds the same commands, but the GitHub workflows are turned off in the repository
-settings, so run them yourself. [AGENTS.md](AGENTS.md) lists the checks that gate a change.
+Checks run on the project's own GPU machines (NVIDIA RTX A6000, Intel Arc 140V, AMD Radeon 680M and Apple silicon),
+not on GitHub: hosted runners have no GPU, and most suites need one. The files in `.github/workflows/` are kept for
+reference and are turned off. Run the commands above yourself; [AGENTS.md](AGENTS.md) lists the full set that gates a
+change.
 
 - Keep a pull request to one change. Small is easier to review.
 - Add or update tests for what you change. Most packages have tests in `packages/<name>/tests/`.

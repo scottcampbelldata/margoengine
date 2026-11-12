@@ -1,6 +1,6 @@
 # Margo Engine micro-kernel
 
-Margo Engine is a small Rust/Wasm engine for web applications with optional domain packages. This delivery implements the four-phase minimal engine plus an extensible core and a working creative pack. The workspace contains the modular packages, starters and their tests and validation evidence.
+Margo Engine is a WebGPU engine for web applications. A Rust kernel compiled to WebAssembly owns transforms, hierarchy and culling in one flat buffer; TypeScript owns loading and the GPU commands. Core (`@margoengine/core`) and the stage (`createStage`) are small and frozen, and every other feature is an optional package that attaches through core's extension hooks. This page covers how those parts fit together, their lifecycle rules and their limits. The [README](README.md) has the quickstart, and the [API overview](docs/api-overview.md) is a short tour.
 
 ## Implemented scope
 

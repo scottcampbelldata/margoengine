@@ -1,5 +1,11 @@
 # Known bugs and unverified features
 
+Every bug found in Margo Engine is logged here with a repro and its cause, fixed or not, and an open one stays here
+until it is fixed. Entries are newest first. A heading starts with the state (Open, Fixed with its date, Corrected);
+an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
+"Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
+new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
 ### Open 2026-11-12: margoengine.com does not serve the pages the packages and docs link to (lane D1)
 
 - **Repro:** `curl -sIL https://margoengine.com/errors` answers 404, and so do `/llms.txt`, `/llms-full.txt`,
@@ -13,7 +19,7 @@
   wrong; the deployment lags the repository.
 - **Done here:** the README, docs/start-here.md, docs/README.md and docs/ai-tools.md now point at the repository copies
   (`site/llms.txt`, `site/llms-full.txt`, docs/conventions.md#errors, `npm run catalog`).
-- **Needs Scott:** deploy the `npm run build:site` output to margoengine.com, or move the help-link base in
+- **Needs a maintainer decision:** deploy the `npm run build:site` output to margoengine.com, or move the help-link base in
   `packages/shared/errors.js` to a page that is live.
 
 ### Open 2026-11-12: sciviz bricks weight-model bound depends on the GPU's sin (AMD GPU hunt R7 row 42)
@@ -29,7 +35,7 @@
   (sin off by up to 3.6e-4). One random pattern's largest difference is the bound: 8 (whole) and 3 (bricked) on the
   RTX A6000, 3 at most on the 680M. The 680M filter is closer to exact than the A6000's (4 against 6); it fails only
   because its pattern of the model moved the picture less.
-- **Fix to build (needs Scott):** a model whose sign pattern is the same on every GPU (an integer hash of a quantized
+- **Fix to build (needs a maintainer decision):** a model whose sign pattern is the same on every GPU (an integer hash of a quantized
   position, the march's own float positions differ in the last bits between GPUs), with the bound measured again on
   the dev PC and here; or a bound that is the worst over the model, not one sample of it. Either changes what the
   check accepts, so it waits for Scott's ruling; the bound is not raised here.
@@ -338,7 +344,7 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   Regression: `tests/smith-shaders.test.js`, "every G2 text keeps the exact value on smooth surfaces at grazing angles"
   (fails before: 0.00002 against 0.83).
 - **Still open:** core's own copy (packages/core/src/shaders.ts, since edcb6debb7) is fixed in the local commit tagged
-  `K1-core-1` (core 22,225 to 22,231 B gzip, core + stage 24,848 to 24,853 B), which lands after the MSVC linker is installed and needs Scott's yes. voxel-night-high needs its baseline re-recorded on the
+  `K1-core-1` (core 22,225 to 22,231 B gzip, core + stage 24,848 to 24,853 B), which lands after the MSVC linker is installed and needs a maintainer decision. voxel-night-high needs its baseline re-recorded on the
   dev PC (visual baselines are per machine): the old one predates the brighter G2 pixels of 29d79d3774.
 
 ### Fixed 2026-11-11: a BatchedMesh over 262,144 vertices threw, so the batched-mesh demo never got ready (KB-VIS-bm)
@@ -1134,7 +1140,7 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   evaluation of the shipped shader already misses the f64 field by 1.36e-4. A GPU that fuses or reorders operations
   can land under 1e-4 (the workstation does); one that rounds each operation as written cannot. The long-time packing
   the case guards (c9b0a86ba) works: the raw time * speed product it replaced is off by far more.
-- **Open:** needs Scott's ruling. The bound is not loosened here. Options: an f32 reference (the model above) with a
+- **Open:** needs a maintainer decision. The bound is not loosened here. Options: an f32 reference (the model above) with a
   bound from WGSL's accuracy rules, or a bound derived from the f32 analysis.
 - **Fix (coordinator ruling 2026-11-11):** the long-time case compares the GPU with an f32 reference of `lens_field`
   (`packages/weather/tests/lens-f32.js`: every WGSL operation rounded once as written, `fma` once, the inputs

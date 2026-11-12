@@ -19,7 +19,7 @@ behind it. They came for the running feature, so the canvas is the first thing t
 - Paper `#f4f1ea`, near black `#1b1a17`, muted ink `#55524a`, hairlines `#b9b3a4`, oxide red `#8f2f1c` for the one primary
   action and the selected section. Brass, slate, sea green and chalk belong to the scenes, not the page chrome.
 - Type: a serif stack for titles (Iowan Old Style, Palatino, Georgia) over the self-hosted Source Sans 3 for body text,
-  and a monospace stack for numbers. The plan's single self-hosted open serif is not chosen yet: it needs Scott's approval
+  and a monospace stack for numbers. The plan's single self-hosted open serif is not chosen yet: it needs a maintainer decision
   of the exact file, source, licence and size before any download, and only `--title` changes when it arrives.
 - Left aligned. The canvas takes most of a wide screen; the panel sits left of it. On a phone the order is title, canvas,
   numbers, panel, so the scene shows before any controls.

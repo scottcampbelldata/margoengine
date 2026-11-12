@@ -250,7 +250,7 @@ changes and local-to-exported type promotion are compatible. Imports and member 
 compatibility. Compatible textual differences still need `api:update` for locked/unlisted packages.
 This is conservative declaration-text analysis, not subtype inference or a runtime behavioral guarantee.
 
-Intentional breaks need Scott's yes and an `api/breaks.json` record: `entry` (full import specifier), `symbol`,
+Intentional breaks need a maintainer decision and an `api/breaks.json` record: `entry` (full import specifier), `symbol`,
 `was` (SHA-1's first eight hex characters of the old LF-normalized, trimmed declaration block), `change`
 (`removed`, `renamed`, `signature`), `reason`, `date`, `approved` (`Scott YYYY-MM-DD`). Diagnostics print a
 record template with the exact hash. Members hash their member block; exports hash the whole declaration.
