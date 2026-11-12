@@ -21,12 +21,26 @@
   packages/webgl2-compat/test/preview-metal-mix.test.js, packages/voxel/tests/metal-mix.test.js (helper
   tests/support/metal-mix.js). Clustered's sampling-text pins and materials' GGX loop text moved with the BRDF text
   (the clustered sampling text with the old BRDF text put back hashes to the old pins); six --current proofs advance.
+  Landed: fix 1fdb55908, proof advance 8d6b26b84 (size budgets of materials mips and skin moved 4 and 10 bytes with
+  the reason). GPU on the Beelink, WebGPU and compat: clustered, animation, lod, post, voxel, materials and
+  webgl2-compat (test:gpu with its path tracer step excluded by profile, see 1974f0bc0) 100 of 100 runs pass.
 - **Still open, core (Scott's call):** `packages/core/src/shaders.ts` keeps the metal-mixed weight until its held core
   commit lands. Until then a part-metal core mesh is darker than the same surface lit by a clustered light, a
   material decal relit over it, or its imposter (which now match the specification).
 - **Re-record on the dev PC:** every lit picture with a part-metal surface moves, so the visual baselines of part-metal
   views (baselines are per machine) and any batch 160 budget that holds such a surface outside gltf-pro are re-recorded
   there.
+
+### Open 2026-11-12: post's GPU check rewrites a tracked result file on every run (hunt K1)
+
+- **Repro:** `npm run test:gpu:flare -w packages/post` on any machine leaves
+  `examples/package-benchmarks/results/flare-gpu.json` modified: the date, commit, GPU and browser of that run replace
+  the RTX A6000 record that packages/post/README.md cites. A lane's tree is then not clean and its landing stops.
+- **Cause:** `examples/package-benchmarks/post-effects-gpu.mjs` writes `results/<section>-gpu.json` after every passing
+  section; the same file is both the benchmark record and the package's GPU test (test:gpu:flare), with no flag that
+  separates recording from checking.
+- **Fix to make (post owner):** write the tracked record only when asked (a record flag), else to test-results/, with a
+  test that a plain run leaves the tracked file unchanged. Until then restore the file after a test run (git checkout).
 
 ### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 
