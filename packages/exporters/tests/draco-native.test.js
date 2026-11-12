@@ -280,10 +280,10 @@ test('malformed packets reject and repeated encode/free cycles keep linear memor
   const pointer = encoder.encoder_alloc(16);
   try {
     new Uint8Array(encoder.memory.buffer, pointer, 16).fill(0);
+    // encoder_encode frees the packet once read (KB0035), so it is not freed here.
     assert.equal(encoder.encoder_encode(pointer, 16), 1);
     assert.equal(encoder.encoder_output_length(), 0);
   } finally {
-    encoder.encoder_free(pointer, 16);
     encoder.encoder_clear();
   }
   const job = {
@@ -356,7 +356,7 @@ test('octahedral reconstruction beats the old encoder maximum error on 3000 fixe
   }
 });
 
-test('bulk Wasm output uses eight boundary calls independently of encoded byte count', { timeout: 30000 }, () => {
+test('bulk Wasm output uses seven boundary calls independently of encoded byte count', { timeout: 30000 }, () => {
   for (const points of [3, 3000]) {
     let calls = 0;
     const counted = new Proxy(
@@ -388,7 +388,7 @@ test('bulk Wasm output uses eight boundary calls independently of encoded byte c
       encodeSpeed: 10,
       decodeSpeed: 10,
     });
-    assert.equal(calls, 8);
+    assert.equal(calls, 7); // alloc, encode (which frees the packet, KB0035), four output reads and clear
     assert.ok(result.data.length > calls);
   }
 });

@@ -704,7 +704,7 @@ Each of these takes GLB bytes and returns smaller GLB bytes, so it follows any w
 
 ### Draco (`@margoengine/exporters/draco`)
 
-`compressDraco(glb, options)` stores triangle geometry as KHR_draco_mesh_compression, with Google's own Draco encoder in Wasm. The encoder loads on the first call: in a worker in a browser, in process in Node. An app that never compresses never fetches it.
+`compressDraco(glb, options)` stores triangle geometry as KHR_draco_mesh_compression, with the package's own clean-room encoder (Rust compiled to Wasm; `encoderPath` still takes an Emscripten encoder folder). The encoder loads on the first call: in a worker in a browser, in process in Node. An app that never compresses never fetches it.
 
 ```ts
 import { exportGLB } from 'margoengine/exporters';
@@ -732,7 +732,7 @@ console.log(`${source.length} -> ${glb.length} bytes, ${compressed} primitives, 
 
 Bits of 0 keep a float attribute exact. Integer attributes such as JOINTS_n and `_CUSTOM` attributes are always exact. Draco is lossy above that: a position lands on a grid of `2 ** positionBits - 1` steps across the mesh's widest axis, so at most half a step from where it was. Accessor `count`, `min` and `max` describe what a decoder gets, to the last bit.
 
-Draco has no place for morph targets and can reorder vertices, so a primitive with targets stays uncompressed, and so do points, lines, strips and fans. `skipped` names each one with its reason. Primitives that differ only in material share one stream. `compressDraco` refuses a GLB with meshopt buffers, and a file with nothing to compress comes back as the same bytes.
+Draco has no place for morph targets and can reorder vertices, so a primitive with targets stays uncompressed, and so do points, lines, strips and fans. `skipped` names each one with its reason. Primitives that differ only in material share one stream. `compressDraco` refuses a GLB with meshopt buffers, and a file with nothing to compress comes back as the same bytes. One primitive's packed input (indices plus attributes) may be up to 280 MiB, enough for a 10M-triangle scan with float normals and UVs; the encoder peaks at up to 12.9 bytes of memory per input byte, so that is the most that fits its 4 GiB with room to spare. Split a larger mesh into primitives.
 
 ### KTX2 textures (`@margoengine/exporters/ktx2`)
 

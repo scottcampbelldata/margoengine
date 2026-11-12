@@ -187,13 +187,21 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   shader, displacement map) are not tested. Regression: packages/gltf-pro/tests/parts.test.js ("each part culls on its
   own"): a strip in 3 parts with a frustum over the first draws 1, not 3.
 
-### compressDraco cannot encode a 10M-triangle mesh with normals and UVs (found 2026-11-11, open)
+### Fixed 2026-11-11: compressDraco could not encode a 10M-triangle mesh with normals and UVs (KB0035)
 
 - **Repro:** `encodeNativeMesh` in `packages/exporters/src/draco-native-encode.ts` with a 5,004,169-vertex,
-  9,999,392-triangle grid carrying float positions, normals and UVs: its packed input is 280 MB.
-- **Cause:** the encoder refuses packed input over 256 MiB (`Draco encoder input exceeds 256 MiB`); the decoders read
-  up to 384 MiB of output since 2026-11-11, so files at that size decode but cannot be re-encoded here.
-- **Fix to build:** size the encoder's input ceiling from its measured peak memory as the decoders' was.
+  9,999,392-triangle grid carrying float positions, normals and UVs: its packed input is 280 MB, over the 256 MiB
+  ceiling. Measuring that ceiling showed it was also too high: the encoder peaked at 20.8 bytes of Wasm memory per
+  input byte, so a 243 MB positions-only mesh passed the check and trapped (`RuntimeError: unreachable`) at 4 GiB.
+- **Cause:** the clean-room encoder (`packages/exporters/draco-kernel`) held a map with a vector per edge
+  (`corners`), a map keyed by a copy of every point's bytes (`compact`), a full clone of the attributes while
+  compacting, the packet and its parsed copy for the whole encode, the first candidate's topology beside the grouped
+  one, and the corner table while building each group's.
+- **Fix:** a sorted edge array, an in-place hash table, no attribute clone, the packet freed once parsed
+  (`encoder_encode` now owns it), and each topology dropped once used. Output is byte-identical; peak memory is 12.9
+  bytes per input byte at most (positions only), 9.1 with normals and UVs. The ceiling is now 280 MiB, the most whose
+  measured peak fits 90% of 4 GiB (docs/limits.md). Regression: packages/exporters/tests/draco-encoder-memory.test.js
+  (the ceiling against the measured peak, the 280,126,152 B scan passing the check, the packet freed by the encoder).
 
 ### gltf-pro extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
 

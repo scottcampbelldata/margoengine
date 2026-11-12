@@ -90,18 +90,30 @@ struct Corners {
 }
 
 fn corners(indices: &[u32]) -> Corners {
-    let mut edges: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
-    for c in 0..indices.len() {
-        let (a, b) = (indices[next(c)], indices[previous(c)]);
-        edges.entry((a.min(b), a.max(b))).or_default().push(c);
-    }
+    // Corners grouped by their undirected opposite edge: one sorted (edge, corner) array instead of a map holding a
+    // vector per edge, which took about 120 bytes per triangle (KB0035). Within an edge, corners stay in index order,
+    // as the map's insertion order kept them, so the table is the same.
+    let mut edges: Vec<(u64, u32)> = (0..indices.len())
+        .map(|c| {
+            let (a, b) = (indices[next(c)], indices[previous(c)]);
+            (((a.min(b) as u64) << 32) | a.max(b) as u64, c as u32)
+        })
+        .collect();
+    edges.sort_unstable();
     let mut opposite = vec![INVALID; indices.len()];
     let mut union = Union::new(indices.len());
-    for group in edges.values() {
+    let mut start = 0;
+    while start < edges.len() {
+        let mut end = start + 1;
+        while end < edges.len() && edges[end].0 == edges[start].0 {
+            end += 1;
+        }
+        let group = &edges[start..end];
+        start = end;
         if group.len() != 2 {
             continue;
         }
-        let (a, b) = (group[0], group[1]);
+        let (a, b) = (group[0].1 as usize, group[1].1 as usize);
         if a / 3 == b / 3 || indices[next(a)] == indices[previous(a)] {
             continue;
         }
@@ -113,19 +125,21 @@ fn corners(indices: &[u32]) -> Corners {
         union.join(next(a), previous(b));
         union.join(previous(a), next(b));
     }
-    // Scan order determines ids, never HashMap iteration order.
-    let mut labels = HashMap::new();
+    drop(edges);
+    // Scan order determines ids: the first corner of each vertex names it.
+    let mut labels = vec![u32::MAX; indices.len()];
     let mut source = Vec::new();
     let vertices: Vec<u32> = (0..indices.len())
         .map(|c| {
             let root = union.root(c);
-            *labels.entry(root).or_insert_with(|| {
-                let id = source.len() as u32;
+            if labels[root] == u32::MAX {
+                labels[root] = source.len() as u32;
                 source.push(indices[c]);
-                id
-            })
+            }
+            labels[root]
         })
         .collect();
+    drop(labels);
     let mut boundary = vec![false; source.len()];
     for c in 0..vertices.len() {
         if opposite[c] == INVALID {
@@ -827,7 +841,8 @@ fn assemble(
     })
 }
 
-fn cut_topology(base: &Topology, seams: &[bool]) -> Topology {
+/// The corner table of `base` cut along `seams`: its opposite corners, corner vertices and vertex count.
+fn cut_vertices(base: &Topology, seams: &[bool]) -> (Vec<i32>, Vec<u32>, usize) {
     let mut union = Union::new(base.corner_vertices.len());
     let mut opposite = base.opposite_corners.clone();
     for c in 0..opposite.len() {
@@ -841,18 +856,24 @@ fn cut_topology(base: &Topology, seams: &[bool]) -> Topology {
         union.join(next(c), previous(o as usize));
         union.join(previous(c), next(o as usize));
     }
-    let mut ids = HashMap::new();
+    let mut ids = vec![u32::MAX; opposite.len()];
     let mut count = 0usize;
     let vertices: Vec<u32> = (0..opposite.len())
         .map(|c| {
             let root = union.root(c);
-            *ids.entry(root).or_insert_with(|| {
-                let id = count as u32;
+            if ids[root] == u32::MAX {
+                ids[root] = count as u32;
                 count += 1;
-                id
-            })
+            }
+            ids[root]
         })
         .collect();
+    drop(ids);
+    (opposite, vertices, count)
+}
+
+fn cut_topology(base: &Topology, seams: &[bool]) -> Topology {
+    let (opposite, vertices, count) = cut_vertices(base, seams);
     let mut boundary = vec![false; count];
     for c in 0..opposite.len() {
         if opposite[c] < 0 {
@@ -966,32 +987,35 @@ pub fn plan_groups_seed(mesh: &Mesh, seed_corner: usize) -> Result<GroupedTopolo
     }
     let mut streams = Vec::new();
     let mut union_seam = vec![false; welded.len()];
-    let mut groups = Vec::with_capacity(patterns.len());
-    for (index, (seam, attributes)) in patterns.into_iter().enumerate() {
-        if index > 0 {
-            streams.push(
-                (0..seam.len())
-                    .filter(|&c| topology.opposite_corners[c] >= c as i32)
-                    .map(|c| seam[c])
-                    .collect(),
-            );
-            for (out, value) in union_seam.iter_mut().zip(&seam) {
-                *out |= value;
-            }
+    for (seam, _) in patterns.iter().skip(1) {
+        streams.push(
+            (0..seam.len())
+                .filter(|&c| topology.opposite_corners[c] >= c as i32)
+                .map(|c| seam[c])
+                .collect(),
+        );
+        for (out, value) in union_seam.iter_mut().zip(seam) {
+            *out |= value;
         }
-        groups.push(AttributeGroup {
-            attributes,
-            topology: cut_topology(&topology, &seam),
-        });
     }
+    // Connectivity first, so the corner table and traversal are gone before the groups' tables are built (KB0035).
     let standard = connectivity_standard(&table, &walk, &streams);
     let valence = connectivity_valence(&table, &walk, &streams)?;
+    drop((table, walk, streams, welded, source_to_position, position_labels));
     topology.connectivity = if valence.len() < standard.len() {
         valence
     } else {
         standard
     };
-    topology.points = cut_topology(&topology, &union_seam).points;
+    topology.points = cut_vertices(&topology, &union_seam).2;
+    drop(union_seam);
+    let groups = patterns
+        .into_iter()
+        .map(|(seam, attributes)| AttributeGroup {
+            attributes,
+            topology: cut_topology(&topology, &seam),
+        })
+        .collect();
     Ok(GroupedTopology { topology, groups })
 }
 

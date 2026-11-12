@@ -24,17 +24,38 @@ pub struct Mesh {
     pub decode_speed: u8,
 }
 
+/// Bytes of packed input one encode may take (src/draco-native-encode.ts holds the same value).
+pub const INPUT_LIMIT: usize = 280 * 1024 * 1024;
+
+/// The 64-bit FNV-1a hash of point `point`'s bytes across every attribute.
+fn row_hash(mesh: &Mesh, strides: &[usize], point: usize) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for (a, &stride) in mesh.attributes.iter().zip(strides) {
+        for &byte in &a.bytes[point * stride..(point + 1) * stride] {
+            hash = (hash ^ byte as u64).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    hash
+}
+
+/// Merges points whose bytes match in every attribute, in index order. The table holds one u32 per slot and compares
+/// rows in place: a map keyed by a copy of each row took about 80 bytes per point (KB0035).
 fn compact(mesh: &Mesh) -> Mesh {
-    let mut unique = std::collections::HashMap::<Vec<u8>, u32>::new();
-    let mut point_map = vec![u32::MAX; mesh.points];
-    let mut sequence = Vec::new();
     let strides: Vec<usize> = mesh
         .attributes
         .iter()
         .map(|a| a.width * scalar_size(a.data_type).unwrap())
         .collect();
-    let row_bytes: usize = strides.iter().sum();
-    let mut key = Vec::with_capacity(row_bytes);
+    let same = |p: usize, q: usize| {
+        mesh.attributes
+            .iter()
+            .zip(&strides)
+            .all(|(a, &s)| a.bytes[p * s..(p + 1) * s] == a.bytes[q * s..(q + 1) * s])
+    };
+    let slots = (mesh.points * 2).next_power_of_two().max(2);
+    let mut table = vec![u32::MAX; slots];
+    let mut point_map = vec![u32::MAX; mesh.points];
+    let mut sequence: Vec<u32> = Vec::new();
     let indices = mesh
         .indices
         .iter()
@@ -43,30 +64,46 @@ fn compact(mesh: &Mesh) -> Mesh {
             if point_map[point] != u32::MAX {
                 return point_map[point];
             }
-            key.clear();
-            for (a, &stride) in mesh.attributes.iter().zip(&strides) {
-                key.extend(&a.bytes[point * stride..(point + 1) * stride]);
-            }
-            let id = if let Some(&id) = unique.get(&key) {
-                id
-            } else {
-                let id = sequence.len() as u32;
-                unique.insert(key.clone(), id);
-                sequence.push(point);
-                id
+            let mut slot = row_hash(mesh, &strides, point) as usize & (slots - 1);
+            let id = loop {
+                let held = table[slot];
+                if held == u32::MAX {
+                    let id = sequence.len() as u32;
+                    table[slot] = id;
+                    sequence.push(point as u32);
+                    break id;
+                }
+                if same(sequence[held as usize] as usize, point) {
+                    break held;
+                }
+                slot = (slot + 1) & (slots - 1);
             };
             point_map[point] = id;
             id
         })
         .collect();
-    let mut attributes = mesh.attributes.clone();
-    for (a, &stride) in attributes.iter_mut().zip(&strides) {
-        let mut bytes = Vec::with_capacity(sequence.len() * stride);
-        for &point in &sequence {
-            bytes.extend(&a.bytes[point * stride..(point + 1) * stride]);
-        }
-        a.bytes = bytes;
-    }
+    drop((table, point_map));
+    let attributes = mesh
+        .attributes
+        .iter()
+        .zip(&strides)
+        .map(|(a, &stride)| {
+            let mut bytes = Vec::with_capacity(sequence.len() * stride);
+            for &point in &sequence {
+                let point = point as usize;
+                bytes.extend(&a.bytes[point * stride..(point + 1) * stride]);
+            }
+            Attribute {
+                kind: a.kind,
+                data_type: a.data_type,
+                width: a.width,
+                normalized: a.normalized,
+                bits: a.bits,
+                grid: a.grid.clone(),
+                bytes,
+            }
+        })
+        .collect();
     Mesh {
         points: sequence.len(),
         indices,
@@ -87,6 +124,11 @@ pub fn encode(mesh: &Mesh) -> Result<Vec<u8>, &'static str> {
 }
 
 fn encode_result(mesh: &Mesh) -> Result<Encoded, &'static str> {
+    encode_compacted(validated_compact(mesh)?)
+}
+
+/// The checked mesh with its equal points merged.
+fn validated_compact(mesh: &Mesh) -> Result<Mesh, &'static str> {
     if mesh.points == 0 || mesh.indices.is_empty() || mesh.indices.len() % 3 != 0 {
         return Err("a nonempty triangle mesh is required");
     }
@@ -116,7 +158,11 @@ fn encode_result(mesh: &Mesh) -> Result<Encoded, &'static str> {
             return Err("nonfinite attribute");
         }
     }
-    let mesh = compact(mesh);
+    Ok(compact(mesh))
+}
+
+/// Encodes a mesh that `compact` already merged.
+fn encode_compacted(mesh: Mesh) -> Result<Encoded, &'static str> {
     let sequential = sequential::encode(&mesh)?;
     let faces = mesh.indices.len() / 3;
     if mesh.encode_speed == 10 || mesh.decode_speed == 10 {
@@ -126,19 +172,22 @@ fn encode_result(mesh: &Mesh) -> Result<Encoded, &'static str> {
             faces,
         });
     }
-    let topology = topology::plan(&mesh)?;
-    let edgebreaker = sequential::encode_edgebreaker(&mesh, &topology)?;
-    let mut result = if edgebreaker.len() < sequential.len() {
-        Encoded {
-            data: edgebreaker,
-            points: topology.points,
-            faces,
-        }
-    } else {
-        Encoded {
-            data: sequential,
-            points: mesh.points,
-            faces,
+    // Each candidate's topology is dropped once encoded, so only one is held at a time (KB0035).
+    let mut result = {
+        let topology = topology::plan(&mesh)?;
+        let edgebreaker = sequential::encode_edgebreaker(&mesh, &topology)?;
+        if edgebreaker.len() < sequential.len() {
+            Encoded {
+                data: edgebreaker,
+                points: topology.points,
+                faces,
+            }
+        } else {
+            Encoded {
+                data: sequential,
+                points: mesh.points,
+                faces,
+            }
         }
     };
     if mesh.attributes.iter().any(|a| a.kind == 0) {
@@ -161,6 +210,7 @@ fn encode_result(mesh: &Mesh) -> Result<Encoded, &'static str> {
                     faces,
                 };
             }
+            drop(degree);
             for seed in topology::seed_candidates(&mesh).into_iter().skip(1) {
                 let grouped = topology::plan_groups_seed(&mesh, seed)?;
                 let data = sequential::encode_grouped(&mesh, &grouped)?;
@@ -193,6 +243,11 @@ pub fn encode_packet(packet: &[u8]) -> Result<Vec<u8>, &'static str> {
 }
 
 fn encode_packet_result(packet: &[u8]) -> Result<Encoded, &'static str> {
+    encode_owned(parse_packet(packet)?)
+}
+
+/// The mesh a packet holds, copied out of it.
+fn parse_packet(packet: &[u8]) -> Result<Mesh, &'static str> {
     struct Reader<'a> {
         bytes: &'a [u8],
         offset: usize,
@@ -268,13 +323,20 @@ fn encode_packet_result(packet: &[u8]) -> Result<Encoded, &'static str> {
     if reader.offset != packet.len() {
         return Err("trailing packet bytes");
     }
-    encode_result(&Mesh {
+    Ok(Mesh {
         points,
         indices,
         attributes,
         encode_speed: speeds as u8,
         decode_speed: (speeds >> 8) as u8,
     })
+}
+
+/// Encodes a mesh it owns: its copy goes once merged, so it is not held beside the merged mesh (KB0035).
+fn encode_owned(mesh: Mesh) -> Result<Encoded, &'static str> {
+    let compacted = validated_compact(&mesh)?;
+    drop(mesh);
+    encode_compacted(compacted)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -288,7 +350,7 @@ mod wasm {
     });
     #[no_mangle]
     pub extern "C" fn encoder_alloc(length: usize) -> *mut u8 {
-        if length == 0 || length > 268435456 {
+        if length == 0 || length > super::INPUT_LIMIT {
             return std::ptr::null_mut();
         }
         unsafe { alloc(Layout::from_size_align(length, 8).unwrap()) }
@@ -299,13 +361,17 @@ mod wasm {
             dealloc(pointer, Layout::from_size_align(length, 8).unwrap());
         }
     }
+    /// Encodes the packet at `pointer`, which `encoder_alloc` gave, and frees it once read (the caller does not):
+    /// the packet is not held while the mesh encodes (KB0035).
     #[no_mangle]
-    pub unsafe extern "C" fn encoder_encode(pointer: *const u8, length: usize) -> u32 {
+    pub unsafe extern "C" fn encoder_encode(pointer: *mut u8, length: usize) -> u32 {
         let mut output = OUTPUT.lock().unwrap();
         output.data.clear();
         output.points = 0;
         output.faces = 0;
-        match super::encode_packet_result(std::slice::from_raw_parts(pointer, length)) {
+        let mesh = super::parse_packet(std::slice::from_raw_parts(pointer, length));
+        encoder_free(pointer, length);
+        match mesh.and_then(super::encode_owned) {
             Ok(encoded) => {
                 *output = encoded;
                 0

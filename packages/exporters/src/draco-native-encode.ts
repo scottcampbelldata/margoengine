@@ -6,6 +6,7 @@ export interface NativeDracoEncoder {
   memory: WebAssembly.Memory;
   encoder_alloc(length: number): number;
   encoder_free(pointer: number, length: number): void;
+  /** Encodes the packet `encoder_alloc` gave and frees it once read: the caller frees it only if this is never called. */
   encoder_encode(pointer: number, length: number): number;
   encoder_output_pointer(): number;
   encoder_output_length(): number;
@@ -48,6 +49,13 @@ const scalarType = (values: DracoJob['attributes'][number]['values']): number =>
             ? 2
             : 1;
 
+/**
+ * Bytes of packed input one encode may take: 280 MiB (293,601,280 B), the most whose measured peak Wasm memory (up to
+ * 12.9 bytes per input byte, positions only; 9.1 with normals and UVs) stays within 90% of the encoder's 4 GiB, so a
+ * 10M-triangle scan with float normals and UVs (280 MB) encodes. Same value as INPUT_LIMIT in draco-kernel/src/lib.rs.
+ */
+export const DRACO_ENCODER_INPUT_LIMIT = 280 * 1024 * 1024;
+
 const kinds = { POSITION: 0, NORMAL: 1, COLOR: 2, TEX_COORD: 3, GENERIC: 4 } as const;
 
 /** Encode through bulk memory transfers, preserving the existing worker job/result contract. */
@@ -56,10 +64,11 @@ export function encodeNativeMesh(module: NativeDracoEncoder, job: DracoJob): Dra
     16 +
     job.indices.byteLength +
     job.attributes.reduce((sum, a) => sum + 8 + (a.grid ? (a.width + 1) * 4 : 0) + a.values.byteLength, 0);
-  if (length > 256 * 1024 * 1024)
-    throw new RangeError('Draco encoder input exceeds 256 MiB; split the mesh into smaller primitives');
+  if (length > DRACO_ENCODER_INPUT_LIMIT)
+    throw new RangeError('Draco encoder input exceeds 280 MiB; split the mesh into smaller primitives');
   const pointer = module.encoder_alloc(length);
   if (!pointer) throw margoError('failed', 'Draco encoder could not allocate its input; split the mesh');
+  let owned = true;
   try {
     const bytes = new Uint8Array(module.memory.buffer, pointer, length),
       view = new DataView(module.memory.buffer, pointer, length);
@@ -83,6 +92,7 @@ export function encodeNativeMesh(module: NativeDracoEncoder, job: DracoJob): Dra
       bytes.set(new Uint8Array(a.values.buffer, a.values.byteOffset, a.values.byteLength), offset);
       offset += a.values.byteLength;
     }
+    owned = false;
     const status = module.encoder_encode(pointer, length);
     if (status === 2)
       throw margoError(
@@ -102,7 +112,7 @@ export function encodeNativeMesh(module: NativeDracoEncoder, job: DracoJob): Dra
       faces: module.encoder_output_faces(),
     };
   } finally {
-    module.encoder_free(pointer, length);
+    if (owned) module.encoder_free(pointer, length);
     module.encoder_clear();
   }
 }
