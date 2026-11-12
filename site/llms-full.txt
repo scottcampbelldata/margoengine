@@ -10182,6 +10182,21 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
 
 # Known bugs and unverified features
 
+### Fixed 2026-11-11 (tooling sweep L4): comment-driven bundler closure, a wall-clock bound, stale llms files, a bare EPIPE
+
+- **KB-L4-cma:** the affected-package scanner (`scripts/support/affected-gpu.mjs`) counted a path named in a source comment
+  (`packages/dof/src/compat.ts` in taa's `upscale.ts`) as a dependency, so dof and about 80 packages joined the bundler
+  closure. Comments are now blanked first (`scripts/support/strip-comments.mjs`, a tokenizer that keeps strings, templates
+  and regexes). The Python browser suite had been found only through a comment, so its frontend entries are stated.
+  Test: `tests/check-merge-affected.test.js`.
+- **KB-L4-wb:** `tests/gate-step.test.js` asserted `Date.now() - started < 20_000` unmarked. It is a hang guard on a 60 s
+  command, so it carries a `// wall-clock:` reason; the baseline is unchanged. Test: `tests/check-wall-budgets.test.js`.
+- **KB-L4-llms:** `site/llms-full.txt` went stale because READMEs and docs change in every landing and only the full
+  verify read the generated files. `npm run hygiene` (part of the fast gate) now fails on a stale file and prints
+  `node scripts/build-llms.mjs`. Test: `tests/llms.test.js`.
+- **KB-NA1b:** `end()` in `scripts/lib/browser.mjs` wrote to an exited browser host and crashed with a bare `write EPIPE`.
+  It now checks the host first and fails with a coded `HOST_GONE` error. Test: `tests/browser-host.test.js`.
+
 ### Corrected: KB1405, the native sciviz WebGL2 driver drew only part of a figure (2026-11-11, retired)
 
 - **Bug:** `@margoengine/sciviz/webgl2` (`attachWebGL2`) drew surfaces, bars, histograms and heatmaps on the small preview
