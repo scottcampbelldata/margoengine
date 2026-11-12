@@ -673,7 +673,7 @@ Fixed 2026-11-11 (bug sweep L6b): a gate step's time limit counted time queued f
 with ERR_GPU_COMMAND_NOT_GPU and those suites could not take a slot. A GPU word in any part of a test script's name now
 makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a GPU word in a later part of their name").
 
-### Open 2026-11-12: Radeon 680M, environment fog-all `fog.enabled = false` one binary16 step from no fog on the WebGL2 layer (list 5 R6 row 28)
+### Fixed 2026-11-12: Radeon 680M, environment fog-all `fog.enabled = false` one binary16 step from no fog on the WebGL2 layer (list 5 R6 row 28)
 
 - **What:** on the Beelink (Radeon 680M, driver 32.0.21030.2001, Chrome, ANGLE D3D11), `environment`
   `test:gpu:fog-all` under `MARGO_COMPAT=1` finds `fog.enabled = false` differing from no fog in 55 VFX pixels by one
@@ -685,17 +685,37 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   truncated, the rest exact); into RGBA8 (i / 65536), both store 2,573 of 65,536 one below round(x * 255) (the
   truncated half before the UNORM rounding). So this GPU's colour export truncates under both APIs, and the layer
   stores what native stores.
-- **Cause (partly known):** the disabled-fog program and the unfogged program, two shader texts equal in exact
-  arithmetic, give float32 colours one ulp apart on either side of the half 0.24609375 under the layer's GLSL (the
-  driver's compiler rounds them apart; native's two programs agree), and truncation makes that ulp a whole half step.
-  WGSL leaves the direction of an inexact narrowing to the implementation. Not yet known: which operation of the
-  layer's two programs rounds apart.
+- **Cause (below Margo, worked around in webgl2-compat):** ANGLE D3D11 on this GPU folds a float add or multiply that a
+  fragment shader writes straight to a 16-bit float or 8-bit UNORM colour output into the export, and stores the step
+  below at a few texels; the same value after any identity operation the compiler cannot fold away (times a uniform 1,
+  plus a uniform 0, a mix at a uniform 0) stores what native WebGPU stores. The unfogged billboard wrote
+  `colour * texel` (and the plain one the colour) straight to its output; the disabled-fog program passes it through
+  `mix(c, fog, 0)` first, so only the unfogged program folded. Bisected on the fog-all page by rewriting the disabled-fog
+  program's GLSL at shaderSource (hunt worktree `.lane/diag/r28-bisect.mjs`): dropping its mix, or a mix by the
+  literal 0 (which FXC folds), gives 0 differences; its vertex shader's extra world-position output is not involved
+  (still 55 pixels without it); `rgb * (1 - u)` and `rgb + 0 * u` with u a uniform 0 keep the 55; a select on
+  `gl_FragCoord.w > 0` in every particle program gives 0. Raw repro (no Margo code, hunt worktree `.lane/diag/r28raw2.html`,
+  `r28raw3.html`): a 256 x 256 RGBA16F target, one full-screen triangle, a vertex-constant colour times a linear sample
+  of fog-all's 2 x 2 RGBA8 texture: written straight it differs from native WebGPU at 3 to 66 texels for 9 of 12
+  colours, always one half below; `* k`, `+ z` or `mix(x, f, a)` with uniforms k = 1, z = a = 0 equal native at
+  every texel of every colour, on both APIs. `c + d` (d a smooth varying) and `d * d.gbr` fold too, and 8-bit UNORM
+  targets (10 texels); RGBA32F targets, a fused `c * d + e`, a division and a plain sample or varying do not.
+  Identities FXC removes (`+ 0.0`, `* 1.0`, `-(-x)`, a bit cast round trip) keep the fold; a select on a value known
+  only at run time (`gl_FragCoord.w > 0.0 ? x : 0`, `gl_FragCoord.x < -1.0 ? 0 : x`, `max(x, -FLT_MAX)`) removes it.
+- **Fix (`packages/webgl2-compat/src/glsl/emit.ts`):** every float fragment output is written as
+  `_oN = gl_FragCoord.w > 0.0 ? value : 0.0`. For every rasterized fragment w is 1 / clip w, above 0, so the select is
+  the value itself on any GPU, bit for bit (NaN included); integer outputs are written straight. fog-all passes under
+  `MARGO_COMPAT=1` (87 of 87). A startup probe was tried first and dropped: on this GPU which texels fold depends on
+  the context and draw, and the probe found no fold in the adapter's own context while the pages folded.
+  Regressions: `features-browser.mjs` `foldedExports` (the raw repro through the layer, twelve colours: without the
+  select 8 of 12 targets differ from native, with it all equal) and `test/folded-exports.test.js` (the emitted writes).
+  Not covered: the compute fragment tier's own storage-texture writes (`src/compute/glsl.ts`), not probed.
 - **Not a fix:** `3adffdee0` rounded every such export to the nearest binary16 in the shader. fog-all then passed, but
   the layer no longer stored what native stores on the same GPU: `dof` `compat-check.mjs` "a one-sample capture blurs
   the same" read max 1 for 0, and `features-browser.mjs` `halfExport` had the layer store 0x3800 for 0.49999997 where
   native stores 0x37ff. The rounding code (`HALF_ROUND_GLSL`, `roundHalfExports`, the adapter's `halfExportRounding`)
   was removed on 2026-11-12 (API break approved by Scott); the dof check and `halfExport`, now layer equals native
-  exactly, are its regressions. fog-all is red under `MARGO_COMPAT=1` on this machine again, as before `3adffdee0`.
+  exactly, are its regressions.
 
 ### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
 

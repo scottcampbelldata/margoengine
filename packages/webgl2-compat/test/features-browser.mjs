@@ -177,6 +177,10 @@ try {
       for (const kind of ['cube', 'array'])
         for (const [round, want] of [[0, 0, 0, 255], [0, 0, 255, 255]].entries())
           assert.deepEqual(r[`${kind} round ${round} 2/4`], want, `freshClears: ${kind} level 2 layer 4 keeps its round ${round} clear`);
+    if (name === 'foldedExports') {
+      assert.deepEqual(r.counts, Array(12).fill(256 * 256 * 4), 'foldedExports: twelve whole targets read');
+      assert.ok(r.first.every((h) => h > 0 && h < 0x3c01), 'foldedExports: each target holds the products');
+    }
     if (name === 'msaaAspects')
       assert.deepEqual(
         r.map((v, i) => (i % 4 === 1 || i % 4 === 2 ? v : Math.abs(v - 0.5) < 1e-6)),

@@ -2418,8 +2418,15 @@ export class StageEmitter {
       }
       if (io.blendSrc !== undefined) throw unsupported('dual-source blending (@blend_src)');
       declarations.push(`layout(location = ${loc}) out ${this.type(t)} _o${loc};`);
-      outputs.push({ location: loc, ...locationType(t) });
-      sets.push(`_o${loc} = ${code};`);
+      const kind = locationType(t);
+      outputs.push({ location: loc, ...kind });
+      // A float output goes through a select on a value known only at run time, the output itself for every rasterized
+      // fragment (its w is 1 / clip w, above 0): ANGLE D3D11 on the Radeon 680M folds a last add or multiply written
+      // straight to a 16-bit float or 8-bit UNORM output into the export and stores the step below at a few texels, where
+      // native WebGPU stores the value (docs/known-bugs.md, list 5 R6 row 28). The compiler cannot fold the select away.
+      sets.push(
+        kind.kind === 'float' ? `_o${loc} = gl_FragCoord.w > 0.0 ? ${code} : ${this.type(t)}(0.0);` : `_o${loc} = ${code};`,
+      );
     };
     const ret = fn.returnType;
     if (ret.kind === 'void') body.push(`${call};`);
