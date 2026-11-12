@@ -15,6 +15,8 @@ export interface TextureNode {
   type: 'texture';
   texture: MaterialExtensionTexture;
   texCoord?: 0 | 1;
+  /** Read one channel, 0 to 3 for R, G, B or A, as a scalar. Unset reads RGBA as a vec4. */
+  channel?: 0 | 1 | 2 | 3;
 }
 /** Component-wise addition. A scalar input broadcasts to the other input's width. */
 export interface AddNode {

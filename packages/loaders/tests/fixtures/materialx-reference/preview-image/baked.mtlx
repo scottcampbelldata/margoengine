@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <nodegraph name="NG_baked" colorspace="srgb_texture">
+    <image name="diffuseColor" type="color3">
+      <input name="file" type="filename" value="M_UsdPreviewSurface_diffuseColor.png" />
+    </image>
+    <output name="diffuseColor_output" type="color3" nodename="diffuseColor" />
+  </nodegraph>
+  <UsdPreviewSurface name="SR" type="surfaceshader">
+    <input name="diffuseColor" type="color3" output="diffuseColor_output" nodegraph="NG_baked" />
+  </UsdPreviewSurface>
+  <surfacematerial name="M" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR" />
+  </surfacematerial>
+</materialx>

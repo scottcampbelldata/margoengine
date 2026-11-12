@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <nodegraph name="NG">
+    <image name="tex" type="color3">
+      <input name="file" type="filename" value="../ramp.png" colorspace="srgb_texture" />
+    </image>
+    <multiply name="mul" type="color3">
+      <input name="in1" type="color3" nodename="tex" />
+      <input name="in2" type="color3" value="0.5, 0.8, 0.3" />
+    </multiply>
+    <output name="out" type="color3" nodename="mul" />
+  </nodegraph>
+  <standard_surface name="SR" type="surfaceshader">
+    <input name="base" type="float" value="1" />
+    <input name="base_color" type="color3" nodegraph="NG" output="out" />
+  </standard_surface>
+  <surfacematerial name="M" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR" />
+  </surfacematerial>
+</materialx>

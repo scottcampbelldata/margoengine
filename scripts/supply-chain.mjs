@@ -140,6 +140,14 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/loaders/tests/fixtures/materialx-examples/NOTICE.md',
+    'MaterialX example materials for the loaders toGraph test (KB3108): the 26 .mtlx files of resources/Materials/Examples of the MaterialX project at tag v1.39.5 (Academy Software Foundation, Copyright Contributors to the MaterialX Project), https://github.com/AcademySoftwareFoundation/MaterialX/tree/v1.39.5/resources/Materials/Examples, unmodified; Apache-2.0, licence text beside them in LICENSE.txt; Git blob and SHA-256 of each file in NOTICE.md. Standard sample data only, no MaterialX source read or copied; never shipped.',
+  ],
+  [
+    'packages/loaders/tests/fixtures/materialx-reference/NOTICE.md',
+    'MaterialX reference bakes (KB3108): our own test documents and images, each baked to a texture by the MaterialX 1.39.5 baker from PyPI (Academy Software Foundation, Apache-2.0) run as a black box by packages/loaders/tests/oracle/materialx-bake.py; the baked documents and PNGs are MaterialX output on Margo data. Never shipped.',
+  ],
+  [
     'examples/assets/sciviz/stream/source.json',
     'Batch 177 live data: unmodified USGS Earthquake Hazards Program all_day GeoJSON snapshot, US government public domain, credit USGS. Official feed https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson and format https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php. Original generated time, count, SHA-256 and preparation are recorded in source.json and prepare.mjs. Standard data only under the standard-file exception, excluded from package tarballs; no external implementation files copied.',
   ],

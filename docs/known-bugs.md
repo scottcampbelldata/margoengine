@@ -16,6 +16,26 @@
   686df9f96d added to `packages/lighting2d/tests/browser-check.js` waits by count on purpose (core counts device losses per
   120 drawn frames) and had no `// fixed-wait:` reason. It carries one now; no wait changed and the baseline stays 0.
 
+### Fixed 2026-11-11: toGraph was never compared with MaterialX, and a float image mixed by R, G, B and A apart (KB3108)
+
+- **Repro:** `node --test packages/loaders/tests/materialx-reference.test.js` on the old loaders: the `mix` fixture, a
+  float image as the mix factor, was 215 of 255 sRGB codes from MaterialX's own bake of it.
+- **Cause:** no MaterialX output was in the repository to compare with. Once it was, the `mix` case showed that a
+  `float` image became a vec4 texture node, so a mix factor (or a roughness or metal input, which read G and B of a
+  vec4) took each colour channel from a different image channel. MaterialX reads a float image's first channel.
+- **Fix:** a texture node of `@margoengine/materials` takes `channel` (0 to 3), which reads that one component as a
+  scalar, and `toGraph` sets `channel: 0` on every `float` image.
+- **Reference:** eight of our own documents (image in sRGB and linear, multiply, add and subtract, mix by a float image,
+  base weight, `gltf_image` into `gltf_pbr`, `UsdPreviewSurface`) on two generated 16 x 16 images, each baked to a
+  texture by MaterialX 1.39.5's GLSL baker (`packages/loaders/tests/oracle/materialx-bake.py`, which rebuilds the
+  fixtures byte for byte). On the CPU every converted graph matches its bake within 1 sRGB code on every texel; on the
+  GPU the node material draws the source and the bake within 1 of 255 per channel (A6000, native and WebGL2 layer). The
+  26 example materials of MaterialX v1.39.5 all convert, each skipping only named inputs with no node material slot.
+- **Accepted difference:** the bake checks the graph (nodes, colour spaces, operand order), not the lit picture: the
+  light and BSDF on both sides are Margo's, and no MaterialXView render is compared, so no lighting parity is claimed.
+- **Regression:** packages/loaders/tests/materialx-reference.test.js (CPU), packages/loaders/tests/materialx-reference-check.mjs
+  (in loaders `test:gpu`, native and `MARGO_COMPAT=1`), packages/materials/tests/nodes.test.js (texture channel).
+
 ### Fixed 2026-11-11 (tooling sweep L4): comment-driven bundler closure, a wall-clock bound, stale llms files, a bare EPIPE
 
 - **KB-L4-cma:** the affected-package scanner (`scripts/support/affected-gpu.mjs`) counted a path named in a source comment
@@ -3795,19 +3815,6 @@ Each is described with its cause and guard in
 | Audit E-01 (bug 61): partial-view clears drew black at 4x MSAA on Intel Arc 140V (D3D12) because the colour came only from the blend constant | `64034d95` | `tests/clear-draw.test.js` |
 
 ## Loaders
-
-### toGraph of MaterialX is not yet compared with a MaterialX render
-
-- **What:** `@margoengine/loaders/materialx` read one real file, an ambientCG `open_pbr_surface` material kept outside the repository, and its test compiles a graph through `nodeMaterial()`. `@margoengine/usdz/materialx` now reads 19 real `.mtlx` files, their networks match OpenUSD, and the shader defaults were checked against the tables of the Physically Based Shading Nodes document. `parseMaterialX` pins them to the published nodedefs, `standard_surface` 1.0.1 and 1.0.0 included (`packages/loaders/tests/materialx.test.js`). Still no material was rendered and compared with a MaterialX viewer.
-- **Repro:** convert a material from the MaterialX sample library, render it on a sphere and compare with MaterialXView.
-- **Cause:** no reference renderer or sample library in the repository.
-- **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.
-
-Lane G's current-main parser/graph control passes all 26 materialx.test.js
-cases. This does not supply a paired MaterialXView image: no installed viewer
-was found in the external comparison tools. The rendering-validation gap and
-required source/licence/reference artifacts remain open; no renderer parity
-is inferred from graph compilation.
 
 ## Mixer batch 111 acceptance
 

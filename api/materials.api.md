@@ -787,6 +787,7 @@ export interface TextureNode {
     type: 'texture';
     texture: MaterialExtensionTexture;
     texCoord?: 0 | 1;
+    channel?: 0 | 1 | 2 | 3;
 }
 
 export interface TextureOptions {

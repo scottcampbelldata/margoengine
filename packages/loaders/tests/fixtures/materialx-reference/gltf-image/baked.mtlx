@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <nodegraph name="NG_baked" colorspace="srgb_texture">
+    <image name="base_color" type="color3">
+      <input name="file" type="filename" value="M_gltf_pbr_base_color.png" />
+    </image>
+    <output name="base_color_output" type="color3" nodename="base_color" />
+  </nodegraph>
+  <gltf_pbr name="SR" type="surfaceshader">
+    <input name="base_color" type="color3" output="base_color_output" nodegraph="NG_baked" />
+  </gltf_pbr>
+  <surfacematerial name="M" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR" />
+  </surfacematerial>
+</materialx>

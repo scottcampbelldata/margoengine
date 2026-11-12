@@ -220,7 +220,7 @@ The supported nodes are a closed set:
 | --- | --- |
 | `color` | `value: [r, g, b, a]` produces a linear `vec4`. |
 | `scalar` | `value: number` produces an `f32`. |
-| `texture` | `texture: {view, sampler?}` and optional `texCoord: 0 \| 1` produce a sampled `vec4`. |
+| `texture` | `texture: {view, sampler?}` and optional `texCoord: 0 \| 1` produce a sampled `vec4`; `channel: 0 \| 1 \| 2 \| 3` reads only R, G, B or A as an `f32`. |
 | `add`, `mul` | Component-wise arithmetic over `a` and `b`. Scalar inputs broadcast to a vector input. |
 | `mix` | Component-wise interpolation of `a` and `b` by `factor`; the factor is scalar or matches the result's width. |
 | `normalMap` | Decodes `texture` (a vec4 node) in the existing tangent frame, with optional scalar `scale` and `texCoord`. |

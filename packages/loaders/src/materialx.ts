@@ -470,7 +470,10 @@ class Converter {
       texture = Promise.resolve(hook(request));
       this.images.set(id, texture);
     }
-    return { type: 'texture', texture: await texture };
+    // A float image reads the file's first channel, as MaterialX does, so it mixes and weighs as a scalar.
+    return node.type === 'float'
+      ? { type: 'texture', texture: await texture, channel: 0 }
+      : { type: 'texture', texture: await texture };
   }
 
   private async build(node: MaterialXNode, graph: MaterialXNodeGraph | null, slot: string): Promise<ValueNode | null> {

@@ -185,6 +185,20 @@ test('texture nodes bind caller views and optional samplers with UV selection in
   assert.throws(() => nodeMaterial(graph(emit({ type: 'texture', texture: {} }))), /texture|view/i);
 });
 
+test('KB3108: a texture channel reads one component as a scalar that broadcasts in mix', () => {
+  const view = {},
+    red = { type: 'texture', texture: { view }, channel: 0 },
+    mixed = { type: 'mix', a: color([0, 0, 0, 1]), b: color([1, 1, 1, 1]), factor: red };
+  const extension = nodeMaterial(graph(emit(mixed)));
+  // One component, so the factor is an f32 and mixes every channel by R (a vec4 factor would mix R, G, B, A apart).
+  assert.match(source(extension), /textureLoad\([^;]*\)\.r;/);
+  assert.equal(nodeMaterial(graph(emit({ ...mixed, factor: { ...red, channel: 3 } }))).wgsl.includes(').a;'), true);
+  // As a scalar it cannot be the emit colour on its own, and only 0 to 3 are channels.
+  assert.throws(() => nodeMaterial(graph(emit(red))), /vec4|emit|type/i);
+  for (const channel of [-1, 4, 0.5, '0'])
+    assert.throws(() => nodeMaterial(graph(emit({ ...mixed, factor: { ...red, channel } }))), /channel/i);
+});
+
 test('normalMap and metalRough reuse the existing surface normal and PBR channels', () => {
   const map = { type: 'texture', texture: { view: {} }, texCoord: 1 };
   const extension = nodeMaterial(

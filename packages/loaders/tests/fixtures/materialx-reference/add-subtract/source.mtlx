@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <nodegraph name="NG">
+    <image name="a" type="color3">
+      <input name="file" type="filename" value="../ramp.png" colorspace="srgb_texture" />
+    </image>
+    <image name="b" type="color3">
+      <input name="file" type="filename" value="../checker.png" colorspace="srgb_texture" />
+    </image>
+    <multiply name="dim" type="color3">
+      <input name="in1" type="color3" nodename="a" />
+      <input name="in2" type="float" value="0.8" />
+    </multiply>
+    <add name="sum" type="color3">
+      <input name="in1" type="color3" nodename="dim" />
+      <input name="in2" type="color3" value="0.1, 0.1, 0.1" />
+    </add>
+    <multiply name="faint" type="color3">
+      <input name="in1" type="color3" nodename="b" />
+      <input name="in2" type="float" value="0.1" />
+    </multiply>
+    <subtract name="diff" type="color3">
+      <input name="in1" type="color3" nodename="sum" />
+      <input name="in2" type="color3" nodename="faint" />
+    </subtract>
+    <output name="out" type="color3" nodename="diff" />
+  </nodegraph>
+  <standard_surface name="SR" type="surfaceshader">
+    <input name="base" type="float" value="1" />
+    <input name="base_color" type="color3" nodegraph="NG" output="out" />
+  </standard_surface>
+  <surfacematerial name="M" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR" />
+  </surfacematerial>
+</materialx>

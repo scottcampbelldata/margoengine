@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <nodegraph name="NG">
+    <image name="tex" type="color3">
+      <input name="file" type="filename" value="../ramp.png" colorspace="srgb_texture" />
+    </image>
+    <output name="out" type="color3" nodename="tex" />
+  </nodegraph>
+  <UsdPreviewSurface name="SR" type="surfaceshader">
+    <input name="diffuseColor" type="color3" nodegraph="NG" output="out" />
+  </UsdPreviewSurface>
+  <surfacematerial name="M" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR" />
+  </surfacematerial>
+</materialx>

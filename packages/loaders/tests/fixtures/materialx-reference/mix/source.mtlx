@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <nodegraph name="NG">
+    <image name="a" type="color3">
+      <input name="file" type="filename" value="../ramp.png" colorspace="srgb_texture" />
+    </image>
+    <image name="b" type="color3">
+      <input name="file" type="filename" value="../checker.png" colorspace="srgb_texture" />
+    </image>
+    <image name="m" type="float">
+      <input name="file" type="filename" value="../ramp.png" />
+    </image>
+    <mix name="blend" type="color3">
+      <input name="fg" type="color3" nodename="a" />
+      <input name="bg" type="color3" nodename="b" />
+      <input name="mix" type="float" nodename="m" />
+    </mix>
+    <output name="out" type="color3" nodename="blend" />
+  </nodegraph>
+  <standard_surface name="SR" type="surfaceshader">
+    <input name="base" type="float" value="1" />
+    <input name="base_color" type="color3" nodegraph="NG" output="out" />
+  </standard_surface>
+  <surfacematerial name="M" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR" />
+  </surfacematerial>
+</materialx>

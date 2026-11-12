@@ -20,7 +20,7 @@ interface Value {
 const fields: Record<string, readonly string[]> = {
   color: ['value'],
   scalar: ['value'],
-  texture: ['texture', 'texCoord'],
+  texture: ['texture', 'texCoord', 'channel'],
   add: ['a', 'b'],
   mul: ['a', 'b'],
   mix: ['a', 'b', 'factor'],
@@ -144,7 +144,9 @@ function compile(
         keys(node.texture, ['view', 'sampler'], 'texture');
         if (!node.texture.view || (node.texture.sampler !== undefined && !node.texture.sampler))
           throw new TypeError('Node texture requires a view and optional sampler');
-        value.kind = 4;
+        if (node.channel !== undefined && ![0, 1, 2, 3].includes(node.channel))
+          throw new TypeError('Invalid texture channel; pass 0 to 3 (R, G, B or A) or leave it unset for RGBA.');
+        value.kind = node.channel === undefined ? 4 : 1;
         value.coord = uv(node.texCoord);
         break;
       case 'add':
@@ -309,7 +311,7 @@ function compile(
           const image = `materialTexture${index}`,
             coords = `uv(i,${value.coord}.0)`,
             size = `vec2f(textureDimensions(${image},0))`;
-          statements += `let ${value.name}=${node.texture.sampler ? `textureSample(${image},materialSampler${index},${coords})` : `textureLoad(${image},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`};\n`;
+          statements += `let ${value.name}=${node.texture.sampler ? `textureSample(${image},materialSampler${index},${coords})` : `textureLoad(${image},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`}${node.channel === undefined ? '' : '.' + 'rgba'[node.channel]};\n`;
           break;
         }
         case 'add':
