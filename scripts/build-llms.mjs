@@ -169,6 +169,16 @@ export function stale(dir = root) {
     .map(([path]) => path);
 }
 
+/**
+ * Throws when a committed llms file is stale, naming the command that fixes it. `npm run hygiene` calls it, so the fast
+ * gate catches a README, api/ or docs/ change that landed without a regenerate (KB-L4-llms: llms-full.txt went stale on
+ * main because only the full verify read it).
+ */
+export function assertLlmsCurrent(dir = root, check = stale) {
+  const paths = check(dir);
+  if (paths.length) throw new Error(`${paths.join(' and ')} stale: run node scripts/build-llms.mjs and commit the result`);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.includes('--check')) {
     const paths = stale();

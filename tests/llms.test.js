@@ -6,6 +6,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import {
   README_CAP,
+  assertLlmsCurrent,
   generate,
   renderLlmsFull,
   renderLlmsTxt,
@@ -147,4 +148,10 @@ test('the check notices a README or API change, and a missing file', () => {
 test('summaryOf takes the first prose paragraph after the title', () => {
   assert.equal(summaryOf('# T\n\n```sh\nnpm i\n```\n\nFirst line\nsecond line.\n\nNext.'), 'First line second line.');
   assert.equal(summaryOf('# T\n\n| a | b |\n\n- list\n\nProse.'), 'Prose.');
+});
+
+test('hygiene fails on a stale llms file and names the command that regenerates it (KB-L4-llms)', () => {
+  assert.throws(() => assertLlmsCurrent('.', () => ['site/llms-full.txt']), /site\/llms-full\.txt stale: run node scripts\/build-llms\.mjs/);
+  assert.doesNotThrow(() => assertLlmsCurrent('.', () => []));
+  assert.match(readFileSync(new URL('../scripts/hygiene.js', import.meta.url), 'utf8'), /^assertLlmsCurrent\(root\);$/m);
 });

@@ -34,6 +34,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { assertLlmsCurrent } from './build-llms.mjs';
 import { assertErrorPageCurrent } from './errors/check.mjs';
 import { entries as errorHelp } from './errors/entries.js';
 import { plan as gpuPlan } from './gpu-package-tests.mjs';
@@ -60,6 +61,8 @@ assertWasmBlueprintsCurrent(root);
 // because the fast gate runs hygiene on every push while a lane runs only its own package tests; an unlisted sciviz
 // message once reached main that way (KB-ERR1).
 assertErrorPageCurrent(root);
+// site/llms.txt and site/llms-full.txt are generated from READMEs, api/ and docs/: a change to those must regenerate them.
+assertLlmsCurrent(root);
 // Every shipped value-returning WGSL function ends in a return on every path, as Firefox requires (KB-FF1b).
 assertWgslReturns(root);
 // Every browser test file must have a script check:gpu-packages runs; its plan throws otherwise. Checked here because
