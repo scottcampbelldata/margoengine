@@ -33,6 +33,11 @@ export interface DrawFrame {
   hooks: GLTFExtendedMaterials | undefined;
   /** The model's lighting effects in order. */
   lighting: readonly LightingEffect[];
+  /**
+   * True when a native glass capture lends this target its per-surface snapshot (materials native-glass.js). Part of
+   * the context: a derivation made before the capture began (blendSpace 'linear' first seen) is not reused once it has.
+   */
+  glass: boolean;
 }
 
 /** A derivation, valid for draws under `frame` (identity: the same call or run); see the file comment. */
@@ -210,6 +215,7 @@ export function sameFrame(a: DrawFrame, b: DrawFrame): boolean {
     a.oit !== b.oit ||
     a.hook !== b.hook ||
     a.hooks !== b.hooks ||
+    a.glass !== b.glass ||
     a.lighting.length !== b.lighting.length
   )
     return false;

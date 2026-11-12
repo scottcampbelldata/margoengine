@@ -114,3 +114,76 @@ test('constructed meshes map forward-Z polygon offset values to reverse-Z and pr
     h.cleanup();
   }
 });
+
+// KB3148b: blendSpace is opt-in render state; the gltf-pro record carries it only when linear.
+test('Material blendSpace defaults to display, validates, and reaches the PBR render state when linear', async () => {
+  const { linearBlendShader } = await import('../src/native-glass.js');
+  const m = new Material({ transparent: true });
+  assert.equal(m.blendSpace, 'display');
+  assert.equal(m.customState, false);
+  assert.throws(() => new Material({ blendSpace: 'srgb' }), /blendSpace is invalid; set 'display' or 'linear'/);
+  assert.throws(() => (m.blendSpace = 'Linear'), /blendSpace is invalid/);
+  m.blendSpace = 'linear';
+  assert.equal(m.customState, true);
+  assert.equal(new Material({ blendSpace: 'linear' }).blendSpace, 'linear');
+  assert.equal(m.clone().blendSpace, 'linear');
+  m.blendSpace = 'display';
+  assert.equal(m.customState, false);
+  // The main fragment entry becomes a plain function wrapped by a new entry, so every return is mixed in linear light,
+  // an unlit material's early return included (the GPU run drew it unblended at 188 of 255 before); other entries keep
+  // theirs, and a shader without the entry is refused, not drawn wrong.
+  const code =
+    '@fragment fn gbuffer(i:Out)->@location(0) vec4f {return vec4f(color,1.0);}\n' +
+    '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {\n' +
+    '  let alpha=0.5;\n  if(f.coordsB.w<0.5){return vec4f(vec3f(0.5),alpha);}\n' +
+    '  var color=vec3f(1);\n  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));\n}';
+  const out = linearBlendShader(code);
+  assert.ok(out.startsWith('@fragment fn gbuffer(i:Out)->@location(0) vec4f {return vec4f(color,1.0);}'));
+  assert.ok(
+    out.includes(
+      'fn margoBlendSurface(i:Out,front:bool)->vec4f {\n  let alpha=0.5;\n  if(f.coordsB.w<0.5){return vec4f(vec3f(0.5),alpha);}',
+    ),
+  );
+  assert.equal(out.match(/@fragment fn fragment\(/g).length, 1);
+  assert.ok(
+    out.includes(
+      '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {\n' +
+        '  let margoBlendSrc=margoBlendSurface(i,front);let margoBlendA=clamp(margoBlendSrc.a,0.0,1.0);',
+    ),
+  );
+  assert.match(out, /margoGlassLinear\(margoBlendDst\.rgb\)\*\(1\.0-margoBlendA\)/);
+  assert.ok(out.includes('textureLoad(margoGlassScene,vec2i(i.clip.xy),0)'));
+  assert.match(out, /var margoGlassScene:texture_2d<f32>;/);
+  assert.throws(() => linearBlendShader(code + '\n' + code), /exactly one/);
+  assert.throws(() => linearBlendShader('@fragment fn other()->@location(0) vec4f {return vec4f(1);}'), /blendSpace 'linear'/);
+});
+
+test('a linear blendSpace material gives the PBR record blendSpace linear and nothing else changes', async () => {
+  const h = optionalGPU(),
+    engine = new Engine(
+      { width: 64, height: 64 },
+      await TransformStore.create(32),
+      { backend: 'webgpu', gpu: h.engine.gpu, add() {}, remove() {}, render() {}, dispose() {} },
+      { position: [0, 0, 4], target: [0, 0, 0] },
+      null,
+    );
+  try {
+    const material = new Material({ transparent: true, opacity: 0.5 });
+    const model = createMesh(
+      engine,
+      { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1] },
+      material,
+    );
+    assert.equal(model.primitives[0].material.renderState, undefined);
+    material.blendSpace = 'linear';
+    const state = model.primitives[0].material.renderState;
+    assert.equal(state.blendSpace, 'linear');
+    assert.equal(state.blend, undefined);
+    material.blendSpace = 'display';
+    assert.equal(model.primitives[0].material.renderState, undefined);
+    model.dispose();
+  } finally {
+    engine.dispose();
+    h.cleanup();
+  }
+});

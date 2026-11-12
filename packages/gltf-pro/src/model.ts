@@ -2,6 +2,7 @@ import { packBaseTextures, type BaseTextureSource, type PackedBaseTextures } fro
 import {
   acquireNativeGlass,
   externalNativeGlass,
+  linearBlendShader,
   nativeGlass,
   nativeGlassShader,
 } from '../../materials/src/native-glass.js';
@@ -310,6 +311,9 @@ const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.rende
     return kind;
   },
   transmits = (m: PBRMaterial) => nativeGlassMaterial(m),
+  /** KB3148b: a plain blended material that asked for linear-light blending (`renderState.blendSpace: 'linear'`). */
+  linearBlends = (m: PBRMaterial) =>
+    m.settings[0] === 2 && !m.tint && m.renderState?.blend === undefined && m.renderState?.blendSpace === 'linear',
   /** A loaded material's tint draw reads the surface; a shading hook's material has its own tint. */
   surfaceTint = (m: PBRMaterial) => !!m.attenuation && !m.shading;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
@@ -780,6 +784,7 @@ function batchable(d: DrawDerivation, r: DrawResource, det: number): boolean {
     !r.batch &&
     !r.mergedInto &&
     !d.tinted &&
+    !d.nativeGlass &&
     d.extension === undefined &&
     det !== 0 &&
     Number.isFinite(det) &&
@@ -855,6 +860,7 @@ function drawFrame(
     last.oit === oit &&
     last.hook === hook &&
     last.hooks === (hooks || undefined) &&
+    last.glass === !!nativeGlass(c) &&
     last.samples === c.descriptor.multisample?.count &&
     last.depthFormat === c.descriptor.depthStencil!.format
   )
@@ -880,7 +886,8 @@ function matchFrame(
 ): DrawFrame {
   const samples = c.descriptor.multisample?.count,
     depthFormat = c.descriptor.depthStencil!.format,
-    extended = hooks || undefined;
+    extended = hooks || undefined,
+    glass = !!nativeGlass(c);
   if (run)
     for (let i = 0; i < run.frames.length; i++) {
       const frame = run.frames[i];
@@ -894,6 +901,7 @@ function matchFrame(
         frame.oit === oit &&
         frame.hook === hook &&
         frame.hooks === extended &&
+        frame.glass === glass &&
         sameLighting(frame.lighting, lighting)
       )
         return frame;
@@ -909,6 +917,7 @@ function matchFrame(
     hook,
     hooks: extended,
     lighting,
+    glass,
   };
   if (run && run.frames.length < 16) run.frames.push(frame);
   return frame;
@@ -1178,6 +1187,15 @@ export interface PBRRenderState {
   colorWrite?: boolean;
   /** MASK materials on a multisampled target cut by sample coverage instead of a per-pixel test; elsewhere no effect. */
   alphaToCoverage?: boolean;
+  /**
+   * Where a BLEND material (without `blend` set here and without transmission) mixes with what is behind it on a
+   * display-encoded target (rgba8unorm, bgra8unorm): 'display' (default) blends the encoded values in the fixed-function
+   * blender, as most WebGL engines do; 'linear' mixes in linear light, so 50% red (linear 0.5) over black
+   * reads sRGB(0.25) = 137 instead of 94. Linear costs a pass break and a full-target copy before each such surface,
+   * and its instances do not blend over one another (one snapshot per draw). On a linear HDR target (rgba16float)
+   * both are the same. The transparency hook (OIT) does not read this option.
+   */
+  blendSpace?: 'display' | 'linear';
 }
 export { validatePreparedGeometry };
 function preparedPrimitive(
@@ -2183,6 +2201,8 @@ function outsideView(planes: Float32Array | undefined, p: PBRPrimitive): boolean
  */
 export class PBRModel implements EnginePlugin {
   private releaseNativeGlass?: () => void;
+  /** True while an acquisition asked for during a frame waits for the frame to end (`wantGlass`). */
+  private glassQueued = false;
   /** Optional scene-wide opaque phase, used by caller-owned color captures. */
   static beginOpaquePass(context: Context): void {
     opaquePasses.set(context, new Set());
@@ -3233,14 +3253,40 @@ export class PBRModel implements EnginePlugin {
     // The capture's non-model passes run outside the model order. Register them after joining this model so merely
     // owning native glass does not split an existing HDR model run or introduce extra MSAA stores/loads.
     // The capture is WebGPU-only and refuses other engines; a headless or preview engine draws no native glass.
-    if (!this.releaseNativeGlass && this.engine.gpu && this.materials.some((m) => m.tint || m.attenuation))
-      this.releaseNativeGlass = acquireNativeGlass(
-        this.engine,
-        () =>
-          !this.transmission &&
-          this.primitives.some((p) => transmits(p.material) && !this.takesTransparent(p.material)),
-      );
+    if (
+      !this.releaseNativeGlass &&
+      this.engine.gpu &&
+      this.materials.some((m) => m.tint || m.attenuation || linearBlends(m))
+    )
+      this.releaseNativeGlass = acquireNativeGlass(this.engine, () => this.glassActive());
     models.revision = graph.revision;
+  }
+  /** Whether a primitive draws as native glass or as a linear-light blend (both read the capture's snapshot). */
+  private glassActive(): boolean {
+    return this.primitives.some(
+      (p) =>
+        !this.takesTransparent(p.material) &&
+        ((!this.transmission && transmits(p.material)) || linearBlends(p.material)),
+    );
+  }
+  /**
+   * KB3148b: a draw found a linear-blend material and no capture (the option was set after the model joined the frame
+   * graph, or the model draws for the materials queue). Plugins cannot join a frame graph while it runs, so the capture
+   * is acquired once this frame ends, in the scene that drew; the surface blends in linear light from the next frame.
+   */
+  private wantGlass(): void {
+    if (this.releaseNativeGlass || this.glassQueued || !this.engine.gpu) return;
+    this.glassQueued = true;
+    const graph = this.engine.frameGraph;
+    queueMicrotask(() => {
+      this.glassQueued = false;
+      if (this.disposed || this.releaseNativeGlass) return;
+      for (const scene of this.engine.scenes)
+        if (scene.frameGraph === graph) {
+          this.releaseNativeGlass = acquireNativeGlass(this.engine, () => this.glassActive(), scene);
+          return;
+        }
+    });
   }
   /**
    * Models whose passes follow one another in the frame graph draw as one run (one render pass, shared batches), in
@@ -4985,6 +5031,8 @@ export class PBRModel implements EnginePlugin {
       out.group = undefined;
       out.blend = m.settings[0] === 2 || transmit;
       out.tinted = transmit && state?.blend === undefined;
+      // A linear-blend surface reads the snapshot of what drew before it, so it never joins an instanced batch.
+      out.nativeGlass = mode === 'beauty' && !linearHdr(c.format) && linearBlends(m) && !!nativeGlass(c);
       out.state = state;
       if (out.block?.length !== v.length) out.block = new Float32Array(v.length);
       out.block.set(v);
@@ -5033,13 +5081,13 @@ export class PBRModel implements EnginePlugin {
     if (m.shading?.texturedTint) code = texturedTintPBR(code);
     else if (!compact && transmits(m) && surfaceTint(m)) code = surfaceTintPBR(code);
     if (through && !transmission && this.transparency!.blends && m.tint) code = transparentTintPBR(code);
-    const native =
-      mode === 'beauty' &&
-      !linearHdr(c.format) &&
-      transmits(m) &&
-      m.renderState?.blend === undefined &&
-      !!nativeGlass(c);
-    if (native) code = nativeGlassShader(code);
+    const display = mode === 'beauty' && !linearHdr(c.format),
+      glassTarget = display && !!nativeGlass(c),
+      linearBlend = display && linearBlends(m),
+      native = glassTarget && ((transmits(m) && m.renderState?.blend === undefined) || linearBlend);
+    // A caller-owned pass blends linearly only when it lends a snapshot hook (PBRDeviceRenderer.draw `snapshot`).
+    if (linearBlend && !glassTarget && !external) this.wantGlass();
+    if (native) code = linearBlend ? linearBlendShader(code) : nativeGlassShader(code);
     if (mode === 'occlusion') {
       const rewritten = occlusionShader(code);
       // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.

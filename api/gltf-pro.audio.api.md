@@ -202,6 +202,7 @@ interface DrawFrame {
     hook: object | undefined;
     hooks: GLTFExtendedMaterials | undefined;
     lighting: readonly LightingEffect[];
+    glass: boolean;
 }
 
 type DrawGroups = GPUBindGroup[] & {
@@ -1106,6 +1107,7 @@ interface PBRRenderState {
     stencilReference?: number;
     colorWrite?: boolean;
     alphaToCoverage?: boolean;
+    blendSpace?: 'display' | 'linear';
 }
 
 interface PBRTransmission {

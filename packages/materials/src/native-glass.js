@@ -144,12 +144,13 @@ class NativeGlass {
     if (scene) this.engine.removePlugin(this.name, scene);
   }
 }
-export function acquireNativeGlass(engine, active) {
-  const graph = engine.frameGraph;
+export function acquireNativeGlass(engine, active, scene) {
+  const graph = (scene ?? engine).frameGraph;
   let capture = captures.get(graph);
   if (!capture) {
     capture = new NativeGlass(engine);
-    engine.use(capture);
+    if (scene) engine.use(capture, scene);
+    else engine.use(capture);
     captures.set(graph, capture);
   }
   capture.users.add(active);
@@ -239,5 +240,34 @@ export function nativeGlassShader(code) {
 @group(2) @binding(${binding}) var margoGlassScene:texture_2d<f32>;
 fn margoGlassLinear(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
 fn margoGlassEncode(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}`
+  );
+}
+
+// KB3148b: a plain alpha-blended surface with `blendSpace: 'linear'` on a display-encoded target composites in linear
+// light. It reads the light behind it from the native glass capture's per-surface snapshot, mixes in linear values and
+// writes the encoded result with blending off. The main `fragment` entry becomes a plain function and a new entry wraps
+// it, so every return (an unlit material returns early) is mixed; the other entries keep theirs.
+const fragmentHead = /@fragment fn fragment\(((?:[^()]|\([^()]*\))*)\)->@location\(0\) vec4f \{/;
+export function linearBlendShader(code) {
+  const head = fragmentHead.exec(code);
+  if (!head || fragmentHead.test(code.slice(head.index + head[0].length)))
+    throw new TypeError(
+      "blendSpace 'linear' needs exactly one PBR fragment entry returning vec4f; this material's shader has none, so use blendSpace 'display' with it",
+    );
+  const params = head[1].split(',').map((p) => p.replace(/@builtin\([^)]*\)\s*/, '').trim()),
+    args = params.map((p) => p.slice(0, p.indexOf(':')).trim()).join(',');
+  return (
+    code.slice(0, head.index) +
+    `fn margoBlendSurface(${params.join(',')})->vec4f {` +
+    code.slice(head.index + head[0].length) +
+    `
+@group(2) @binding(${binding}) var margoGlassScene:texture_2d<f32>;
+fn margoGlassLinear(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
+fn margoGlassEncode(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
+${head[0]}
+  let margoBlendSrc=margoBlendSurface(${args});let margoBlendA=clamp(margoBlendSrc.a,0.0,1.0);
+  let margoBlendDst=textureLoad(margoGlassScene,vec2i(${args.split(',')[0]}.clip.xy),0);
+  return vec4f(margoGlassEncode(margoGlassLinear(margoBlendSrc.rgb)*margoBlendA+margoGlassLinear(margoBlendDst.rgb)*(1.0-margoBlendA)),margoBlendA+margoBlendDst.a*(1.0-margoBlendA));
+}`
   );
 }

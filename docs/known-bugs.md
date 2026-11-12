@@ -3673,19 +3673,24 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   weighted default measures MAE 1.567519 again. Pinned by
   `packages/oit/test/gpu/reference-check.mjs` (exact routes below MAE 0.133 and max 4; weighted within 25% of 1.568,
   background exact); docs/limits.md (Transparency row) and docs/whitepaper/perf-vs-rivals.md carry the row.
-- **Transparent material colour is blended in the display domain** (`packages/materials/src/built-material.ts`,
-  `packages/oit/src/index.ts`): the material encodes each source before the transparency hook. For a single
-  50%-coverage basic red with linear source 0.5 over black, the pipeline computes 0.5*sRGB(0.5) rather than
-  sRGB(0.25). Sorted and OIT drawing share this cause. The initial graded-colour batch 168 probe exposed
-  nonzero single-layer error; it is not attributed to weighted depth approximation. Binary source channels in
-  the published comparison bypass this confound without changing geometry or drawing less work. A linear
-  composition/output contract across the owning optional packages is still needed; this remains open.
-
-  Lane G current-main controls (2026-11-10): the complete five-pane weighted
-  picture still has MAE 1.5675188078703703 and max 15 on both backends. The
-  graded single-layer probe reads red 94 sorted and 93 weighted, against 137
-  for linear-light composition; opaque control is 188. Same-frame GPU buffer
-  copies retain the canvas before presentation expiry. Neither cause is closed.
+- **Fixed 2026-11-11 for the sorted path, opt-in (KB3148b): transparent material colour blended in the display domain**
+  (`packages/materials/src/built-material.ts`, `packages/gltf-pro/src/model.ts`,
+  `packages/materials/src/native-glass.js`).
+  - **Was:** a 'normal'-blended material on a display-encoded canvas (rgba8unorm, bgra8unorm) encoded its colour and
+    then blended in the fixed-function blender, so 50% red (linear 0.5) over black read 0.5 * sRGB(0.5) = 94 of 255,
+    not sRGB(0.25) = 137 (Lane G probe: 94 sorted, 93 weighted, 137 linear).
+  - **Now:** `Material.blendSpace = 'linear'` (materials) or `renderState.blendSpace: 'linear'` (gltf-pro) mixes in
+    linear light: the draw reads the light behind it from the native glass capture's snapshot, mixes
+    a * lin(src) + (1 - a) * lin(dst) and writes the encoded sum with blending off. The default stays 'display', the
+    blend three.js and most WebGL engines use, so existing pictures do not move. Measured on the RTX A6000, native
+    WebGPU and the WebGL2 layer, 1x and 4x: one layer 137 (display 94), two layers 165 (display 141).
+  - **Cost:** a pass break and a full-target copy before each linear surface (the native glass cost); its instances
+    do not blend over each other and it never joins an instanced batch. The option takes effect from the frame after a
+    model first draws it (the capture joins the frame graph between frames).
+  - **Still open (KB3148d):** an OIT pass does not take a linear material: its `renderState` keeps it on the sorted path
+    (blended in linear light, not order-independent), and the OIT passes would average encoded colours if it did.
+  - Regression: `packages/materials/test/native-glass-browser.mjs` (`linearBlend`: materials and glTF, set before the
+    first frame and after it), `packages/materials/test/render-state.test.js`.
 
 
 - **Accepted 2026-11-11 (KB3148c): default Preetham angular radiance differs from Mitsuba sunsky** (`@margoengine/sky`,

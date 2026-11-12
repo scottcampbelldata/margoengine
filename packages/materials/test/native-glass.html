@@ -26,6 +26,43 @@ window.nativeGlass=async()=>{
  }
  return rows;
 };
+// KB3148b: a 50% red surface (linear 0.5) over black, one or two layers, blendSpace display or linear, set before
+// the first frame or after it (late: the first frame drew without the capture, so its derivation must not be reused).
+// gltf: the same through parseGLTF with renderState {blendSpace:'linear'} on the primitive's material.
+window.linearBlend=async()=>{
+ const {UnlitMaterial,createMesh}=await import('/packages/materials/dist/index.js');
+ const quad=(z)=>({positions:[-1,-1,z,1,-1,z,1,1,z,-1,1,z],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+ const rows=[];
+ const cases=[[1,'display'],[1,'linear'],[1,'linear',true],[2,'linear'],[2,'display'],[2,'linear',true],[1,'linear',false,true],[1,'linear',true,true]];
+ for(const samples of [1,4]) for(const [layers,space,late,gltf] of cases){
+  const canvas=document.body.appendChild(document.createElement('canvas'));
+  const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
+  try{
+   engine.scene.background='#000000';engine.lighting.radiance.fill(0);
+   let set;
+   if(gltf){
+    const input=instancedGLTF(Array.from({length:layers},(_,i)=>({t:[0,0,-i*0.1]})),{instanced:false,material:{
+     alphaMode:'BLEND',pbrMetallicRoughness:{baseColorFactor:[0.5,0,0,0.5],metallicFactor:0,roughnessFactor:1},extensions:{KHR_materials_unlit:{}},
+    }});
+    input.doc.extensionsUsed=['KHR_materials_unlit'];
+    const model=parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
+    set=(v)=>{for(const p of model.primitives)p.material.renderState={blendSpace:v};};
+   }else{
+    const material=new UnlitMaterial({color:[0.5,0,0],opacity:0.5,transparent:true});
+    for(let i=0;i<layers;i++)createMesh(engine,quad(-i*0.1),material);
+    set=(v)=>{material.blendSpace=v;};
+   }
+   if(!late)set(space);
+   const frame=async()=>{engine.render({culling:false,samples});await engine.gpu.queue.onSubmittedWorkDone();};
+   await waitForPipelines(frame);
+   let before;
+   if(late){before=canvas.toDataURL('image/png');set(space);}
+   await waitForPipelines(frame);await frame();
+   rows.push({samples,layers,space,late:!!late,gltf:!!gltf,png:canvas.toDataURL('image/png'),before});
+  }finally{engine.dispose();canvas.remove();}
+ }
+ return rows;
+};
 // KB2281: the same glass through createRenderer into a caller-owned, already-open pass on an rgba8unorm target.
 // background: the grey drawn first; hook: whether draw gets the snapshot hook. Returns the centre texel.
 window.externalGlass=async()=>{

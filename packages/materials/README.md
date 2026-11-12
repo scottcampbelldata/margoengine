@@ -311,8 +311,27 @@ paint.dispose();
 - `color`, `emissive` and `specular` are the live linear arrays meshes read (element writes work); `set(input)` and
   assignment take `'#rrggbb'`, `'#rgb'`, `0xrrggbb` (sRGB) or linear `[r, g, b]` (keeps opacity) / `[r, g, b, a]`.
   Every colour option, including the physical ones, takes numbers.
-- Render state is live: `blending`, `depthWrite`, `depthTest`, `colorWrite`, `polygonOffset*`, the stencil options and
-  `wireframe`. Returning to the defaults reuses the original pipeline; a `stencilRef` change alone keeps its pipeline.
+- Render state is live: `blending`, `blendSpace`, `depthWrite`, `depthTest`, `colorWrite`, `polygonOffset*`, the
+  stencil options and `wireframe`. Returning to the defaults reuses the original pipeline; a `stencilRef` change alone
+  keeps its pipeline.
+- `blendSpace` (default `'display'`) sets where a transparent material mixes with what is behind it on a
+  display-encoded canvas. `'display'` blends the stored sRGB values, as most WebGL engines do: 50% red over black reads 94 of
+  255. `'linear'` mixes in linear light and reads 137, the physically right value, at the cost of a pass break and a
+  full-target copy before each such mesh (the native glass snapshot); its instances do not blend over one another. It
+  takes effect from the frame after a mesh first draws with it. On an HDR target (Bloom, tonemapping) every blend is
+  linear already. A model added to an OIT pass keeps such a mesh on the sorted path, blended in linear
+  light but not order-independent (docs/known-bugs.md, KB3148d).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {UnlitMaterial, createMesh} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const smoke = new UnlitMaterial({color: [0.5, 0, 0], opacity: 0.5, transparent: true, blendSpace: 'linear'});
+createMesh(engine, boxGeometry(1, 1, 1), smoke);
+smoke.blendSpace = 'display'; // live: back to the default blend next frame
+```
 - `clone()` makes an independent material of the same class sharing only textures; `copy(source)` writes a
   same-shading source's values into this one in place; `dispose()` frees what no live mesh uses, after which
   `createMesh` and `mesh.material =` refuse it (MargoError `disposed`). Textures stay the caller's.

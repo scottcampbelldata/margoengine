@@ -1218,6 +1218,8 @@ export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'di
 export type DepthPacking = 'basic' | 'rgba';
 /** How a material combines with what is behind it: `'normal'` (default), `'additive'`, `'multiply'` or `'none'` (opaque write). */
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
+/** Where a transparent material mixes with what is behind it on a display-encoded target (`Material.blendSpace`). */
+export type BlendSpace = 'display' | 'linear';
 /** A live linear colour array (what gltf-pro reads every frame) whose `set` takes any colour input, like the option. */
 type LiveColor = number[] & { set(value: ColorInput): number[] };
 /**
@@ -1432,6 +1434,12 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Draws triangle edges instead of filled surfaces; defaults to false. Live, like all render state below. */
   wireframe?: boolean;
   blending?: Blending;
+  /**
+   * Where a transparent material mixes with what is behind it on a display-encoded canvas: 'display' (default, the
+   * common WebGL blend) or 'linear' (linear light: 50% red over black reads sRGB(0.25), not half of sRGB(0.5)).
+   * Linear costs a pass break and a full-target copy before each such mesh. Live.
+   */
+  blendSpace?: BlendSpace;
   depthWrite?: boolean;
   depthTest?: boolean;
   colorWrite?: boolean;
@@ -1552,6 +1560,7 @@ const finiteFloat = (v: unknown, label: string, min = -Infinity): number => {
 /** Render state, live: each change selects the matching beauty pipeline on the next draw. */
 interface Raster {
   blending: Blending;
+  blendSpace: BlendSpace;
   depthWrite: boolean | undefined;
   depthTest: boolean;
   colorWrite: boolean;
@@ -1572,6 +1581,7 @@ interface Raster {
 }
 const rasterDefaults: Raster = {
   blending: 'normal',
+  blendSpace: 'display',
   depthWrite: undefined,
   depthTest: true,
   colorWrite: true,
@@ -1600,6 +1610,7 @@ const oneOf = (list: readonly string[], kind: string) => (v: unknown, label: str
 };
 const rasterChecks: Record<keyof Raster, (v: never, label: string) => unknown> = {
   blending: oneOf(['normal', 'additive', 'multiply', 'none'], "'normal', 'additive', 'multiply' or 'none'"),
+  blendSpace: oneOf(['display', 'linear'], "'display' or 'linear'"),
   depthWrite: (v, label) => (v === undefined ? v : flag(v, label)),
   depthTest: flag,
   colorWrite: flag,
@@ -2832,6 +2843,17 @@ export class Material {
   set blending(v: Blending) {
     this.setRaster('blending', v);
   }
+  /**
+   * Where a transparent ('normal' blending) material mixes with what is behind it on a display-encoded canvas
+   * (default 'display'). 'linear' mixes in linear light, at the cost of a pass break and a full-target copy per mesh;
+   * an HDR target (Bloom, tonemapping) is linear either way.
+   */
+  get blendSpace(): BlendSpace {
+    return this.raster.blendSpace;
+  }
+  set blendSpace(v: BlendSpace) {
+    this.setRaster('blendSpace', v);
+  }
   get depthWrite(): boolean | undefined {
     return this.raster.depthWrite;
   }
@@ -3424,6 +3446,7 @@ export class Material {
   get customState(): boolean {
     return (
       this.blending !== 'normal' ||
+      this.blendSpace !== 'display' ||
       this.depthWrite !== undefined ||
       !this.depthTest ||
       !this.colorWrite ||
@@ -3917,6 +3940,7 @@ function renderStateOf(m: Material): PBRRenderState | undefined {
   };
   state = {
     blend: blends[m.blending],
+    ...(m.blendSpace === 'linear' ? { blendSpace: 'linear' as const } : {}),
     depthWrite: m.depthWrite,
     depthCompare: m.depthTest ? undefined : 'always',
     ...(m.colorWrite ? {} : { colorWrite: false }),

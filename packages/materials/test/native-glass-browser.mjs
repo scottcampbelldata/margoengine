@@ -42,6 +42,28 @@ await runSuite(
       without.some((x, k) => x - linear[k] > 1),
       'without the hook the encoded tint/add blend stays brighter (the documented default)',
     );
+    // KB3148b: blendSpace 'linear' mixes in linear light; the default keeps the display-domain blend.
+    const centre = async (png) => {
+      const picture = await decodePNG(Buffer.from(png.split(',')[1], 'base64'));
+      const offset = (Math.floor(picture.height / 2) * picture.width + Math.floor(picture.width / 2)) * 4;
+      return Array.from(picture.data.slice(offset, offset + 3));
+    };
+    const over = (layers, linear) => {
+      // Each layer: out = a*src + (1-a)*dst, src red 0.5 linear, a 0.5, over black.
+      let red = 0;
+      for (let i = 0; i < layers; i++) red = linear ? 0.25 + 0.5 * red : 0.5 * encode(0.5) + 0.5 * red;
+      return Math.round(255 * (linear ? encode(red) : red));
+    };
+    for (const row of await browser.page.evaluate(() => window.linearBlend())) {
+      const actual = await centre(row.png),
+        expected = over(row.layers, row.space === 'linear');
+      console.log({ linearBlend: true, ...row, png: undefined, before: undefined, actual, expected });
+      assert.ok(Math.abs(actual[0] - expected) <= 1 && actual[1] <= 1 && actual[2] <= 1, `blendSpace ${row.space}`);
+      if (row.late) {
+        const before = await centre(row.before);
+        assert.ok(Math.abs(before[0] - over(row.layers, false)) <= 1, 'the first frame drew the display blend');
+      }
+    }
     assert.deepEqual(errors, []);
   },
   () => browser.close(),

@@ -41,6 +41,8 @@ export interface AtlasOptions {
     maxSize?: number;
 }
 
+export type BlendSpace = 'display' | 'linear';
+
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 
 export interface ClearcoatNode {
@@ -284,6 +286,8 @@ export class Material {
     constructor(o?: MaterialOptions);
     get blending(): Blending;
     set blending(v: Blending);
+    get blendSpace(): BlendSpace;
+    set blendSpace(v: BlendSpace);
     get depthWrite(): boolean | undefined;
     set depthWrite(v: boolean | undefined);
     get depthTest(): boolean;
@@ -559,6 +563,7 @@ export interface MaterialOptions extends PhysicalOptions {
     doubleSided?: boolean;
     wireframe?: boolean;
     blending?: Blending;
+    blendSpace?: BlendSpace;
     depthWrite?: boolean;
     depthTest?: boolean;
     colorWrite?: boolean;

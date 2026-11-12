@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15149585,
+  "total": 15154001,
   "history": [
     {
       "date": "2026-10-24",
@@ -8639,6 +8639,12 @@
       "commit": "63a7b1234",
       "reason": "batch 132b text second pass",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "739f28fcd8",
+      "reason": "KB3148b: the usdz worker bundles gltf-pro's draw path, which gains the opt-in linear-light blend (linearBlends, wantGlass, DrawFrame.glass): +75 B gzip measured; a lazy split of 75 B would cost a request",
+      "grew": 1
     }
   ],
   "items": {
@@ -9792,7 +9798,7 @@
     "@margoengine/ui/world": 10170,
     "@margoengine/ui/world-gl": 7816,
     "@margoengine/usdz": 12918,
-    "@margoengine/usdz dist/workers/usdz.js": 144594,
+    "@margoengine/usdz dist/workers/usdz.js": 149010,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/clips": 23672,
     "@margoengine/usdz/compose": 19685,

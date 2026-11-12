@@ -140,7 +140,7 @@ counted. The chain is fitted to the material's cutoff and base alpha at load; th
 its own copy. Nothing to set.
 
 `primitive.material.renderState` supplies beauty-only blend/depth overrides, polygon bias, stencil face states,
-masks/reference, `colorWrite` and `alphaToCoverage` (MASK materials on a multisampled target: edges cut by sample coverage). Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
+masks/reference, `colorWrite`, `alphaToCoverage` (MASK materials on a multisampled target: edges cut by sample coverage) and `blendSpace` (`'linear'`: a BLEND material on a display-encoded target mixes in linear light from the native glass snapshot, one pass break and target copy per surface; default `'display'`; KB3148b). Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
 offsets away from the camera across main reverse-Z and forward-Z device views. `stencilReference` is live per draw
 and reuses pipelines. Native front/back stencil states follow raster winding. Different face operations temporarily
 use the original primitives instead of winding-normalized static batches; symmetric state restores batching.

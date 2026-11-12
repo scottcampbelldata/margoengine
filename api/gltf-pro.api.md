@@ -534,6 +534,7 @@ export interface PBRRenderState {
     stencilReference?: number;
     colorWrite?: boolean;
     alphaToCoverage?: boolean;
+    blendSpace?: 'display' | 'linear';
 }
 
 export interface PBRTransmission {
@@ -779,6 +780,7 @@ interface DrawFrame {
     hook: object | undefined;
     hooks: GLTFExtendedMaterials | undefined;
     lighting: readonly LightingEffect[];
+    glass: boolean;
 }
 
 type DrawGroups = GPUBindGroup[] & {

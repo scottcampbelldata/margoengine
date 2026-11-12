@@ -15,6 +15,8 @@ export function objectNormal(options?: ObjectNormalOptions): MaterialFeature;
 
 // Not exported from this entry, but used by the exports above:
 
+type BlendSpace = 'display' | 'linear';
+
 type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 
 type CasterDisplacement =
@@ -194,6 +196,8 @@ class Material {
     constructor(o?: MaterialOptions);
     get blending(): Blending;
     set blending(v: Blending);
+    get blendSpace(): BlendSpace;
+    set blendSpace(v: BlendSpace);
     get depthWrite(): boolean | undefined;
     set depthWrite(v: boolean | undefined);
     get depthTest(): boolean;
@@ -427,6 +431,7 @@ interface MaterialOptions extends PhysicalOptions {
     doubleSided?: boolean;
     wireframe?: boolean;
     blending?: Blending;
+    blendSpace?: BlendSpace;
     depthWrite?: boolean;
     depthTest?: boolean;
     colorWrite?: boolean;
