@@ -113,8 +113,8 @@ From a built checkout, with the outside reference PNG already captured:
 
 ```sh
 node scripts/reference-rendering/fetch-assets.mjs
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 -- node scripts/reference-rendering/run.mjs
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 -- node scripts/reference-rendering/run.mjs --compat
+node scripts/gpu-lock.mjs run --owner=docs --max=5 -- node scripts/reference-rendering/run.mjs
+node scripts/gpu-lock.mjs run --owner=docs --max=5 -- node scripts/reference-rendering/run.mjs --compat
 ```
 
 Loaded triangle materials expose live `side: 'front' | 'back' | 'double'`, initialized from glTF's `doubleSided`.

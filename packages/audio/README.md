@@ -506,7 +506,7 @@ rain stimulus excerpt: [source/changes](tests/fixtures/NOTICE.md). That file val
 decoding/resampling and matrix output, not a microphone chain or recording provenance.
 Listening quality, other browsers/devices and performance remain unmeasured.
 
-Batch 110 PCM proofs use real browser Web Audio offline rendering, without output-device PCM or listening measurements. Live Doppler regressions use real AudioContext nodes/state changes with controlled 60 Hz frame times and a 10.667 ms quantized audio clock. Long-loop markers at 130 bpm cover one hour at 8 kHz and five minutes each at 44.1/48 kHz; loop endpoints keep fractional sample positions rather than accumulating sample-rounding drift. Other browsers/devices remain unmeasured.
+The PCM proofs use real browser Web Audio offline rendering, without output-device PCM or listening measurements. Live Doppler regressions use real AudioContext nodes/state changes with controlled 60 Hz frame times and a 10.667 ms quantized audio clock. Long-loop markers at 130 bpm cover one hour at 8 kHz and five minutes each at 44.1/48 kHz; loop endpoints keep fractional sample positions rather than accumulating sample-rounding drift. Other browsers/devices remain unmeasured.
 
 ## Offline spectrograms
 

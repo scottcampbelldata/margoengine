@@ -472,7 +472,7 @@ CPU at 45-100 %):
 
 ## Reference measurement
 
-From the built repository run `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
+From the built repository run `node scripts/gpu-lock.mjs run --exclusive --owner=docs -- node packages/oit/scripts/rival-bench.mjs`.
 The external depth-peeling install stays in engine-bench/batch-168 (setup and versions in
 [reproduce](../../docs/whitepaper/reproduce.md)). Five binary-colour panes are compared against exact
 ray-sorted emission/coverage transport, with common sRGB encoding after readback. The measured picture

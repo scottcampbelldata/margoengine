@@ -134,7 +134,7 @@ linked `unsupported`. The viewport and rounding repairs live in environment, the
 
 ## Ray-traced reference
 
-After building, run `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
+After building, run `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=docs -- node packages/staging/scripts/rival-bench.mjs`.
 The default effect is compared with 4096 cosine rays per exposed-ground pixel around a sphere under uniform
 hemispherical lighting. Independent projected-solid-angle tests validate the ray tracer. Normalized darkness
 MAE is 0.048174: the default effect is a footprint cue by design. It darkens the ground under a caster by how
