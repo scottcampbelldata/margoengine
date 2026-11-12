@@ -31,7 +31,7 @@ every file is free of side effects. An app that imports `margoengine/shadows` bu
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
 never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,848 B gzip.
 
-Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
+Use either name; they are interchangeable. Each package also has its own name (`@margoengine/shadows`) for
 apps that want a smaller install.
 
 ## Short names
