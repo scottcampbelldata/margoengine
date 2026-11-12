@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { decodePNG } from '../../../../tests/support/png.js';
+import { frameDiff } from './msaa.mjs';
 for (const kind of ['core', 'static', 'models', 'dynamic']) {
   const context = await openBrowser({ startPath: '/packages/culling/test/gpu/sort.html?kind=' + kind, port: 'free' }),
     errors = [];
@@ -20,10 +21,10 @@ for (const kind of ['core', 'static', 'models', 'dynamic']) {
     }
     for (let i = 0; i < 3; i++) {
       await context.page.evaluate((n) => window.check.step(n), i);
-      const a = await decodePNG(await context.page.locator('#a').screenshot()),
-        b = await decodePNG(await context.page.locator('#b').screenshot());
-      assert.deepEqual(a.data, b.data, `${kind} step ${i}: sorting changed visible pixels`);
-      console.log('sorted pixels', kind, i);
+      const shot = async (id) => decodePNG(await context.page.locator(`#${id}`).screenshot()),
+        { differing, at, mode } = await frameDiff(context.page, shot);
+      assert.equal(differing, 0, `${kind} step ${i}: sorting changed visible ${mode} ${JSON.stringify(at)}`);
+      console.log('sorted pixels', kind, i, mode);
     }
     assert.deepEqual(errors, []);
   } finally {
