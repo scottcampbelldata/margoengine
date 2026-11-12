@@ -484,9 +484,9 @@ const cases = {
 
   /**
    * Float32 colours just off a binary16 step, drawn into rgba16float: the stored halves (features-browser.mjs checks
-   * the layer against the nearest half and native against the two nearest). Regression for the Radeon 680M under ANGLE
-   * D3D11, whose export truncates to binary16 (docs/known-bugs.md): without the layer's rounding it stores the half
-   * below for every value just under a step.
+   * native against the two nearest and the layer against native). Regression for the Radeon 680M, whose export
+   * truncates to binary16 under native Direct3D 12 and ANGLE Direct3D 11 alike: the layer's shader rounding to the
+   * nearest half (3adffdee0) stored 0x3800 for 0.49999997 where native stores 0x37ff.
    */
   /**
    * Fresh rgba8unorm textures (a 4 x 4 cube and a 2D array of 6 layers, 3 levels each, and plain 2D mips), every level

@@ -1,6 +1,6 @@
-// The layer's binary16 export rounding (src/device/half-export.ts; docs/known-bugs.md, "Radeon 680M D3D11 export
-// truncates to binary16"). The GPU check is features-browser.mjs halfExport; these pin which outputs it rounds and the
-// rounding the GLSL computes, step by step in float32.
+// The binary16 export rounding of src/device/half-export.ts, which no pipeline applies now (docs/known-bugs.md,
+// environment fog-all row 28): these pin which outputs it rounds and the rounding the GLSL computes, step by step in
+// float32. The GPU check features-browser.mjs halfExport now requires the layer to store what native stores.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { HALF_ROUND_GLSL, roundHalfExports } from '../dist/glsl.js';

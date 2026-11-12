@@ -99,7 +99,7 @@ const sum = (counts) => Object.values(counts).reduce((a, b) => a + b, 0);
 
 test('every WebGL object the device makes is deleted by the device; destroy() leaves created equal to deleted', async () => {
   const { gl, device } = await recordingDevice();
-  // The adapter's startup probes (the binary16 export) delete their own objects before the device exists.
+  // The adapter's startup probes (lost clears, inverse trigonometry) delete their own objects before the device exists.
   const probes = gl.deleted.length;
   device.createBuffer({ size: 256, usage: GPUBufferUsageLike.VERTEX | GPUBufferUsageLike.COPY_DST });
   device.createBuffer({ size: 64, usage: GPUBufferUsageLike.INDEX });

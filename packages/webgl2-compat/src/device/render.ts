@@ -6,7 +6,6 @@ import { fault } from '../../../shared/errors.js';
 import { translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
 import type { TextureType } from '../wgsl/types.js';
 import { type FormatInfo, glTexelBytes, hasDepth, hasStencil, VERTEX_FORMATS } from './formats.js';
-import { roundHalfExports } from './half-export.js';
 import type { CompatDevice } from './device.js';
 import { type BoundGroup, CompatComputePassEncoder, type CompatComputePipeline } from './compute.js';
 import {
@@ -432,16 +431,6 @@ export class CompatRenderPipeline {
             [...(descriptor.fragment?.targets ?? [])],
             fragment.outputs,
           ),
-        },
-      };
-    }
-    if (device.adapter.halfExportRounding) {
-      const fragment = this.glsl.fragment;
-      this.glsl = {
-        ...this.glsl,
-        fragment: {
-          ...fragment,
-          source: roundHalfExports(fragment.source, [...(descriptor.fragment?.targets ?? [])], fragment.outputs),
         },
       };
     }

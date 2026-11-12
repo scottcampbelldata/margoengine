@@ -11,7 +11,6 @@ import { fence, fenceDone, nextGPUTask } from './tasks.js';
 import { ExternalCopies } from './externals.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { clearsLost } from './fresh-clears.js';
-import { exportTruncatesHalf } from './half-export.js';
 import { inverseTrigInaccurate } from './inverse-trig.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
@@ -198,7 +197,7 @@ export class CompatGPU {
       caps,
       budget,
       formats,
-      !formats && exportTruncatesHalf(gl),
+      false,
       clearsLost(gl),
       inverseTrigInaccurate(gl),
     );
@@ -226,8 +225,9 @@ export class CompatAdapter {
     /** @internal Lower-tier target selection, loaded only for a lower-tier adapter. */
     readonly tierFormats?: TierFormats,
     /**
-     * @internal True when this GPU's colour export truncates float32 to binary16 (device/half-export.ts): render
-     * pipelines then round their narrowed outputs to the nearest half in the shader.
+     * @internal Always false. The layer once rounded colour exports to the nearest binary16 where the driver truncates
+     * (3adffdee0), but native WebGPU on that GPU (Radeon 680M) truncates the same way, so the layer now stores what the
+     * driver stores; the parameter keeps the constructor's argument order.
      */
     readonly halfExportRounding = false,
     /**

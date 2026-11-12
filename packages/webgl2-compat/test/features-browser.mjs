@@ -150,15 +150,17 @@ try {
       assert.ok(layer.max <= 1e-5, `inverseTrig: the layer's acos, asin or atan2 is ${layer.max} off at ${JSON.stringify(layer.at)}`);
       lines.push(`${name}: the layer within ${layer.max.toExponential(2)} of float64 over the whole domain, native ${worst(native.result).max.toExponential(2)}`);
     } else if (name === 'halfExport') {
-      // WGSL leaves an inexact narrowing to either neighbour, so native may store either half; the layer stores the
-      // nearest (ties to even) on every GPU, also where the driver's export truncates (Radeon 680M, ANGLE D3D11).
+      // WGSL leaves an inexact narrowing to either neighbour, so native may store either half; the layer stores what
+      // native stores on the same GPU. The Radeon 680M truncates under native Direct3D 12 and ANGLE Direct3D 11 alike,
+      // so the layer's former rounding to the nearest half (3adffdee0) stored a half native never does (dof compat-check).
       const { values } = compat.result;
       assert.equal(values.length, 32, 'halfExport values');
-      assert.deepEqual(compat.result.halves, values.map(nearestHalf), 'halfExport: the layer stores the nearest half');
       native.result.halves.forEach((h, i) =>
         assert.ok(halfNeighbours(values[i]).includes(h), `halfExport native ${values[i]}: ${h} is neither neighbour`),
       );
-      lines.push(`${name}: the layer stores the nearest half of each value, native one of the two neighbours`);
+      assert.deepEqual(compat.result.halves, native.result.halves, 'halfExport: the layer stores the halves native stores');
+      const nearest = values.filter((v, i) => native.result.halves[i] === nearestHalf(v)).length;
+      lines.push(`${name}: the layer stores native's half of each value (native: ${nearest} of 32 the nearest)`);
     } else {
       const diff = differences(native.result, compat.result);
       assert.deepEqual(diff, [], `${name}: compat differs from native`);
