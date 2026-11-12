@@ -62,7 +62,7 @@ const at = (v, i) => (Array.isArray(v) ? v[i] : v);
 function tokenize(source) {
   const tokens = [],
     pattern =
-      /\s+|\/\/[^\n]*|(\d+\.\d*(?:e[+-]?\d+)?|\d*\.\d+(?:e[+-]?\d+)?|\d+[ui]?)|([A-Za-z_]\w*)|(->|&&|\|\||==|!=|<=|>=|[-+*/<>(){}[\],.;:=!&_|@])/gy;
+      /\s+|\/\/[^\n]*|(\d+\.\d*(?:e[+-]?\d+)?|\d*\.\d+(?:e[+-]?\d+)?|\d+e[+-]?\d+|\d+[ui]?)|([A-Za-z_]\w*)|(->|&&|\|\||==|!=|<=|>=|[-+*/<>(){}[\],.;:=!&_|@])/gy;
   let m;
   while (pattern.lastIndex < source.length && (m = pattern.exec(source)))
     if (m[1] !== undefined) tokens.push({ t: 'num', v: Number.parseFloat(m[1]) });

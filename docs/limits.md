@@ -1946,6 +1946,7 @@ Not re-recorded: voxel-night-high. At `29d79d3774` 3,536 of its changed pixels a
 distant water. The height-correlated G2's `max(den, 0.0001)` guard undercuts G2 on a smooth surface at grazing angles
 (at a2 = 1e-6 and nl = nv = 0.001 it gives 0.02 against 0.71), so G2 falls below the separable term it replaced. That is
 a defect, listed in docs/known-bugs.md; the view keeps its old baseline and fails until the guard is fixed.
+The packages' guard is fixed (2026-11-12, KB-G2guard, floor 1e-30); the view is re-recorded on the dev PC once that lands.
 Reproduce: `node scripts/visual-regression.js --only=<view>` at a commit and at its parent, then compare
 `test-results/visual/*.actual.png`.
 

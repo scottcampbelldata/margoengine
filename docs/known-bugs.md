@@ -223,7 +223,7 @@ Repro: GPU-locked `node scripts/reference-rendering/cornell.mjs --decompose`, an
 
 Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`, then with --compat (add --capture-decomposition to regenerate the hash-checked CUDA Mitsuba references). The frozen direct-only MAE 2.9175338745117188 (native) is measured against Mitsuba principled with full visibility. Decomposition (KB3563, 2026-11-11, RTX A6000): `node scripts/reference-rendering/environment.mjs [--compat] --decompose` compares the frozen Margo picture with four more Mitsuba 3.9.1 pictures from scripts/reference-rendering/mitsuba-environment-decompose.py (cuda_ad_rgb, 1024 spp, hash-checked, frozen in whitepaper/results/batch-160-environment-decomposition.json and pinned by tests/reference-environment.test.js). Of the native direct absolute 2,294,442: 128-spp reference noise 41,414 (1.8 %); scene visibility (other spheres occlude the environment, which split-sum IBL cannot see) 983,219 (42.9 %); Mitsuba principled against the glTF appendix B BRDF (Burley diffuse, its own specular mapping) 251,899 (11.0 %); Margo's deliberate multiple-scattering compensation and the diffuse that keeps the energy neither specular term reflects (Fdez-Aguera 2019), against single-scattering glTF, 532,957 (23.2 %). Against the split-sum model with its directional albedo terms integrated exactly per pixel, 484,953 remain (21.1 %): 445,796 on silhouette edges (MSAA against a box-filtered reference) and 39,157 (1.7 %) over flat areas with a signed sum of -3,965, so the LUT, SH irradiance and prefiltered cube add no measurable bias in this furnace. Compatibility rows are within 60 of these. Accepted difference: the two large shares are the documented IBL model (no scene visibility; multiple scattering on purpose) and the reference BSDF, not a package defect; no budget or setting moved. Docs: docs/limits.md (batch 160 job 7). Sources: Karis 2013, "Real Shading in Unreal Engine 4", SIGGRAPH course notes (split-sum scale and bias); Fdez-Aguera 2019, "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting", JCGT 8(1), https://www.jcgt.org/published/0008/01/03/paper.pdf; Heitz, Hanika, d'Eon and Dachsbacher 2016, "Multiple-Scattering Microfacet BSDFs with the Smith Model", ACM TOG 35(4), https://doi.org/10.1145/2897824.2925943; Walter, Marschner, Li and Torrance 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR; Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), https://jcgt.org/published/0003/02/03/ (height-correlated Smith); Heitz 2018, "Sampling the GGX Distribution of Visible Normals", JCGT 7(4), https://jcgt.org/published/0007/04/01/; Burley 2012, "Physically-Based Shading at Disney", SIGGRAPH course notes (the principled diffuse that Mitsuba principled follows); Khronos glTF 2.0 specification, appendix B (BRDF implementation), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; Jakob et al. 2022, Mitsuba 3, https://mitsuba-renderer.org.
 
-### Height-correlated Smith G2 is too dark on smooth surfaces at grazing angles (found 2026-11-11, open, KB-G2guard)
+### Fixed 2026-11-12 in the packages, core copy pending: height-correlated Smith G2 was too dark on smooth surfaces at grazing angles (KB-G2guard)
 
 - **Repro:** visual:check voxel-night-high at 29d79d3774 against its parent b19009b802: 3,536 pixels of the distant
   night water darker, up to 5 levels, while every other change of that commit is brighter.
@@ -234,6 +234,15 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   smallest normal float is enough to stop 0/0 at nl = a2 = 0.
 - **Effect:** voxel-night-high keeps its old baseline and fails visual:check until this is fixed (docs/limits.md,
   KB2224b). Core's copy is a core change: Scott's call.
+- **Fixed 2026-11-12 (hunt K1), packages:** the floor is now 1e-30 in `smithGCorrelated`, `smithGCorrelatedFloat` and
+  `ggxNamed` (packages/shared/light-terms.js) and in materials' anisotropic `materialG2`
+  (packages/materials/src/lobe-shader.ts, the same guard): far above the smallest normal float32 (1.2e-38), so no backend
+  flushes it, and below 2 nl nv for every lit pixel, so G2 is the exact value down to nl = 1e-5, nv = 1e-4, a2 = 1e-10.
+  Regression: `tests/smith-shaders.test.js`, "every G2 text keeps the exact value on smooth surfaces at grazing angles"
+  (fails before: 0.00002 against 0.83).
+- **Still open:** core's own copy (packages/core/src/shaders.ts, since edcb6debb7) is fixed in the local commit tagged
+  `K1-core-1`, which lands after the MSVC linker is installed. voxel-night-high needs its baseline re-recorded on the
+  dev PC (visual baselines are per machine): the old one predates the brighter G2 pixels of 29d79d3774.
 
 ### Fixed 2026-11-11: a BatchedMesh over 262,144 vertices threw, so the batched-mesh demo never got ready (KB-VIS-bm)
 

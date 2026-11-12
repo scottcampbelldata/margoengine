@@ -164,7 +164,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
       // isotropic G2 of the base shader at at = ab (Heitz 2014, JCGT 3(2), eq. 99; KHR_materials_anisotropy V).
       let materialViewLength=length(vec3f(materialAT*dot(material.tangent,materialV),materialAB*dot(material.bitangent,materialV),materialNV));
       let materialLightLength=length(vec3f(materialAT*dot(material.tangent,materialL),materialAB*dot(material.bitangent,materialL),materialNL));
-      let materialG2=2*materialNL*materialNV/max(materialNL*materialViewLength+materialNV*materialLightLength,0.0001);
+      let materialG2=2*materialNL*materialNV/max(materialNL*materialViewLength+materialNV*materialLightLength,1e-30);
       materialSpecularBRDF=materialAnisotropicD*materialG2/max(4*materialNL*materialNV,0.0001);
       }
     }

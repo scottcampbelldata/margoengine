@@ -11,7 +11,7 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // gltf-pro's base shader since KB3240 (direct diffuse keeps the dielectric Fresnel weight); was bdf7de1e...834390 (KB6016c).
-const baselineShader = '9a0544b943b39c68a254f23b383d5118ae41ef819e77c4d6abf21625b239b5dc';
+const baselineShader = '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23';
 
 test('clearcoat maps upload retained Node pixels and generate their sampler mip chain', async () => {
   const image = { width: 2, height: 2, data: new Uint8Array(16).fill(127) };

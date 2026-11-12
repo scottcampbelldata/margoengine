@@ -112,3 +112,34 @@ test('the shared GGX D is a2 / pi where the half vector faces away, and the text
       }
   }
 });
+
+// Regression (KB-G2guard, 2026-11-11): the height-correlated G2 divided by max(den, 1e-4). On a smooth surface at
+// grazing angles den falls far below 1e-4 (a2 = 1e-6, nl = nv = 0.001: den 2.8e-6), so G2 came out 0.02 against 0.71
+// exact, darker than the separable G1 G1 (0.69) it replaced: the distant night water of visual:check voxel-night-high
+// lost up to 5 levels at 29d79d3774. den is never below 2 nl nv, so the floor only has to stop 0/0 at nl = a2 = 0.
+test('every G2 text keeps the exact value on smooth surfaces at grazing angles, and 0 at nl = a2 = 0', () => {
+  const names = ['nl', 'nv', 'a2'],
+    lobe = /let materialG2=([^;]+);/.exec(read('packages/materials/src/lobe-shader.ts'))[1],
+    lobeG2 = shaderExpression(lobe, ['materialNL', 'materialNV', 'materialViewLength', 'materialLightLength']),
+    width = (c, a2) => Math.sqrt(a2 * (1 - c * c) + c * c),
+    forms = {
+      smithGCorrelated: shaderExpression(terms.smithGCorrelated, names),
+      smithGCorrelatedFloat: shaderExpression(terms.smithGCorrelatedFloat, names),
+      ggxNamed: shaderExpression(terms.ggxNamed('q2', 'qh', 'qv', 'ql')[1], ['ql', 'qv', 'q2']),
+      materialG2: (nl, nv, a2) => lobeG2(nl, nv, width(nv, a2), width(nl, a2)),
+    };
+  for (const [name, g] of Object.entries(forms)) {
+    for (const nl of [1e-5, 1e-4, 0.001, 0.003, 0.01])
+      for (const nv of [1e-4, 0.001, 0.01, 0.5])
+        for (const a2 of [1e-10, 1e-8, 1e-6, 1e-4]) {
+          const want = correlatedG2(nl, nv, a2);
+          assert.ok(Math.abs(g(nl, nv, a2) / want - 1) < 1e-9, `${name} at nl ${nl}, nv ${nv}, a2 ${a2}: ${g(nl, nv, a2)} vs ${want}`);
+        }
+    assert.equal(g(0, 0.5, 0), 0, `${name} at nl = a2 = 0`);
+  }
+  // The floor is a normal float32 (no backend flushes it to zero, which would bring the 0/0 back).
+  for (const text of [terms.smithGCorrelated, terms.smithGCorrelatedFloat, lobe]) {
+    const floor = Number(/,([0-9.e+-]+)\)$/.exec(text)[1]);
+    assert.ok(Math.fround(floor) >= 2 ** -126 && floor <= 1e-20, `floor ${floor}`);
+  }
+});

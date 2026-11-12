@@ -11,7 +11,7 @@ const digest = (value) => createHash('sha256').update(value).digest('hex');
 // Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
 // 2026-11-11: the base shader's Smith term is the height-correlated G2 (KB5875a); was 20ea22e3...ca4297.
 // 2026-11-12: the direct diffuse keeps the dielectric Fresnel weight (KB3240); was bdf7de1e...834390.
-const baselineShader = '9a0544b943b39c68a254f23b383d5118ae41ef819e77c4d6abf21625b239b5dc';
+const baselineShader = '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23';
 // The missing normal-map factor is zero; Camera.up-aware view math also preserves its signed-zero lanes.
 const baselineFrame = '611297c77674bf4a5642e187218a161e688e4b0cca3155598ff5768c34ecdba4';
 

@@ -42,7 +42,9 @@ text against Heitz's Lambda over 150 (nl, nv, roughness) points (1e-12); G2 is n
 percent rough and grazing. gltf-pro's naming proof fixture follows the same line (re-recorded). Since KB6016 every
 other PBR direct light (clustered, materials, terrain, lod imposters, animation VAT, post material decals, voxel) takes
 the same `smithGCorrelated`, and the separable `smithG` export is gone; `tests/smith-shaders.test.js` evaluates each
-user and scans every package's source for a separable product. Missing: environment's split-sum DFG table still
+user and scans every package's source for a separable product. Its guard is max(den, 1e-30) (KB-G2guard, 2026-11-12):
+the denominator is never below 2 nl nv, and the old 1e-4 floor cut G2 to 0.02 of 0.71 on smooth grazing surfaces; the
+same test evaluates every G2 text down to nl = 1e-5, a2 = 1e-10. Core's copy follows in a core commit. Missing: environment's split-sum DFG table still
 integrates the separable G (KB6016b, docs/known-bugs.md, open); no multiple-scattering compensation in direct light.
 
 ### Section 5 evidence: allocation-free changed-row uploads (2026-11-11)

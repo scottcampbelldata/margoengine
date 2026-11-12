@@ -59,15 +59,18 @@ export const ggxDFloat = ggxD;
  * never darkens below the separable product of two Smith G1 terms (Walter et al. 2007, eq. 34), which counts a microfacet
  * hidden from both directions twice (Heitz 2014, section 6.2). Every PBR direct light in the engine uses it: core, its
  * WebGL2 twin and gltf-pro since KB5875a; clustered, materials, terrain, lod imposters, animation VAT, post material
- * decals and voxel since KB6016. The guard only stops 0/0 at nl = a2 = 0.
+ * decals and voxel since KB6016. The guard only stops 0/0 at nl = a2 = 0: the denominator is never below 2 nl nv, so
+ * a floor of 1e-30 (far above the smallest normal float32, 1.2e-38, which no backend flushes) changes no lit pixel. A
+ * 1e-4 floor did (KB-G2guard): on a smooth surface at grazing angles the denominator falls far below it (a2 = 1e-6,
+ * nl = nv = 0.001: 2.8e-6), and G2 came out 0.02 against 0.71.
  */
-export const smithGCorrelated = '2*nl*nv/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),0.0001)';
+export const smithGCorrelated = '2*nl*nv/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),1e-30)';
 /** {@link smithGCorrelated} with float literals (core's WGSL and GLSL text). */
-export const smithGCorrelatedFloat = '2.0*nl*nv/max(nl*sqrt(a2+(1.0-a2)*nv*nv)+nv*sqrt(a2+(1.0-a2)*nl*nl),0.0001)';
+export const smithGCorrelatedFloat = '2.0*nl*nv/max(nl*sqrt(a2+(1.0-a2)*nv*nv)+nv*sqrt(a2+(1.0-a2)*nl*nl),1e-30)';
 /** GGX distribution denominator `nh^2 (a2 - 1) + 1` (float literals) over the name `nh` (default 'nh'). */
 export const ggxDenominator = (nh = 'nh') => `${nh}*${nh}*(a2-1.0)+1.0`;
 /** {@link ggxD} and {@link smithGCorrelated} over other names, for shaders whose locals are prefixed. */
 export const ggxNamed = (a2, nh, nv, nl) => [
   `${a2}/(3.14159265*pow(${nh}*${nh}*(${a2}-1)+1,2.0))`,
-  `2*${nl}*${nv}/max(${nl}*sqrt(${a2}+(1-${a2})*${nv}*${nv})+${nv}*sqrt(${a2}+(1-${a2})*${nl}*${nl}),0.0001)`,
+  `2*${nl}*${nv}/max(${nl}*sqrt(${a2}+(1-${a2})*${nv}*${nv})+${nv}*sqrt(${a2}+(1-${a2})*${nl}*${nl}),1e-30)`,
 ];
