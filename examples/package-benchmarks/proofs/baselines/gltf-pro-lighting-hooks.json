@@ -1,12 +1,12 @@
 {
  "proof": "gltf-pro-lighting-hooks",
- "ref": "29d79d377",
- "revision": "29d79d3774d1538255ead8f7be62d6601540b8d5",
- "capturedAt": "7c2e06972583b292fe081d6a47a8f7ac1a22015f",
+ "ref": "8e6eb73dd",
+ "revision": "8e6eb73ddb0d83423139ddb99d81fdfe344843ed",
+ "capturedAt": "8e6eb73ddb0d83423139ddb99d81fdfe344843ed",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "1x": "4b1bffb35ee4aea94d63eeac5118c4cd3904280a821143949342da6530b96169",
-  "4x": "974f32de3e141ac46bbd60cb4c02561ee00f1eaef2c240d640633045e91f816b"
+  "1x": "5a8280d445f56bda4655d61eff18b36926fbfa0934c7be9382b3d9ad9a71ccb8",
+  "4x": "1a1461a4f786e273b333d92ae83b1f91acf8e45cd06235c3ca4f221c254bc326"
  }
 }
