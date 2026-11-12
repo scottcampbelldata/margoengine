@@ -563,7 +563,8 @@ Turn a glTF primitive, an OBJ or any indexed triangles into polygons you can edi
 import { readAccessor, splitGLB } from 'margoengine/exporters';
 import { mergeFlatFaces, polygonMeshFromTriangles } from 'margoengine/mesh-edit/modeling';
 
-const parts = splitGLB(new Uint8Array(await (await fetch('/models/crate.glb')).arrayBuffer()));
+// Any glTF binary with indices and UVs, such as the Khronos sample BoxTextured.glb.
+const parts = splitGLB(new Uint8Array(await (await fetch('/BoxTextured.glb')).arrayBuffer()));
 const gltf = parts.json as { meshes: { primitives: { attributes: Record<string, number>; indices: number }[] }[] };
 const primitive = gltf.meshes[0].primitives[0];
 // Seams rejoin, coplanar triangles merge back into quads, UVs are kept (or unwrapped when missing).
