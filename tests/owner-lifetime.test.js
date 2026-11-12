@@ -10,13 +10,14 @@ test('registered package fixtures share every lifetime transition', { timeout: 1
   try {
     const result = await runOwners({ packages: ['cinematic', 'controls'], adapter });
     assert.deepEqual(result.failures, []);
-    assert.equal(result.results.length, 132);
-    for (const mode of ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached'])
+    assert.equal(result.results.length, 156);
+    for (const mode of ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached', 'cycles'])
       assert.ok(result.results.some((r) => r.mode === mode));
   } finally { adapter.close(); }
 });
 
-for (const fault of ['registration', 'listeners', 'resources', 'viewport', 'scissor', 'view-mutation', 'restore-leak'])
+for (const fault of ['registration', 'listeners', 'resources', 'viewport', 'scissor', 'view-mutation', 'restore-leak',
+  'frame-callback', 'views', 'cycle-growth'])
   test(`shared harness rejects ${fault} defects`, { timeout: 10000 }, async () => {
     const adapter = await nodeLifetimeAdapter();
     const fixture = { name: `broken-${fault}`, create({ engine }) {
@@ -25,6 +26,8 @@ for (const fault of ['registration', 'listeners', 'resources', 'viewport', 'scis
         name: 'broken',
         setup() {
           if (fault === 'resources') gpu = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM });
+          if (fault === 'frame-callback') engine.onFrame(() => {});
+          if (fault === 'views') engine.views = [{ camera: engine.camera, viewport: [0, 0, 1, 1] }];
           if (fault === 'listeners') {
             listener = () => {};
             engine.canvas.addEventListener('pointerdown', listener);
@@ -51,15 +54,24 @@ for (const fault of ['registration', 'listeners', 'resources', 'viewport', 'scis
           if (fault !== 'listeners' && listener) engine.canvas.removeEventListener('pointerdown', listener);
         },
       };
-      return { plugin, dispose: () => plugin.dispose() };
+      // An unowned cache that gains a buffer on every disposal: only the cycles case sees it.
+      return { plugin, dispose: () => {
+        if (fault === 'cycle-growth') engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM });
+        plugin.dispose();
+      } };
     } };
     const expected = {
       registration: /releases its registration/, listeners: /leaked event listeners/,
       resources: /leaked GPU/, viewport: /current viewport/, scissor: /current scissor/,
       'view-mutation': /preserves view state/, 'restore-leak': /leaked event listeners/,
+      'frame-callback': /leaked onFrame callbacks/, views: /engine\.views/, 'cycle-growth': /grow per attach and dispose/,
     };
-    try { await assert.rejects(exerciseLifetime(fixture, adapter,
-      { mode: fault === 'resources' ? 'direct' : 'loss-attached' }), expected[fault]); }
+    const mode = { resources: 'direct', 'cycle-growth': 'cycles' }[fault] ?? 'loss-attached';
+    try {
+      await assert.rejects(exerciseLifetime(fixture, adapter, { mode }), expected[fault]);
+      // The growth is unowned: every case before 'cycles' passes it.
+      if (fault === 'cycle-growth') await exerciseLifetime(fixture, adapter, { mode: 'direct' });
+    }
     finally { adapter.close(); }
   });
 
@@ -90,8 +102,8 @@ test('listener observation respects duplicate identity, capture, once and AbortS
 test('packages with no fixture are pending, never passed; held packages are explicit; unknown names throw', () => {
   assert.deepEqual(selectOwnerPackages(['math', 'cinematic']), { selected: ['cinematic'], pending: ['math'] });
   assert.throws(() => selectOwnerPackages(['unknown']), /OWNER_UNKNOWN_PACKAGE: unknown/);
-  assert.deepEqual(selectOwnerPackages(['physics', 'physics2d', 'ragdoll', 'core', 'stage', 'cinematic']),
-    { selected: ['cinematic'], pending: ['stage'] });
+  assert.deepEqual(selectOwnerPackages(['physics', 'physics2d', 'ragdoll', 'core', 'terrain', 'cinematic']),
+    { selected: ['cinematic'], pending: ['terrain'] });
   assert.match(pendingLine(['audio', 'stage']), /pending, no fixture yet, NOT checked \(2\): audio, stage/);
   assert.equal(pendingLine([]), '');
 });

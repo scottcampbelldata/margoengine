@@ -14,6 +14,9 @@ export class LifetimeObserver {
   owner = null;
   context = null;
   resources = new Set();
+  // Every live buffer, texture and query set per device, owned or not: an unowned cache growing per attach shows here.
+  alive = new Map();
+  frames = new Set();
   listeners = new Set();
   undo = [];
   draws = 0;
@@ -99,15 +102,16 @@ export class LifetimeObserver {
       if (!device[method]) continue;
       this.patch(device, method, (original) => function (...args) {
         const object = original.apply(this, args);
-        if (observer.owner) {
-          const record = { object, device, owner: observer.owner, method };
-          observer.resources.add(record);
-          observer.patch(object, 'destroy', (destroy) => function (...values) {
-            const result = destroy.apply(this, values);
-            observer.resources.delete(record);
-            return result;
-          });
-        }
+        const alive = observer.alive.get(device) ?? observer.alive.set(device, new Set()).get(device);
+        alive.add(object);
+        const record = observer.owner && { object, device, owner: observer.owner, method };
+        if (record) observer.resources.add(record);
+        observer.patch(object, 'destroy', (destroy) => function (...values) {
+          const result = destroy.apply(this, values);
+          alive.delete(object);
+          if (record) observer.resources.delete(record);
+          return result;
+        });
         return object;
       });
     }
@@ -148,6 +152,21 @@ export class LifetimeObserver {
       observer.watchPlugin(plugin, observer.owner ?? owner);
       return original.call(this, plugin, ...args);
     });
+    // Frame callbacks run only in the frame loop, never in render(): their registrations are what an owner leaves.
+    this.patch(engine, 'onFrame', (original) => function (callback) {
+      const remove = original.call(this, callback);
+      if (!observer.owner) return remove;
+      const record = { engine: this, owner: observer.owner };
+      observer.frames.add(record);
+      return () => {
+        observer.frames.delete(record);
+        return remove();
+      };
+    });
+    this.patch(engine, 'dispose', (original) => function (...args) {
+      for (const record of observer.frames) if (record.engine === this) observer.frames.delete(record);
+      return original.apply(this, args);
+    });
   }
   watchPlugin(plugin, owner) {
     if (this.watched.has(plugin)) return;
@@ -182,10 +201,15 @@ export class LifetimeObserver {
   }
   lost(device) {
     for (const record of this.resources) if (record.device === device) this.resources.delete(record);
+    this.alive.delete(device);
+  }
+  liveOn(device) {
+    return this.alive.get(device)?.size ?? 0;
   }
   assertReleased(owner) {
     invariant(![...this.listeners].some((r) => r.owner === owner), 'no leaked event listeners');
     invariant(![...this.resources].some((r) => r.owner === owner), 'no leaked GPU buffers, textures or query sets');
+    invariant(![...this.frames].some((r) => r.owner === owner), 'no leaked onFrame callbacks');
   }
   close() {
     for (const record of [...this.resources]) record.object.destroy();
@@ -195,7 +219,9 @@ export class LifetimeObserver {
 }
 
 // Each case has independent engines; a failure cannot contaminate a following case.
-export const lifecycleCases = ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached'];
+// 'cycles' attaches and disposes three more times on one device: GPU objects left alive, owned or not, must not grow
+// from the second disposal to the third.
+export const lifecycleCases = ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached', 'cycles'];
 export async function exerciseLifetime(fixture, adapter, { target = 'secondary', mode = 'direct' } = {}) {
   const observer = new LifetimeObserver(), token = {}, peerToken = {}, dependencyToken = {}, hosts = [];
   let handle, peer;
@@ -231,19 +257,26 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     ];
     await host.render(views);
     const baseline = await host.pixels?.();
-    let pending;
-    const scope = { name: 'owner-lifetime:create', setup() {
-      pending = observer.scope(token, () => fixture.create({ engine, scene, host, dependency }));
-    } };
-    handle = await observer.hold(token, () => {
-      scene.use(scope);
-      scene.removePlugin(scope.name);
-      return pending;
-    });
-    invariant(handle && typeof handle.dispose === 'function', `${fixture.name} provides dispose`);
-    if (handle.plugin && !engine.sceneOf(handle.plugin)) scene.use(handle.plugin);
-    if (handle.plugin) invariant(engine.sceneOf(handle.plugin) === scene, 'async factory retains its originating scene');
-    const installed = [...scene.plugins.values()].filter((p) => !initial.has(p.name) && !handle.dependencies?.includes(p));
+    const views0 = engine.views;
+    const attach = async () => {
+      let pending;
+      const scope = { name: 'owner-lifetime:create', setup() {
+        pending = observer.scope(token, () => fixture.create({ engine, scene, host, dependency }));
+      } };
+      const made = await observer.hold(token, () => {
+        scene.use(scope);
+        scene.removePlugin(scope.name);
+        return pending;
+      });
+      invariant(made && typeof made.dispose === 'function', `${fixture.name} provides dispose`);
+      if (made.plugin && !engine.sceneOf(made.plugin)) scene.use(made.plugin);
+      if (made.plugin) invariant(engine.sceneOf(made.plugin) === scene, 'async factory retains its originating scene');
+      return made;
+    };
+    const releasedViews = () => invariant(((views0?.length ?? 0) === 0 && (engine.views?.length ?? 0) === 0) ||
+      engine.views === views0, 'disposal leaves engine.views as it found them');
+    handle = await attach();
+    let installed =[...scene.plugins.values()].filter((p) => !initial.has(p.name) && !handle.dependencies?.includes(p));
     invariant(installed.length > 0, `${fixture.name} exercises a real registration`);
     const sentinels = installed.map((p) => ({ name: p.name, setup() {}, dispose() {
       this.removed = true;
@@ -284,6 +317,23 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
       await handle.check?.({ phase: 'render', host, views });
     };
     await render();
+    if (mode === 'cycles') {
+      const alive = [];
+      for (let cycle = 2; cycle <= 4; cycle++) {
+        handle.dispose();
+        for (const plugin of installed) invariant(!engine.sceneOf(plugin), `${fixture.name} releases its registration`);
+        await handle.cleanup?.();
+        observer.assertReleased(token);
+        releasedViews();
+        await host.render(views);
+        alive.push(observer.liveOn(engine.gpu));
+        handle = await attach();
+        installed = [...scene.plugins.values()].filter((p) => !initial.has(p.name) && !handle.dependencies?.includes(p));
+        await render();
+      }
+      // The first disposal may still fill lazily made shared caches; from the second on, a cycle leaves what the last did.
+      invariant(alive[2] <= alive[1], `GPU objects left alive grow per attach and dispose: ${alive.join(', ')}`);
+    }
     if (mode === 'loss-attached') {
       await host.lose(observer);
       await render();
@@ -294,6 +344,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     else if (mode === 'engine') engine.dispose();
     else handle.dispose();
     for (const plugin of installed) invariant(!engine.sceneOf(plugin), `${fixture.name} releases its registration`);
+    if (mode !== 'engine') releasedViews();
     // A dependency may own lazily allocated shared pages. Its caller lifetime ends at cleanup, below.
     if (!handle.dependencies?.length) observer.assertReleased(token);
     if (mode !== 'engine' && !(target === 'default' && mode === 'scene')) {

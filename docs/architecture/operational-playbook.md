@@ -7896,3 +7896,14 @@ small and size later submissions from its measured speed; keep any timing-driven
 (row bands), with value-affecting splits (sample runs) fixed by work counts alone. Evidence: work counts in
 `packages/voxel-pathtracer/tests/dispatch-budget.test.js`; bit-identical bands in the browser check's `determinism`
 case. Still missing: the Beelink validation run under a heat watchdog (recorded in docs/known-bugs.md when done).
+
+## Plugin lifetime in check:owners (integration J1, list 5 batch I1, 2026-11-11)
+
+A plugin package proves its lifetime with a `test(s)/owner-lifetime.fixture.js` run by `npm run check:owners`, not by a
+runner of its own (manager ruling, 2026-11-11). Write the fixture with the package; a package printed as pending is not
+checked. The shared harness (`tests/support/owner-lifetime.js`) runs every entry in the default and a second scene,
+through dispose, detach, scene and engine disposal, device loss attached and detached, and `cycles` (three more
+attaches and disposals, GPU objects alive must not grow), and fails on a leaked listener, GPU object or `onFrame`
+callback, `engine.views` left changed, a pass still running after disposal or a same-name plugin in the other scene
+removed. Each new check has a deliberate-defect test in `tests/owner-lifetime.test.js`. Details and the revert proofs:
+docs/integration-fixtures.md.

@@ -73,7 +73,7 @@ export async function nodeLifetimeAdapter() {
         h.engine.gpu.createCommandEncoder = () => ({
           ...h.context.encoder,
           beginRenderPass(descriptor) {
-            return { ...begin(descriptor), setViewport() {}, setScissorRect() {} };
+            return { ...begin(descriptor), setViewport() {}, setScissorRect() {}, setStencilReference() {} };
           },
           finish() { return {}; },
         });
