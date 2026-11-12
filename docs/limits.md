@@ -1879,6 +1879,28 @@ This is an open image-quality loss, not proof of physically accurate materials o
 reference PNGs remain outside the repository; CI unit tests validate the comparison contract and record,
 while the GPU reproduction requires those outside files. No speed or bundle-size change is claimed.
 
+## Visual baselines re-recorded (2026-11-11, KB-RM2)
+
+Scott's ruling of 2026-11-11 ("Yes, re-record") after the 15:00 full check failed `visual:check` on 30 Khronos model
+views of the Edge 157 profile (`tests/visual/profiles/nvidia-ampere-msedge-157`, recorded at `b6865f6d83`). Re-recorded
+with `npm run visual:update -- --only=<the 30 views> --runs=4` on the RTX A6000, Edge 157.0.4341.46, at `739f28fcd8` (no rendering commit after `29d79d3774`).
+Each step was bisected by capturing all 32 Khronos views at the commit and at its parent (one shared
+GPU slot each) and comparing the pictures pixel by pixel:
+
+| Commit | What it changes | Views it moved | Proof that nothing else moved |
+| --- | --- | --- | --- |
+| `b6865f6d83` to `da12bd07e1` | baseline commit, unit light direction | none over tolerance | `b6865f6d83`, `d0ab60bbd4` and `da12bd07e1` pass every view on Edge 157.0.4341.46, so the browser update moved nothing |
+| `401c2e032b` | native glass composited in linear light | exactly the 7 models with KHR_materials_transmission: ABeautifulGame, AnisotropyBarnLamp, CommercialRefrigerator, FlightHelmet, IridescenceLamp, LightsPunctualLamp, ToyCar (up to 192 levels, nearly all pixels darker) | the other 25 views identical to the parent |
+| `676d06e49e` | MASK base colour mips keep their cut-out coverage | AlphaBlendModeTest only (max 150, 1.2% of pixels), on its three MASK cut-off panels | BLEND panel and backdrop unchanged; MeshoptCubeTest, MASK without mips, unchanged; `dc48f63633` (MASK cutoff exactness) moved nothing |
+| `65098f33fe` | area-filter mip chains, alpha-weighted colour | the 24 views that sample mipmapped textures, at most 10 levels (most 1 to 3) | the untextured views (BoxVertexColors, Cameras, DirectionalLight, MeshPrimitiveModes, MultipleScenes, OrientationTest, RiggedFigure) and MeshoptCubeTest identical |
+| `edcb6debb7` | height-correlated Smith G2 (KB5875a) | 29 views, at most 8 levels | every changed pixel is brighter, none darker or mixed, as G2 >= G1 x G1 requires |
+| `edcb6debb7` to `87970e1b93` | (0525c34e14 and 113 more) | none | all 32 views bit-identical |
+| `29d79d3774` (KB6016) | height-correlated Smith G2 in clustered, materials and the other PBR packages | LightsPunctualLamp only, at most 6 levels | 489 pixels brighter, 1 mixed, none darker; the re-recorded baselines are bit-identical to this commit's pictures |
+
+Pass on DirectionalLight and MorphStressTest throughout, so they keep their baselines. Between the steps the only other
+differences were single pixels of 1 level (noise floor). Reproduce: `node scripts/visual-regression.js --only=khronos`
+at a commit and its parent, then compare `test-results/visual/*.actual.png`.
+
 ## Batch 160 budgets re-recorded (2026-11-11, accepted differences)
 
 Scott's ruling of 2026-11-11 ("Yes, re-record"): the batch 160 reference-rendering budgets in
