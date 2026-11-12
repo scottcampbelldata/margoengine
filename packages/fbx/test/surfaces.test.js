@@ -5,7 +5,8 @@ import { convertFBX } from '../dist/index.js';
 import { surfaces } from '../dist/surfaces.js';
 import { legacyFBX } from '../dist/legacy.js';
 import { largeFBX } from '../dist/large.js';
-import { binary, ascii, L, A } from './fixtures.js';
+import { binary, ascii, L, I, A } from './fixtures.js';
+import { evaluateNurbsSurface } from '../../loaders/dist/nurbs.js';
 import { readGLB } from './native-scene-helper.js';
 import { runParseWorker } from '../../../tests/support/parse-worker.js';
 import validator from 'gltf-validator';
@@ -233,9 +234,192 @@ test('the real Maya control net gives byte-identical tessellation when the same 
     fields.find((x) => x[0] === 'KnotVector' + axis)[1] = [A('d', values('KnotVector' + axis))];
   assert.deepEqual(geometry(await convert(tree, 'ascii')), geometry(await convert(tree, 'binary')));
 });
-test('a control-net skin is refused before its original indices could deform tessellated vertices incorrectly', async () => {
-  const tree = surfaceTree();
-  tree[0][2].push(['Deformer', [L(3), 'Skin', 'Skin']]);
-  tree[1][2].push(['C', ['OO', L(3), L(1)]]);
-  await assert.rejects(convert(tree), (error) => error.code === 'unsupported' && /bake/.test(error.message));
+// A rational biquadratic net with a heavier middle point, and its basis written out from Bernstein polynomials so the
+// expected numbers do not come from the evaluator under test (The NURBS Book, eq. 4.2).
+const quadNet = Array.from({ length: 9 }, (_, i) => [(i % 3) / 2, Math.floor(i / 3) / 2, 0, i === 4 ? 2 : 1]).flat();
+function quadratic(points = quadNet) {
+  const tree = surfaceTree({ u: 3, v: 3, points });
+  const fields = tree[0][2][0][2];
+  fields.find((x) => x[0] === 'NurbsSurfaceOrder')[1] = [3, 3];
+  for (const axis of ['U', 'V']) fields.find((x) => x[0] === 'KnotVector' + axis)[1] = [A('d', [0, 0, 0, 1, 1, 1])];
+  fields.find((x) => x[0] === 'Step')[1] = [4, 4];
+  return tree;
+}
+const bern = (i, t) => [(1 - t) ** 2, 2 * t * (1 - t), t * t][i];
+function share(cp, u, v, points = quadNet) {
+  let sum = 0;
+  for (let k = 0; k < 9; k++) sum += points[k * 4 + 3] * bern(k % 3, u) * bern(Math.floor(k / 3), v);
+  return (points[cp * 4 + 3] * bern(cp % 3, u) * bern(Math.floor(cp / 3), v)) / sum;
+}
+// Each output vertex's (u, v): its UV, with the V flip the writer may apply chosen by the position it gives.
+function parameters(g, points = quadNet) {
+  return Array.from({ length: g.positions.length / 3 }, (_, i) => {
+    const u = g.uvs[i * 2];
+    for (const v of [g.uvs[i * 2 + 1], 1 - g.uvs[i * 2 + 1]]) {
+      let x = 0,
+        y = 0;
+      for (let cp = 0; cp < 9; cp++) {
+        x += share(cp, u, v, points) * points[cp * 4];
+        y += share(cp, u, v, points) * points[cp * 4 + 1];
+      }
+      if (Math.abs(x - g.positions[i * 3]) < 1e-6 && Math.abs(y - g.positions[i * 3 + 1]) < 1e-6) return [u, v];
+    }
+    assert.fail(`vertex ${i} is not on the surface`);
+  });
+}
+const loadersSurface = (points) => ({
+  degreeU: 2,
+  degreeV: 2,
+  countU: 3,
+  countV: 3,
+  knotsU: [0, 0, 0, 1, 1, 1],
+  knotsV: [0, 0, 0, 1, 1, 1],
+  points: Array.from({ length: 27 }, (_, k) => points[((k / 3) % 3 | 0) * 12 + Math.floor(k / 9) * 4 + (k % 3)]),
+  weights: Array.from({ length: 9 }, (_, k) => points[(k % 3) * 12 + Math.floor(k / 3) * 4 + 3]),
+});
+test('KB5330b: a blend shape on a NURBS control net morphs every tessellated vertex exactly, at every weight', async () => {
+  const tree = quadratic(),
+    shape = [0, 0, 1, 0, 0, 0.5];
+  tree[0][2].push(
+    ['Deformer', [L(3), 'Deformer::Blend', 'BlendShape'], [['Version', [I(100)]]]],
+    [
+      'Deformer',
+      [L(4), 'SubDeformer::Lift', 'BlendShapeChannel'],
+      [['Version', [I(100)]], ['DeformPercent', [25]], ['FullWeights', [A('d', [100])]]],
+    ],
+    [
+      'Geometry',
+      [L(5), 'Geometry::Lift', 'Shape'],
+      [['Version', [I(100)]], ['Indexes', [A('i', [4, 1])]], ['Vertices', [A('d', shape)]]],
+    ],
+  );
+  tree[1][2].push(['C', ['OO', L(3), L(1)]], ['C', ['OO', L(4), L(3)]], ['C', ['OO', L(5), L(4)]]);
+  const lifted = quadNet.slice();
+  for (let k = 0; k < 3; k++) {
+    lifted[4 * 4 + k] += shape[k];
+    lifted[1 * 4 + k] += shape[3 + k];
+  }
+  const target = loadersSurface(lifted);
+  for (const format of ['ascii', 'binary']) {
+    const result = await convert(tree, format),
+      p = result.doc.meshes[0].primitives[0],
+      g = geometry(result),
+      delta = result.accessor(p.targets[0].POSITION),
+      normal = result.accessor(p.targets[0].NORMAL);
+    assert.equal((result.doc.nodes.find((n) => n.mesh === 0).weights ?? result.doc.meshes[0].weights)[0], 0.25);
+    assert.equal(g.positions.length, 75);
+    parameters(g).forEach(([u, v], i) => {
+      // Linear in the control points: the delta of each vertex is its basis share of each moved point.
+      const expected = [0, 0, shape[2] * share(4, u, v) + shape[5] * share(1, u, v)];
+      for (let k = 0; k < 3; k++) assert.ok(Math.abs(delta[i * 3 + k] - expected[k]) < 1e-7, `${format} delta ${i}`);
+      const n = evaluateNurbsSurface(target, u, v).normal;
+      for (let k = 0; k < 3; k++)
+        assert.ok(Math.abs(normal[i * 3 + k] - (n[k] - g.normals[i * 3 + k])) < 2e-7, `${format} normal ${i}`);
+    });
+  }
+});
+const jointsOf = (result) => {
+  const p = result.doc.meshes[0].primitives[0];
+  return { joints: result.accessor(p.attributes.JOINTS_0), weights: result.accessor(p.attributes.WEIGHTS_0) };
+};
+function skinned(tree, sets) {
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  tree[0][2].push(
+    ['Model', [L(10), 'Model::Root', 'LimbNode'], []],
+    ['Model', [L(11), 'Model::Tip', 'LimbNode'], []],
+    ['Deformer', [L(20), 'Deformer::Skin', 'Skin'], [['Version', [I(101)]]]],
+    ...sets.map(([indexes, weights], c) => [
+      'Deformer',
+      [L(21 + c), 'SubDeformer::Bone' + c, 'Cluster'],
+      [
+        ['Version', [I(100)]],
+        ['Indexes', [A('i', indexes)]],
+        ['Weights', [A('d', weights)]],
+        ['Transform', [A('d', identity)]],
+        ['TransformLink', [A('d', identity)]],
+      ],
+    ]),
+  );
+  tree[1][2].push(
+    ['C', ['OO', L(10), L(0)]],
+    ['C', ['OO', L(11), L(10)]],
+    ['C', ['OO', L(20), L(1)]],
+    ...sets.flatMap((_, c) => [
+      ['C', ['OO', L(21 + c), L(20)]],
+      ['C', ['OO', L(10 + c), L(21 + c)]],
+    ]),
+  );
+  return tree;
+}
+test('KB5330b: a skin whose control points give each vertex one weight set skins the tessellated surface exactly', async () => {
+  // Step 1 on a linear net puts every vertex on a knot, where it reaches one column: two weight sets, both exact.
+  const tree = surfaceTree({ u: 4, v: 2 }),
+    fields = tree[0][2][0][2];
+  fields.find((x) => x[0] === 'KnotVectorU')[1] = [A('d', [0, 0, 1, 2, 3, 3])];
+  fields.find((x) => x[0] === 'Step')[1] = [1, 1];
+  skinned(tree, [
+    [
+      [0, 1, 4, 5, 2, 3, 6, 7],
+      [0.25, 0.25, 0.25, 0.25, 1, 1, 1, 1],
+    ],
+    [
+      [0, 1, 4, 5],
+      [0.75, 0.75, 0.75, 0.75],
+    ],
+  ]);
+  for (const format of ['ascii', 'binary']) {
+    const result = await convert(tree, format),
+      g = geometry(result),
+      { joints, weights } = jointsOf(result);
+    assert.equal(g.positions.length, 24);
+    for (let i = 0; i < 8; i++) {
+      const column = Math.round(g.positions[i * 3] * 3),
+        expected = column < 2 ? { 0: 0.25, 1: 0.75 } : { 0: 1 },
+        got = {};
+      for (let k = 0; k < 4; k++) if (weights[i * 4 + k] > 0) got[joints[i * 4 + k]] = weights[i * 4 + k];
+      assert.deepEqual(got, expected, `${format} vertex ${i}`);
+    }
+  }
+  // One fractional set on every point of a curved rational net is exact at every vertex, between knots too.
+  const uniform = skinned(quadratic(), [
+    [Array.from({ length: 9 }, (_, i) => i), new Array(9).fill(0.4)],
+    [Array.from({ length: 9 }, (_, i) => i), new Array(9).fill(0.6)],
+  ]);
+  const { joints, weights } = jointsOf(await convert(uniform));
+  for (let i = 0; i < joints.length / 4; i++) {
+    const got = {};
+    for (let k = 0; k < 4; k++) if (weights[i * 4 + k] > 0) got[joints[i * 4 + k]] = weights[i * 4 + k];
+    assert.deepEqual(got, { 0: Math.fround(0.4), 1: Math.fround(0.6) });
+  }
+});
+test('KB5330b: control-net skin weights that blend within one vertex are refused, never approximated', async () => {
+  const tree = skinned(quadratic(), [
+    [
+      [0, 1, 2, 3, 4, 5, 6, 7, 8],
+      [1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
+    ],
+    [
+      [6, 7, 8],
+      [0.5, 0.5, 0.5],
+    ],
+  ]);
+  await assert.rejects(
+    convert(tree),
+    (error) => error.code === 'unsupported' && /blend across the control points of one vertex/.test(error.message),
+  );
+  // A Cardinal patch mixes neighbours with negative coefficients; a blended skin there is still found.
+  const cardinal = skinned(
+    surfaceTree({ type: 'Patch', u: 4, v: 2, fields: [['PatchType', ['Cardinal', 'Linear']]] }),
+    [
+      [
+        [0, 1, 2, 3, 4, 5, 6, 7],
+        [1, 1, 1, 0, 1, 1, 1, 0],
+      ],
+      [
+        [3, 7],
+        [1, 1],
+      ],
+    ],
+  );
+  await assert.rejects(convert(cardinal), (error) => error.code === 'unsupported');
 });

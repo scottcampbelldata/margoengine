@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15163365,
+  "total": 15168884,
   "history": [
     {
       "date": "2026-10-24",
@@ -8663,6 +8663,12 @@
       "commit": "e96361a0d6",
       "reason": "KB3148e: ExactOIT, MomentOIT, PeelOIT and PreciseOIT take blendSpace linear layers (sRGB decode/encode and over-in-linear WGSL, per-index linear resolve for exact and peel, linear composite pipeline and group for moments and precise): exact 4820 to 5200, moments 5512 to 5888, peel 3293 to 3515, precise 4033 to 4352 B gzip; not split, as KB3148d measured a lazy import() split of the same composite larger than inline (4466 against 4376 B)",
       "grew": 4
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "ae8a69714b",
+      "reason": "KB5330b: exact blend-shape and skin baking on NURBS control nets in fbx/surfaces (3433 to 4676 B; worker 114006 to 114588 B). A split entry would make every deformed surface load a second chunk for about 1.2 KB.",
+      "grew": 2
     }
   ],
   "items": {
@@ -9015,7 +9021,7 @@
     "@margoengine/exporters/usdz-anim": 20969,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 23366,
-    "@margoengine/fbx dist/workers/fbx.js": 114006,
+    "@margoengine/fbx dist/workers/fbx.js": 118026,
     "@margoengine/fbx/curves": 2304,
     "@margoengine/fbx/deformers": 1108,
     "@margoengine/fbx/export": 8525,
@@ -9024,7 +9030,7 @@
     "@margoengine/fbx/legacy": 6650,
     "@margoengine/fbx/pbr": 3843,
     "@margoengine/fbx/scene-extras": 2735,
-    "@margoengine/fbx/surfaces": 3433,
+    "@margoengine/fbx/surfaces": 4932,
     "@margoengine/fbx/textures": 751,
     "@margoengine/fbx/worker": 23796,
     "@margoengine/fsm": 1852,

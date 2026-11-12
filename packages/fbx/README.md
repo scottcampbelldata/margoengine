@@ -109,6 +109,22 @@ Texture slots with no glTF place (`bump_map`, `displacement_map`, coat, sheen, a
 
 Proof: real files from 3ds Max and Maya give each parameter its own number, and each lands in its slot (`test/pbr.test.js`); the Stingray file embeds its images, so its blue channel is compared with the embedded metal map. Other images are stand-ins, since those files' textures were never published. The order of a layered texture follows the FBX SDK reference and has no render from Maya to compare with.
 
+## NURBS surfaces and patches
+
+`surfaces` from `margoengine/fbx/surfaces` tessellates FBX NURBS surfaces and the five patch bases (Bezier, BezierQuadric, Cardinal, BSpline, Linear) into triangle meshes, with exact normals, parameter UVs and optional end caps. `Step` in the file sets the quads per knot span.
+
+```ts
+import {convertFBX} from 'margoengine/fbx';
+import {surfaces} from 'margoengine/fbx/surfaces';
+const glb = await convertFBX(await (await fetch('/assets/nurbs-plane.fbx')).arrayBuffer(), {extensions: [surfaces]});
+const json = JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, new DataView(glb).getUint32(12, true))));
+console.log(json.meshes[0].primitives[0].attributes);
+```
+
+Blend shapes and skins on a surface move its control points, as Maya and the FBX SDK do. A blend shape becomes a glTF morph target that is exact at every weight, in-betweens included: the surface is linear in its control points, so each vertex moves by its basis share of each moved point. Its normals are the deformed surface's own at full weight, as a mesh shape's are. A skin is exact where the control points a vertex reaches carry one weight set, as with a rigid bind or one shared blend; there the vertex takes that set. Where they carry different sets, an exact result needs each joint at its own bind position, which a glTF skin cannot hold, so the import refuses it and names the remedy (convert the surface to polygons and bind those) rather than approximating.
+
+Proof: real Maya surfaces and every basis tessellate on both front ends, and the morph of a rational biquadratic net matches its Bernstein basis written out by hand, position and normal, at every vertex (`test/surfaces.test.js`).
+
 ## NURBS curves and lines
 
 `nurbsCurves` from `margoengine/fbx/curves` keeps the file's NURBS curves and lines. Each sits on its node as `extras.fbxCurve`, in the node's space, and `fbxCurves` hands them back as splines from `@margoengine/geometry/nurbs` for paths, tubes and anything else that takes a curve.
@@ -125,7 +141,7 @@ for (const {name, record, curve} of fbxCurves(nodes)) console.log(name, record.f
 
 The record holds `form` (`Open`, `Closed`, `Periodic`, or `Line` for a polyline), `degree`, `points` (flat xyz, a periodic curve's wrapped ones included), `weights` (one per point, so a rational curve keeps its pull), `knots` and `polyline`. `polyline` is the curve in straight pieces, eight per knot span, ready to draw. The GLB has no line of its own: the curve travels in the node's `extras`, so a viewer that does not read them shows an empty node. `spline(record)` makes one spline from one record.
 
-`nurbsCurves` defaults off: without it a curve is left out, and a file of only curves has nothing to show. FBX NURBS surfaces are not read.
+`nurbsCurves` defaults off: without it a curve is left out, and a file of only curves has nothing to show. FBX NURBS surfaces are read by `surfaces`, above.
 
 Proof: a real 3ds Max spline passes through every point of the line Max converted it to, the three forms Maya writes close as they say and stay on the circle Maya drew, and a real rational curve bends toward its heavy point (`test/curves.test.js`).
 
@@ -228,7 +244,7 @@ Children of a node with an uneven scale get `InheritType` 1, the plain parent x 
 
 Input is capped at 64 MiB, converted GLB at 128 MiB, expanded position vertices at 1,000,000 across mesh instances, and decoded texture pixels at 16,000,000. Parsing also bounds cumulative decoded arrays to 128 MiB, allocation accounting to 128 MiB, node/property counts, hierarchy depth, and work. Geometry, deformation, and animation have additional work/output limits. These are import budgets, not a zero-allocation or peak-heap guarantee. Measured on the defaults (`test/large.test.js`, `test/default-scale-browser.mjs`): a 996,004-vertex mesh whose every corner is its own vertex, with normals, a UV set and tangents in a zlib-compressed binary file, converts to one glTF primitive and attaches with `parseFBX`, on WebGPU and on the WebGL2 layer; gltf-pro draws it as parts of at most 262,144 vertices (its default `maxPartVertices`), one draw each, which together hold every vertex and every triangle once (a vertex on a cut is stored in each part that uses it, under 1% extra; `test/part-coverage.js`). The geometry build holds about 94 B per corner for such a mesh (24 B per control point, 8 B per corner, 12 B per triangle corner, 28 B plus 4 B per float per vertex), so the 128 MiB scene cap is not what stops it; the 1,000,000-vertex cap is, and past it `largeFBX` raises every cap together. A file whose arrays are not compressed reaches the 64 MiB input cap first, at about 860,000 such vertices. The downstream glTF runtime separately limits GLB/buffer bytes to 64 MiB, so a larger `convertFBX` result may be exportable but cannot be attached by `parseFBX`.
 
-Unsupported data rejects explicitly: an InheritType that does not exist, a shear on a node of its own, Additive/TotalOne, dual quaternion or blended skinning and progressive morphs without `deformers`, layered textures without `pbrMaterials`, and, without `animationLayers`, cubic/mixed/constant-next curves and more than one animation layer. Cameras and lights stay empty nodes without `sceneExtras`. Curves are left out without `nurbsCurves`, and NURBS surfaces, patches and other non-mesh geometry do not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
+Unsupported data rejects explicitly: an InheritType that does not exist, a shear on a node of its own, Additive/TotalOne, dual quaternion or blended skinning and progressive morphs without `deformers`, layered textures without `pbrMaterials`, and, without `animationLayers`, cubic/mixed/constant-next curves and more than one animation layer. Cameras and lights stay empty nodes without `sceneExtras`. Curves are left out without `nurbsCurves`, NURBS surfaces and patches without `surfaces`, and other non-mesh geometry does not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
 
 Array decompression requires platform `DecompressionStream('deflate')`. Image decoding in `parseFBX` requires `createImageBitmap`; `convertFBX` can run headlessly without image decoding. Cancellation is checked during fetch, decompression, parsing, baking, and image decoding; synchronous CPU sections cannot process a newly dispatched abort until the JavaScript event loop resumes.
 

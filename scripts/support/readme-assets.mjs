@@ -69,6 +69,7 @@ export const README_FILES = {
   '/assets/maya-rig.fbx': 'packages/fbx/test/fixtures/real/maya_mixed_inherit_mode_7700_ascii.fbx',
   '/assets/take.fbx': 'packages/fbx/test/fixtures/real/maya_anim_layers_7500_ascii.fbx',
   '/assets/crate.fbx': 'packages/fbx/test/fixtures/real/max_pbr_metal_rough_material_7700_ascii.fbx',
+  '/assets/nurbs-plane.fbx': 'packages/fbx/test/fixtures/real/maya_nurbs_surface_plane_7500_ascii.fbx',
   '/assets/route.fbx': 'packages/fbx/test/fixtures/real/max_nurbs_curve_rational_7500_binary.fbx',
   '/assets/hero.fbx': 'packages/fbx/test/fixtures/real/maya_dq_weights_7500_binary.fbx',
 };

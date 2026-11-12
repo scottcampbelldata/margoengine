@@ -170,7 +170,7 @@ function caps(
   result: { positions: Float32Array; normals?: Float32Array; uvs?: Float32Array },
   triangles: Int32Array,
   budget: ParseBudget,
-): { positions: Float32Array; normals: Float32Array; uvs: Float32Array; indices: Int32Array } {
+): Grid {
   const boundaries: { ring: number[]; reverse: boolean }[] = [];
   const u = field(source, 'UCapped', [0, 0]),
     v = field(source, 'VCapped', [0, 0]);
@@ -195,7 +195,7 @@ function caps(
       reverse: false,
     });
   if (!boundaries.length)
-    return { positions: result.positions, normals: result.normals!, uvs: result.uvs!, indices: triangles };
+    return { positions: result.positions, normals: result.normals!, uvs: result.uvs!, indices: triangles, rings: [] };
   const extra = boundaries.reduce((n, b) => n + b.ring.length, 0),
     count = result.positions.length / 3;
   if (count + extra > budget.limits.vertices || triangles.length + extra * 3 > budget.limits.corners)
@@ -206,22 +206,15 @@ function caps(
     normals = Array.from(result.normals!),
     uvs = Array.from(result.uvs!),
     indices = Array.from(triangles),
-    flip = Number(field(source, 'FlipNormals', [0])[0]) ? -1 : 1;
+    flip = Number(field(source, 'FlipNormals', [0])[0]) ? -1 : 1,
+    rings: number[][] = [];
   for (const { ring, reverse } of boundaries) {
     if (ring.length > 4096) invalid('surface cap polygon budget');
     if (reverse !== (flip === -1)) ring.reverse();
-    const normal = [0, 0, 0];
-    for (let i = 0; i < ring.length; i++) {
-      const a = ring[i] * 3,
-        b = ring[(i + 1) % ring.length] * 3;
-      for (let k = 0; k < 3; k++) {
-        normal[k] +=
-          (positions[a + ((k + 1) % 3)] - positions[b + ((k + 1) % 3)]) *
-          (positions[a + ((k + 2) % 3)] + positions[b + ((k + 2) % 3)]);
-      }
-    }
-    const length = Math.hypot(...normal);
+    const normal = newell(positions, ring),
+      length = Math.hypot(...normal);
     if (length === 0) continue;
+    rings.push(ring);
     const first = positions.length / 3;
     for (const i of ring) {
       for (let k = 0; k < 3; k++) {
@@ -237,12 +230,35 @@ function caps(
     normals: Float32Array.from(normals),
     uvs: Float32Array.from(uvs),
     indices: Int32Array.from(indices),
+    rings,
   };
 }
-function mesh(source: FBXNode, budget: ParseBudget): void {
-  const control = net(source, budget),
-    type = String(source.properties[2]),
-    surface = type === 'Patch' ? patch(source, control, budget) : nurbs(source, control, budget),
+// The unnormalized polygon normal of Newell's method: twice the projected areas of the ring.
+function newell(positions: ArrayLike<number>, ring: readonly number[]): number[] {
+  const normal = [0, 0, 0];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i] * 3,
+      b = ring[(i + 1) % ring.length] * 3;
+    for (let k = 0; k < 3; k++)
+      normal[k] +=
+        (positions[a + ((k + 1) % 3)] - positions[b + ((k + 1) % 3)]) *
+        (positions[a + ((k + 2) % 3)] + positions[b + ((k + 2) % 3)]);
+  }
+  return normal;
+}
+interface Grid {
+  positions: Float32Array;
+  normals: Float32Array;
+  uvs: Float32Array;
+  indices: Int32Array;
+  /** Boundary rings copied for caps, in order: the cap vertices after the grid repeat them. */
+  rings: number[][];
+}
+const surfaceOf = (source: FBXNode, control: Net, budget: ParseBudget): NurbsSurface =>
+  String(source.properties[2]) === 'Patch' ? patch(source, control, budget) : nurbs(source, control, budget);
+// The grid of one control net: the same knots, weights and steps give the same parameters for every net of a geometry.
+function tessellate(source: FBXNode, control: Net, budget: ParseBudget, withCaps: boolean): Grid {
+  const surface = surfaceOf(source, control, budget),
     step = field(source, 'Step', [4 * surface.degreeU, 4 * surface.degreeV]).map(Number);
   if (step.length !== 2 || step.some((n) => !Number.isSafeInteger(n) || n < 1)) invalid('surface step');
   // Charge before the shared tessellator allocates either break lists or output grids.
@@ -277,7 +293,14 @@ function mesh(source: FBXNode, budget: ParseBudget): void {
     }
     for (let i = 0; i < result.normals!.length; i++) result.normals![i] *= -1;
   }
-  const capped = caps(source, rows, cols, result, indices, budget);
+  return withCaps
+    ? caps(source, rows, cols, result, indices, budget)
+    : { positions: result.positions, normals: result.normals!, uvs: result.uvs!, indices, rings: [] };
+}
+function mesh(source: FBXNode, budget: ParseBudget, deformed?: Deformation): void {
+  const control = net(source, budget),
+    capped = tessellate(source, control, budget, true);
+  if (deformed) deform(source, control, capped, deformed, budget);
   const layer = (name: string, dataName: string, width: number, data: Float32Array) =>
     record(
       name,
@@ -298,31 +321,239 @@ function mesh(source: FBXNode, budget: ParseBudget): void {
     layer('LayerElementUV', 'UV', 2, capped.uvs),
   ];
 }
+// A control net with the geometry's own weights and other xyz: every grid of one geometry has the same rational basis
+// R (The NURBS Book, Piegl and Tiller 1997, eq. 4.2), so the grid of these values is R times them.
+function derived(control: Net, budget: ParseBudget, fill: (cp: number, out: Float64Array, at: number) => void): Net {
+  budget.array(control.points.length * 8);
+  budget.work(control.points.length);
+  const points = new Float64Array(control.points.length);
+  for (let cp = 0, at = 0; at < points.length; cp++, at += 4) {
+    fill(cp, points, at);
+    points[at + 3] = control.points[at + 3];
+  }
+  return { u: control.u, v: control.v, points };
+}
+interface Deformation {
+  shapes: FBXNode[];
+  clusters: FBXNode[];
+}
+const unsupported = (what: string): never => {
+  throw fault(
+    'unsupported',
+    `FBX surface ${what}; bake it to an animated polygon mesh before import, or give the control points each vertex reaches one weight set`,
+  );
+};
+// A shape moves control points, and the surface is linear in them: the grid of the deltas is the exact morph of every
+// vertex at every weight, in-betweens included. Normals are the deformed surface's own at full weight, as a mesh shape's.
+function deformShape(source: FBXNode, control: Net, base: Grid, shape: FBXNode, budget: ParseBudget): void {
+  const cpCount = control.u * control.v,
+    indices = array(shape, 'Indexes'),
+    deltas = array(shape, 'Vertices');
+  if (deltas.length !== indices.length * 3) invalid('surface shape delta count');
+  budget.array(cpCount * 4);
+  budget.work(indices.length * 4);
+  const lookup = new Int32Array(cpCount).fill(-1);
+  for (let i = 0; i < indices.length; i++) {
+    const cp = indices[i];
+    if (!Number.isInteger(cp) || cp < 0 || cp >= cpCount || lookup[cp] !== -1) invalid('surface shape control point');
+    for (let k = 0; k < 3; k++) if (!Number.isFinite(deltas[i * 3 + k])) invalid('surface shape delta');
+    lookup[cp] = i;
+  }
+  const value = (cp: number, k: number) => (lookup[cp] < 0 ? 0 : deltas[lookup[cp] * 3 + k]);
+  const moved = tessellate(
+      source,
+      derived(control, budget, (cp, out, at) => {
+        for (let k = 0; k < 3; k++) out[at + k] = value(cp, k);
+      }),
+      budget,
+      false,
+    ),
+    target = tessellate(
+      source,
+      derived(control, budget, (cp, out, at) => {
+        for (let k = 0; k < 3; k++) out[at + k] = control.points[cp * 4 + k] + value(cp, k);
+      }),
+      budget,
+      false,
+    );
+  const count = base.positions.length / 3,
+    grid = moved.positions.length / 3;
+  budget.array(count * 72);
+  budget.work(count * 8);
+  const offsets = new Float64Array(count * 3),
+    normals = new Float64Array(count * 3),
+    targets = new Float64Array(count * 3);
+  for (let i = 0; i < grid * 3; i++) {
+    offsets[i] = moved.positions[i];
+    normals[i] = target.normals[i] - base.normals[i];
+    targets[i] = target.positions[i];
+  }
+  // Cap vertices repeat their ring, and a cap's normal is the flat one of its moved ring.
+  let at = grid;
+  for (const ring of base.rings) {
+    const normal = newell(targets, ring),
+      length = Math.hypot(...normal);
+    for (const v of ring) {
+      for (let k = 0; k < 3; k++) {
+        offsets[at * 3 + k] = offsets[v * 3 + k];
+        normals[at * 3 + k] = length ? normal[k] / length - base.normals[at * 3 + k] : 0;
+      }
+      at++;
+    }
+  }
+  if (at !== count) invalid('surface cap layout');
+  const kept: number[] = [];
+  for (let v = 0; v < count; v++)
+    for (let k = 0; k < 3; k++)
+      if (offsets[v * 3 + k] || normals[v * 3 + k]) {
+        kept.push(v);
+        break;
+      }
+  budget.array(kept.length * 52);
+  const pick = (from: Float64Array) =>
+    Float64Array.from({ length: kept.length * 3 }, (_, i) => from[kept[Math.floor(i / 3)] * 3 + (i % 3)]);
+  shape.children = [
+    ...shape.children.filter((n) => !['Indexes', 'Vertices', 'Normals'].includes(n.name)),
+    record('Indexes', [Int32Array.from(kept)]),
+    record('Vertices', [pick(offsets)]),
+    record('Normals', [pick(normals)]),
+  ];
+}
+// A skin moves each control point by the blend of its own weights. A vertex is a fixed affine combination of the
+// control points its basis reaches, so when they all carry one weight set the vertex moves by that same blend, exactly,
+// whatever the joints do: an affine map commutes with affine combinations (Farin, Curves and Surfaces for CAGD, 2002,
+// ch. 3). Where those points carry different sets, the exact result needs each joint at its own bind position, which a
+// glTF skin (one position shared by every joint of a vertex) cannot hold, so it is refused rather than approximated.
+function deformSkin(source: FBXNode, control: Net, base: Grid, clusters: FBXNode[], budget: ParseBudget): void {
+  const cpCount = control.u * control.v,
+    n = clusters.length;
+  budget.array(cpCount * n * 8 + cpCount * 8);
+  budget.work(cpCount * n);
+  const weights = new Float64Array(cpCount * n),
+    seen = new Int32Array(cpCount);
+  clusters.forEach((cluster, c) => {
+    if (!findChild(cluster, 'Indexes') && !findChild(cluster, 'Weights')) return;
+    const indices = array(cluster, 'Indexes'),
+      values = array(cluster, 'Weights');
+    if (indices.length !== values.length) invalid('surface cluster weight count');
+    budget.work(indices.length);
+    for (let i = 0; i < indices.length; i++) {
+      const cp = indices[i],
+        weight = values[i];
+      // As on a mesh, writers leave entries for control points the geometry lost after binding.
+      if (cp >= cpCount) continue;
+      if (!Number.isInteger(cp) || cp < 0 || seen[cp] === c + 1 || !Number.isFinite(weight) || weight < 0)
+        invalid('surface cluster weight');
+      seen[cp] = c + 1;
+      weights[cp * n + c] = weight;
+    }
+  });
+  const sets = new Map<string, number>(),
+    setOf = new Int32Array(cpCount);
+  for (let cp = 0; cp < cpCount; cp++) {
+    const key = weights.subarray(cp * n, cp * n + n).join(',');
+    let set = sets.get(key);
+    if (set === undefined) sets.set(key, (set = sets.size));
+    setOf[cp] = set;
+  }
+  const count = base.positions.length / 3,
+    copies = base.rings.flat(),
+    grid = count - copies.length;
+  budget.array(count * 4);
+  const vertexSet = new Int32Array(count).fill(-1);
+  // A set reaches a vertex when its points' share of the vertex is not zero. Generic positive values stand in for one,
+  // so a Cardinal patch's negative coefficients cannot cancel to an exact zero (Schwartz 1980; Zippel 1979).
+  for (let set = 0; set < sets.size; set++) {
+    const reach = tessellate(
+      source,
+      derived(control, budget, (cp, out, at) => {
+        out[at] = setOf[cp] === set ? 1 + ((cp * 0.6180339887498949) % 1) : 0;
+        out[at + 1] = out[at + 2] = 0;
+      }),
+      budget,
+      false,
+    );
+    for (let v = 0; v < grid; v++) {
+      if (reach.positions[v * 3] === 0) continue;
+      if (vertexSet[v] !== -1) unsupported('skin weights blend across the control points of one vertex');
+      vertexSet[v] = set;
+    }
+  }
+  for (let i = 0; i < copies.length; i++) vertexSet[grid + i] = vertexSet[copies[i]];
+  for (let v = 0; v < count; v++) if (vertexSet[v] < 0) invalid('surface skin coverage');
+  const rows = [...sets.keys()].map((key) => key.split(',').map(Number));
+  clusters.forEach((cluster, c) => {
+    const indices: number[] = [],
+      values: number[] = [];
+    for (let v = 0; v < count; v++) {
+      const weight = rows[vertexSet[v]][c];
+      if (weight > 0) {
+        indices.push(v);
+        values.push(weight);
+      }
+    }
+    budget.array(indices.length * 12);
+    const rest = cluster.children.filter((node) => node.name !== 'Indexes' && node.name !== 'Weights');
+    cluster.children = indices.length
+      ? [...rest, record('Indexes', [Int32Array.from(indices)]), record('Weights', [Float64Array.from(values)])]
+      : rest;
+  });
+}
+function deform(source: FBXNode, control: Net, base: Grid, deformation: Deformation, budget: ParseBudget): void {
+  for (const shape of deformation.shapes) deformShape(source, control, base, shape, budget);
+  if (deformation.clusters.length) deformSkin(source, control, base, deformation.clusters, budget);
+}
 function normalize(roots: FBXNode[], budget: ParseBudget): void {
   const objects = roots.find((n) => n.name === 'Objects');
   if (!objects) return;
-  const deformers = new Set(
-    objects.children
-      .filter((n) => n.name === 'Deformer' && ['Skin', 'BlendShape'].includes(String(n.properties[2])))
-      .map((n) => String(n.properties[0])),
-  );
-  const deformed = new Set(
-    (roots.find((n) => n.name === 'Connections')?.children ?? [])
-      .filter((n) => n.name === 'C' && n.properties[0] === 'OO' && deformers.has(String(n.properties[1])))
-      .map((n) => String(n.properties[2])),
-  );
+  const links = (roots.find((n) => n.name === 'Connections')?.children ?? []).filter(
+      (n) => n.name === 'C' && n.properties[0] === 'OO',
+    ),
+    byId = new Map(objects.children.map((n) => [String(n.properties[0]), n])),
+    parents = new Map<string, number>(),
+    kids = new Map<string, FBXNode[]>();
+  budget.work(links.length);
+  for (const link of links) {
+    const child = String(link.properties[1]),
+      parent = String(link.properties[2]),
+      node = byId.get(child);
+    parents.set(child, (parents.get(child) ?? 0) + 1);
+    if (!node) continue;
+    let list = kids.get(parent);
+    if (!list) kids.set(parent, (list = []));
+    list.push(node);
+  }
+  const typed = (id: FBXValue, type: string) => (kids.get(String(id)) ?? []).filter((n) => n.properties[2] === type);
+  const surface = (n: FBXNode) => ['Nurb', 'NurbsSurface', 'Patch'].includes(String(n.properties[2]));
+  // The deformers of each surface, gathered before any geometry is rewritten.
+  const deformations = new Map<FBXNode, Deformation>();
+  for (const source of objects.children) {
+    if (!surface(source)) continue;
+    const deformers = (kids.get(String(source.properties[0])) ?? []).filter(
+      (n) => n.name === 'Deformer' && (n.properties[2] === 'Skin' || n.properties[2] === 'BlendShape'),
+    );
+    if (source.children.some((n) => n.name === 'Shape') || (deformers.length && source.name !== 'Geometry'))
+      unsupported('deformation on inline legacy geometry has no control-net form');
+    if (!deformers.length) continue;
+    const skins = deformers.filter((n) => n.properties[2] === 'Skin');
+    if (skins.length > 1) throw new TypeError('Multiple FBX skins on geometry; keep one per target when exporting');
+    const shapes = deformers
+      .filter((n) => n.properties[2] === 'BlendShape')
+      .flatMap((d) => typed(d.properties[0], 'BlendShapeChannel'))
+      .flatMap((c) => typed(c.properties[0], 'Shape'));
+    const clusters = skins.flatMap((d) => typed(d.properties[0], 'Cluster'));
+    // Each rewritten node must belong to this surface alone, or another geometry would read surface vertex numbers.
+    for (const node of [...deformers, ...shapes, ...clusters])
+      if (parents.get(String(node.properties[0])) !== 1) unsupported('deformer shared with other geometry');
+    deformations.set(source, { shapes, clusters });
+  }
   const used = new Set(objects.children.map((n) => String(n.properties[0])));
   let next = -1n;
   let connections = roots.find((n) => n.name === 'Connections');
   for (const source of [...objects.children]) {
     budget.work();
-    if (!['Nurb', 'NurbsSurface', 'Patch'].includes(String(source.properties[2]))) continue;
-    if (deformed.has(String(source.properties[0])) || source.children.some((n) => n.name === 'Shape'))
-      throw fault(
-        'unsupported',
-        'FBX surface control-point deformation has no exact glTF skin equivalent; bake it to an animated polygon mesh before import',
-      );
-    if (source.name === 'Geometry') mesh(source, budget);
+    if (!surface(source)) continue;
+    if (source.name === 'Geometry') mesh(source, budget, deformations.get(source));
     else if (source.name === 'Model' && findChild(source, 'Points')) {
       while (used.has(String(next))) next--;
       budget.node(1);
