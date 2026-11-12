@@ -48,3 +48,21 @@ test('loaders reject abort and local URLs before resources are created',async()=
   await assert.rejects(loadMargoNodes({},'https://example.invalid/nodes',{signal}),/cancel live nodes/);
   await assert.rejects(loadMargoNodes({},'file:///nodes.margo'),/HTTP\(S\)/);
 });
+test('KB5339b: exported socket F-curves give Blender\'s own values between frames, every exact span and both extrapolations', async () => {
+  // Truth: Blender 5.3 evaluating each socket at eighth-frame steps (tools/blender-addon/tests/blender_node_curves.py).
+  const { graph: curved, truth } = JSON.parse(await readFile(new URL('./fixtures/node-curves.json', import.meta.url), 'utf8'));
+  const live = new MargoNodeMaterial(curved);
+  for (const { seconds, values } of truth) {
+    live.seek(seconds);
+    // Blender solves a Bezier span's cubic in single precision: on the span whose free handles pass its end, its answer
+    // sits 7.4e-6 from the exact root; every other span and both extrapolations agree within 2e-7.
+    for (const [key, expected] of Object.entries(values))
+      live.get(key).forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < 1e-5, `${key}[${i}] at ${seconds}s: ${v} against ${expected[i]}`));
+  }
+  assert.equal(curved.parameters['Spring/outputs/0'].curves, undefined);
+  const mutate = (fn) => { const g = structuredClone(curved); fn(g.parameters['Amount/outputs/0'].curves[0]); assert.throws(() => new MargoNodeMaterial(g), /curves of Amount/); };
+  mutate((c) => (c.extrapolation = 'CYCLIC'));
+  mutate((c) => (c.keys[1].t = c.keys[0].t));
+  mutate((c) => (c.keys[0].i = 'ELASTIC'));
+  mutate((c) => (c.keys[0].l = [0, NaN]));
+});

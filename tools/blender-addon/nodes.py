@@ -1,6 +1,51 @@
 """Clean-room live socket graph serialization. No shader code or texture baking."""
 import math
 
+# F-curve keys of one live parameter, in seconds from the scene start, when Blender's own evaluation can be reproduced
+# exactly between frames: CONSTANT, LINEAR, BEZIER and the Penner easings other than ELASTIC, with no modifier, driver,
+# NLA or mute. Anything else keeps the per-frame samples alone.
+EXACT_INTERPOLATIONS = {"CONSTANT", "LINEAR", "BEZIER", "SINE", "QUAD", "CUBIC", "QUART", "QUINT", "EXPO", "CIRC", "BACK", "BOUNCE"}
+
+
+def _fcurves(animation):
+    action = animation.action
+    if action is None:
+        return None
+    slot = getattr(animation, "action_slot", None)
+    if slot is not None:
+        from bpy_extras import anim_utils
+        bag = anim_utils.action_get_channelbag_for_slot(action, slot)
+        return list(bag.fcurves) if bag else []
+    return list(action.fcurves)
+
+
+def exact_curves(animation, path, width, start, fps):
+    if path is None or animation.nla_tracks or any(d.data_path == path for d in animation.drivers):
+        return None
+    fcurves = _fcurves(animation)
+    if fcurves is None:
+        return None
+    curves = []
+    for index in range(width):
+        found = [f for f in fcurves if f.data_path == path and f.array_index == index]
+        if not found:
+            curves.append(None)
+            continue
+        fcurve = found[0]
+        points = fcurve.keyframe_points
+        if fcurve.mute or len(fcurve.modifiers) or not len(points) or fcurve.extrapolation not in {"CONSTANT", "LINEAR"}:
+            return None
+        if any(k.interpolation not in EXACT_INTERPOLATIONS for k in points[:-1]):
+            return None
+        if any(points[n].co[0] <= points[n - 1].co[0] for n in range(1, len(points))):
+            return None
+        seconds = lambda frame: (frame - start) / fps
+        curves.append({"extrapolation": fcurve.extrapolation, "keys": [
+            {"t": seconds(k.co[0]), "v": k.co[1], "l": [seconds(k.handle_left[0]), k.handle_left[1]],
+             "r": [seconds(k.handle_right[0]), k.handle_right[1]], "i": k.interpolation, "e": k.easing, "b": k.back}
+            for k in points]})
+    return curves if any(c is not None for c in curves) else None
+
 
 def graph(context, material, owner):
     tree = material.node_tree
@@ -11,12 +56,13 @@ def graph(context, material, owner):
     shader = output.inputs["Surface"].links[0].from_node
     if shader.type != "BSDF_PRINCIPLED" or output.inputs["Volume"].is_linked or output.inputs["Displacement"].is_linked:
         raise ValueError(f"Material '{material.name}': live nodes require a direct Principled surface")
-    nodes, parameters, readers, memo, active = [], {}, {}, {}, set()
+    nodes, parameters, readers, memo, active, paths = [], {}, {}, {}, set(), {}
 
     def fail(node, detail):
         raise ValueError(f"Material '{material.name}', node '{node.name}': {detail}; disable live_nodes to bake this graph")
 
-    def parameter(key, read):
+    def parameter(key, read, path=None):
+        paths[key] = path
         def value():
             v = read()
             v = [float(v)] if isinstance(v, (int, float)) else list(v)
@@ -32,7 +78,7 @@ def graph(context, material, owner):
         if s.is_linked:
             link = s.links[0]
             return visit(link.from_node, link.from_socket)
-        return parameter(f"{node.name}/inputs/{index}", lambda: s.default_value)
+        return parameter(f"{node.name}/inputs/{index}", lambda: s.default_value, s.path_from_id("default_value"))
 
     def visit(node, out):
         key = (node.as_pointer(), out.identifier)
@@ -50,7 +96,7 @@ def graph(context, material, owner):
             active.remove(key)
             return result
         if t in {"VALUE", "RGB"}:
-            data.update(op="value", inputs=[parameter(f"{node.name}/outputs/0", lambda: out.default_value)])
+            data.update(op="value", inputs=[parameter(f"{node.name}/outputs/0", lambda: out.default_value, out.path_from_id("default_value"))])
         elif t == "MATH":
             data.update(op="math", operation=node.operation, clamp=node.use_clamp, inputs=[socket(node, i) for i in range(3)])
         elif t in {"MIX", "MIX_RGB"}:
@@ -68,7 +114,7 @@ def graph(context, material, owner):
             ramp = node.color_ramp
             data.update(op="ramp", interpolation=ramp.interpolation, colorMode=ramp.color_mode, hue=ramp.hue_interpolation, inputs=[socket(node, 0)], stops=[])
             for i, element in enumerate(ramp.elements):
-                data["stops"].append([parameter(f"{node.name}/stops/{i}/position", lambda e=element: e.position), parameter(f"{node.name}/stops/{i}/color", lambda e=element: e.color)])
+                data["stops"].append([parameter(f"{node.name}/stops/{i}/position", lambda e=element: e.position, element.path_from_id("position")), parameter(f"{node.name}/stops/{i}/color", lambda e=element: e.color, element.path_from_id("color"))])
             data["alpha"] = out.name == "Alpha"
         elif t == "TEX_NOISE":
             data.update(op="noise", dimensions=int(node.noise_dimensions[0]), normalize=getattr(node, "normalize", True), noiseType=getattr(node, "noise_type", "FBM"), color=out.name == "Color")
@@ -135,6 +181,9 @@ def graph(context, material, owner):
         for k, values in samples.items():
             if any(v != values[0] for v in values[1:]):
                 parameters[k]["samples"] = values
+                curves = exact_curves(animation, paths[k], len(values[0]), start, fps)
+                if curves:
+                    parameters[k]["curves"] = curves
     return result
 
 

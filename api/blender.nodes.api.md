@@ -45,6 +45,16 @@ export function parseMargoNodes(engine: EngineKernel, input: ArrayBuffer | Array
 
 // Not exported from this entry, but used by the exports above:
 
+interface CurveKey {
+    t: number;
+    v: number;
+    l: [number, number];
+    r: [number, number];
+    i: string;
+    e: string;
+    b: number;
+}
+
 interface GraphNode {
     name: string;
     op: string;
@@ -75,6 +85,12 @@ interface MargoOptions {
 interface Parameter {
     value: number[];
     samples?: number[][];
+    curves?: (SocketCurve | null)[];
+}
+
+interface SocketCurve {
+    extrapolation: 'CONSTANT' | 'LINEAR';
+    keys: CurveKey[];
 }
 
 type Value = readonly number[];

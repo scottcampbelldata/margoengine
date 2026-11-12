@@ -8,7 +8,7 @@ import { mathExpressions, blendExpressions, nodeHelpers, noiseHelpers } from './
 
 type Value = readonly number[];
 type Wire = { link: number } | { parameter: string };
-interface Parameter { value: number[]; samples?: number[][] }
+interface Parameter { value: number[]; samples?: number[][]; curves?: (SocketCurve | null)[] }
 interface GraphNode {
   name: string; op: string; type: 'float' | 'color' | 'vector'; inputs: Wire[];
   operation?: string; clamp?: boolean; clampFactor?: boolean; mode?: string; blend?: string;
@@ -32,6 +32,76 @@ function reject(detail: string): never {
 }
 const finiteValue = (v: unknown): v is number[] => Array.isArray(v) && [1, 3, 4].includes(v.length) && v.every(n => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 1e20);
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+/** One F-curve key in seconds from the scene start, with its handles and the interpolation of the span it starts. */
+interface CurveKey { t: number; v: number; l: [number, number]; r: [number, number]; i: string; e: string; b: number }
+/** An F-curve the exporter could carry exactly; Blender evaluates the same curve between frames. */
+interface SocketCurve { extrapolation: 'CONSTANT' | 'LINEAR'; keys: CurveKey[] }
+const EASED = ['SINE', 'QUAD', 'CUBIC', 'QUART', 'QUINT', 'EXPO', 'CIRC', 'BACK', 'BOUNCE'];
+const SPANS = new Set(['CONSTANT', 'LINEAR', 'BEZIER', ...EASED]), EASINGS = new Set(['AUTO', 'EASE_IN', 'EASE_OUT', 'EASE_IN_OUT']);
+function validCurve(c: unknown): c is SocketCurve {
+  if (!record(c) || (c.extrapolation !== 'CONSTANT' && c.extrapolation !== 'LINEAR') || !Array.isArray(c.keys) || !c.keys.length || c.keys.length > 65536) return false;
+  const pair = (p: unknown) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite);
+  return (c.keys as unknown[]).every((k, n, all) => record(k) && Number.isFinite(k.t) && Number.isFinite(k.v) && pair(k.l) && pair(k.r) && SPANS.has(k.i as string) && EASINGS.has(k.e as string) && Number.isFinite(k.b) && (n === 0 || (k.t as number) > ((all[n - 1] as CurveKey).t)));
+}
+// Penner's easing equations (R. Penner, Programming Macromedia Flash MX, 2002, ch. 7) as ease-in on 0..1. Blender's exponential
+// one is rescaled to meet both ends, as observed against its own evaluation.
+function bounceOut(x: number): number {
+  if (x < 1 / 2.75) return 7.5625 * x * x;
+  if (x < 2 / 2.75) return 7.5625 * (x -= 1.5 / 2.75) * x + 0.75;
+  if (x < 2.5 / 2.75) return 7.5625 * (x -= 2.25 / 2.75) * x + 0.9375;
+  return 7.5625 * (x -= 2.625 / 2.75) * x + 0.984375;
+}
+function easeIn(kind: string, x: number, back: number): number {
+  switch (kind) {
+    case 'SINE': return 1 - Math.cos((x * Math.PI) / 2);
+    case 'QUAD': return x * x;
+    case 'CUBIC': return x ** 3;
+    case 'QUART': return x ** 4;
+    case 'QUINT': return x ** 5;
+    case 'EXPO': return x === 0 ? 0 : (2 ** (10 * (x - 1)) - 2 ** -10) / (1 - 2 ** -10);
+    case 'CIRC': return 1 - Math.sqrt(1 - x * x);
+    case 'BACK': return x * x * ((back + 1) * x - back);
+    default: return 1 - bounceOut(1 - x);
+  }
+}
+function eased(kind: string, easing: string, x: number, back: number): number {
+  const mode = easing === 'AUTO' ? (kind === 'BACK' || kind === 'BOUNCE' ? 'EASE_OUT' : 'EASE_IN') : easing;
+  // Penner's in-out Back widens the overshoot by 1.525 on both halves.
+  if (mode === 'EASE_IN_OUT') { const s = kind === 'BACK' ? back * 1.525 : back; return x < 0.5 ? easeIn(kind, 2 * x, s) / 2 : 1 - easeIn(kind, 2 - 2 * x, s) / 2; }
+  return mode === 'EASE_IN' ? easeIn(kind, x, back) : 1 - easeIn(kind, 1 - x, back);
+}
+// A Bezier span as Blender evaluates it: each handle is shortened along itself to reach at most the span's length in
+// time, which keeps time monotonic, then time is solved for the curve parameter.
+function bezier(a: CurveKey, b: CurveKey, s: number): number {
+  const length = b.t - a.t;
+  let [x1, y1] = a.r, [x2, y2] = b.l;
+  if (x1 - a.t > length) { y1 = a.v + ((y1 - a.v) * length) / (x1 - a.t); x1 = a.t + length; }
+  if (b.t - x2 > length) { y2 = b.v - ((b.v - y2) * length) / (b.t - x2); x2 = b.t - length; }
+  const at = (p0: number, p1: number, p2: number, p3: number, u: number) => { const w = 1 - u; return w * w * w * p0 + 3 * w * w * u * p1 + 3 * w * u * u * p2 + u * u * u * p3; };
+  let lo = 0, hi = 1;
+  for (let n = 0; n < 64; n++) { const mid = (lo + hi) / 2; if (at(a.t, x1, x2, b.t, mid) < s) lo = mid; else hi = mid; }
+  return at(a.v, y1, y2, b.v, (lo + hi) / 2);
+}
+function evaluateCurve(c: SocketCurve, s: number): number {
+  const k = c.keys, first = k[0], last = k[k.length - 1];
+  if (s <= first.t || k.length === 1) {
+    if (c.extrapolation === 'CONSTANT' || k.length === 1) return first.v;
+    const slope = first.i === 'BEZIER' ? (first.t === first.l[0] ? 0 : (first.v - first.l[1]) / (first.t - first.l[0])) : (k[1].v - first.v) / (k[1].t - first.t);
+    return first.v + (s - first.t) * slope;
+  }
+  if (s >= last.t) {
+    if (c.extrapolation === 'CONSTANT') return last.v;
+    const prev = k[k.length - 2], slope = last.i === 'BEZIER' ? (last.r[0] === last.t ? 0 : (last.r[1] - last.v) / (last.r[0] - last.t)) : (last.v - prev.v) / (last.t - prev.t);
+    return last.v + (s - last.t) * slope;
+  }
+  let lo = 0, hi = k.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (k[mid].t <= s) lo = mid; else hi = mid; }
+  const a = k[lo], b = k[hi], x = (s - a.t) / (b.t - a.t);
+  if (a.i === 'CONSTANT') return a.v;
+  if (a.i === 'LINEAR') return a.v + (b.v - a.v) * x;
+  if (a.i === 'BEZIER') return bezier(a, b, s);
+  return a.v + (b.v - a.v) * eased(a.i, a.e, x, a.b);
+}
 const scalar = (e: string, type: string) => type === 'color' ? `dot(${e}.rgb,vec3f(0.3333333333))` : `${e}.x`;
 
 /** A compiled GPU surface and its live uniform values. set and seek never recompile the shader or bake an image. */
@@ -58,7 +128,8 @@ export class MargoNodeMaterial {
     for (const [key,p] of Object.entries(g.parameters)) {
       if (!record(p) || !finiteValue(p.value)) reject(`parameter ${key}`);
       if (p.samples && (!g.times || !Array.isArray(p.samples) || p.samples.length !== g.times.length || p.samples.some(v => !finiteValue(v) || v.length !== p.value.length))) reject(`samples of ${key}`);
-      sampleCount += p.samples?.length ?? 0;
+      if (p.curves !== undefined && (!g.times || !Array.isArray(p.curves) || p.curves.length !== p.value.length || p.curves.some(c => c !== null && !validCurve(c)))) reject(`curves of ${key}`);
+      sampleCount += (p.samples?.length ?? 0) + (p.curves ?? []).reduce((n, c) => n + (c ? c.keys.length : 0), 0);
       this.offsets.set(key, this.offsets.size * 4);
     }
     if (sampleCount > 262144) reject('more than 262144 samples');
@@ -198,8 +269,10 @@ export class MargoNodeMaterial {
     const times=this.graph.times;
     let left=0,right=0,t=0;
     if(times){right=times.findIndex(v=>v>seconds);if(right<0)right=times.length-1;left=Math.max(0,right-1);t=right===left?0:Math.max(0,Math.min(1,(seconds-times[left])/(times[right]-times[left])));}
+    // Exported F-curves are evaluated as Blender does between frames; other animation interpolates its frame samples.
+    const at=times?Math.max(times[0],Math.min(times[times.length-1],seconds)):0;
     for(const [key,p] of Object.entries(this.graph.parameters)) {
-      const v=this.overrides.get(key)??(p.samples?p.samples[left].map((v,i)=>v+(p.samples![right][i]-v)*t):p.value);
+      const v=this.overrides.get(key)??(p.curves?p.value.map((v,i)=>p.curves![i]?evaluateCurve(p.curves![i]!,at):v):p.samples?p.samples[left].map((v,i)=>v+(p.samples![right][i]-v)*t):p.value);
       this.write(key,v);
     }
     return this;

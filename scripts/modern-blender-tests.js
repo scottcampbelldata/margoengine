@@ -226,6 +226,23 @@ if (process.env.MARGO_BLENDER) {
       "truth",
     );
   }
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    ["--background", "--factory-startup", "--python-exit-code", "1", "--python", "tools/blender-addon/tests/blender_node_curves.py", "--", "test-results/blender/node-curves"],
+    { stdio: "inherit" },
+  );
+  {
+    // The committed socket-curve truth must still be what Blender exports and evaluates (KB5339b).
+    const fresh = JSON.parse(await readFile("test-results/blender/node-curves/node-curves.json", "utf8"));
+    const kept = JSON.parse(await readFile("packages/blender/tests/fixtures/node-curves.json", "utf8"));
+    const close = (a, b, path) => {
+      if (typeof a === "number") assert.ok(Math.abs(a - b) < 1e-6, `fresh node curves differ at ${path}: ${a} against ${b}`);
+      else if (a && typeof a === "object") for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) close(a[key], b[key], `${path}.${key}`);
+      else assert.equal(a, b, `fresh node curves differ at ${path}`);
+    };
+    close(fresh.truth, kept.truth, "truth");
+    close(fresh.graph.parameters, kept.graph.parameters, "parameters");
+  }
   const { margoComponents } =
     await import("../packages/blender/dist/components.js");
   assert.deepEqual(

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15168884,
+  "total": 15169983,
   "history": [
     {
       "date": "2026-10-24",
@@ -8669,6 +8669,12 @@
       "commit": "ae8a69714b",
       "reason": "KB5330b: exact blend-shape and skin baking on NURBS control nets in fbx/surfaces (3433 to 4676 B; worker 114006 to 114588 B). A split entry would make every deformed surface load a second chunk for about 1.2 KB.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "4cb6fb1913",
+      "reason": "KB5339b: live socket F-curves evaluated as Blender does (Bezier with handle clamp, nine Penner easings, extrapolation, validation): blender/nodes 10102 to 11169 B gzip. Not split: every animated live graph needs it, so a lazy chunk would add a request for about 1 KB.",
+      "grew": 1
     }
   ],
   "items": {
@@ -8769,7 +8775,7 @@
     "@margoengine/blender/lightmap": 4892,
     "@margoengine/blender/live": 4953,
     "@margoengine/blender/meshopt": 8560,
-    "@margoengine/blender/nodes": 10406,
+    "@margoengine/blender/nodes": 11505,
     "@margoengine/blender/objects": 5201,
     "@margoengine/blender/pbr-ext": 13434,
     "@margoengine/bvh": 24403,
