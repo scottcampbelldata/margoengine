@@ -1,5 +1,23 @@
 # Known bugs and unverified features
 
+### Open: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
+
+- **What:** glTF 2.0 Appendix B defines material = mix(dielectric_brdf, metal_brdf, metallic); only the dielectric has a
+  diffuse lobe, weighted by 1 minus the dielectric Fresnel (F0 0.04). gltf-pro's base direct light was fixed for this in
+  864051383 (KB3240, MetalRoughSpheresNoTextures MAE 1.7865 to 0.6997), but these direct lights still write
+  `(1 - F(mix(0.04, base, metallic))) * (1 - metallic) * base / pi`, which darkens every part-metal surface (at
+  metallic 5/6 the smooth diffuse is half the spec's):
+  `packages/core/src/shaders.ts` (core's WGSL direct light), `packages/shared/light-terms.js` `clusterBrdf` (clustered,
+  materials), `packages/animation/src/vat.ts` (two sites), `packages/lod/src/imposter.ts`,
+  `packages/post/src/material-decals.ts` and `packages/webgl2-compat/src/preview.ts` (core's WebGL2 twin).
+- **Repro:** read each site: its `f0` is `mix(vec3f(0.04), base, metal)` and the diffuse takes `(1.0 - f)` of that f0.
+  `packages/gltf-pro/tests/metal-dielectric-mix.test.js` holds the expected weight.
+- **Cause:** the KB3240 fix was made in gltf-pro only; the other copies of the same direct light kept the old weight.
+- **Fix to build:** each site weights the diffuse by `1 - (0.04 + 0.96 (1 - vh)^5)` (the dielectric Schlick term; an IOR
+  extension's own F0 where the package has one), with a test per site like gltf-pro's. Every lit picture with a
+  part-metal surface moves: the visual baselines and the batch 160 proofs that hold such surfaces are re-recorded on the
+  dev PC (baselines are per machine), and core's site is a core change (Scott's call).
+
 ### Fixed 2026-11-12: Radeon 680M, biomes flythrough on the WebGL2 layer took 0.5 to 0.75 s a frame (AMD GPU hunt row 34)
 
 - **Repro:** on the Beelink (Radeon 680M, Chromium with ANGLE D3D11),
@@ -234,14 +252,14 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   smallest normal float is enough to stop 0/0 at nl = a2 = 0.
 - **Effect:** voxel-night-high keeps its old baseline and fails visual:check until this is fixed (docs/limits.md,
   KB2224b). Core's copy is a core change: Scott's call.
-- **Fixed 2026-11-12 (hunt K1), packages:** the floor is now 1e-30 in `smithGCorrelated`, `smithGCorrelatedFloat` and
+- **Fixed 2026-11-12 (hunt K1), packages, `675ee2476` (proofs advanced in `cdfdd3b77`):** the floor is now 1e-30 in `smithGCorrelated`, `smithGCorrelatedFloat` and
   `ggxNamed` (packages/shared/light-terms.js) and in materials' anisotropic `materialG2`
   (packages/materials/src/lobe-shader.ts, the same guard): far above the smallest normal float32 (1.2e-38), so no backend
   flushes it, and below 2 nl nv for every lit pixel, so G2 is the exact value down to nl = 1e-5, nv = 1e-4, a2 = 1e-10.
   Regression: `tests/smith-shaders.test.js`, "every G2 text keeps the exact value on smooth surfaces at grazing angles"
   (fails before: 0.00002 against 0.83).
 - **Still open:** core's own copy (packages/core/src/shaders.ts, since edcb6debb7) is fixed in the local commit tagged
-  `K1-core-1`, which lands after the MSVC linker is installed. voxel-night-high needs its baseline re-recorded on the
+  `K1-core-1` (core 22,225 to 22,231 B gzip, core + stage 24,848 to 24,853 B), which lands after the MSVC linker is installed and needs Scott's yes. voxel-night-high needs its baseline re-recorded on the
   dev PC (visual baselines are per machine): the old one predates the brighter G2 pixels of 29d79d3774.
 
 ### Fixed 2026-11-11: a BatchedMesh over 262,144 vertices threw, so the batched-mesh demo never got ready (KB-VIS-bm)
@@ -2584,6 +2602,8 @@ Fixed 2026-11-11 (bug sweep L3b, KB1843): the gathers are now scatter as gather 
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
+- **Rechecked 2026-11-12 (hunt K1, origin/main 25a036b46):** `scripts/support/readme-run-known.json` holds one entry, not 101:
+  `ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55` ("Unknown animator clip GetUpFromBack"), which waits with physics.
 - **Current source audit (2026-11-09):** 101 entries remain after the upstream voxel-pathtracer repair, 84 labelled `sample:` and 17 labelled `example:`.
   The required-test-items scoped rerun ran 62 of 94 examples, with 32 allowed failures. It exited zero; that does not mean
   those 32 examples ran. Their missing/incompatible inputs are indexed in [missing-test-items](work-lists/missing-test-items.md).
@@ -4174,7 +4194,7 @@ re-recorded at these lower values (stricter, both backends). The rest is mostly
 silhouette and edge antialiasing and stays open. Environment, Cornell area and point
 proofs are unchanged (their scenes are metallic 0 or 1). Regression:
 packages/gltf-pro/tests/metal-dielectric-mix.test.js (fails on the old weight). The
-same weight is open in other packages: see the bug-sweep rows named in that commit.
+same weight is open in other packages: KB3240b below.
 
 ### Batch 160 clearcoat picture loss (open)
 
