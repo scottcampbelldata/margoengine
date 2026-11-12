@@ -43,9 +43,9 @@ The following failures remain for the next complete jobs:
 
 | Pair | Observed cause and next work |
 | --- | --- |
-| Margo compute | The old adapter rejects storage-buffer drawing, although shader/raw now exposes storage inputs. Build the adapter using that supported API. |
+| Margo compute | Fixed 2026-11-11 (KB6250b, aa6ffaab01): the adapter builds the case with shader's `ComputePass`, storage buffers and raw point meshes instead of throwing unsupported. Parity smoke `p-compute-262144@margo: ok` (one run, no timing: speed phase). Regression: tests/parity-adapters.test.js. |
 | Margo light probe | The scene supplies nine SH coefficients; the current adapter only knows baked LightProbes. Add the missing coefficient-source API in environment if no supported input fits. |
-| Margo grading | The adapter rejects hue rotation although shader utilities and tonemap/hue now supply hue operations. Wire the matching grading arithmetic and verify output. |
+| Margo grading | Fixed 2026-11-11 (KB6250b, aa6ffaab01): the adapter builds the case with shader's `NodePass` and the hue and saturation utilities instead of throwing unsupported. Parity smoke `p-color-grading@margo: ok` (one run, no timing: speed phase). Regression: tests/parity-adapters.test.js. |
 | Margo lens flare | Built in post (2026-11-11, KB6250c): `LensFlare` takes a point `position` and up to 16 configurable screen-size `elements`, and the adapter now builds the scene's light and four elements. Proved by packages/post/test/lens-flare.test.js and `npm run test:gpu:flare` (WebGPU and the WebGL2 layer); the matrix row updates at the next parity run, which the build phase defers. |
 | Margo meshopt | Fixed in round 2: the owning gltf-pro parser and async resolver now apply the fallback contract to EXT and KHR. See the regression and reproduction below. |
 | Reference depth material, WebGPU | Closed in round 3 as rival unsupported (KB6250f): three.js 0.186.1 WebGPURenderer refuses MeshDepthMaterial. The WebGL comparison stands. |
