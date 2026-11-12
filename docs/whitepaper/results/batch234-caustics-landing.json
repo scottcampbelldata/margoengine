@@ -391,7 +391,7 @@
     "An unclassified Biomes water leaf required an explicit GPU rendering reason before startup.",
     "The outer flythrough hold was corrected from six minutes to its existing fifteen-minute test limit. No test or assertion changed."
   ],
-  "readme": "deferred in docs/work-lists/readme-owed.md",
+  "readme": "deferred in the README-owed list",
   "fullVerify": "local CI only",
   "sizesGzip": {
     "water": 20106,

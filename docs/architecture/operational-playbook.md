@@ -703,7 +703,7 @@ acceptance. Capture stability is assigned to the separate capture-msaa-hunt
 branch; this continuation neither changes nor clears that regression. No push.
 
 The source inventory is retained in
-[the wider owner audit](../work-lists/batch-56-scene-owners.md): 181 actual calls,
+the wider owner audit: 181 actual calls,
 including 118 registration-review candidates in 46 packages. It also scans
 explicit EnginePlugin disposal methods to catch missing calls. This remains
 open; syntactic inventory is not a substitute for per-owner runtime proof.
@@ -781,7 +781,7 @@ could not run at all. Test: `tests/gpu-lock-bench-correctness.test.js`.
 
 The named `npm run test:speed` suite retains the budgets in
 `scripts/speed/budgets.mjs`, speed test registrations and standalone drivers,
-listed in [the release inventory](../work-lists/speed-phase.md). Mixed CPU files
+listed in the release inventory. Mixed CPU files
 still check values, geometry, errors, allocations and work counts. Pure speed
 callbacks are registered only in the active speed phase, with explicit deferral
 output rather than skipped tests or passing substitute numbers. Repeated EXR,
@@ -2662,7 +2662,7 @@ This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they d
 - **Fast gate before a push:** lint, hygiene, check:banned-terms, build:packages, api:check, quality, and the tests of the changed packages and the packages that depend on them, with their GPU tests on WebGPU and the WebGL2 compatibility layer. Exports changed: commit the api:update output.
 - **Machine paths (2026-11-11):** check:banned-terms also fails on any tracked text file that names an absolute machine path (a drive-letter or Git Bash path into a home folder or the dev PC's project folder). Name sibling checkouts as `../name` and tool caches by their environment variable; scripts resolve outside folders from `import.meta.url`. The allow list with its reasons is in `scripts/machine-paths.mjs`; the regression is `tests/machine-paths.test.js`.
 - **No full verify in any lane.** Local CI on the dev PC runs the one full `npm run verify` on the newest `main` (scheduled task "Margo CI (CPU)"). Running it in a lane doubles the work: eleven lanes doing so held the CPU at 94% and stretched verify from 12 to 40 minutes. A red `main` is fixed forward by the lane that caused it within about 2 hours, or that commit is reverted.
-- **No README work until the features are built.** No `check:readme-run`, no README example writing or fixing. Each job adds one line per changed package to `docs/work-lists/readme-owed.md`; the README phase before release clears it.
+- **No README work until the features are built.** No `check:readme-run`, no README example writing or fixing. Each job adds one line per changed package to the README-owed list; the README phase before release clears it.
 - **Only complete jobs reach `main`,** squashed into one commit: no checkpoint, evidence-only or partial pushes.
 - **Round caps:** a stuck job parks with a note after 3 rounds in the build phase (5 to 10 only for an obvious bug with measured gains each round); parked notes feed the fix phase. A blocker owned by another lane gets one line in the handoff, and the lane moves on to its next job.
 - **This section stays short.** Evidence for a gate goes in its own row in 4.1 or a line in section 5, never a new essay at the top of this file.
@@ -2948,7 +2948,7 @@ of static batches; an upload over the device binding throws naming `maxPartVerti
 (1,001,000 vertices: 4 parts, identical triangle multiset, 0.37% copied, BLEND order, points and lines, worker and prepared
 paths, refusals), exporters [split-primitive.test.js](../../packages/exporters/tests/split-primitive.test.js) and the lod
 autoLOD part test. Missing: GPU pixel equality against a pre-split reference and the 10M-triangle frame time on the
-A6000 and an iGPU (docs/work-lists/speed-phase.md). Progressive loads (2026-11-11) stream a split primitive part by part:
+A6000 and an iGPU (the speed-phase inventory). Progressive loads (2026-11-11) stream a split primitive part by part:
 the worker posts one message per part as it packs it, the first part replaces the placeholder box and each later one is
 inserted after the previous part on every node that uses the mesh (`PBRModel.insertPart`), so `complete` equals
 `loadGLTF` byte for byte ([progressive.test.js](../../packages/gltf-pro/tests/progressive.test.js), grids and a textured
@@ -3085,7 +3085,7 @@ Batch 257 job 3: native Chromium pointer lock is proved across the canvas bridge
 Batch 257 job 2: automatic worker/page selection is proved with one shared scene module and six rendered worker/page/fallback cases across WebGPU and WebGL2. Capability/module preparation precedes irreversible canvas transfer. Worker runtime failures propagate; cleanup is acknowledged over RPC before termination. Native Firefox/Safari evidence is the separate batch job 4.
 
 Batch 253 input evidence: `packages/input/test/input-browser.mjs` acquires native pointer lock from a click, drives a mesh transform through vector and locked mouse action channels, checks rendered pixel movement, then checks return after release. WebGPU and WebGL2 compatibility both pass. The package's `test:browser` registers this rendering proof in the GPU suite; changed-package GPU checks use a shared slot only. Physical XR controllers, hand tracking and raw mouse fidelity still need hardware acceptance; CPU fixtures cover their action/replay contracts and raw capability negotiation. No new rendering algorithm or speed claim.
-Batch 257 job 1: worker RPC adds typed task dispatch and fixed FIFO pools without renderer changes. CPU proof covers actual worker transfer, cancellation, concurrency and transport errors; the worker GPU fixture also checks browser RPC. Existing thread-independence timing budgets are deferred by speedEnabled() during the build phase, with their original bars in docs/work-lists/speed-phase.md. Render, pick, sizing and input assertions still run on both backends.
+Batch 257 job 1: worker RPC adds typed task dispatch and fixed FIFO pools without renderer changes. CPU proof covers actual worker transfer, cancellation, concurrency and transport errors; the worker GPU fixture also checks browser RPC. Existing thread-independence timing budgets are deferred by speedEnabled() during the build phase, with their original bars in the speed-phase inventory. Render, pick, sizing and input assertions still run on both backends.
 
 Batch 273 array-layer repair separates adapter capacity from the unrequested
 device default. The optional compatibility adapter reports GL's actual array
@@ -3101,7 +3101,7 @@ that separate coverage gap remains in known-bugs. Full receipt:
 `docs/whitepaper/results/batch-273-array-layer-limits.json`.
 
 Batch 273 round 9 groups failures 11 through 26 in
-`docs/work-lists/batch-273-compat-triage.md`. Native reference fixtures explicitly
+the batch 273 compatibility triage. Native reference fixtures explicitly
 disable the outer forced-compatibility shim while continuing to select the
 layer inside their own comparison. `tests/compat-baselines.test.js` executes
 all seven canonical setup calls under `MARGO_COMPAT=1` in verify and therefore
@@ -3210,7 +3210,7 @@ timing assertion, and ran once before that was noticed. The default gate now
 uses the same 140 frames per mode and all original assertions without reading
 timing clocks. Its regression executes the actual fixture and checks every
 render; the old fixture fails when it reads the forbidden clock. The optional
-measurement path is explicitly deferred in `docs/work-lists/speed-phase.md`.
+measurement path is explicitly deferred in the speed-phase inventory.
 
 ### Context loss during active D3D11 compilation (test-page 45)
 
@@ -3665,7 +3665,7 @@ previous unbounded shutdown while validating this consolidation.
 
 
 
-The required-fixture audit is tracked in [missing-test-items](../work-lists/missing-test-items.md).
+The required-fixture audit is tracked in the missing-test-items audit.
 The verify root suite now runs `tests/fixture-skips.test.js`, which parses test/proof syntax with
 `scripts/check-fixture-skips.mjs` and rejects the audited missing-file skip/early-success patterns.
 Required reads also reject absent files and Git LFS pointers with an exact path and recovery command.
@@ -4300,7 +4300,7 @@ Batch 160 job 2 extends the outside picture evidence to all 27 ClearCoatTest pri
 factor/roughness textures and independent normal maps. All-pixel RGB error budgets are frozen on
 WebGPU and actual compatibility WebGL2; native WebGL2 rejection is asserted. No core or GPU math
 was changed. The full cause of the image loss remains unisolated in known-bugs. The 14 original
-verify skips were missing assets, not hardware: docs/work-lists/batch-160-skips.md lists each;
+verify skips were missing assets, not hardware: docs/whitepaper/batch-160-skips.md lists each;
 external fixtures now run all 63 tests in the four affected files, with zero skips.
 
 Job 2 verification also repairs the WFC browser harness's unbounded shutdown: closeAll now
@@ -5792,7 +5792,7 @@ SAXPY/grid outputs at every original candidate and unchanged 300,001-element
 integer kernels. Clock/cache semantics retain scripted-device unit coverage.
 The AST regression protects every timing call and the explicit set of deferred
 callbacks. It fails against the parent. Research, scope and retained measurements
-are in clean-room.md and work-lists/speed-phase.md. No speed work ran here.
+are in clean-room.md and the speed-phase inventory. No speed work ran here.
 
 ### Batch 56 continuation acceptance snapshot (2026-11-09)
 
@@ -5938,7 +5938,7 @@ failure. No runtime/core/stage change or size-ceiling change; root gzip 23,924 B
 Research, defect, reproduction and durable summary: clean-room.md,
 known-bugs.md, whitepaper/reproduce.md and
 whitepaper/results/batch-273-dispersion-checkpoint.json. The job 2 checklist in
-work-lists/batch-273-browser-matrix.md records real Windows browser availability,
+the batch 273 browser matrix checklist records real Windows browser availability,
 the Firefox spawn refusal and the exact external device/access needs.
 
 ### Section 5 evidence: recorded colour-map precision
@@ -7387,7 +7387,7 @@ The all-package discovery regression also catches packages that add their first 
 
 ### Section 5 evidence: typed table GPU aggregation (batch 174 job 2)
 
-The optional sciviz/table entry classifies rows and applies immutable filter snapshots on the CPU, then dispatches one independent invocation per 256-row tile through ComputeContext. Each invocation owns its bin counters and numeric accumulators. No global float atomic, race-dependent sum or per-bin repeated scan exists. Bounded chunks return partial counts/sums/min/max for a float64 host merge; the same order defines the CPU fallback. Tests cover actual WebGPU and the WebGL2 compatibility device, including rendered filtered histogram/heatmap pixels and 10,000,000 physical rows, exact independent per-bin comparisons, 39 dispatches and 1,250,016 partial bins. No timing assertions or exclusive lock. Existing renderer/core/stage implementations are unchanged. File-format fixtures come from an opaque PyArrow writer; CRC, truncation, null, integer precision and allocation-limit checks are CPU regressions. Limits and deferred timing are in limits.md and work-lists/speed-phase.md.
+The optional sciviz/table entry classifies rows and applies immutable filter snapshots on the CPU, then dispatches one independent invocation per 256-row tile through ComputeContext. Each invocation owns its bin counters and numeric accumulators. No global float atomic, race-dependent sum or per-bin repeated scan exists. Bounded chunks return partial counts/sums/min/max for a float64 host merge; the same order defines the CPU fallback. Tests cover actual WebGPU and the WebGL2 compatibility device, including rendered filtered histogram/heatmap pixels and 10,000,000 physical rows, exact independent per-bin comparisons, 39 dispatches and 1,250,016 partial bins. No timing assertions or exclusive lock. Existing renderer/core/stage implementations are unchanged. File-format fixtures come from an opaque PyArrow writer; CRC, truncation, null, integer precision and allocation-limit checks are CPU regressions. Limits and deferred timing are in limits.md and the speed-phase inventory.
 ### Section 5 evidence: scientific PDF and math
 Batch 178 job 2 keeps PDF/math optional. The ordinary figure export overlay registry retains formula paths across HTML, PNG, SVG and PDF and disposes them with the figure. Font outlines come from the existing loader, with exact quadratic-to-cubic conversion for PDF. No core/stage or GPU shader change. Both rendering backends produce an entirely vector 3441-sample LIGO figure; independent MuPDF opens all six PDF fixtures without repair and confirms paths, raster alpha, clipping, gradient and image orientation. Scope, tests and remaining font-specific math appearance differences are in docs/sciviz-publication.md.
 
@@ -7853,7 +7853,7 @@ The optional compute/distance entry adds one WGSL kernel (seed, flood, distance 
 workgroups, integer squared distances, ties to the lower index) with no core, stage or backend change. Evidence: error
 rates against the exact separable transform on WebGPU and the WebGL2 layer, nearest-seed buffers bit-identical to the CPU
 backend, 200 brute-force oracle masks (docs/limits.md, "Compute distance fields"). Missing: quiet-machine GPU timings
-(docs/work-lists/speed-phase.md) and the follow-up consumers (coast foam, outline widening).
+(the speed-phase inventory) and the follow-up consumers (coast foam, outline widening).
 
 ### 5. Audio offline spectrograms (2026-11-10)
 
@@ -7861,10 +7861,10 @@ The optional audio/spectrogram entry is CPU code (radix-2 FFT in double precisio
 GPU path that loads compute/fft lazily and batches frames; no core, stage or backend change. Evidence: windows against Harris's
 formulas, FFT against a direct DFT, Parseval, round trip within 6e-8, Griffin-Lim SNR and convergence, GPU against CPU on both
 backends (docs/limits.md, "Audio offline spectrograms"). Missing: the Rust/Wasm FFT A/B and quiet-machine timings
-(docs/work-lists/speed-phase.md), the phase vocoder.
+(the speed-phase inventory), the phase vocoder.
 
 ## Section 5 evidence: lague plan 1 particle liquid
-Optional water/liquid (ParticleLiquid) is an HDR PostStack stage of six render passes: sphere sprites to r32float eye depth with a depth32float attachment, three narrow-range filter passes (Truong and Yuksel 2018), additive r16float thickness, one composite. It reads particle centres from a storage buffer in the vertex stage (the WebGL2 layer's data texture) and uses no compute, workgroup memory, barriers or 32-bit float blending, so both backends run the same WGSL as draws. Evidence: packages/water/test/liquid.browser.mjs passes natively and with MARGO_COMPAT=1 (GPU filter equals the float64 oracle within 1e-4 at every covered pixel, refraction and Fresnel against ray optics, steady-frame work counts at 1,000,000 particles). Missing: the iGPU timing and the quiet-machine rerun (docs/work-lists/speed-phase.md). No core, stage or water root change.
+Optional water/liquid (ParticleLiquid) is an HDR PostStack stage of six render passes: sphere sprites to r32float eye depth with a depth32float attachment, three narrow-range filter passes (Truong and Yuksel 2018), additive r16float thickness, one composite. It reads particle centres from a storage buffer in the vertex stage (the WebGL2 layer's data texture) and uses no compute, workgroup memory, barriers or 32-bit float blending, so both backends run the same WGSL as draws. Evidence: packages/water/test/liquid.browser.mjs passes natively and with MARGO_COMPAT=1 (GPU filter equals the float64 oracle within 1e-4 at every covered pixel, refraction and Fresnel against ray optics, steady-frame work counts at 1,000,000 particles). Missing: the iGPU timing and the quiet-machine rerun (the speed-phase inventory). No core, stage or water root change.
 Whitewater (2026-11-11): a lazy chunk of seven render-pass pipelines (bucket fill by depth-tested point draws into r32uint, normals and potentials into rgba32float and r32uint, a count pyramid in two r32uint atlases, the pool step as MRT into two rgba32float targets, a 1x1 ring head, sprites into an rgba16float layer the composite reads). No compute, atomics, workgroup memory or barriers, so the WebGL2 layer runs every pass as a draw; its fragment stages read storage buffers through the layer's data textures. Evidence: packages/water/test/liquid-whitewater.browser.mjs passes natively and with MARGO_COMPAT=1 with identical counts, equal to the float64 oracle on the first step; the CPU test checks and translates every shader with the layer's own WGSL front end. Missing: iGPU timing and the quiet rerun.
 
 Narrow band (2026-11-11, packages/water/src/liquid-band.ts, Oliveira and Paiva 2022): a lazy chunk of render passes only (bounds reduction, a 1x1 grid pass, additive voxel counts in rgba16float, two r32uint label passes, depth sprites culled in the vertex stage, one thickness ball per voxel), so the WebGL2 layer runs it as draws. Evidence: packages/water/test/liquid-band.browser.mjs, native and MARGO_COMPAT=1, labels equal the Algorithm 1 oracle, nearest depth identical with and without the band. Missing: quiet timing to set the default.

@@ -3243,7 +3243,7 @@ untouched.
 - **Job 2 and /exr-codecs:** another machine's a331427a0 (`@margoengine/environment/exr-codecs`) decodes PXR24, B44
   and DWA through a prebuilt OpenEXR worker and reads only the full-resolution level of tiled files; job 2's
   `/exr-tiled` stays as the clean-room, synchronous reader of every mip and rip level.
-- **Not done (docs/work-lists/finish-later.md):** clean-room PXR24, B44 and DWA decoding (no byte-level public
+- **Not done (the finish-later list):** clean-room PXR24, B44 and DWA decoding (no byte-level public
   spec), so those codecs in tiled mip levels; multi-part and deep EXR; water and VFX in probe captures (job 1); fog
   multiple scattering into shadowed froxels and from clustered lights (job 3).
 - **Bugs fixed on the way:** none in the batch's own code beyond its tests; the job 1 README example used a
@@ -3309,7 +3309,7 @@ waiting on lane J and a smaller worker file. Core and stage are untouched. Nothi
 
 Five jobs for `@margoengine/voxel-edit` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
 untouched. Job 4 was first blocked for the clean room and landed after Scott's decision; this follow-up commit records it
-and sets row 97 of `docs/work-lists/list-2.md` to done.
+and sets row 97 of work list 2 to done.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -3673,8 +3673,8 @@ Repository gates additionally caught the handoff's fixed 100 ms cancellation-tes
 
 Eight jobs in `@margoengine/clustered`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes E and I with one job
 (52.6) from the other machine, each in its own optional entry, option or hook, with no core or stage source changes.
-Rows left unfinished are in docs/work-lists/finish-later.md under 52.x; README examples owed are in
-docs/work-lists/readme-owed.md.
+Rows left unfinished are in the finish-later list under 52.x; README examples owed are in
+the README-owed list.
 
 | # | Job | Status | Commit | Entry | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -3705,8 +3705,8 @@ docs/work-lists/readme-owed.md.
 
 Two optional jobs for `@margoengine/clustered`, built on the M6 Mac mini (WebGPU on Metal) in lane E, with no core or
 stage source changes. Neither existed on main: the package had no contact shadows per light and fixed caps of 1,024
-point and spot lights and 64 area lights. Rows left unfinished are in docs/work-lists/finish-later.md under 53.x; README
-examples owed are in docs/work-lists/readme-owed.md.
+point and spot lights and 64 area lights. Rows left unfinished are in the finish-later list under 53.x; README
+examples owed are in the README-owed list.
 
 | # | Job | Status | Commit | Entry | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -3740,15 +3740,15 @@ examples owed are in docs/work-lists/readme-owed.md.
 - **Limits and unmeasured:** Apple Mac mini (Metal) only; not timed. Contact uses the first view's depth only and trails a
   moving caster by one frame; culling tests every light per cluster; area lights are not clustered and only the first 64
   may cast shadows; IES, projector and contact per-light settings stop at index 1,024 (docs/limits.md LIM-655, LIM-656).
-- **Docs per job:** clustered README prose (examples owed, docs/work-lists/readme-owed.md), operational playbook,
+- **Docs per job:** clustered README prose (examples owed, the README-owed list), operational playbook,
   limits, claims, clean-room; job 1 also docs/shader-contracts.md (binding 145).
 
 ## Batch 54: lightmap
 
 Eight jobs in `@margoengine/lightmap`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes F, J and K, each in
 its own optional entry or option, with no core or stage source changes (core 21,775 B and stage 3,222 B gzip, under 25,000).
-Rows the build phase left unfinished are in docs/work-lists/finish-later.md under 54.x; README examples are owed in
-docs/work-lists/readme-owed.md.
+Rows the build phase left unfinished are in the finish-later list under 54.x; README examples are owed in
+the README-owed list.
 
 | # | Job | Status | Commit | Entry | Evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -3908,7 +3908,7 @@ Six optional audio capabilities, built in order, one commit and push per job. Be
 
 ## Batch 160: outside rendering correctness
 
-Eight-job plan: [work list](../work-lists/batch-160-plan.md). Job 1 measures gltf-pro's base
+Eight-job plan: work list. Job 1 measures gltf-pro's base
 metallic-roughness family against Khronos Sample Viewer public-UI PNG output. It preserves all 123
 primitives, adds a shared camera/sun, and keeps every pixel in the score. RTX A6000 RGB MAE
 1.837511698404948 (WebGPU), 1.837506612141927 (WebGL2 compatibility); native WebGL2 explicitly
@@ -3928,7 +3928,7 @@ all source factors/textures preserved and matched camera/sun. RGB MAE is 1.68091
 The open picture loss is recorded with known formulation differences and an unisolated full cause.
 No shader or core changes. The harness now selects families without changing job 1's scene/hash
 or budget and refuses --measure for an established result. All 14 former verify skips are audited
-individually in work-lists/batch-160-skips.md and their missing outside assets supplied; 63 tests
+individually in docs/whitepaper/batch-160-skips.md and their missing outside assets supplied; 63 tests
 in the affected four files pass with zero skips. Physics package code is untouched.
 
 The first job 2 verify run executed 13,064 tests with zero skips and found two non-timing gate
@@ -4006,7 +4006,7 @@ release retest stays recorded honestly; this batch did not change its budget or 
 
 Seven jobs for `@margoengine/voxel-net` on the M6 Mac mini, each landed as one commit, each a new optional entry or
 option; core and stage are untouched. Job 5 landed before job 4 on purpose: lag compensation sends its shots as the
-client-to-server app messages job 5 added. This last commit (job 7) also sets row 98 of `docs/work-lists/list-2.md`
+client-to-server app messages job 5 added. This last commit (job 7) also sets row 98 of work list 2
 to done.
 
 | # | Job | Status | Commit | Entry | Claim |
@@ -4043,7 +4043,7 @@ to done.
 
 ## Required test items audit (2026-11-09, first group)
 
-The work list is [missing-test-items](../work-lists/missing-test-items.md). It inventories 28
+The work list is the missing-test-items audit. It inventories 28
 executable missing-evidence paths, 32 remaining file/reference investigations and three held
 physics rows. Batch 160's 14 already-owned items are not duplicated. This group changes test
 infrastructure only: required files/LFS data, sibling builds, glTF validator, sharp and Python
@@ -4160,7 +4160,7 @@ the audited aliases. A real scoped run of loaders, decoders, FBX, environment an
 30 formerly known failures now pass and were removed, leaving 70 exceptions repository-wide at this checkpoint.
 Fifteen scoped failures remain, including missing inputs and deferred nonmissing README causes. OpenVDB smoke's
 density example now runs. No core, stage or physics source changed. Detailed scope, sources, accepted alias identities
-and regression paths are in docs/work-lists/missing-test-items.md. This is execution proof, not a performance claim.
+and regression paths are in the missing-test-items audit. This is execution proof, not a performance claim.
 
 ### Missing format proofs and tool recovery (2026-11-09)
 
@@ -4815,7 +4815,7 @@ PhysicalCamera, and creative points to grass interaction and terrain chunks/LOD.
 The first tonemap example also supplied no grade.cube asset. It now contains
 a complete 2x2x2 identity Cube, with no fetch or new parser behavior. The actual
 README regression fails before the repair and passes with exact identity samples,
-LUT clearing and both owners disposed. Research: docs/work-lists/skip-gaps-research.md.
+LUT clearing and both owners disposed. Research: the skip-gaps research notes.
 Landing: lint and hygiene pass; full verify passes 13,637 tests with no failures
 or skips (287.1 s), and all 130 package CPU cases pass. One shared GPU slot
 passes all ten package GPU suites and all 19 executable README examples with
@@ -4865,7 +4865,7 @@ are unchanged.
 | 5. Automatic LOD rings | DONE | e306a3ab3 | scatter/simplify; three rings from one mesh through lod's simplifier, packages/scatter/test/simplify.test.js |
 | 6. Procedural grass | DONE | this commit | scatter/grass; blade clumps built in the vertex stage, packages/scatter/test/grass.test.js and grass.browser.mjs |
 
-What each job left unfinished is in docs/work-lists/finish-later.md (rows 64.5 and 64.6).
+What each job left unfinished is in the finish-later list (rows 64.5 and 64.6).
 
 ## Batch 107: inspector (2026-11-10)
 
@@ -4878,7 +4878,7 @@ Four jobs in `@margoengine/inspector`, each adding to the inspector without chan
 | 3 | Remote inspection | DONE | this commit | New entries `@margoengine/inspector/remote` and `/remote-relay`: a desktop `RemoteInspector` reads and edits a `RemoteTarget` on a phone over a MessageChannel or a plain HTTP relay (LIM-651). |
 | 4 | Plugin and pass graph view | DONE | 5be47e01d | `FrameReport.plugins` lists every plugin in attach order with its passes and `onPreUpdate` time (LIM-570). |
 
-Left for later: job 3's run against a real phone or headset browser, relay stream reconnects and remote hierarchy editing (docs/work-lists/finish-later.md, 107.3). README examples are owed (docs/work-lists/readme-owed.md).
+Left for later: job 3's run against a real phone or headset browser, relay stream reconnects and remote hierarchy editing (the finish-later list, 107.3). README examples are owed (the README-owed list).
 
 ## List 3 batch 66: water (2026-11-10)
 
@@ -4911,7 +4911,7 @@ Bug fixed: WaterFlow replaced the exact ripple line, so attaching WaterRain firs
 
 Proof: each job has CPU tests (validation, copies, dispose) and a GPU test run by land.sh on this Mac (Metal): bodies against exact signed distances and levels; scatter's WGSL term against an independent JavaScript evaluation within 1e-5; rain's WGSL ring slope against a JavaScript evaluation with the same PCG hash within 2e-4 over 578 points. Each GPU test also checks the effect off matches the plain frame and disposing restores it exactly.
 
-Limits and unmeasured: bodies have no holes or islands and no per-body foam or flow; scatter uses a thickness proxy and directional lights only; rain splash radius is checked by Ripples only when the frame renders. GPU time is not measured for any of the three. Details are in docs/limits.md and docs/work-lists/finish-later.md.
+Limits and unmeasured: bodies have no holes or islands and no per-body foam or flow; scatter uses a thickness proxy and directional lights only; rain splash radius is checked by Ripples only when the frame renders. GPU time is not measured for any of the three. Details are in docs/limits.md and the finish-later list.
 
 ## List 4 on the Mac: batches 121, R5 and 132 (2026-11-10)
 
@@ -4926,7 +4926,7 @@ GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
   WebKit's encoder (`ba89faa5a`), H.264 for `recordCanvas` MP4 (`34463ac6d`). Claims corrected in `5f1f3cb81`. The
   tests only Scott can run on a phone or headset are listed there; they have not been run yet.
 - **Review 5:** all 22 list 2 and 3 packages; findings, inputs and fix hashes in
-  [review-5.md](../work-lists/review-5.md).
+  the review 5 list.
 - **Batch 132, research and quality audit:** [package-audit.md](package-audit.md), one row per package with sources
   read in full, what was checked, found, fixed and still open. 99 of 102 packages audited; 49 rows are partial and say
   which files are owed; physics, physics2d and ragdoll are excluded by Scott's physics hold and listed with that
@@ -4942,7 +4942,7 @@ GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
 Run on the Beelink (AMD Radeon 680M, RDNA 2 iGPU, driver 32.0.21030.2001, Windows 11; Chromium with WebGPU on Dawn
 D3D12 and the WebGL2 layer on ANGLE D3D11), the project's only AMD GPU. Every package's GPU and browser tests ran on
 both backends, one GPU slot, the mini-pc heat profile; the failed suites ran again on current main after the fixes.
-Every row, with what came out, the cause and its state, is in [amd-gpu-hunt.md](../work-lists/amd-gpu-hunt.md).
+Every row, with what came out, the cause and its state, is in the AMD GPU hunt list.
 
 - **Fixed in the owning package, each with a regression test:** animator and four other packages' browser checks
   served the wrong folder (`195e51396`); biomes erosion's consumer page (`bd3147a9f`); creative's half-float mip

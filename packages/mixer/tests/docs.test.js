@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 
 test('mixer landing documents contain no unresolved merge markers', () => {
   for (const file of ['api-surface.md', 'clean-room.md', 'known-bugs.md', 'limits.md',
-    'whitepaper/claims.md', 'whitepaper/reproduce.md', 'work-lists/readme-owed.md']) {
+    'whitepaper/claims.md', 'whitepaper/reproduce.md', 'whitepaper/build-record.md']) {
     assert.doesNotMatch(readFileSync(join(root, 'docs', file), 'utf8'), /^(?:<{7}|={7}|>{7})(?: |\r?$)/m, file);
   }
 });

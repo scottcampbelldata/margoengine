@@ -1806,7 +1806,7 @@ resources but keep their registration. scene-owner.test.js exercises direct
 disposal, owning-scene removal, restore, same-name isolation and replacement
 with a real engine. Repairs are local; package acceptance and the remaining
 non-PostStack audit are open. Capture stability remains with its separate hunter.
-The [wider inventory](work-lists/batch-56-scene-owners.md) retains every candidate
+The wider inventory retains every candidate
 and explicitly distinguishes syntactic review from proven defects.
 
 Four terrain provider defects are also reproduced and repaired locally:
@@ -1908,7 +1908,7 @@ CPU/GPU, deterministic replay, all-pixel parity and desktop/mobile real-data bro
 the operational playbook's moving-flow section. Native WebGL2 flow awaits batch 181; jobs 2 to 6 remain pending.
 Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repair and the native surface/rectangle
 piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
-and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.
+and paired size-record gate are validated before its push. the sciviz progress list tracks all six jobs.
 
 
 ### Open: full-layer validation transferred to parity batch 273
@@ -2143,7 +2143,7 @@ both independently authored baked-UV comparisons (max UV error 0.0059999654,
 unchanged bound 0.01) and their rendered-pixel bars. Default and quarter-turn
 cutout ray/shadow coverage also pass. Keep those independent authored references;
 do not replace them with an oracle that repeats the implementation's matrix.
-Sources are in [the research record](work-lists/skip-gaps-research.md); actual
+Sources are in the research record; actual
 [production results](whitepaper/results/rt-alpha-texture-reference-20261109.json)
 retain the source-model pin and rendered comparison counts.
 
@@ -2513,7 +2513,7 @@ was treating required test evidence as optional. Fixture reads now fail with a p
 the validator is mandatory, imports propagate missing-build failure, and Python setup failure exits
 unsuccessfully. `tests/fixture-skips.test.js` regresses missing files, LFS pointers, HTTP/size/hash failure
 and executable skip/return patterns; `tests/python-venv.test.js` checks missing Python even with strict
-flags unset. [The inventory](work-lists/missing-test-items.md) separates batch 160, held physics and
+flags unset. The inventory separates batch 160, held physics and
 remaining unverified real-file variants. Their proof gaps are not claimed fixed by the gate.
 
 ### Open, outside Margo, worked around 2026-11-10: Windows finishes tearing down an ended Chromium process late under GPU load
@@ -2696,7 +2696,7 @@ Fixed 2026-11-11 (bug sweep L3b, KB1843): the gathers are now scatter as gather 
   `ragdoll/readme-getting-up-margoengine-ragdoll-g-f43e55` ("Unknown animator clip GetUpFromBack"), which waits with physics.
 - **Current source audit (2026-11-09):** 101 entries remain after the upstream voxel-pathtracer repair, 84 labelled `sample:` and 17 labelled `example:`.
   The required-test-items scoped rerun ran 62 of 94 examples, with 32 allowed failures. It exited zero; that does not mean
-  those 32 examples ran. Their missing/incompatible inputs are indexed in [missing-test-items](work-lists/missing-test-items.md).
+  those 32 examples ran. Their missing/incompatible inputs are indexed in the missing-test-items audit.
 - **Cause:** sample entries name a file of their own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. The ragdoll's
   get-up is in this group: it needs prone and supine get-up clips (getting up from the front and from the back) on a humanoid rig, and no free rig in the repository has them; the Quaternius Universal Animation Library Standard 3.0 pack (CC0) was checked on 2026-11-07 and has none (its closest clips, `Sitting_Exit`, `Death01` and `Fixing_Kneeling`, are not get-ups). Fbx and the animator's joint indices are in this group too (the two usdz examples once listed here now run on repository files). 17 start
@@ -3327,7 +3327,7 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   `~/margo-test/repo` (`diag-flythrough.mjs`, `wake-check.html`, `wake-check.mjs`).
 - **Held for the speed phase (2026-11-11, bug sweep lane L4):** the slow sends assertion is a timing budget, and
   `scripts/speed-phase.json` defers every timing assertion from the correctness gates until Scott ends the build
-  phase (row `biomes-slow-sends` in `docs/work-lists/speed-phase.md`). The measured cause above is the operating
+  phase (row `biomes-slow-sends` in the speed-phase inventory). The measured cause above is the operating
   system taking the page thread's core, not Margo code, so no code change is a fix now. The open choice (time the
   view's frame by the page thread's CPU time from a trace, or keep the wall clock) is made on the quiet machine at the
   start of the speed phase, before the budget is run there; the budget itself is not changed.
@@ -3863,7 +3863,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   background next to a moving object takes none of the object's colour (no pixel outside the bar's own 8 lit at any
   scale); Margo reconstructs after McGuire et al. 2012, so the object smears over the background it sweeps. The SSIM
   of `p-motion-blur` with both fixes waits for the quiet speed-phase run (bench/cli.mjs is deferred in the build
-  phase); docs/work-lists/speed-phase.md lists it. Regression: tests/bench-still-frame.test.js.
+  phase); the speed-phase inventory lists it. Regression: tests/bench-still-frame.test.js.
 
 ### Build plus first frame of 100 morphed copies is still slower than three's WebGL backend
 
@@ -5181,7 +5181,7 @@ PhysicalCamera, and creative points to grass interaction and terrain chunks/LOD.
 The first tonemap example also supplied no grade.cube asset. It now contains
 a complete 2x2x2 identity Cube, with no fetch or new parser behavior. The actual
 README regression fails before the repair and passes with exact identity samples,
-LUT clearing and both owners disposed. Research: docs/work-lists/skip-gaps-research.md.
+LUT clearing and both owners disposed. Research: the skip-gaps research notes.
 Landing: lint and hygiene pass; full verify passes 13,637 tests with no failures
 or skips (287.1 s), and all 130 package CPU cases pass. One shared GPU slot
 passes all ten package GPU suites and all 19 executable README examples with
@@ -5815,7 +5815,7 @@ losses on the 1,937/1,003 accepted-input sets. Profiling Margo's own named Wasm
 localizes remaining cost to mapping, reconstruction and traversal; the proven
 mapping work reduction did not establish overall speed parity. Reproduce with
 the pinned paired manifest and private batch 133 driver. Speed work is deferred
-by scripts/speed-phase.json; the item is listed in docs/work-lists/speed-phase.md.
+by scripts/speed-phase.json; the item is listed in the speed-phase inventory.
 Fresh-process RSS losses are closed (KB4824a, below); the native process
 starts below the prebuilt in every campaign.
 Historical predictor 3 and invalid UTF8 metadata conversion were closed on
@@ -6172,7 +6172,7 @@ pipelines plus the required negative pipeline rejection. The old patched-browser
 side-by-side loader diagnosis above is historical, not a refusal by this shipped
 browser. Its default native WebGPU requestAdapter is null, so native-baseline
 canonical driver refusals remain visible in the receipt. Full-package and
-physical-device certification remains open; see work-lists/batch-273-browser-matrix.md.
+physical-device certification remains open; see the batch 273 browser matrix checklist.
 The latest main's committed merge markers in the umbrella manifest and size
 baseline blocked this job's package build. Both additions and history records
 are retained, budgets unchanged, and tests/integration-json.test.js parses all

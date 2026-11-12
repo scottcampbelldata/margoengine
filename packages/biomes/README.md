@@ -93,7 +93,7 @@ npm run test:speed -- --list
 ```
 
 After the build phase ends, run the full suite with `MARGO_SPEED_PHASE=active`
-on a quiet machine. See `docs/work-lists/speed-phase.md` for the retained budgets.
+on a quiet machine. The retained scenes and budgets stay unchanged until then.
 
 Written clean room from public papers: Volder 1959 (CORDIC), Jarzynski and Olano 2020 (PCG hashes for GPUs), Perlin
 2002 (quintic fade), Wendland 1995 (compactly supported kernels). Details in `docs/clean-room.md`.

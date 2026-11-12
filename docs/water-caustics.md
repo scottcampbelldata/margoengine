@@ -32,7 +32,7 @@ its existing fifteen-minute limit; the corrected invocation uses that existing
 limit. No test or assertion changed, and both failed invocations are retained.
 [Landing receipt](whitepaper/results/batch234-caustics-landing.json).
 
-README examples are deferred in `docs/work-lists/readme-owed.md`; local CI owns
+README examples are deferred in the README-owed list; local CI owns
 the full repository verify. No speed result is claimed. Local logs are retained
 under `test-results/caustics-land/`.
 

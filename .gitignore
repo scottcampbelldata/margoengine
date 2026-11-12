@@ -45,3 +45,6 @@ packages/voxel-pathtracer/mesh-kernel/target/
 /packages/procedural/buildings-kernel/target/
 
 /packages/procedural/caves-kernel/target/
+
+# Local working notes (work lists, handoffs); never committed.
+/private/

@@ -2139,7 +2139,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Trade-off:** the bars this bought (a block on a slope holds and slides at its rate, a cube dropped flat lands flat, the
   14-row pile stops) against about 14 times the normal-row work. Rapier 0.21 and Box2D v3 solve a manifold's points one pass
   each, as Margo did before. A stop on the soft passes that keeps every bar is the open tuning item
-  of the physics lane; time hints only until the quiet rerun (`docs/work-lists/busy-retests.md`).
+  of the physics lane; time hints only until the quiet rerun (the busy-retests list).
 - **Rerun:** `cargo run --locked --release --features counts --manifest-path packages/physics/kernel/Cargo.toml --example
   profile -- pyramid default` (and `cubes5000-awake`, `equal`).
 
@@ -3165,7 +3165,7 @@ evidence against a reconstruct-then-pack design, not an old/new speed claim.
 The incomplete Wasm is 107,169 raw and 43,720 gzip bytes using the baseline
 Node gzip9 compressor. Public integration, other target encoders, full hostile-input,
 GPU, memory and final acceptance remain open. No new timing A/B or timing-only
-assertion was run; timing proof stays in [speed-phase.md](../work-lists/speed-phase.md).
+assertion was run; timing proof stays in the speed-phase inventory.
 
 ### Batch 133 prebuilt decoder targets (development)
 
@@ -3607,7 +3607,7 @@ batch 132 research audit. Each entry names commits on `main`; open items stay in
 - **What it cost:** `20038ea37` added four plain `Error` throws that failed the quality gate on `main` until
   `f11511163`. The first core landing, `e8f3decf6`, left without its size record because the refresh refused a kit
   `package.json`; `c6dd876b1` recorded it. Review 5 then found and fixed correctness bugs in work landed that day,
-  listed in [review-5.md](../work-lists/review-5.md), among them a 1,024-light cap that let indices spill into the next
+  listed in the review 5 list, among them a 1,024-light cap that let indices spill into the next
   cluster (`b7f008ab1`), a sun-shaft focus term with the wrong sign (`5b19b51aa`) and two remote viewers receiving each
   other's replies (`1ca4f50f5`).
 - **What we got wrong:** the full `npm run verify` on `main` had been red since `4e3337946` (about 18 hours) and no

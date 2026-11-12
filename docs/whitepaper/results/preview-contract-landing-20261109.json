@@ -11,7 +11,7 @@
     "total": 13633,
     "skipped": 0,
     "failure": "Upstream GPU report named an untracked coordination path",
-    "repair": "docs/work-lists/gpu-lock-report.md reworded; tests/no-private-paths.test.js unchanged"
+    "repair": "the GPU lock report reworded; tests/no-private-paths.test.js unchanged"
   },
   "finalFocused": {
     "passed": 380,

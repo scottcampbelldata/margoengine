@@ -2,7 +2,7 @@
 
 J6 composes public calls from package READMEs in `examples/integration/`, with entry pages under
 `examples/test-pages/`. These are test pages. No package implementation or private CAD API is imported.
-The build phase defers README edits and Works with lines to `docs/work-lists/readme-owed.md`.
+The build phase defers README edits and Works with lines to the README-owed list.
 
 Run `npm run build:packages`, then `npm run test:integration:browser -- --scene=game`.
 The runner takes one shared GPU slot, with a 150 second limit per scene and a 60 second pipeline readiness limit.

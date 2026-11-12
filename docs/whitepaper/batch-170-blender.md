@@ -32,7 +32,7 @@ same size; that row is below.
 | Vertex bytes as each exporter writes them | 10,444,800 (80 B) | 4,177,920 (32 B) |
 
 A compact `.margo` vertex layout (attributes trimmed or quantized at export, measured against glTF size) is listed in
-[finish-later.md](../work-lists/finish-later.md); until it lands, `compressMargoMeshopt` is the smaller option.
+the finish-later list; until it lands, `compressMargoMeshopt` is the smaller option.
 
 Reproduce (outside this repository, Blender installed):
 `blender --background --factory-startup --python engine-bench/batch-170/blender-compare.py -- <margo repo> <out dir>`

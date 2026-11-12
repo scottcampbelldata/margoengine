@@ -104,4 +104,4 @@ and exact backward-seek pixels. CPU tests also cover constraints, curves,
 skins, nonrendering attachments, sequences, physics warnings/round-trips,
 malformed inputs, cancellation and zero-scale bind data. No speed result
 or complete editor/runtime API parity is claimed. README work is owed in
-`docs/work-lists/readme-owed.md` for the build phase.
+the README-owed list for the build phase.

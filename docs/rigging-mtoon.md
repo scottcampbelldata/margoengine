@@ -99,7 +99,7 @@ boundaries. Optional shadow-caster alpha shaders do not yet apply spatially
 masked MToon UV animation; the body, normal, emission and outline paths do.
 Those optional-package integration refinements remain follow-ups. No shader
 fallback, missing rim or omitted outline is used to pass an assertion.
-README examples are deferred to docs/work-lists/readme-owed.md.
+README examples are deferred to the README-owed list.
 
 ## Sources compared
 

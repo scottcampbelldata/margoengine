@@ -297,4 +297,4 @@ secondary scenes, checks their pixels and cancels queued work when stopped.
 During the build phase it validates real timestamp readings, tier decisions and
 wrapper cleanup. The original triangle p90 below 7 ms and submit-to-done
 diagnostic remain in the named deferred speed suite; run them only after the
-speed phase is enabled (see docs/work-lists/speed-phase.md).
+speed phase is enabled.

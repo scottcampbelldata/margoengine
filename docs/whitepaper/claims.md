@@ -642,7 +642,7 @@ treat it as unverified and open an issue.
 Commands for rerunning everything are in [reproduce.md](reproduce.md). Every past performance loss and significant
 bug the checks caught, with its cause, fix, after number and guard, is in [perf-history.md](perf-history.md). What each
 finished batch of work landed, how it was proved and what is still unproved is in [build-record.md](build-record.md).
-The [required-input audit](../work-lists/missing-test-items.md) records fixture acquisition, missing-input
+The required-input audit records fixture acquisition, missing-input
 failures and remaining real-file/reference gaps. Passing its gate does not promote a stand-in claim to real-file proof.
 
 Which claims rest only on a validator, our own reader, a stand-in or a built file, and what would really prove them, is in
@@ -2611,7 +2611,7 @@ with `packages/biomes/tests/erosion-dem.mjs` (see reproduce.md). Work counts pro
 10 fewer kernel array bytes per cell and four-lane final differences, not faster
 elapsed execution. Total backing memory including copies is 244,908,032 B in a
 fresh instance. Production-browser, package GPU and README proofs pass. Research and
-the clean-room comparison are in docs/work-lists/skip-gaps-research.md.
+the clean-room comparison are in the skip-gaps research notes.
 ## RT cutout coverage evidence
 
 The optional RT-alpha path tests MASK coverage before closest/any acceptance,
@@ -2627,7 +2627,7 @@ The finite RT reach isolates foreground panels from the sample's opaque backboar
 the fallback uses its own full-distance oracle. This is deterministic MASK
 coverage, not stochastic transparency or hardware ray queries. Reproduce using
 the registered package GPU scripts and whitepaper/reproduce.md; clean-room sources
-and the texture-rotation reconciliation are in work-lists/skip-gaps-research.md.
+and the texture-rotation reconciliation are in the skip-gaps research notes.
 Raw passing [traversal results](results/rt-alpha-traversal-20261109.json) and
 [attached receiver results](results/rt-alpha-attach-20261109.json) retain the
 reported ray/pixel counts, including opaque controls and restoration.

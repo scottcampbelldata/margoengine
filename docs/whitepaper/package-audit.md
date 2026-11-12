@@ -12,9 +12,9 @@ pass, and both are kept. 45 rows say "partial": they name the files that were no
 owed. The 3 packages with no audit, physics, physics2d and ragdoll, are excluded by Scott's physics hold and listed at
 the end of the table. Every source a row could not read in full (paywall,
 dead link, a PDF with no extractable text, an ISO licence page we did not accept) is named in that row and in
-[finish-later.md](../work-lists/finish-later.md). Each row's regression tests fail on the code before its fix unless the
+the finish-later list. Each row's regression tests fail on the code before its fix unless the
 row says otherwise. Correctness review of the work landed on 2026-11-10 is in
-[review-5.md](../work-lists/review-5.md); what our checks caught and what we got wrong that day is in
+the review 5 list; what our checks caught and what we got wrong that day is in
 [perf-history.md](perf-history.md).
 
 | Package | Sources read in full | Checked | Found | Fixed | Open |

@@ -13,7 +13,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 
 // Internal records and the package READMEs (their own check) are not reader pages for this rule.
 const SKIP =
-  /^(?:docs\/(?:work-lists|whitepaper|architecture|upstream-reports|research)\/|packages\/|CHANGELOG\.md$|docs\/known-bugs\.md$)/;
+  /^(?:docs\/(?:whitepaper|architecture|upstream-reports|research)\/|packages\/|CHANGELOG\.md$|docs\/known-bugs\.md$)/;
 const SHELL = /```(?:sh|bash|shell|console|powershell|ps1)?\r?\n([\s\S]*?)```/g;
 const INSTALL = /\bnpm (?:i|install|add)\b[^\n]*?(?:\bmargoengine\b|@margoengine\/)/;
 const CREATE = /\bnpm create margo\b/;

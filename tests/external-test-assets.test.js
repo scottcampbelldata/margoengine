@@ -110,7 +110,7 @@ test('missing, partial, changed and LFS-only external caches fail loudly with th
 
 test('physics sample provenance preserves the exact pinned commit in notices and the audit', () => {
   const commit = new URL(externalAssets.find(({ file }) => file.startsWith('physics/')).url).pathname.split('/')[3];
-  for (const file of ['scripts/supply-chain.mjs', 'docs/work-lists/batch-160-skips.md']) {
+  for (const file of ['scripts/supply-chain.mjs', 'docs/whitepaper/batch-160-skips.md']) {
     assert.ok(
       readFileSync(new URL('../' + file, import.meta.url), 'utf8').includes(commit),
       file + ' must name ' + commit,

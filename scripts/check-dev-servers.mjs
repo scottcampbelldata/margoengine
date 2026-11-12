@@ -204,7 +204,7 @@ const COMMAND = /^(?:\$\s*)?((?:npm (?:run|start|create|init|exec)\b|npx\b|pnpm\
 function docCommands() {
   const found = [];
   for (const file of markdownFiles(root)) {
-    if (/(^|\/)docs\/(known-bugs|clean-room|limits)\.md$/.test(slash(relative(root, file))) || /whitepaper|work-lists|handoffs/.test(file)) continue;
+    if (/(^|\/)docs\/(known-bugs|clean-room|limits)\.md$/.test(slash(relative(root, file))) || /whitepaper|handoffs/.test(file)) continue;
     let inFence = false;
     for (const [index, line] of readFileSync(file, 'utf8').split(/\r?\n/).entries()) {
       if (/^\s*```/.test(line)) {

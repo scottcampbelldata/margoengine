@@ -24,7 +24,7 @@ export function deferSpeed(label, log = console.log) {
   if (!announced.has(label)) {
     announced.add(label);
     log(
-      `SPEED DEFERRED: ${label}; correctness and deterministic work counts remain enabled (docs/work-lists/speed-phase.md)`,
+      `SPEED DEFERRED: ${label}; correctness and deterministic work counts remain enabled (scripts/speed-phase.json; npm run test:speed -- --list names the suite)`,
     );
   }
   return true;

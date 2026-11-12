@@ -585,7 +585,7 @@ route is a clone because 1.0.0 is not on npm yet.
 | --- | --- | --- | --- | --- |
 | Core + stage gzip (CI gate, < 25,000 B) | `npm run measure:size` | no | console | Also enforced by `npm run build:packages`. |
 | meshopt, TypeScript against Wasm SIMD | `node packages/decoders/scripts/meshopt-simd-bench.mjs <file.glb>` (after `npm run build --workspace packages/decoders`) | no | console | Any glTF binary compressed by gltfpack; perf-history entry 75. |
-| Own physics step profile and harness bars, native (Lane Q tuning) | `cargo run --locked --release --manifest-path packages/physics/kernel/Cargo.toml --example profile -- [pyramid\|cubes1000\|cubes5000\|cubes1000-awake\|cubes5000-awake\|chain\|grid\|all] [default\|equal]`; `... --example bars` | no | console | `profile` times each phase of `World::step` and counts awake bodies, pairs, solved pairs and points per step; a twin world stepped by `World::step` must end hash-equal, so the profile cannot time a different step. `bars` gives the bounce, pyramid and heavy-on-light numbers of `physics-refs/js/margo-next/margo3d.mjs` at both settings; native and Wasm agree bit for bit, so they are the harness's numbers. Timings are hints on a loaded machine (`docs/work-lists/busy-retests.md`). |
+| Own physics step profile and harness bars, native (Lane Q tuning) | `cargo run --locked --release --manifest-path packages/physics/kernel/Cargo.toml --example profile -- [pyramid\|cubes1000\|cubes5000\|cubes1000-awake\|cubes5000-awake\|chain\|grid\|all] [default\|equal]`; `... --example bars` | no | console | `profile` times each phase of `World::step` and counts awake bodies, pairs, solved pairs and points per step; a twin world stepped by `World::step` must end hash-equal, so the profile cannot time a different step. `bars` gives the bounce, pyramid and heavy-on-light numbers of `physics-refs/js/margo-next/margo3d.mjs` at both settings; native and Wasm agree bit for bit, so they are the harness's numbers. Timings are hints on a loaded machine (the busy-retests list). |
 | Own physics separating axis test against every axis (LIM-369) | `npm run test:physics-kernel` | no | no | under a minute |
 | Flock of 1,000 against Yuka (perf history entry 93) | `node packages/behavior/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/behavior` | no | console | Yuka 0.7.8 is installed outside the repository under engine-bench `batch-167` (`MARGO_ENGINE_BENCH` overrides the folder). Paired turns, per-round minimum. Busy-machine numbers are diagnostic. |
 | Navmesh build and path length against recast-navigation (perf history entry 94) | `node packages/navmesh/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/navmesh` | no | console | recast-navigation 0.44.0 is installed outside the repository under engine-bench `batch-167`. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The open-floor length and the gapped hole check are `node --test packages/navmesh/test/path-length.test.js`. |
@@ -1136,7 +1136,7 @@ scene, geometry, material factors and textures are preserved. All 27 primitives 
 Frozen reference 49a82f5e1990209481b28f3bf64afc390e407e2eb9ab3571cb904a28ab4bdd09.
 The recorded outside legal README credits Ed Mackey / Analytical Graphics, Inc. under CC-BY-4.0.
 `--measure` now refuses an established result file, preventing accidental budget replacement.
-See [the skip audit](../work-lists/batch-160-skips.md) for all 14 former missing-data skips and setup.
+See [the skip audit](batch-160-skips.md) for all 14 former missing-data skips and setup.
 
 ### Batch 160 sheen
 
@@ -1839,7 +1839,7 @@ After `npm run build:packages`, run `npm run check:preview-contract` and `node -
 
 The package-tier browser gate also covers Gemini entries 21, 22, 26, 29, 30, 31, 33 and the missing-fallback diagnostic (28). Run webgl2-compat/test/device.test.js after the package build for the native-retained install warning (27). The procedural preview route must finish without loading the compatibility layer.
 
-Research basis and source comparison: [preview contract review](preview-contract-research.md). Under the 2026-11-10 restart use the shared GPU phase only; the three cutout-caster timing scripts are deferred in [the speed-phase record](../work-lists/speed-phase.md).
+Research basis and source comparison: [preview contract review](preview-contract-research.md). Under the 2026-11-10 restart use the shared GPU phase only; the three cutout-caster timing scripts are deferred in the speed-phase record.
 
 Recording example activation: run `node --test --test-timeout=30000 packages/video/test/readme-record.test.js` and `npm run check:readme-run -- --packages=video` under the shared GPU lock. Click the README example's Record button to capture its generated picture and tone. [Research and the regression's scope](recording-example-research.md).
 
@@ -2235,7 +2235,7 @@ original error, detailed remaining defect and sizes are in clean-room.md,
 known-bugs.md and results/batch-273-dispersion-checkpoint.json. Total remains
 2/26 suites closed; continue from failure 10 after this checkpoint lands.
 Job 2's exact acquisition checklist and local browser receipts are in
-../work-lists/batch-273-browser-matrix.md. No speed run or Bug 45 work was done.
+../the batch 273 browser matrix checklist. No speed run or Bug 45 work was done.
 
 Batch 273 failure 6: after building packages, run
 `node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=2 -- node packages/materials/test/features-browser.mjs`.
@@ -2769,7 +2769,7 @@ Run npm run test --workspace @margoengine/inspector, then after build:packages r
 node scripts/gpu-lock.mjs run --owner=inspector-parity --max=3 --wait-max=60 -- node
 packages/inspector/test/parity-browser.mjs (one command line). It drives native
 controls and undo over real WebGPU and WebGL2 preview draws; repeat that command
-with --compat appended for the WebGL2 compatibility layer. README coverage is tracked in docs/work-lists/readme-owed.md. Entry bytes use bundleBytes
+with --compat appended for the WebGL2 compatibility layer. README coverage is tracked in the README-owed list. Entry bytes use bundleBytes
 from scripts/measure-size.js and gzipSync, with bare imports external.
 
 
@@ -2815,7 +2815,7 @@ node scripts/gpu-lock.mjs run --owner=codex-batch262 --wait-max=60 --max=4 -- no
 packages/inspector/test/edit-browser.mjs, then the same command with --compat appended.
 The browser tests use real HTML tree dragging and form input, plus rendered native
 point/spot/directional lights and preview ambient. All assertions are correctness
-checks, never time budgets. README coverage is tracked in docs/work-lists/readme-owed.md.
+checks, never time budgets. README coverage is tracked in the README-owed list.
 
 Batch 254 binaural: after build:packages, node --test --test-timeout=60000 packages/audio/tests/binaural.test.js proves modal reconstruction and lifecycle. Shared-lock node packages/audio/scripts/test-browser.js runs binaural-browser.js, comparing 32 native HRTFs driven by the gain graph against independent polynomial speaker PCM. Test-results report records max error/energy, channels and rotation; tolerance 1e-6 is for float32 summation, not listening quality.
 Batch 257 job 1: after npm run build:packages, run node --test --test-timeout=20000 packages/worker/tests/rpc.test.js; node node_modules/typescript/bin/tsc --noEmit --strict --skipLibCheck --target esnext --module nodenext packages/worker/tests/rpc-types.ts; and node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-check.mjs. The browser check covers WebGPU and WebGL2 worker canvases and the browser RPC pool. Build phase defers only the existing timing budgets; correctness assertions remain enabled.
@@ -2856,7 +2856,7 @@ The existing HTML browser commands above also run blendScenario on WebGPU and na
 ## Batch 262 texture explorer
 
 Run the inspector unit suite and build:packages. README work is tracked in
-docs/work-lists/readme-owed.md.
+the README-owed list.
 Run node scripts/gpu-lock.mjs run --owner=codex-batch262 --wait-max=60 --max=4 --
 node packages/inspector/test/textures-browser.mjs; repeat with --compat appended.
 The source textures precede panel attachment and exact byte assertions check mip,
@@ -3169,7 +3169,7 @@ After building, run `node --test --test-timeout=60000 packages/ui/tests/i18n.tes
 
 
 ### Batch 243 mesh PBR channels
-Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtracer/tests/mesh-pbr.test.js. GPU correctness uses node scripts/gpu-lock.mjs run --owner=codex-batch243 --wait-max=60 --max=5 -- node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs. The latter tests native and WebGL2/Vulkan, compares maps with independent equivalent scalar/vertex scenes and snapshots the existing licensed Khronos Box before disposing its loaded model. Results: test-results/voxel-pathtracer-mesh-pbr.json. README work remains deferred in docs/work-lists/readme-owed.md.
+Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtracer/tests/mesh-pbr.test.js. GPU correctness uses node scripts/gpu-lock.mjs run --owner=codex-batch243 --wait-max=60 --max=5 -- node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs. The latter tests native and WebGL2/Vulkan, compares maps with independent equivalent scalar/vertex scenes and snapshots the existing licensed Khronos Box before disposing its loaded model. Results: test-results/voxel-pathtracer-mesh-pbr.json. README work remains deferred in the README-owed list.
 ### Batch 233 job 1: road intersections
 After building packages: node --test --test-timeout=120000 packages/road/test/intersections.test.js. Rendering: node scripts/gpu-lock.mjs run --owner=codex-batch233 --max=8 --wait-max=60 -- node packages/road/test/browser-check.mjs. Both backends check separate layer pixels, restoration and disposal. Analytic fixtures use independent equations, no timing assertions. See [road-design.md](../road-design.md).
 Batch 219 job 2: after building packages run `node --test --test-timeout=120000 packages/geometry/tests/parity-extras.test.js`; geometry/tests/gpu-check.mjs through the shared GPU lock normally and with --compat covers all five uploads and a Goldberg picture. No timed performance comparison is claimed.
@@ -3830,7 +3830,7 @@ in ../sciviz-monitor.md. It includes source commit and source digest, raw per-la
 and bytes, browser, GPU and CPU utilization. Original asset hashes/provenance stay beside
 the assets; NYC TLC source.json includes its exact query and terms. Default scene ceilings
 are censored correctness observations. Timed mode is refused until speed-phase.json ends
-deferral; the exact outstanding scale and format matrix is in work-lists/speed-phase.md.
+deferral; the exact outstanding scale and format matrix is in the speed-phase inventory.
 Batch 180 job 2 vector geography: build packages, then node --test --test-timeout=120000 packages/sciviz/tests/geo-vector.test.js. Render correctness: node scripts/gpu-lock.mjs run --owner=<lane> --wait-max=60 --max=1 -- node packages/sciviz/scripts/browser-root.mjs tests/geo-vector-browser.mjs. Both backends write test-results/sciviz-geo-vector.json and use examples/sciviz-geo-vector.html. Asset reconstruction commands, original/derived hashes and fields are in examples/assets/sciviz/geo-vector/source.json and prepare.mjs. No benchmark or timing claim.
 Batch 183 job 2: after build:packages run the stage and clustered CPU suites, then `node scripts/gpu-lock.mjs run --owner=codex-batch183 --wait-max=60 --max=4 --gpu=stage-lights-pixel-comparison -- node packages/stage/test/gpu/lights-check.mjs`. Each backend renders point, spot, rectangular area, extra directional and all four together. The facade must equal direct setup byte for byte, visibly change at least 100 pixels from the unlit-by-those-lights baseline and report no page/device error. The BoxTextured source/licence record is cited in docs/clean-room.md.
 
@@ -3914,7 +3914,7 @@ After build:packages, run `node --experimental-test-module-mocks --test --test-t
 
 Batch 180 job 5: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/temporal.test.js. For real rendering use node scripts/gpu-lock.mjs run --owner=temporal-review --wait-max=60 --max=1 -- node packages/sciviz/tests/temporal-browser.mjs. Open examples/sciviz-temporal.html, select NOAA or ERA5, choose any reduction, drag time or change probe longitude/latitude. Native and ?backend=webgl2 use identical data. The test writes test-results/sciviz-temporal.json. Recreate the unchanged NOAA daily JSON files with node scripts/prepare-sciviz-temporal.mjs; the separately curated era5.nc is pinned by SHA-256 in source.json. No benchmark, full verify or README execution is required.
 
-Batch 181 density: after build:packages, run `node --test packages/sciviz/tests/density.test.js`, then `node scripts/gpu-lock.mjs run --owner=density-check --max=5 --wait-max=60 -- node packages/sciviz/tests/density-browser.mjs` and the same command with `density-scale-browser.mjs` and --max=6. Both browser suites run native and WebGL2 compatibility and write test-results/batch181-j4-density.json and batch181-j4-scale.json. Scale data is the retained SoA gzip 2MASS stars.bin (RA, Dec, J-Ks, Ks) tiled 20 times, and the retained quoted NYC TLC CSV tiled to exactly 10M rows, with its incomplete final tile retained. No timing assertions or benchmark is part of these commands. Demo: examples/sciviz-density.html, also ?backend=webgl2. The 20M/10M timed rival comparison stays in work-lists/speed-phase.md until Scott ends the build phase.
+Batch 181 density: after build:packages, run `node --test packages/sciviz/tests/density.test.js`, then `node scripts/gpu-lock.mjs run --owner=density-check --max=5 --wait-max=60 -- node packages/sciviz/tests/density-browser.mjs` and the same command with `density-scale-browser.mjs` and --max=6. Both browser suites run native and WebGL2 compatibility and write test-results/batch181-j4-density.json and batch181-j4-scale.json. Scale data is the retained SoA gzip 2MASS stars.bin (RA, Dec, J-Ks, Ks) tiled 20 times, and the retained quoted NYC TLC CSV tiled to exactly 10M rows, with its incomplete final tile retained. No timing assertions or benchmark is part of these commands. Demo: examples/sciviz-density.html, also ?backend=webgl2. The 20M/10M timed rival comparison stays in the speed-phase inventory until Scott ends the build phase.
 
 Density pixel-only rival reproduction: install regl-scatterplot@1.16.0, @deck.gl/core@9.4.1 and @deck.gl/layers@9.4.1 outside the repository under ../engine-bench/batch-181-density (MARGO_DENSITY_RIVALS overrides it). Run `node scripts/sciviz-density-pixels.mjs --prepare` on the CPU to bundle their published APIs into that external folder, then `node scripts/gpu-lock.mjs run --owner=density-pixels --max=3 --wait-max=60 --gpu="Render external density pixels" -- node scripts/sciviz-density-pixels.mjs --prepared`. The script captures Margo through Figure.toPNG, compares actual pixel bytes and separately checks analytical opacity, and writes test-results/batch181-j4-rival-pixels.json/.png. It measures no time. Exact source coordinates, draw policies, versions and hardware are in results/batch181-density.json. Packages are executed as black boxes; source implementations are never consulted by the agent or copied into Margo.
 

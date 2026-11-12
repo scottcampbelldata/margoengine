@@ -12,7 +12,7 @@ test('generated API, import metadata and public help contain no unresolved merge
     'docs/limits.md',
     'docs/whitepaper/claims.md',
     'docs/whitepaper/reproduce.md',
-    'docs/work-lists/readme-owed.md',
+    'docs/whitepaper/build-record.md',
     'site/llms.txt',
     'site/llms-full.txt',
     'site/errors.html',

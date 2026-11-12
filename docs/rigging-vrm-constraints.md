@@ -67,4 +67,4 @@ claim. Run the package's test:constraints:browser command with and without
   https://pixiv.github.io/three-vrm/docs/classes/three-vrm.VRMAimConstraint.html.
   Only public constructor, state, dependency and update outputs were inspected.
 
-README work is owed in docs/work-lists/readme-owed.md.
+README work is owed in the README-owed list.
