@@ -28,6 +28,7 @@ const TIERS = {
   cpuCube: 'cpu',
   asyncPipeline: 'scatter',
   scatterAfterWrite: 'scatter',
+  mirrorReads: 'scatter',
   scatterLayersSmall: 'scatter',
 };
 
@@ -117,6 +118,9 @@ async function suite() {
       lines.push(`${name} (${TIERS[name]}): compat the nearest step, native one of the two nearest`);
       continue;
     }
+    // AMD GPU hunt row 34: compute writes read by later dispatches stay on the GPU as textures; nothing is read back
+    // into a GL buffer until a copy reads one (each dispatch read its stores back with readPixels before).
+    if (name === 'mirrorReads') assert.equal(compat.result.readPixels, 0, `${name}: readPixels while the dispatches ran`);
     const diff = differences(native.result.values, compat.result.values, compat.result.tolerance ?? 1e-6);
     assert.deepEqual(diff, [], `${name}: compat differs from native`);
     // Each case must test something: all-zero results on both sides fail.

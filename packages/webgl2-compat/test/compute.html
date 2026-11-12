@@ -492,6 +492,42 @@ const cases = {
     run(device, p, [g], 3);
     return { values: { first, second: await read() }, tier: tierOf(p) };
   },
+  /**
+   * AMD GPU hunt row 34: a compute write lands in the buffer's data texture, which later dispatches (and draws) read
+   * through their bind groups, copied texture to texture; the GL buffer is read back from it only when something reads
+   * the GL buffer itself (here the copy to the read-back buffer). Before 2026-11-12 every dispatch read its stores back
+   * into the GL buffer at once (readPixels) and each bind group uploaded the buffer again from there.
+   */
+  async mirrorReads(device) {
+    const write = compute(device, `
+      @group(0) @binding(0) var<storage, read_write> a: array<u32>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+        if (id.x < 256u) { a[id.x] = id.x * 7u + 3u; }
+      }`);
+    const add = compute(device, `
+      @group(0) @binding(0) var<storage, read> a: array<u32>;
+      @group(0) @binding(1) var<storage, read> k: array<u32>;
+      @group(0) @binding(2) var<storage, read_write> o: array<u32>;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+        if (id.x < 256u) { o[id.x] = a[id.x] + k[id.x & 3u]; }
+      }`);
+    const a = device.createBuffer({ size: 1024, usage: B.STORAGE });
+    const k1 = buffer(device, Uint32Array.of(1, 2, 3, 4)), k2 = buffer(device, Uint32Array.of(100, 200, 300, 400));
+    const o1 = buffer(device, new Uint32Array(256)), o2 = buffer(device, new Uint32Array(256));
+    const gl = device.gl, readPixels = gl?.readPixels;
+    let packs = 0;
+    if (gl) gl.readPixels = function (...args) { packs++; return readPixels.apply(this, args); };
+    try {
+      run(device, write, [group(device, write, [{ buffer: a }])], 4);
+      // Two bind groups read the written buffer, each beside a buffer of its own.
+      run(device, add, [group(device, add, [{ buffer: a }, { buffer: k1 }, { buffer: o1 }])], 4);
+      run(device, add, [group(device, add, [{ buffer: a }, { buffer: k2 }, { buffer: o2 }])], 4);
+      await device.queue.onSubmittedWorkDone();
+    } finally {
+      if (gl) gl.readPixels = readPixels;
+    }
+    return { values: { o1: u32(await readBuffer(device, o1)), o2: u32(await readBuffer(device, o2)) }, tier: tierOf(add), readPixels: gl ? packs : null };
+  },
   // Bug sweep L3 (KB-L3b): on a context with MAX_TEXTURE_SIZE 2,048 a word texture holds 16 MiB (2,048 x 2,048 words),
   // under the 64 MiB binding that context allows. A 40 MiB binding spans three word textures; words are stored at its
   // start, around the first texture boundary and at its end. largeWords covers the 8,192 context.

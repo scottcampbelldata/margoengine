@@ -118,7 +118,8 @@ export class CompatBuffer {
     label: string;
     readonly size: number;
     readonly usage: number;
-    readonly gl: WebGLBuffer | null;
+    readonly raw: WebGLBuffer | null;
+    get gl(): WebGLBuffer | null;
     readonly element: WebGLBuffer | null;
     readonly shadow: Uint8Array | null;
     shadowValid: boolean;
@@ -138,7 +139,15 @@ export class CompatBuffer {
     dataTexture(): {
         texture: WebGLTexture;
         shift: number;
+        version: number;
     } | null;
+    mirror(): {
+        texture: WebGLTexture;
+        shift: number;
+        version: number;
+    } | null;
+    mirrorFramebuffer(): WebGLFramebuffer | null;
+    mirrored(): void;
     mapAsync(mode: number, offset?: number, size?: number): Promise<undefined>;
     getMappedRange(offset?: number, size?: number): ArrayBuffer;
     unmap(): void;

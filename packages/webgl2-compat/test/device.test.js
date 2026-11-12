@@ -617,10 +617,12 @@ test('a bind group whose storage bindings pass 2,048 x maxTextureDimension2D row
   });
   assert.equal(await device.popErrorScope(), null);
   assert.equal(group.invalid, null);
-  const data = group.storageTexture();
-  // 22,500,000 rows: 2,048 wide would be 10,987 high, past 8,192; 4,096 wide is 5,494 high.
+  const made = storage.length,
+    data = group.storageTexture();
+  // 22,500,000 rows: 2,048 wide would be 10,987 high, past 8,192; 4,096 wide is 5,494 high. (The group's texture is
+  // made first; texture copies of its buffers' own data textures may follow it.)
   assert.equal(data.shift, 12);
-  assert.deepEqual(storage.at(-1), [4096, 5494]);
+  assert.deepEqual(storage[made], [4096, 5494]);
   assert.deepEqual([...data.rows], [[0, 0], [1, 7_500_000], [2, 15_000_000]]);
   // Past maxTextureDimension2D squared rows (1 GiB here) a group still cannot be held.
   const big = device.createBuffer({ size: 128 * 1024 * 1024, usage: 0x80 | 0x8 }),

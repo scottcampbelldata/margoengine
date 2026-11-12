@@ -413,13 +413,39 @@ class Runtime implements ComputeRuntime {
   }
 
   /**
-   * Copies a buffer's word textures back into it on the GPU: four words per RGBA32UI texel through a draw, then
-   * readPixels into the buffer as a pixel-pack buffer.
+   * Copies a buffer's word textures back into it on the GPU: four words per RGBA32UI texel through a draw. A buffer of
+   * one word texture is drawn into its data texture, which storage reads use as it is; its GL buffer is read back from
+   * that only when something reads the GL buffer (CompatBuffer.gl). A larger one is drawn into texels of its own and
+   * read into the GL buffer at once (readPixels into it as a pixel-pack buffer).
    */
   private copyBack(r: Replayer, buffer: CompatBuffer, ws: Words): void {
     const gl = this.gl,
       state = this.device.state;
-    if (!buffer.gl) return;
+    if (!buffer.raw) return;
+    const fbo = ws.chunks.length === 1 ? buffer.mirrorFramebuffer() : null,
+      mirror = fbo && buffer.mirror();
+    if (fbo && mirror) {
+      const w = 1 << mirror.shift,
+        texels = Math.max(1, Math.ceil(buffer.size / 16)),
+        words = ws.width;
+      // Texel (x, y) of the data texture is row y * w + x of the buffer: its four words, in a row of the word texture.
+      const h = r.helper(
+        `words${w}x${words}`,
+        `uniform highp usampler2D t;\nout highp uvec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy); int i = (p.y * ${w} + p.x) * 4; ivec2 q = ivec2(i % ${words}, i / ${words}); c = uvec4(texelFetch(t, q, 0).x, texelFetch(t, q + ivec2(1, 0), 0).x, texelFetch(t, q + ivec2(2, 0), 0).x, texelFetch(t, q + ivec2(3, 0), 0).x); }`,
+      );
+      state.bindDrawFramebuffer(fbo);
+      r.helperState(h, w, Math.ceil(texels / w));
+      state.unit(0, gl.TEXTURE_2D, ws.chunks[0].texture.texture, this.device.loadSampler);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      buffer.mirrored();
+      if (buffer.element) {
+        // WebGL keeps index data in its own buffer: bring it up to date from the GPU (a counted stall).
+        const bytes = buffer.bytes();
+        buffer.land(0, bytes.slice());
+      }
+      ws.version = buffer.version;
+      return;
+    }
     const w4 = ws.width / 4;
     const h = r.helper(
       'words',
@@ -446,7 +472,7 @@ class Runtime implements ComputeRuntime {
         to = c.base * 4;
       state.bindReadFramebuffer(c.fbo);
       gl.readBuffer(gl.COLOR_ATTACHMENT0);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer.gl);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer.raw);
       if (full) gl.readPixels(0, 0, w4, full, gl.RGBA_INTEGER, gl.UNSIGNED_INT, to);
       if (rest) gl.readPixels(0, full, rest, 1, gl.RGBA_INTEGER, gl.UNSIGNED_INT, to + full * w4 * 16);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);

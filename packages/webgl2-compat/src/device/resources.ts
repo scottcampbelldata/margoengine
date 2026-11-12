@@ -72,8 +72,22 @@ export class CompatBuffer {
   label: string;
   readonly size: number;
   readonly usage: number;
-  /** GL buffer for every binding but the index binding (vertex, uniform, copies, pixel transfers). */
-  readonly gl: WebGLBuffer | null;
+  /**
+   * GL buffer for every binding but the index binding (vertex, uniform, copies, pixel transfers), as it is: it may be
+   * behind the data texture after a compute write (see `gl`).
+   */
+  readonly raw: WebGLBuffer | null;
+  /**
+   * The GL buffer, brought up to date first. A compute write lands in the data texture only (storage reads use that), and
+   * the GL buffer is copied from it when something reads the GL buffer itself: before 2026-11-12 every compute write was
+   * read back into it at once, and each draw's bind group copied it into its own texture again (AMD GPU hunt row 34).
+   */
+  get gl(): WebGLBuffer | null {
+    if (this.packPending) this.pack();
+    return this.raw;
+  }
+  /** The data texture holds a compute write the GL buffer does not have yet (`gl` copies it over). */
+  private packPending = false;
   /** GL element buffer, for the index usage. */
   readonly element: WebGLBuffer | null;
   /** CPU copy; current when `shadowValid`. */
@@ -91,7 +105,7 @@ export class CompatBuffer {
    * The RGBA32UI texture shaders read the buffer through as a storage buffer (WebGL2 has none): one 16-byte row per
    * texel, `1 << shift` texels wide; refreshed from the GL buffer on the GPU when the contents changed.
    */
-  private data: { texture: WebGLTexture; shift: number; version: number } | null = null;
+  private data: { texture: WebGLTexture; shift: number; version: number; fbo: WebGLFramebuffer | null } | null = null;
   /** @internal GPU objects the compute runtime keeps for this buffer (its word texture), freed with it. */
   computeState: { destroy(): void } | null = null;
   /** destroy() was called (see Usable); `destroyed` follows once its GL objects are freed. */
@@ -114,7 +128,7 @@ export class CompatBuffer {
       device.validationError(
         `createBuffer${this.label ? ` '${this.label}'` : ''}: ${size} bytes is over this device's maxBufferSize of ${most}`,
       );
-      this.gl = this.element = this.shadow = null;
+      this.raw = this.element = this.shadow = null;
       this.destroyed = true;
       return;
     }
@@ -131,12 +145,12 @@ export class CompatBuffer {
       BufferUsage.INDIRECT;
     const staging = (usage & ~(BufferUsage.MAP_WRITE | BufferUsage.COPY_SRC)) === 0;
     const own = <T>(o: T) => device.objects.own(this, o);
-    this.gl =
+    this.raw =
       !staging && usage & gpuUses && usage & ~(BufferUsage.INDEX | BufferUsage.COPY_DST)
         ? own(gl.createBuffer())
         : null;
-    if (this.gl) {
-      gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
+    if (this.raw) {
+      gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.raw);
       gl.bufferData(gl.COPY_WRITE_BUFFER, glSize, gl.DYNAMIC_DRAW);
       device.allocated(`buffer '${this.label}' (${glSize} bytes)`);
     }
@@ -251,14 +265,29 @@ export class CompatBuffer {
 
   /**
    * The data texture shaders read this buffer through as a storage buffer, brought up to date first (a GPU-side copy
-   * from the GL buffer through PIXEL_UNPACK_BUFFER); null for a buffer without a GL buffer.
+   * from the GL buffer through PIXEL_UNPACK_BUFFER, once per version of the contents however many bind groups read
+   * it); null for a buffer without a GL buffer.
    */
-  dataTexture(): { texture: WebGLTexture; shift: number } | null {
-    if (!this.gl) return null;
-    const gl = this.device.gl,
-      texels = Math.max(1, Math.ceil(this.size / 16));
+  dataTexture(): { texture: WebGLTexture; shift: number; version: number } | null {
+    const d = this.mirror();
+    if (!d) return null;
+    if (d.version !== this.version) {
+      const gl = this.device.gl;
+      if (this.readbacks.length) this.settle();
+      this.device.state.scratch(gl.TEXTURE_2D, d.texture);
+      uploadRows(gl, this.gl as WebGLBuffer, 1 << d.shift, 0, Math.max(1, Math.ceil(this.size / 16)), 0);
+      d.version = this.version;
+    }
+    return d;
+  }
+
+  /** @internal The data texture as it is (made, zeroed, when first needed), without bringing it up to date. */
+  mirror(): { texture: WebGLTexture; shift: number; version: number } | null {
+    if (!this.raw || this.destroyed) return null;
     if (!this.data) {
-      const shift = rowShift(texels, this.device.limits.maxTextureDimension2D),
+      const gl = this.device.gl,
+        texels = Math.max(1, Math.ceil(this.size / 16)),
+        shift = rowShift(texels, this.device.limits.maxTextureDimension2D),
         w = 1 << shift,
         h = Math.ceil(texels / w);
       const texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
@@ -266,16 +295,58 @@ export class CompatBuffer {
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w, h);
       this.device.allocated(`the data texture of buffer '${this.label}' (${w} x ${h})`);
       this.device.replayer.zero(texture, gl.TEXTURE_2D, WORDS, 1, w, h, 1);
-      this.data = { texture, shift, version: -1 };
+      this.data = { texture, shift, version: -1, fbo: null };
     }
+    return this.data;
+  }
+
+  /**
+   * @internal A framebuffer with the data texture as its one colour attachment: compute writes draw into it, bind groups
+   * copy their rows out of it and `gl` reads the GL buffer back from it. Made on the read binding: bind groups ask for it
+   * while a pass draws, and the pass's draw framebuffer must stay bound (its draw buffer is COLOR_ATTACHMENT0 already).
+   */
+  mirrorFramebuffer(): WebGLFramebuffer | null {
+    if (!this.mirror()) return null;
+    const d = this.data as NonNullable<typeof this.data>;
+    const gl = this.device.gl;
+    if (!d.fbo) {
+      d.fbo = this.device.objects.own(this, gl.createFramebuffer() as WebGLFramebuffer);
+      this.device.state.bindReadFramebuffer(d.fbo);
+      gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, d.texture, 0);
+      this.device.state.bindReadFramebuffer(null);
+    }
+    return d.fbo;
+  }
+
+  /**
+   * @internal The compute runtime drew new contents into the data texture: it is the newest copy, the CPU copy is
+   * stale and the GL buffer follows when read (`gl`).
+   */
+  mirrored(): void {
+    this.version++;
+    (this.data as NonNullable<typeof this.data>).version = this.version;
+    this.packPending = true;
+    if (this.shadow) this.shadowValid = false;
+  }
+
+  /** Copies the data texture into the GL buffer (on the GPU, readPixels into it as a pixel pack buffer). */
+  private pack(): void {
+    this.packPending = false;
     const d = this.data;
-    if (d.version !== this.version) {
-      if (this.readbacks.length) this.settle();
-      this.device.state.scratch(gl.TEXTURE_2D, d.texture);
-      uploadRows(gl, this.gl, 1 << d.shift, 0, texels, 0);
-      d.version = this.version;
-    }
-    return d;
+    if (!d?.fbo || !this.raw || this.destroyed) return;
+    const gl = this.device.gl,
+      state = this.device.state,
+      w = 1 << d.shift,
+      texels = Math.max(1, Math.ceil(this.size / 16)),
+      full = Math.floor(texels / w),
+      rest = texels - full * w;
+    state.bindReadFramebuffer(d.fbo);
+    gl.readBuffer(gl.COLOR_ATTACHMENT0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.raw);
+    if (full) gl.readPixels(0, 0, w, full, gl.RGBA_INTEGER, gl.UNSIGNED_INT, 0);
+    if (rest) gl.readPixels(0, full, rest, 1, gl.RGBA_INTEGER, gl.UNSIGNED_INT, full * w * 16);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    state.bindReadFramebuffer(null);
   }
 
   mapAsync(mode: number, offset = 0, size?: number): Promise<undefined> {
@@ -299,6 +370,8 @@ export class CompatBuffer {
     return Promise.resolve(this.device.queue.waiting).then(async () => {
       // Mapping waits for this buffer's writes, not a new fence after the entire device queue. Texture/query
       // readbacks carry their own readiness; a GPU-only buffer copy without one still needs the queue fence.
+      // A compute write waiting in the data texture goes to the GL buffer before that fence.
+      if (this.packPending) this.pack();
       if (!this.readbacks.length && !this.shadowValid) await this.device.idle();
       else this.device.gl.flush();
       // Occlusion results arrive a task after the GPU finishes: wait for every write this buffer still expects.
@@ -367,11 +440,13 @@ export class CompatBuffer {
     if (this.destroyed || this.device.queue.afterWaiting(() => this.destroy())) return;
     this.destroyed = true;
     const gl = this.device.gl;
-    if (this.gl) gl.deleteBuffer(this.gl);
+    this.packPending = false;
+    if (this.raw) gl.deleteBuffer(this.raw);
     if (this.element) gl.deleteBuffer(this.element);
     if (this.data) {
       this.device.state.forgetTexture(this.data.texture);
       gl.deleteTexture(this.data.texture);
+      if (this.data.fbo) gl.deleteFramebuffer(this.data.fbo);
     }
     this.computeState?.destroy();
     this.mapState = 'unmapped';
@@ -434,6 +509,77 @@ function uploadRows(
     src += n * 16;
   }
   gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+}
+
+/**
+ * Where each storage binding of a bind group starts in its shared texture (texels): in order, each placed so that its
+ * rows copy out of its buffer's data texture in few rectangles. A binding whose data texture is as wide as the shared
+ * one starts at the same column as in it (whole rows then copy at once); a shorter one does not cross a row. Falls
+ * back to packing them tight when the padding would change the width or not fit.
+ */
+function storageLayout(
+  list: readonly { binding: number; texels: number; from: number; width: number }[],
+  most: number,
+): { rows: Map<number, number>; total: number } {
+  const tight = () => {
+    const rows = new Map<number, number>();
+    let total = 0;
+    for (const b of list) {
+      rows.set(b.binding, total);
+      total += b.texels;
+    }
+    return { rows, total };
+  };
+  let shift = rowShift(tight().total, most);
+  for (let tries = 0; tries < 4; tries++) {
+    const w = 1 << shift,
+      rows = new Map<number, number>();
+    let at = 0;
+    for (const b of list) {
+      let start = at;
+      if (b.width === w) start += (((b.from - at) % w) + w) % w;
+      else if (b.texels <= w && (start % w) + b.texels > w) start = Math.ceil(start / w) * w;
+      rows.set(b.binding, start);
+      at = start + b.texels;
+    }
+    if (at > most * most) break;
+    const next = rowShift(at, most);
+    if (next === shift) return { rows, total: at };
+    shift = next;
+  }
+  return tight();
+}
+
+/**
+ * The runs `copyTexels` copies `n` texels in, from texel `s` of a texture `ws` wide to texel `d` of one `wd` wide:
+ * whole rows at once where both line up, else one run per stretch that stays inside a row of both.
+ */
+function texelRuns(ws: number, s: number, wd: number, d: number, n: number, copy?: (r: number[]) => void): number {
+  let runs = 0;
+  while (n > 0) {
+    const sx = s % ws,
+      dx = d % wd;
+    let k: number, run: number[];
+    if (sx === 0 && dx === 0 && ws === wd && n >= ws) {
+      const rows = Math.floor(n / ws);
+      k = rows * ws;
+      run = [0, d / wd, 0, s / ws, ws, rows];
+    } else {
+      k = Math.min(n, ws - sx, wd - dx);
+      run = [dx, Math.floor(d / wd), sx, Math.floor(s / ws), k, 1];
+    }
+    copy?.(run);
+    runs++;
+    s += k;
+    d += k;
+    n -= k;
+  }
+  return runs;
+}
+
+/** Copies texels from the read framebuffer's texture into the TEXTURE_2D bound on the active unit (see texelRuns). */
+function copyTexels(gl: WebGL2RenderingContext, ws: number, s: number, wd: number, d: number, n: number): void {
+  texelRuns(ws, s, wd, d, n, ([dx, dy, sx, sy, w, h]) => gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, dx, dy, sx, sy, w, h));
 }
 
 /** One writeTexture into a block-compressed texture: whole blocks of a region of one level (tight rows). */
@@ -1134,22 +1280,31 @@ export class CompatBindGroup {
   /**
    * One RGBA32UI texture holding the rows of every storage binding of the group without a dynamic offset, one after
    * another (`rows` gives each binding's first texel), so a pipeline spends one texture unit on them. A binding is
-   * copied in again, on the GPU, whenever its buffer changed; null when the group has no such binding.
+   * copied in again, on the GPU, whenever its buffer changed: texture to texture from the buffer's own data texture,
+   * which is brought up to date once per version of the buffer however many groups read it. Null when the group has no
+   * such binding. Before 2026-11-12 each group copied each changed buffer whole out of its GL buffer through
+   * PIXEL_UNPACK_BUFFER, so a buffer read by six groups went up six times a frame, after a read-back of every compute
+   * write into the GL buffer (AMD GPU hunt row 34: 1,140 texSubImage2D and 360 readPixels a frame in the biomes flight).
    */
   storageTexture(): { texture: WebGLTexture; shift: number; rows: ReadonlyMap<number, number> } | null {
     const gl = this.device.gl;
     if (!this.shared) {
-      const rows = new Map<number, number>();
-      let total = 0;
+      const list: { binding: number; texels: number; from: number; width: number }[] = [];
+      const most = this.device.limits.maxTextureDimension2D;
       for (const e of this.layout.entries) {
         const bound = this.entries.get(e.binding);
         if (!e.buffer || e.buffer.type === 'uniform' || e.buffer.hasDynamicOffset || bound?.kind !== 'buffer') continue;
-        rows.set(e.binding, total);
-        total += Math.max(1, Math.ceil(bound.size / 16));
+        list.push({
+          binding: e.binding,
+          texels: Math.max(1, Math.ceil(bound.size / 16)),
+          from: bound.offset >> 4,
+          width: 1 << rowShift(Math.max(1, Math.ceil(bound.buffer.size / 16)), most),
+        });
       }
-      if (!total) return null;
+      if (!list.length) return null;
+      const { rows, total } = storageLayout(list, most);
       // Bind groups have no destroy(): the texture goes once the group is collected (GLObjects.own).
-      const shift = rowShift(total, this.device.limits.maxTextureDimension2D),
+      const shift = rowShift(total, most),
         texture = this.device.objects.own(this, gl.createTexture() as WebGLTexture);
       this.device.state.scratch(gl.TEXTURE_2D, texture);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
@@ -1158,15 +1313,28 @@ export class CompatBindGroup {
       this.shared = { texture, shift, rows, versions: new Map() };
     }
     const d = this.shared;
+    let read = false;
     for (const [binding, row] of d.rows) {
       const bound = this.entries.get(binding) as Extract<Bound, { kind: 'buffer' }>,
         buffer = bound.buffer;
-      if (d.versions.get(binding) === buffer.version || buffer.destroyed || !buffer.gl) continue;
+      if (d.versions.get(binding) === buffer.version || buffer.destroyed || !buffer.raw) continue;
       if (buffer.readbacks.length) buffer.settle();
+      const texels = Math.max(1, Math.ceil(bound.size / 16)),
+        from = bound.offset >> 4,
+        width = 1 << rowShift(Math.max(1, Math.ceil(buffer.size / 16)), this.device.limits.maxTextureDimension2D),
+        // Few rectangles (the layout lines rows up): copy from the data texture; else rows from the GL buffer.
+        source = texelRuns(width, from, 1 << d.shift, row, texels) <= 4 ? buffer.dataTexture() : null,
+        fbo = source && buffer.mirrorFramebuffer();
       this.device.state.scratch(gl.TEXTURE_2D, d.texture);
-      uploadRows(gl, buffer.gl, 1 << d.shift, row, Math.max(1, Math.ceil(bound.size / 16)), bound.offset);
+      if (source && fbo) {
+        this.device.state.bindReadFramebuffer(fbo);
+        gl.readBuffer(gl.COLOR_ATTACHMENT0);
+        read = true;
+        copyTexels(gl, 1 << source.shift, from, 1 << d.shift, row, texels);
+      } else uploadRows(gl, buffer.gl as WebGLBuffer, 1 << d.shift, row, texels, bound.offset);
       d.versions.set(binding, buffer.version);
     }
+    if (read) this.device.state.bindReadFramebuffer(null);
     return d;
   }
 }
