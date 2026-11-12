@@ -13,24 +13,30 @@
 // document's `pagehide` has fired, each WebGPU promise it settles is held instead of resolved, so the document's
 // script stops at its next GPU wait. A document the back/forward cache shows again (`pageshow` with `persisted`) gets
 // every held result, in order, and carries on.
+//
+// So the hold is kept per document, not per window (AMD GPU hunt R7 row 41, found 2026-11-12): an iframe's initial
+// about:blank document fires `pagehide` when the document it loads replaces it (a `srcdoc` or blob page, as sciviz's
+// exportStandalone embed), and Chromium hands that document the same Window, wrappers included. Held per window,
+// every WebGPU promise of the new document was held for good (`requestAdapter never settled`).
 
 /** Init script: holds the WebGPU promises of a document once the tab has left it; see the file comment. */
 export function holdStaleDocumentGpu() {
   if (typeof GPU === 'undefined' || GPU.prototype.requestAdapter.margoStaleDocument) return;
-  let gone = false;
+  // The documents this window has left; `document` is read when a promise settles, so it names the live document.
+  const left = new WeakSet();
   const held = [];
   addEventListener('pagehide', () => {
-    gone = true;
+    left.add(document);
   });
   addEventListener('pageshow', (event) => {
     if (!event.persisted) return;
-    gone = false;
+    left.delete(document);
     for (const release of held.splice(0)) release();
   });
   const hold = (promise) =>
     promise.then(
-      (value) => (gone ? new Promise((resolve) => held.push(() => resolve(value))) : value),
-      (error) => (gone ? new Promise((_, reject) => held.push(() => reject(error))) : Promise.reject(error)),
+      (value) => (left.has(document) ? new Promise((resolve) => held.push(() => resolve(value))) : value),
+      (error) => (left.has(document) ? new Promise((_, reject) => held.push(() => reject(error))) : Promise.reject(error)),
     );
   const wrap = (prototype, name) => {
     const original = prototype?.[name];

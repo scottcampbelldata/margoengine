@@ -66,3 +66,22 @@ test('a document left while starting up writes nothing into the next one', { tim
     }
   }),
 );
+
+// AMD GPU hunt R7 row 41: an iframe's initial about:blank fires pagehide when its srcdoc document replaces it, and
+// Chromium gives the new document the same Window. While the hold was kept per window, the srcdoc page's
+// requestAdapter was held for good (sciviz share check: "WebGPU requestAdapter never settled").
+test('a srcdoc iframe that takes over its about:blank window still gets its adapter', { timeout: 120_000 }, () =>
+  withPage(async (page) => {
+    await page.waitForFunction(() => window.ready, null, { timeout: 60_000 });
+    const result = await page.evaluate(async () => {
+      const iframe = document.createElement('iframe');
+      iframe.srcdoc =
+        '<script>navigator.gpu.requestAdapter().then((a) => (window.result = a ? "adapter" : "null"), (e) => (window.result = "error " + e.message))</script>';
+      document.body.append(iframe);
+      const start = performance.now();
+      while (!iframe.contentWindow.result && performance.now() - start < 30_000) await new Promise((r) => setTimeout(r, 50));
+      return iframe.contentWindow.result ?? 'pending after 30 s';
+    });
+    assert.equal(result, 'adapter');
+  }),
+);
