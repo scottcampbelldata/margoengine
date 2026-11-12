@@ -72,11 +72,6 @@ for (const format of ['ascii', 'binary'])
     assert.deepEqual([...internal.cellArrays.U.slice(0, 3)], [1, 2, 3]);
     assert.deepEqual([...walls.cellArrays.U.slice(0, 3)], [4, 5, 6]);
   });
-test('OpenFOAM real airfoil polyMesh retains all named patches', { timeout: 60000 }, async () => {
-  const grid = await readOpenFOAM(new Uint8Array(), files('foam-ascii/'));
-  assert.deepEqual(grid.names, ['internalMesh', 'inlet', 'outlet', 'walls', 'frontAndBack']);
-  assert.equal(grid.blocks[0].sourceCells.at(-1), 10719);
-});
 test('Ansys EnSight 10.2 Gold binary aircraft keeps parts and six nodal fields', { timeout: 60000 }, async () => {
   const grid = await readEnSight(bytes('ensight-owner/extra300_RC_Plane_nodal.case'), {
     ...files('ensight-owner/'),

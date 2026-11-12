@@ -34,13 +34,6 @@
       "transformation": "None; byte-for-byte original standard sample data."
     },
     {
-      "files": "foam-ascii/**",
-      "title": "OpenFOAM Foundation airFoil2D tutorial polyMesh",
-      "url": "https://github.com/OpenFOAM/OpenFOAM-dev/tree/master/tutorials/incompressibleFluid/airFoil2D/constant/polyMesh",
-      "license": "GPL-3.0-or-later; standard sample data exception only, no implementation source",
-      "transformation": "None; original standard case mesh files."
-    },
-    {
       "files": "foam-owner-*/**",
       "title": "Original Margo 2 by 2 by 2 hexahedron mesh and fields",
       "license": "Apache-2.0",
@@ -89,11 +82,6 @@
       "path": "LICENSE-ANSYS.txt",
       "bytes": 1114,
       "sha256": "46617266d39d9ecdd829d29ef6e9a237e9312e71531ddc258e2303e28ab041db"
-    },
-    {
-      "path": "LICENSE-OpenFOAM.txt",
-      "bytes": 35646,
-      "sha256": "a62f4262b9739f43478d025ed9fc5419585ec27b4b50e88f55e3186141e18ef1"
     },
     {
       "path": "LICENSE-SEACAS.txt",
@@ -179,36 +167,6 @@
       "path": "ensight-owner/extra300_RC_Plane_nodal.yPlus",
       "bytes": 1267940,
       "sha256": "abc22e3efa043be0ad4dd79c1f7af966549073bc2d7ae90559245c5bb83ed719"
-    },
-    {
-      "path": "foam-ascii/constant/polyMesh/boundary",
-      "bytes": 1052,
-      "sha256": "7744212a4646640a031bac21879bc901d70d9fc9e939e07576bce8f9ddc8fd20"
-    },
-    {
-      "path": "foam-ascii/constant/polyMesh/cells",
-      "bytes": 396547,
-      "sha256": "d5715925bb85d57f6fbae6d41579aaa91e3fa411d5863c9a92d06fbf8bbe413b"
-    },
-    {
-      "path": "foam-ascii/constant/polyMesh/faces",
-      "bytes": 1075835,
-      "sha256": "8c198f4b3b068bf18a03fbf6ce1bacc989e251e1f70eeb92774104fa40f5ba7e"
-    },
-    {
-      "path": "foam-ascii/constant/polyMesh/neighbour",
-      "bytes": 106360,
-      "sha256": "69d6b4022707c1d88ea11244d0d508faac3ff77420bd6c259bf1019a4f2b57c1"
-    },
-    {
-      "path": "foam-ascii/constant/polyMesh/owner",
-      "bytes": 214280,
-      "sha256": "ded79e040947d55714121354ba37f92f1a5f07e29e407d6523b09c42bbff0a0d"
-    },
-    {
-      "path": "foam-ascii/constant/polyMesh/points",
-      "bytes": 486569,
-      "sha256": "5d1c490b27421d1e5d80715bb53b88411efad92f60545ac626ce5de03ea356a9"
     },
     {
       "path": "foam-owner-ascii/0/p",
