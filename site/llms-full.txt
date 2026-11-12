@@ -10298,7 +10298,7 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
   views (baselines are per machine) and any batch 160 budget that holds such a surface outside gltf-pro are re-recorded
   there.
 
-### Open 2026-11-12: post's GPU check rewrites a tracked result file on every run (hunt K1)
+### Fixed 2026-11-12: post's GPU check rewrote a tracked result file on every run (hunt K1)
 
 - **Repro:** `npm run test:gpu:flare -w packages/post` on any machine leaves
   `examples/package-benchmarks/results/flare-gpu.json` modified: the date, commit, GPU and browser of that run replace
@@ -10306,8 +10306,12 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
 - **Cause:** `examples/package-benchmarks/post-effects-gpu.mjs` writes `results/<section>-gpu.json` after every passing
   section; the same file is both the benchmark record and the package's GPU test (test:gpu:flare), with no flag that
   separates recording from checking.
-- **Fix to make (post owner):** write the tracked record only when asked (a record flag), else to test-results/, with a
-  test that a plain run leaves the tracked file unchanged. Until then restore the file after a test run (git checkout).
+- **Fix:** the script writes a section's report to `test-results/post-<section>-gpu.json` (ignored) and the tracked
+  `results/<section>-gpu.json` only with `--record` (the record flag of packages/staging and packages/wfc), through
+  `examples/package-benchmarks/post-effects-output.mjs`. The RTX A6000 record on main was never overwritten, so
+  nothing was restored. Regression: `tests/post-effects-gpu-record.test.js` (the planned report path of
+  test:gpu:flare's own arguments and of --record, and the script's text; no GPU), which fails on the old script.
+- **Landed:** fe59e4dbe.
 
 ### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 

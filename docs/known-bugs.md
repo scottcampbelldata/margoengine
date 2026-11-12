@@ -44,6 +44,7 @@
   `examples/package-benchmarks/post-effects-output.mjs`. The RTX A6000 record on main was never overwritten, so
   nothing was restored. Regression: `tests/post-effects-gpu-record.test.js` (the planned report path of
   test:gpu:flare's own arguments and of --record, and the script's text; no GPU), which fails on the old script.
+- **Landed:** fe59e4dbe.
 
 ### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 
