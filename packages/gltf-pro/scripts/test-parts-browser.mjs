@@ -3,12 +3,18 @@
 // as a reference GLB pre-split at export into row bands of at most 262,144 vertices, far away and close up, natively
 // and on the WebGL2 layer (--compat). For maxPartVertices 2^16, 2^18 and 2^20 it records the work counts (parts,
 // draws, triangles submitted) of both views, and the Node prepare's peak ArrayBuffer bytes per input byte.
+// Natively the views compare the 4x multisample colour samples before the resolve, not the resolved canvas: the
+// Radeon 680M's resolve rounds an exact .5 average by draw history, and the parts draw in another order than the
+// reference's bands (docs/work-lists/amd-gpu-hunt.md rows 8 and 39, Scott's ruling option a). The samples are what the
+// draws wrote, so a part dropped, moved or drawn twice still changes them. The WebGL2 layer has no samples to read and
+// compares the resolved canvas.
 // The GLBs are generated once into test-results/gltf-parts/ (git-ignored). Run from the repository root after building
 // packages, under the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=<lane> -- node packages/gltf-pro/scripts/test-parts-browser.mjs [--compat]
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
 import { runSuite } from '../../../scripts/support/shutdown.mjs';
 
 const compat = process.argv.includes('--compat'),
@@ -145,6 +151,39 @@ await runSuite(
           { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
           { loadGLTFProgressive } = await import('/packages/gltf-pro/dist/progressive.js'),
           { CulledModels } = await import('/packages/culling/dist/models.js');
+        // Natively: keep the canvas pass's 4x colour samples stored and readable (core discards them after the resolve).
+        const multisampled = (d) =>
+            d.sampleCount === 4 && !String(d.format).startsWith('depth') && !String(d.format).startsWith('stencil'),
+          textureOfView = new WeakMap(),
+          readable = new WeakSet();
+        let samplesTexture = null;
+        if (globalThis.GPUDevice && !globalThis.__margoCompat) {
+          const createTexture = GPUDevice.prototype.createTexture,
+            createView = GPUTexture.prototype.createView,
+            beginRenderPass = GPUCommandEncoder.prototype.beginRenderPass;
+          GPUDevice.prototype.createTexture = function (d) {
+            const texture = createTexture.call(
+              this,
+              multisampled(d) ? { ...d, usage: d.usage | GPUTextureUsage.TEXTURE_BINDING } : d,
+            );
+            if (multisampled(d)) readable.add(texture);
+            return texture;
+          };
+          GPUTexture.prototype.createView = function (...args) {
+            const view = createView.apply(this, args);
+            textureOfView.set(view, this);
+            return view;
+          };
+          GPUCommandEncoder.prototype.beginRenderPass = function (d) {
+            for (const c of d.colorAttachments ?? []) {
+              const texture = c?.resolveTarget && textureOfView.get(c.view);
+              if (!texture || !readable.has(texture)) continue;
+              c.storeOp = 'store';
+              samplesTexture = texture;
+            }
+            return beginRenderPass.call(this, d);
+          };
+        }
         const canvas = document.createElement('canvas'),
           W = 512;
         canvas.width = canvas.height = W;
@@ -181,6 +220,49 @@ await runSuite(
           format: navigator.gpu.getPreferredCanvasFormat(),
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
         });
+        // Every sample of the last canvas pass as 8-bit rgb in a u32 (the canvas format is 8-bit, so this is exact).
+        const readSamples = async () => {
+          const texture = samplesTexture,
+            n = texture.width * texture.height * 4,
+            module = device.createShaderModule({
+              code: `@group(0) @binding(0) var t: texture_multisampled_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> o: array<u32>;
+@compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) g: vec3u) {
+  let size = textureDimensions(t);
+  if (g.x >= size.x || g.y >= size.y) { return; }
+  for (var s = 0u; s < 4u; s++) {
+    let c = vec3u(round(clamp(textureLoad(t, vec2i(g.xy), s).rgb, vec3f(0.0), vec3f(1.0)) * 255.0));
+    o[(g.y * size.x + g.x) * 4u + s] = c.r | (c.g << 8u) | (c.b << 16u);
+  }
+}`,
+            }),
+            pipeline = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } }),
+            out = device.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+            back = device.createBuffer({ size: n * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+            encoder = device.createCommandEncoder(),
+            pass = encoder.beginComputePass();
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(
+            0,
+            device.createBindGroup({
+              layout: pipeline.getBindGroupLayout(0),
+              entries: [
+                { binding: 0, resource: texture.createView() },
+                { binding: 1, resource: { buffer: out } },
+              ],
+            }),
+          );
+          pass.dispatchWorkgroups(Math.ceil(texture.width / 8), Math.ceil(texture.height / 8));
+          pass.end();
+          encoder.copyBufferToBuffer(out, 0, back, 0, n * 4);
+          device.queue.submit([encoder.finish()]);
+          await back.mapAsync(GPUMapMode.READ);
+          const data = new Uint32Array(back.getMappedRange().slice(0));
+          back.unmap();
+          out.destroy();
+          back.destroy();
+          return data;
+        };
         const render = async (view) => {
           instance.camera.position = [...views[view].position];
           instance.camera.target = [...views[view].target];
@@ -189,6 +271,7 @@ await runSuite(
           context.getCurrentTexture = () => (texture = original());
           try {
             submitted = 0;
+            samplesTexture = null;
             instance.render();
             const counts = { draws: engine.stats.drawCalls, triangles: drawIndexed ? submitted / 3 : null };
             const row = W * 4,
@@ -200,7 +283,7 @@ await runSuite(
             const pixels = new Uint8Array(read.getMappedRange()).slice();
             read.unmap();
             read.destroy();
-            return { pixels, counts };
+            return { pixels, counts, samples: samplesTexture ? await readSamples() : null };
           } finally {
             context.getCurrentTexture = original;
           }
@@ -222,9 +305,21 @@ await runSuite(
           }
           return out;
         };
+        // Pixels whose four samples differ (natively) or whose resolved rgb differs (the WebGL2 layer).
         const differ = (a, b) => {
           let n = 0;
-          for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) n++;
+          if (a.samples && b.samples) {
+            for (let p = 0; p < a.samples.length; p += 4)
+              for (let s = 0; s < 4; s++)
+                if (a.samples[p + s] !== b.samples[p + s]) {
+                  n++;
+                  break;
+                }
+            return n;
+          }
+          const x = a.pixels,
+            y = b.pixels;
+          for (let i = 0; i < x.length; i += 4) if (x[i] !== y[i] || x[i + 1] !== y[i + 1] || x[i + 2] !== y[i + 2]) n++;
           return n;
         };
         const background = (p) => {
@@ -271,6 +366,9 @@ await runSuite(
           out = {
             validation,
             backend: instance.backend,
+            compare: ref.far.samples ? 'samples' : 'resolved',
+            // Control: the far and close views' samples differ, so the comparison reads what the draws wrote.
+            control: differ(ref.far, ref.close),
             sizes: fitting,
             limits: {
               maxStorageBufferBindingSize: device.limits.maxStorageBufferBindingSize,
@@ -288,7 +386,7 @@ await runSuite(
                 view,
                 {
                   ...run.frames[view].counts,
-                  differ: differ(run.frames[view].pixels, ref[view].pixels),
+                  differ: differ(run.frames[view], ref[view]),
                   culled: run.culled[view],
                 },
               ]),
@@ -302,6 +400,9 @@ await runSuite(
     );
     console.log(JSON.stringify({ compat, memory, ...result }));
     assert.deepEqual(result.validation, []);
+    // Natively the samples must be read: a silent fall back to the resolved canvas would hide a broken hook.
+    assert.equal(result.compare, compatRun() ? 'resolved' : 'samples', 'the views compare the multisample samples natively');
+    assert.ok(result.control > 1000, `the far and close views differ (${result.control} pixels)`);
     assert.ok(result.coverage.far > 0.2 && result.coverage.close > 0.98, JSON.stringify(result.coverage));
     for (const name of ['loadGLTF', 'progressive', ...result.sizes.map((s) => `parts${s}`)]) {
       for (const view of ['far', 'low', 'close'])
