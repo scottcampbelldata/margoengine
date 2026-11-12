@@ -2,6 +2,20 @@
 
 Import `margoengine/gltf-pro` from the `margoengine` package, or `@margoengine/gltf-pro` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
+Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage.
+
+Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend:'webgpu'});
+const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
+const b = model.bounds;
+stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
+// Call model.destroy() when unloading the model, or stage.dispose() on unmount.
+```
+
 `Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
 primitive nodes automatically. `selection.set([primitive.node])` also discovers
 their model; explicit `add(model)` remains supported and is deduplicated.
@@ -84,20 +98,6 @@ animation.playing = false;
 animation.seek(1);
 console.log(model.primitives[0].material.tint); // [0.25, 0.5, 1]
 engine.start();
-```
-
-Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
-
-Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
-
-```ts
-import {createStage} from 'margoengine';
-import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
-const stage = await createStage('#viewport', {backend:'webgpu'});
-const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
-const b = model.bounds;
-stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
-// Call model.destroy() when unloading the model, or stage.dispose() on unmount.
 ```
 
 `KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).

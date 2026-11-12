@@ -1,5 +1,7 @@
 # @margoengine/sciviz
 
+Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots with axes, ticks, labels and colour bars, and perceptual colour maps.
+
 Real-data examples: [MRI head volume](../../examples/sciviz-head.html) (OpenNeuro, CC0),
 [Star catalogue](../../examples/sciviz-stars.html) (one million public-domain 2MASS sources in observed sky position
 and colour space, selection linked to a histogram), and [Wind field](../../examples/sciviz-wind.html)

@@ -1,5 +1,7 @@
 # @margoengine/cameras
 
+Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.
+
 `WideAngle` and `WideAngleCube` detach from their owning scene when disposed and
 preserve same-name effects in other scenes. Device restoration keeps them attached.
 Use `scene.use()` to attach their PostStack to a secondary scene:

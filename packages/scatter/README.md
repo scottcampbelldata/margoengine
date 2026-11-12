@@ -1,5 +1,7 @@
 # @margoengine/scatter
 
+Seeded instancing, distance-based LOD and procedural wind.
+
 Import `margoengine/scatter` from the `margoengine` package, or `@margoengine/scatter` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `randomPlacements(count, bounds, [minScale,maxScale], seed)` generates seeded

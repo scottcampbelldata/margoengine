@@ -1,5 +1,7 @@
 # @margoengine/loaders
 
+PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, NURBS, LAS, OpenVDB, MaterialX, Lottie, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.
+
 `@margoengine/loaders/vtk-xml` also exposes `openVTKXMLDataset` for lazy numeric arrays and intact volume
 topology in `.vtu`, `.vti`, `.vts` and `.vtp`. It shares every decoder with `parseVTKXML`; it does not construct
 or triangulate geometry. Metadata and arrays stay separated by piece. Array `read(signal?)` returns owned

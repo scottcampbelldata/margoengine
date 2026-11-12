@@ -1,31 +1,9 @@
 # @margoengine/webgl2-compat
 
-The WGSL front end resolves adjacent minus signs in expression context, while keeping statement decrements:
-
-```ts
-import {checkWGSL} from '@margoengine/webgl2-compat/wgsl';
-const module = checkWGSL('const value = 1--2; fn f(){var i=2; i--;}');
-const value = module.globals.find(item => item.name === 'value');
-console.log(value?.kind === 'const' ? value.value : undefined); // 3
-```
-
-This also accepts subtraction of negative constants in generated shaders, including Tonemap's custom curves.
-
-Live `/restore` rebuilds and renderer disposal release the renderer's current shader program before
-deleting it. Other plugins can save and restore GL state during reconstruction without retaining a
-deleted program; a current program owned by another plugin is preserved. The existing restore example
-below needs no additional setup. CPU lifetime tests cover owned, foreign and null bindings; the sciviz
-native reboot pixel/error gate remains pending the browser teardown repair.
-
-The full device infers module-private WGSL variable types from constant initializers,
-including `var<private> enabled = true;`.
-
-
 This is the single WebGL2 package. Use the root `install()` entry to run the real
 renderer without WebGPU. The optional `/preview`, `/pick`, `/restore` and `/auto`
-entries preserve the smaller preview for lower-tier WebGL2. The former webgl
-workspace and its umbrella aliases were removed before release; use the entries
-and examples below.
+entries keep the smaller preview for lower-tier WebGL2. The entries and examples below
+show each one.
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
@@ -67,6 +45,26 @@ Installer diagnostics keep the error code, help link and every missing capabilit
 name concise enough to fit the existing entry size ceilings. A full-tier probe
 checks capabilities; package parity failures remain tracked in
 [known bugs](../../docs/known-bugs.md#open-full-layer-validation-transferred-to-parity-batch-273).
+
+The WGSL front end resolves adjacent minus signs in expression context, while keeping statement decrements:
+
+```ts
+import {checkWGSL} from '@margoengine/webgl2-compat/wgsl';
+const module = checkWGSL('const value = 1--2; fn f(){var i=2; i--;}');
+const value = module.globals.find(item => item.name === 'value');
+console.log(value?.kind === 'const' ? value.value : undefined); // 3
+```
+
+This also accepts subtraction of negative constants in generated shaders, including Tonemap's custom curves.
+
+Live `/restore` rebuilds and renderer disposal release the renderer's current shader program before
+deleting it. Other plugins can save and restore GL state during reconstruction without retaining a
+deleted program; a current program owned by another plugin is preserved. The existing restore example
+below needs no additional setup. CPU lifetime tests cover owned, foreign and null bindings; the sciviz
+native reboot pixel/error gate remains pending the browser teardown repair.
+
+The full device infers module-private WGSL variable types from constant initializers,
+including `var<private> enabled = true;`.
 
 What it does:
 

@@ -1,5 +1,7 @@
 # @margoengine/lod
 
+Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.
+
 The GPU correctness check renders all 140 frames per scene mode and keeps its
 existing image and level assertions, without collecting CPU/GPU timings. The
 manual page's timing path requires `?benchmark=1` and is deferred during the build

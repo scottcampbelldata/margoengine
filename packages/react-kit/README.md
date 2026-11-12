@@ -9,7 +9,7 @@ All packages release together at one version. Optional third-party peers remain 
 See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
 model-loading entries and measured package counts.
 
-With a `<div id="viewport" style="height:400px"></div>` in the page and a `<div id="root"></div>` for React:
+With a `<div id="root"></div>` in the page:
 
 ```tsx
 import {createRoot} from 'react-dom/client';

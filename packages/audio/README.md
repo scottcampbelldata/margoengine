@@ -1,5 +1,7 @@
 # @margoengine/audio
 
+Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine.
+
 Pose writes read the three stored vector components directly. They preserve the existing parameter scheduling,
 smoothing and clock-read order. This removes vector-iterator work; it does not establish a measured speedup.
 For a self-contained offline example with no audio device or user gesture:

@@ -1,5 +1,7 @@
 # @margoengine/cinematic
 
+Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake.
+
 `Cinematic` and `CameraBrain` detach from the scene where their actual plugin
 instance was registered. Direct disposal, removing the owning plugin or scene,
 and engine disposal all release the registration. Repeated disposal preserves

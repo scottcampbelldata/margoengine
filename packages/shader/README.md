@@ -1,5 +1,7 @@
 # @margoengine/shader
 
+Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes, with a visual node editor.
+
 `ComputePass`, `ScenePass` and `RawShaders` also detach from their actual scene
 on disposal, leaving same-name plugins in other scenes alone. Restoration keeps
 the registration. For example:

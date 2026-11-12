@@ -1,5 +1,7 @@
 # @margoengine/tween
 
+Allocation-free numeric tween updates and easing timelines.
+
 Import `margoengine/tween` from the `margoengine` package, or `@margoengine/tween` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Numeric property interpolation and easing; `update` steps the existing tracks in place and creates no per-track objects.
