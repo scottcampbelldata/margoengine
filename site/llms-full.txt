@@ -10533,27 +10533,50 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   and by `refresh` start and end, plus a `refreshPending` getter; the save rejects with code 'state' when either moved.
   Test: the repro above expects code 'state'. The gate then adds `--page=blend` and `--page=prefiltered` to the GPU chunks.
 
-### Open: probe reflections over-blur roughness below 0.2; probes-gpu "mirror floor vs walls" p95 4/255 (KB-A3c, found 2026-11-12, needs Scott)
+### Fixed 2026-11-12 in `f0004d6c8e`: probe reflections over-blurred roughness below 0.2; probes-gpu "mirror floor vs walls" p95 4/255 (KB-A3c)
 
 - **What:** `examples/package-benchmarks/probes-gpu.mjs` check 4 compares each mirror floor pixel with the wall its
-  reflected ray hits, p95 within 3/255. Ruling applied (Scott, option a, tolerance kept): the truth is now the room
-  radiance seen from the floor point, GGX-prefiltered at the floor's real roughness (core's 0.045 floor) times the
-  split-sum weight 0.975 (`examples/package-benchmarks/parts/probe-truth.mjs`, test `tests/probes-wall-truth.test.js`).
-  The corrected check still fails: median 1, p95 4, p99 7, max 9/255 over 2657 pixels (2406 near wall edges skipped),
-  Radeon 680M, WebGPU, 2026-11-12. The GPU matches the CPU mirror of the WGSL within 1/255 (median 0, p95 1, max 1) and
-  the diffuse, mirror and rough checks pass, so the probe shader does what it says; what it says is not physical.
-- **Repro:** `node examples/package-benchmarks/probes-gpu.mjs` (GPU lock): one line, `FAIL mirror floor vs walls: p95 4/255`.
-- **Cause:** `probeRadiance` in `packages/environment/src/probes.ts` maps roughness linearly to the level,
-  `lod = roughness * (levels - 1)`, and a 128 probe has 6 levels prefiltered at roughness 0, 0.2, 0.4, ... So roughness
-  0.045 reads lod 0.225: 22.5 % of the level prefiltered at roughness 0.2 (GGX alpha 0.04), about 20 times wider than
-  the material's lobe (alpha 0.002, narrower than a level 0 texel). The physical truth at 0.045 equals the wall colour
-  times 0.975 (the same p95 4, max 9 as folding only the 0.975 weight in), so the whole gap is that level 1 blend
-  pulling neighbouring wall colours in. Every probe-lit surface below roughness 0.2 is too blurry the same way.
-  b4675ba36's PBR Neutral made it visible (Reinhard showed median 1, p95 2).
-- **Needs Scott:** the fix is an environment change to the lod curve or the level roughness spacing, and it moves every
-  probe-lit low-roughness pixel (CPU mirror in probes-gpu.mjs, browser checks, baselines). Until then the probes-bench
-  gate step fails on every GPU and blocks landings that run it.
+  reflected ray hits, p95 within 3/255. With Scott's ruling (option a, tolerance kept) the truth is the room radiance
+  seen from the floor point, GGX-prefiltered at the floor's real roughness (core's 0.045 floor) times the split-sum
+  weight 0.975 (`examples/package-benchmarks/parts/probe-truth.mjs`, test `tests/probes-wall-truth.test.js`). The
+  check then failed on the Radeon 680M: median 1, p95 4, p99 7, max 9/255 over 2657 pixels, while the GPU matched the
+  CPU mirror of the WGSL within 1/255.
+- **Repro (before the fix):** `node examples/package-benchmarks/probes-gpu.mjs` (GPU lock):
+  `FAIL mirror floor vs walls: p95 4/255`.
+- **Cause:** `probeRadiance` in `packages/environment/src/probes.ts` read lod `roughness * (levels - 1)` and mixed the
+  two levels around it linearly in roughness. A 128 probe has 6 levels prefiltered at roughness 0, 0.2, 0.4, ..., so
+  0.045 (GGX alpha 0.002) took 22.5 % of the level prefiltered at 0.2 (alpha 0.04): a lobe about 20 times too wide,
+  pulling neighbouring wall colours into every probe-lit surface below roughness 0.2.
+- **Fix (`f0004d6c8e`):** the levels and their prefilter are unchanged (same texel layout, bake and live refresh); the
+  lookup still reads each level alone at its own roughness but blends the two around a roughness by GGX alpha, the
+  lobe width: weight `(x^2 - k^2) / (2k + 1)` in level units x. 0.045 now takes 5.06 % of the 0.2 level. WebGPU and
+  the WebGL2 layer run the same WGSL. A CPU model of the room probe (300 directions per roughness) put the mean
+  error against a true GGX prefilter at 0.0117 (was 0.0224) at roughness 0.045, 0.0123 (0.026) at 0.1, 0.0109
+  (0.0194) at 0.15 and within 0.002 of before from 0.25 to 0.9; squared level spacing also passed check 4 but doubled
+  the error from 0.25 up, and cubed spacing failed check 4 (p95 6). probes-gpu's CPU mirror reads the same blend (`probeLevelBlend` in probe-truth.mjs).
+- **Test:** `tests/probes-level-blend.test.js` pins the WGSL to that blend and models check 4 on the CPU (the old blend
+  gives p95 above 3/255, the new one within it). The environment-hemisphere proof advanced to `f0004d6c8e`.
+- **Measured after the fix (Radeon 680M, WebGPU, 2026-11-12):** mirror floor vs walls median 0, p95 1, p99 1, max
+  2/255 over 2657 pixels (2406 near wall edges skipped); GPU vs CPU mirror median 0, p95 1, max 1 on the diffuse,
+  mirror and rough floors; probes-live-gpu passes. No stored picture baseline holds a probe-lit surface, so none was
+  re-recorded and none is owed by the dev PC.
 
+### Open: Environment IBL and the materials envMap blend prefiltered mips linearly in roughness (KB-A3e, found 2026-11-12)
+
+- **What:** the KB-A3c over-blur, in the other prefiltered-mip lookups. `iblPrefiltered` in
+  `packages/environment/src/ibl.ts` samples `textureSampleLevel(..., roughness * (mips - 1))` with mip m prefiltered
+  at roughness m / (mips - 1), so hardware trilinear mixes the two mips linearly in roughness: with 6 mips, 0.045
+  takes 22.5 % of the 0.2 mip. It also feeds LightProbes' environment fallback and post's SSR replacement.
+  `packages/materials/src/env-map.ts` uploads `levels - 1` for the same `roughness * (levels - 1)` lookup (materials
+  README, Standard shading). `packages/sky/src/lighting.ts` reads `rough * 3.0`; its levels need the same check.
+- **Repro:** `tests/probes-level-blend.test.js`'s CPU mirror floor with the linear blend gives p95 above 3/255; a
+  0.045 metal under a high-contrast Environment shows the 0.2 mip's blur the same way.
+- **Cause:** blending in roughness instead of GGX alpha (see KB-A3c).
+- **Fix to build:** `lod = k + (x^2 - k^2) / (2k + 1)`, `x = roughness * (mips - 1)`, `k = min(floor(x), mips - 2)`,
+  in `iblPrefiltered`, materials' env map and every copy (core's WebGL2 twin in webgl2-compat preview if it has one),
+  with a test per site. It moves every Environment-lit pixel between mip roughnesses: the proofs that compose
+  `IBL_WGSL` advance, and picture baselines with IBL-lit low-roughness surfaces are re-recorded on their recording
+  machine (dev PC).
 ### Open in core only: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
 
 - **What:** glTF 2.0 Appendix B defines material = mix(dielectric_brdf, metal_brdf, metallic); only the dielectric has a
