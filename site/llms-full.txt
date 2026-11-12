@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 24,808 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,825 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -297,7 +297,7 @@ which stays for v1.0.
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,808 B | 61,253 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,825 B | 61,288 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -3676,7 +3676,7 @@ Required test inputs and still-missing real-file proof are listed in
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 24,808 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,207 B of its 22,208 B cap (2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 24,825 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,225 B of its 22,226 B cap (2026-11-11: Scott-approved bug-sweep fix KB6016c, core's GGX D denominator written |n x h|^2 + a2 nh^2 so float32 does not cancel it on smooth surfaces, took core from 22,207 B to 22,225 B and core + stage from 24,808 B to 24,825 B; 2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -10390,6 +10390,30 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
 - Source: W3C WebGPU Shading Language, section "Behavior Analysis" (function return rules),
   https://www.w3.org/TR/WGSL/#behaviors.
 
+### Fixed 2026-11-11: float32 GGX D lost tens of percent on smooth surfaces (KB6016c)
+
+- **Repro:** `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/core/tests/ggx-precision.browser.mjs` on the
+  old core: at roughness 0.03 core's D was 125,995 against an f64 98,243 for the same float32 vectors (+28 %), 3.2 % at
+  0.05 and 0.28 % at 0.1; WebGL2 layer the same.
+- **Cause:** every GGX D in the engine wrote its denominator `nh^2 (a2 - 1) + 1`. Near the peak of a narrow lobe
+  `1 - nh^2` is a few float32 steps while `a2` is about 8e-7 at roughness 0.03, so the rounding of `nh` alone moved D
+  by tens of percent (and gave 0/0 at roughness 0, nh 1). Found while fixing KB6016b: the same form in a reference
+  script biased smooth spheres by -13 %.
+- **Fix:** the denominator is `|n x h|^2 + a2 nh^2`, equal for unit vectors by the Lagrange identity
+  (|n x h|^2 = 1 - nh^2); the cross product keeps its relative precision. Core's mesh shader (Scott's ruling "fix C the
+  core"; core 22,207 B -> 22,225 B, core + stage 24,808 B -> 24,825 B) and the shared `ggxD` / new `ggxDOf(n, h)` in
+  packages/shared/light-terms.js, used by animation (VAT), clustered, gltf-pro, lod imposters, materials (base, coat,
+  eye, skin), post material decals, terrain, voxel and the WebGL2 preview. After the fix the worst error is 6e-5. Where the half vector faces away (dot(n, h) < 0, nh clamped to 0) the identity holds for the raw dot only: |n x h|^2 fell below 1 and reached 0 as h turned to -n, so D was unbounded on back-facing shading normals lit from the front (found by terrain's crest check on the WebGL2 layer, "weightedUncapped: 9 specks uncapped"); the term is max(|n x h|^2, step(nh, 0)), so D is a2 / pi there as before (+10 B, core 22,225 B).
+- **Still open (KB6016d):** the scalar `ggxDenominator(nh)` callers (environment prefilter and probes, water glints,
+  voxel-pathtracer) and materials' `ggxNamed` lobes keep the old form; they need the vectors passed in.
+- **Regression:** packages/core/tests/ggx-precision.browser.mjs (core's own D statements on the GPU against f64, bound
+  0.2 %, in core's test:gpu, native and WebGL2 layer, back-facing half vectors included); packages/core/tests/smith.test.js and
+  tests/smith-shaders.test.js (D = a2 / pi where dot(n, h) < 0, for core and the shared ggxD, ggxDFloat, ggxDOf).
+- Sources: Walter, Marschner, Li and Torrance 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR,
+  eq. 33; Guy and Agopian, "Physically Based Rendering in Filament", section 4.4.1 (the same cross-product form),
+  https://google.github.io/filament/Filament.html; Goldberg 1991, "What Every Computer Scientist Should Know About
+  Floating-Point Arithmetic", ACM Computing Surveys 23(1) (cancellation).
+
 ### Fixed 2026-11-11: no gate held the Firefox return-path rule outside water (KB-FF1b)
 
 - **Repro:** before this change, a WGSL function in any package other than water could end in a `loop` left only by
@@ -16833,6 +16857,7 @@ Platform defect below the compatibility layer, proven at the WebGL call level (b
 - Probes (git-excluded, in the main checkout): `handoffs/compat-determinism-probes/` in the git-excluded work folder holds `disp-probe.js` (the grid with recorder, extra frames, direct reads, attachment map and `PROBE_NOINVALIDATE`), `gl-recorder.js`, `diffstreams.cjs`, the raw pages and one failing stream capture.
 - Batch 164 SSAO resolve control (2026-11-10): `node packages/post/test/ssao-resolve-browser.mjs` with `MARGO_COMPAT=1` fails default ANGLE D3D11 exact pixels after odd-size 4x resize (59 channels, max two display levels). Its three unchanged historical-control frames also vary by the same 59 channels and two levels; native and ANGLE Vulkan (`BROWSER_ARGS=["--use-angle=vulkan"]`) pass all 12 pairs. This is consistent with the recorded D3D resolve defect above, but this fixture still needs a raw GL command replay to isolate the cause. Control evidence: `test-results/bp164-compat-diagnostic.log`; native `bp164-ssao-pixels.log` and actual Vulkan `bp164-compat-vulkan-real.log` (the earlier `bp164-compat-vulkan.log` did not forward the backend argument and is not Vulkan evidence). Under Scott's 2026-11-10 control-variance ruling, D3D11 cannot prove or disprove this change's identical output; the exact native and Vulkan checks supply that proof. The original exact test and assertion remain unchanged. This is a landing exception, not a repaired driver claim.
 
+- KB6016c lane (2026-11-11, sweep-l4): the compat leg of `materials/test:gpu:dispersion` at the KB6016c tree failed 4 exact 4x checks (loaded glTF vs constructed; groups, instances and mirror device restoration) with the same max 0.000244140625 signature; the native leg passed. Same open defect: the shader text the compared draws use is identical within each comparison, and nothing was rerun to green.
 - Next step: report to ANGLE/NVIDIA with a self-contained replay of the recorded session (full payloads, not hashes). Until then this stays a release blocker for exact compat captures on Windows D3D11. Never raise the bound for it.
 
 
@@ -17905,7 +17930,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,808 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,825 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
