@@ -258,6 +258,10 @@ export function copyTextureToBuffer(
         gl.deleteSync(sync);
         dst.land(offset, convertRows(data, t.info, plan, w, h, bytesPerRow));
       },
+      discard: () => {
+        gl.deleteBuffer(pack);
+        gl.deleteSync(sync);
+      },
     });
   }
 }

@@ -14,7 +14,7 @@
 import { CompatCanvasContext, createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
 
 const U = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
-const B = { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 64, QUERY_RESOLVE: 512 };
+const B = { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, QUERY_RESOLVE: 512 };
 
 /** Reads a whole level and layer of a texture through copyTextureToBuffer: an array of rows of `texel` bytes. */
 async function read(device, texture, { bytes, level = 0, layer = 0, aspect = 'all', w, h } = {}) {
@@ -494,6 +494,70 @@ const cases = {
    * Regression for the Radeon 680M under ANGLE D3D11 (docs/known-bugs.md): a clear of a level or layer whose last write
    * was a clear was lost there (level 2 of face 4 read 0, 0, 0, 0 for 0, 0, 0, 1).
    */
+  /**
+   * Copies from textures into a vertex, a uniform, a storage and an index buffer, then draws with them in the same
+   * submit. The layer lands such a copy a task later (a pixel pack buffer behind a fence); before 2026-11-12 the draws
+   * read the buffers' old zeros (a degenerate triangle: both targets stayed clear), because only CPU readers applied a
+   * waiting copy first, and the bind group had copied the storage rows before the copy (its version moves only when
+   * the copy lands). Landing the copy into the vertex and index buffer must leave the draw's vertex array bound, and
+   * the index buffer's copy must land before the draw sets up its vertex array. Regression: test/pending-copies.test.js.
+   */
+  async texelCopyReaders(device) {
+    const module = device.createShaderModule({
+      code: `struct U { c: vec4f }
+      @group(0) @binding(0) var<uniform> u: U;
+      @group(0) @binding(1) var<storage, read> s: array<vec4f>;
+      @vertex fn v(@location(0) p: vec4f) -> @builtin(position) vec4f { return p; }
+      @fragment fn f() -> @location(0) vec4f { return u.c + s[0]; }`,
+    });
+    const pipeline = device.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module, entryPoint: 'v', buffers: [{ arrayStride: 16, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }] },
+      fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba32float' }] },
+    });
+    const source = (format, w, data) => {
+      const t = device.createTexture({ size: [w, 1], format, usage: U.COPY_SRC | U.COPY_DST });
+      device.queue.writeTexture({ texture: t }, data, { bytesPerRow: data.byteLength }, [w, 1]);
+      return t;
+    };
+    const positions = source('rgba32float', 3, Float32Array.of(-1, -1, 0, 1, 3, -1, 0, 1, -1, 3, 0, 1));
+    const colour = source('rgba32float', 1, Float32Array.of(0.25, 0.5, 0, 0));
+    const more = source('rgba32float', 1, Float32Array.of(0, 0, 0.75, 1));
+    const order = source('r32uint', 4, Uint32Array.of(0, 1, 2, 0));
+    // Vertex and index usage: landing the copy writes its element buffer too, while the draw is being set up.
+    const vb = device.createBuffer({ size: 48, usage: B.VERTEX | B.INDEX | B.COPY_DST });
+    const ub = device.createBuffer({ size: 16, usage: B.UNIFORM | B.COPY_DST });
+    const sb = device.createBuffer({ size: 16, usage: B.STORAGE | B.COPY_DST });
+    const ib = device.createBuffer({ size: 16, usage: B.INDEX | B.COPY_DST });
+    const group = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ub } }, { binding: 1, resource: { buffer: sb } }] });
+    const targets = [0, 1, 2].map(() => device.createTexture({ size: [2, 2], format: 'rgba32float', usage: U.RENDER_ATTACHMENT | U.COPY_SRC }));
+    const pass = (e, target, indexed) => {
+      const p = e.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] });
+      p.setPipeline(pipeline);
+      p.setBindGroup(0, group);
+      p.setVertexBuffer(0, vb);
+      if (indexed) {
+        p.setIndexBuffer(ib, 'uint32');
+        p.drawIndexed(3);
+      } else p.draw(3);
+      p.end();
+    };
+    // Before the copies: every buffer holds zeros (a degenerate triangle); the bind group copies its storage once.
+    let e = device.createCommandEncoder();
+    pass(e, targets[0], false);
+    device.queue.submit([e.finish()]);
+    e = device.createCommandEncoder();
+    e.copyTextureToBuffer({ texture: positions }, { buffer: vb }, [3, 1]);
+    e.copyTextureToBuffer({ texture: colour }, { buffer: ub }, [1, 1]);
+    e.copyTextureToBuffer({ texture: more }, { buffer: sb }, [1, 1]);
+    e.copyTextureToBuffer({ texture: order }, { buffer: ib }, [4, 1]);
+    pass(e, targets[1], false);
+    pass(e, targets[2], true);
+    device.queue.submit([e.finish()]);
+    const out = {};
+    for (const [i, t] of targets.entries()) out[`target ${i}`] = [...new Float32Array((await read(device, t, { bytes: 16 })).buffer)];
+    return out;
+  },
   async freshClears(device) {
     const out = {};
     for (const [kind, layers] of [['cube', 6], ['array', 6], ['2d', 1]]) {

@@ -11017,6 +11017,23 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
   headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
 
+### Fixed 2026-11-12: a draw after copyTextureToBuffer read the buffer's old contents on the WebGL2 layer (audit A2)
+
+- **Repro:** copy textures into a vertex, a uniform, a storage and an index buffer, then draw with them in the same
+  submit (`packages/webgl2-compat/test/features.html` case `texelCopyReaders`): native WebGPU draws the triangle in the
+  copied colour, the layer drew nothing (the buffers' old zeros) on the Beelink (Radeon 680M, ANGLE D3D11); any GPU.
+- **Cause (webgl2-compat):** the layer lands a copy from a texture a task later (readPixels into a pixel pack buffer
+  behind a fence, applied when the fence passes). Only CPU readers (mapping, `bytes()`, copies out of the buffer)
+  applied a waiting copy first. Vertex, index and uniform bindings read the GL buffer as it was, and a bind group that
+  had copied the storage rows kept them, since the buffer's version moves only when the copy lands. A buffer destroyed
+  with a copy still waiting also kept that copy's pixel pack buffer and fence for the life of the context.
+- **Fix:** `CompatBuffer.drain()` applies the waiting writes (texture copies forced, a counted stall; query results
+  not available yet still wait) without reading the buffer back into its CPU copy; `gl`, indexed draws, the data
+  texture, bind groups' storage copies and the compute word textures call it first. `destroy()` frees a waiting
+  write's pack buffer, fence or held queries. A write landing in an element buffer binds the draw's vertex array
+  again after (it binds none to write). Regressions: `features-browser.mjs` `texelCopyReaders` (both targets
+  differ from native without the fix) and `test/pending-copies.test.js` (fails without the fix).
+
 ### Fixed 2026-11-11: the no-adapter check failed every WebGL2 compatibility leg on ANGLE Vulkan (KB-L5a-7)
 
 - **Repro:** on main at 6e254d26e9, `node packages/voxel-pathtracer/tests/guiding-browser.mjs` passed its native leg and

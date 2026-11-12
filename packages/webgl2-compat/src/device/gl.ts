@@ -83,6 +83,10 @@ export class GLState {
   useProgram(p: WebGLProgram | null): void {
     if (!this.hit(this.program === p)) this.gl.useProgram((this.program = p));
   }
+  /** The vertex array bound now (as this cache knows it). */
+  get vertexArray(): WebGLVertexArrayObject | null {
+    return this.vao;
+  }
   bindVertexArray(v: WebGLVertexArrayObject | null): void {
     if (!this.hit(this.vao === v)) this.gl.bindVertexArray((this.vao = v));
   }

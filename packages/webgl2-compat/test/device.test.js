@@ -106,7 +106,7 @@ test('indexed replay detaches the old element binding before selecting a replace
   gl.bindBuffer = (...args) => calls.push(['bind', ...args]);
   gl.drawElementsInstanced = (...args) => calls.push(['draw', ...args]);
   const pipeline = { mode: 1, cache: { element: -1 } },
-    a = { id: 1, element: {} }, b = { id: 2, element: {} },
+    a = { id: 1, element: {}, drain() {} }, b = { id: 2, element: {}, drain() {} },
     replay = device.replayer;
   replay.ready = () => pipeline;
   try {

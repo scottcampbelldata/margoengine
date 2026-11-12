@@ -1875,6 +1875,7 @@ export class Replayer {
         set.release(queries);
         dst.land(offset, new Uint8Array(out.buffer));
       },
+      discard: () => set.release(queries),
     });
   }
 
@@ -2294,6 +2295,9 @@ export class Replayer {
       this.device.validationError('drawIndexed without an index buffer');
       return;
     }
+    // Writes still waiting land in the element buffer first (a copyTextureToBuffer into it lands a task later). Before
+    // ready(): landing one binds vertex array null to write the element buffer, which would undo the draw's vertex array.
+    index.buffer.drain();
     const p = this.ready(baseVertex, firstInstance);
     if (!p) return;
     if (p.cache.element !== index.buffer.id) {

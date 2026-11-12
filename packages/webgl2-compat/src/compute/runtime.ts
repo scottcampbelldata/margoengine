@@ -352,7 +352,7 @@ class Runtime implements ComputeRuntime {
   private words(_r: Replayer, buffer: CompatBuffer): Words {
     const gl = this.gl,
       device = this.device;
-    if (buffer.readbacks.length) buffer.settle();
+    buffer.drain();
     let ws = buffer.computeState as Words | null;
     const count = Math.max(1, Math.ceil(buffer.size / 16) * 4);
     if (!ws) {

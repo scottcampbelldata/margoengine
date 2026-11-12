@@ -180,6 +180,7 @@ class CompatBuffer {
     constructor(device: CompatDevice, descriptor: GPUBufferDescriptor);
     write(offset: number, bytes: Uint8Array): void;
     settle(force?: boolean): boolean;
+    drain(): void;
     land(offset: number, bytes: Uint8Array): void;
     bytes(): Uint8Array;
     dataTexture(): {
@@ -774,6 +775,7 @@ class GLState {
     };
     constructor(gl: WebGL2RenderingContext);
     useProgram(p: WebGLProgram | null): void;
+    get vertexArray(): WebGLVertexArrayObject | null;
     bindVertexArray(v: WebGLVertexArrayObject | null): void;
     bindDrawFramebuffer(f: WebGLFramebuffer | null): void;
     bindReadFramebuffer(f: WebGLFramebuffer | null): void;
@@ -1093,6 +1095,7 @@ type Readback = {
     ready(): boolean;
     readonly forcible: boolean;
     apply(): void;
+    discard?(): void;
 };
 
 class Replayer {

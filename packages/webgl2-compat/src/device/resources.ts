@@ -64,6 +64,12 @@ type Readback = {
   /** True when apply() may run before ready() (a stall, counted). */
   readonly forcible: boolean;
   apply(): void;
+  /**
+   * Frees what the write holds without applying it (its pixel pack buffer and fence, or its held queries): the buffer
+   * was destroyed first. Before 2026-11-12 a buffer destroyed with a copy from a texture still waiting kept that copy's
+   * pixel pack buffer and fence for the life of the context.
+   */
+  discard?(): void;
 };
 
 /** A GPUBuffer on WebGL2. */
@@ -83,12 +89,13 @@ export class CompatBuffer {
    * read back into it at once, and each draw's bind group copied it into its own texture again (AMD GPU hunt row 34).
    */
   get gl(): WebGLBuffer | null {
+    this.drain();
     if (this.packPending) this.pack();
     return this.raw;
   }
   /** The data texture holds a compute write the GL buffer does not have yet (`gl` copies it over). */
   private packPending = false;
-  /** GL element buffer, for the index usage. */
+  /** GL element buffer, for the index usage, as it is: a write may still wait in `readbacks` (see `drain`). */
   readonly element: WebGLBuffer | null;
   /** CPU copy; current when `shadowValid`. */
   readonly shadow: Uint8Array | null;
@@ -194,11 +201,7 @@ export class CompatBuffer {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
       gl.bufferSubData(gl.COPY_WRITE_BUFFER, offset, bytes);
     }
-    if (this.element) {
-      this.device.state.bindVertexArray(null);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.element);
-      gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset, bytes);
-    }
+    if (this.element) writeElements(this.device, this.element, offset, bytes);
     if (this.shadow && (this.shadowValid || (offset === 0 && bytes.byteLength === this.size))) {
       this.shadow.set(bytes, offset);
       if (offset === 0 && bytes.byteLength === this.size) this.shadowValid = true;
@@ -211,15 +214,7 @@ export class CompatBuffer {
    */
   settle(force = true): boolean {
     const gl = this.device.gl;
-    while (this.readbacks.length) {
-      const r = this.readbacks[0];
-      if (!r.ready()) {
-        if (!force || !r.forcible) return false;
-        this.device.stalls++;
-      }
-      this.readbacks.shift();
-      r.apply();
-    }
+    if (!applyWaiting(this, force)) return false;
     if (!this.shadowValid && this.shadow && this.gl) {
       gl.bindBuffer(gl.COPY_READ_BUFFER, this.gl);
       gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, this.shadow);
@@ -228,20 +223,28 @@ export class CompatBuffer {
     return true;
   }
 
+  /**
+   * @internal Applies the writes still waiting (a copy from a texture is forced, a stall; query results not available
+   * yet keep it and the writes after it waiting), without reading the GL buffer back into the CPU copy as `settle`
+   * does. Every reader of the GPU copies calls it first (`gl`, `index`, the data texture, the compute word textures): a
+   * copyTextureToBuffer lands on the CPU a task later, and before 2026-11-12 a draw after one read the buffer's old
+   * contents as vertices, indices, uniforms or storage until something else settled it.
+   */
+  drain(): void {
+    if (this.readbacks.length) applyWaiting(this, true);
+  }
+
   /** Writes bytes into the GL buffers and the shadow copy at once (a waiting write's last step). */
   land(offset: number, bytes: Uint8Array): void {
     const gl = this.device.gl;
     this.version++;
     if (this.shadow) this.shadow.set(bytes.subarray(0, Math.max(0, this.size - offset)), offset);
-    for (const [target, b] of [
-      [gl.COPY_WRITE_BUFFER, this.gl],
-      [gl.ELEMENT_ARRAY_BUFFER, this.element],
-    ] as const)
-      if (b) {
-        if (target === gl.ELEMENT_ARRAY_BUFFER) this.device.state.bindVertexArray(null);
-        gl.bindBuffer(target, b);
-        gl.bufferSubData(target, offset, bytes.subarray(0, Math.max(0, this.size - offset)));
-      }
+    const inside = bytes.subarray(0, Math.max(0, this.size - offset));
+    if (this.gl) {
+      gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
+      gl.bufferSubData(gl.COPY_WRITE_BUFFER, offset, inside);
+    }
+    if (this.element) writeElements(this.device, this.element, offset, inside);
   }
 
   /** The current bytes (settling first): for indirect arguments and copies the GPU cannot do. */
@@ -271,9 +274,10 @@ export class CompatBuffer {
   dataTexture(): { texture: WebGLTexture; shift: number; version: number } | null {
     const d = this.mirror();
     if (!d) return null;
+    // Writes still waiting change the version when they land: apply them before comparing.
+    this.drain();
     if (d.version !== this.version) {
       const gl = this.device.gl;
-      if (this.readbacks.length) this.settle();
       this.device.state.scratch(gl.TEXTURE_2D, d.texture);
       uploadRows(gl, this.gl as WebGLBuffer, 1 << d.shift, 0, Math.max(1, Math.ceil(this.size / 16)), 0);
       d.version = this.version;
@@ -441,6 +445,7 @@ export class CompatBuffer {
     this.destroyed = true;
     const gl = this.device.gl;
     this.packPending = false;
+    for (const r of this.readbacks.splice(0)) r.discard?.();
     if (this.raw) gl.deleteBuffer(this.raw);
     if (this.element) gl.deleteBuffer(this.element);
     if (this.data) {
@@ -483,6 +488,47 @@ export interface TextureStorage {
  */
 const rowShift = (rows: number, most: number) =>
   Math.max(Math.min(11, Math.ceil(Math.log2(rows))), Math.ceil(Math.log2(rows / most)));
+
+/**
+ * Writes bytes into an element buffer. ELEMENT_ARRAY_BUFFER is vertex array state, so the write binds no vertex array
+ * first, and binds the one that was bound again after: a waiting write lands while a draw is being set up (`gl` and
+ * drain from applyVertex, after the pipeline bound its vertex array), and before 2026-11-12 that draw ran with none.
+ */
+function writeElements(device: CompatDevice, element: WebGLBuffer, offset: number, bytes: Uint8Array): void {
+  const gl = device.gl,
+    vao = device.state.vertexArray;
+  device.state.bindVertexArray(null);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, element);
+  gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset, bytes);
+  device.state.bindVertexArray(vao);
+}
+
+/** Buffers whose waiting writes are being applied: `gl` inside one of those writes must not apply the next ones. */
+const applying = new WeakSet<object>();
+
+/**
+ * Applies a buffer's waiting writes in order (CompatBuffer.settle and drain); false when one cannot land yet: it is not
+ * ready and may not be forced (`force` false, or query results). Inside a write being applied (its `land` reads `gl`)
+ * it applies nothing, so the writes keep their order.
+ */
+function applyWaiting(buffer: { readonly readbacks: Readback[]; readonly device: { stalls: number } }, force: boolean): boolean {
+  if (applying.has(buffer)) return true;
+  applying.add(buffer);
+  try {
+    while (buffer.readbacks.length) {
+      const r = buffer.readbacks[0];
+      if (!r.ready()) {
+        if (!force || !r.forcible) return false;
+        buffer.device.stalls++;
+      }
+      buffer.readbacks.shift();
+      r.apply();
+    }
+    return true;
+  } finally {
+    applying.delete(buffer);
+  }
+}
 
 /**
  * Copies `count` 16-byte rows of a GL buffer, from byte `from`, into the RGBA32UI texture bound at TEXTURE_2D on the
@@ -1317,8 +1363,10 @@ export class CompatBindGroup {
     for (const [binding, row] of d.rows) {
       const bound = this.entries.get(binding) as Extract<Bound, { kind: 'buffer' }>,
         buffer = bound.buffer;
-      if (d.versions.get(binding) === buffer.version || buffer.destroyed || !buffer.raw) continue;
-      if (buffer.readbacks.length) buffer.settle();
+      if (buffer.destroyed || !buffer.raw) continue;
+      // Writes still waiting change the version when they land: apply them before comparing.
+      buffer.drain();
+      if (d.versions.get(binding) === buffer.version) continue;
       const texels = Math.max(1, Math.ceil(bound.size / 16)),
         from = bound.offset >> 4,
         width = 1 << rowShift(Math.max(1, Math.ceil(buffer.size / 16)), this.device.limits.maxTextureDimension2D),
