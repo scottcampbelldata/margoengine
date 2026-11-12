@@ -350,11 +350,14 @@ test('a heartbeat process that starts slowly still keeps its holder alive', asyn
       slow,
       `import {existsSync, writeFileSync} from 'node:fs';
 const end = Date.now() + 2500; while (Date.now() < end);
-if (process.argv[2] === 'beat' && existsSync(${JSON.stringify(folder)})) writeFileSync(${JSON.stringify(ready)}, String(process.pid));`,
+if (process.argv[2] === 'beat' && existsSync(${JSON.stringify(folder)})) try { writeFileSync(${JSON.stringify(ready)}, String(process.pid)); } catch {}`,
     );
     await heartbeatKeepsHolder({ NODE_OPTIONS: `--import=${pathToFileURL(slow).href}` }, () => existsSync(ready));
   } finally {
-    rmSync(folder, { recursive: true, force: true });
+    // Regression (lane H3, 2026-11-11 root run: ENOTEMPTY here): the heartbeat of a holder released moments before
+    // was still in its 2.5 s start-up delay and wrote its marker while this removal ran. A late marker is removed on a
+    // retry, and one whose folder is already gone is not written (the hook catches it), so nothing outlives the test.
+    rmSync(folder, { recursive: true, force: true, maxRetries: 50, retryDelay: 100 });
   }
 });
 
