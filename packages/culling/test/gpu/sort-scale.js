@@ -1,18 +1,31 @@
 // Browser side of sort-scale-check.mjs: 1,200,000 instances of one box, past 1,048,574, where core's instance buffer
 // doubles to 2,097,150 slots (201 MB). The device's storage binding is held to WebGPU's default 128 MiB (as an adapter
-// offering no more, or the WebGL2 layer), so the doubled buffer is past one binding. Engine A orders them with
-// FrontToBack, engine B draws them with no plugin; the frames must match. Before the fix FrontToBack bound core's whole
-// instance buffer, a validation error on every frame.
+// offering no more), so the doubled buffer is past one binding. Engine A orders them with FrontToBack, engine B draws
+// them with no plugin; the frames must match. Before the fix FrontToBack bound core's whole instance buffer, a
+// validation error on every frame.
 import { Engine, box, PbrMaterial } from '../../../core/dist/index.js';
 import { FrontToBack } from '../../dist/sort.js';
 
-const binding = 128 * 1024 * 1024,
-  request = GPUAdapter.prototype.requestDevice;
-GPUAdapter.prototype.requestDevice = function (descriptor = {}) {
-  const limits = { ...descriptor.requiredLimits };
-  if (!(limits.maxStorageBufferBindingSize <= binding)) limits.maxStorageBufferBindingSize = binding;
-  return request.call(this, { ...descriptor, requiredLimits: limits });
-};
+// The hold goes on each adapter navigator.gpu returns, set when the engines are made, not on GPUAdapter.prototype at
+// import: the WebGL2 layer's adapter is its own class, its devices reach 1 GiB bindings when core asks (KB2604d), and
+// the layer replaces navigator.gpu once something first asks for an adapter (AMD GPU hunt R7 row 37).
+const binding = 128 * 1024 * 1024;
+function holdBinding() {
+  const gpu = navigator.gpu,
+    requestAdapter = gpu.requestAdapter;
+  gpu.requestAdapter = async function (...args) {
+    const adapter = await requestAdapter.apply(this, args);
+    if (adapter) {
+      const request = adapter.requestDevice;
+      adapter.requestDevice = function (descriptor = {}) {
+        const limits = { ...descriptor.requiredLimits };
+        if (!(limits.maxStorageBufferBindingSize <= binding)) limits.maxStorageBufferBindingSize = binding;
+        return request.call(this, { ...descriptor, requiredLimits: limits });
+      };
+    }
+    return adapter;
+  };
+}
 const errors = [],
   count = 1_200_000,
   side = Math.ceil(Math.sqrt(count)),
@@ -33,6 +46,7 @@ const draw = async () => {
   await Promise.all([a.gpu.queue.onSubmittedWorkDone(), b.gpu.queue.onSubmittedWorkDone()]);
 };
 async function setup() {
+  holdBinding();
   const options = { camera, capacity: count + 16 };
   a = await Engine.create(document.getElementById('a'), options);
   b = await Engine.create(document.getElementById('b'), options);
