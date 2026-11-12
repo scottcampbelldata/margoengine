@@ -60,6 +60,10 @@ interface Node {
    * specification's "deeper in namespace" does not say which namespace: this is what orders specializes arcs.
    */
   reached?: number;
+  /** Namespace depth, in its own stack, of the prim that authored this arc when it was placed. */
+  intro?: number;
+  /** On an implied arc: `intro` of the authored arc it stands for. */
+  source?: number;
 }
 /** What composition could not do. It goes on, as OpenUSD does, and the caller may read these. */
 export interface ComposeIssue {
@@ -380,18 +384,17 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       own = checked({ offset: item.offset, scale: item.scale }, target),
       // Within one stack each layer's own offset already places its opinions.
       time = internal ? own : after(entry.offset, checked(after(own, { offset: 0, scale: near / far }), target));
-    const site = tree(stack, target, false);
-    attach(
-      node,
-      graft(
+    const site = tree(stack, target, false),
+      placed = graft(
         site,
         kind,
         depth,
         order,
         [{ from: target, to: stripVariants(node.path), open: internal }, ...node.steps],
         after(node.offset, time),
-      ),
-    );
+      );
+    placed.intro = stripVariants(node.path).split('/').length - 1;
+    attach(node, placed);
   }
   function placeClass(
     node: Node,
@@ -421,6 +424,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       node.offset,
     );
     placed.implied = implied;
+    placed.intro = stripVariants(node.path).split('/').length - 1;
     attach(node, placed);
     return placed;
   }
@@ -438,6 +442,23 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     listed<string>(stack, path, 'specializes').forEach(({ item }, i) => placeClass(node, depth, 'specialize', item, i));
     void top;
   }
+  /**
+   * Seen on OpenUSD (black-box stages, KB1942); the specification does not say. In one specializes family the implied
+   * arcs keep the order of the stacks that hold them, strongest first, and the authored arc comes after them, unless it
+   * was authored under a variant or reference (`node`) whose own prim sits shallower in its namespace than the stage
+   * prim holding the outermost reference or payload around it: then the authored arc comes first.
+   */
+  const familyKey = (node: Node, c: Node): number => {
+    if (c.implied) return 0;
+    if (node.kind !== 'variant' && node.kind !== 'reference' && node.kind !== 'payload') return -1;
+    let outer: Node | undefined;
+    for (let up = node.parent; up; up = up.parent) if (up.kind === 'reference' || up.kind === 'payload') outer = up;
+    const inner = node.intro ?? node.depth;
+    if (!outer) return -1;
+    // A reference authored in a variant counts from the prim that holds the variant set.
+    const from = outer.parent?.kind === 'variant' ? outer.parent.depth : outer.depth;
+    return from > inner ? 1 : -1;
+  };
   /** Every node, strongest first; specializes come after everything else. */
   function strength(top: Node): Node[] {
     const siteOf = (node: Node) => node.stack.id + '\0' + node.path,
@@ -449,7 +470,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     };
     mark(top);
     const out: Node[] = [],
-      groups = new Map<object, { depth: number; rank: number; members: { level: number; nodes: Node[] }[] }>();
+      groups = new Map<object, { depth: number; rank: number; members: { key: number; level: number; nodes: Node[] }[] }>();
     let rank = 0;
     const walk = (node: Node, list: Node[], level: number, inImplied: boolean) => {
       const through = inImplied || !!node.implied;
@@ -467,7 +488,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
             group.depth = c.reached ?? c.depth;
             group.rank = rank++;
           }
-          group.members.push({ level, nodes });
+          group.members.push({ key: familyKey(node, c), level, nodes });
           walk(c, nodes, level + 1, through);
         } else walk(c, list, level + 1, through);
       }
@@ -477,7 +498,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     const all = [...out],
       seen = new Map<string, number>();
     for (const group of late)
-      for (const item of group.members.sort((a, b) => a.level - b.level))
+      for (const item of group.members.sort((a, b) => b.key - a.key || a.level - b.level))
         for (const node of item.nodes) {
           const site = siteOf(node),
             at = seen.get(site);
@@ -531,6 +552,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         offset: node.offset,
         children: [],
         settled: new Set(),
+        intro: stripVariants(node.path).split('/').length - 1,
       };
       attach(node, variant);
       expand(top, variant, depth);
@@ -563,7 +585,10 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         placed = placeClass(near, depth, kind, path, near.children.length, true);
       if (!placed) return;
       arc.family ??= {};
-      if (placed.implied) placed.family ??= arc.family;
+      if (placed.implied) {
+        placed.family ??= arc.family;
+        placed.source ??= arc.implied ? arc.source : arc.intro;
+      }
       for (const c of arc.children)
         if (c.kind === 'inherit' || c.kind === 'specialize') lift(placed, c, stripVariants(c.path));
       const up = upstream(near, path);
