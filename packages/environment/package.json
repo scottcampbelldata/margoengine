@@ -44,6 +44,7 @@
     "test:exr-codecs-bundled:browser": "node tests/exr-codecs-bundled-browser.mjs",
     "test:probe-capture:browser": "npm run build && node scripts/test-browser.js --page=probe-capture",
     "test:fog-transparent:browser": "npm run build && node scripts/test-browser.js --page=volumetric-transparent",
+    "test:fog-route:browser": "npm run build && node scripts/test-browser.js --page=volumetric-route",
     "test:reflection-shapes:browser": "npm run build && node scripts/test-browser.js --page=reflection-shapes",
     "test:bright:browser": "npm run build && node scripts/test-browser.js --page=bright",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js && node scripts/env-mirror-gpu-check.js --compat && node packages/environment/tests/review56-browser.mjs && node packages/environment/tests/review56-browser.mjs --compat && node packages/environment/tests/capture-stability-browser.mjs && node packages/environment/tests/capture-stability-browser.mjs --compat",

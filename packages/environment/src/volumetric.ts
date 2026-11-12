@@ -21,6 +21,7 @@ import { clusterCell, decayTerms, legacyTerms } from '../../shared/light-terms.j
 import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
 import { alphaBlend, groupCode, overlayPass, type SurfaceTransparency } from '../../shared/pass.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { compatTier } from '../../shared/compat.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
@@ -117,7 +118,18 @@ fn sliceDepth(s:f32)->f32 {let x=s/volume.grid.z;return volume.shape.x*x*x;}
 // 0.95 cap on f_ms (at most 19 times the isotropic source) is Margo tuning: it keeps white fog of unbounded depth finite.
 const multiple =
   'let ms=min(volume.scatter.rgb*(1.0-exp(-sigma*volume.sun.w)),vec3f(0.95));light+=(volume.ambient.rgb+sun*0.0795775)*ms/(1.0-ms);';
-const compute = (lights: string | undefined, shadows: string | undefined, medium?: string, ms?: boolean) =>
+// On the WebGL2 compatibility layer (`own`), each invocation integrates its own froxel instead of a whole column: the
+// layer runs a compute entry point on the GPU only when every store writes the invocation's own texel (a fragment
+// draw per slice), and the column loop's store at each slice sent `integrate` to its CPU tier (about 1 s a frame at
+// the default grid: the scattering volume read back, 14,400 columns of 64 steps in JavaScript, the result uploaded).
+// A froxel at slice z replays the column's steps 0 to z in the same order with the same arithmetic, so it stores the
+// value the column loop stores there; the cost is z + 1 steps instead of 1, (n + 1) / 2 times the column's work, all
+// on the GPU (the fragment-era prefix scan's O(n^2) work, Horn, "Stream Reduction Operations for GPGPU Applications",
+// GPU Gems 2 ch. 36, 2005, as measured by Sengupta, Harris, Zhang and Owens, "Scan Primitives for GPU Computing",
+// Graphics Hardware 2007). A log-step parallel scan (Hillis and Steele, "Data Parallel Algorithms", CACM 29(12), 1986;
+// Blelloch, "Prefix Sums and Their Applications", CMU-CS-90-190, 1990) would do less work but add the terms in another
+// order, which rounds differently (Higham, "The Accuracy of Floating Point Summation", SIAM J. Sci. Comput. 14(4), 1993).
+const compute = (lights: string | undefined, shadows: string | undefined, medium?: string, ms?: boolean, own?: boolean) =>
   struct +
   (lights ?? '') +
   (shadows ?? '') +
@@ -200,20 +212,19 @@ ${/* @__PURE__ */ clusterCell('p')}
 }
 // Front to back along each froxel column: in-scattered light reaching the camera (rgb) and optical depth (a) at each
 // slice's far boundary, integrating each slice analytically (energy conserving for thick slices).
-@compute @workgroup_size(8,8) fn integrate(@builtin(global_invocation_id) id:vec3u) {
-  let size=vec3u(volume.grid.xyz);if(any(id.xy>=size.xy)){return;}
+@compute @workgroup_size(${own ? '4,4,4' : '8,8'}) fn integrate(@builtin(global_invocation_id) id:vec3u) {
+  let size=vec3u(volume.grid.xyz);if(any(id${own ? '' : '.xy'}>=size${own ? '' : '.xy'})){return;}
   let uv=(vec2f(id.xy)+0.5)/volume.grid.xy;let ndc=vec2f(uv.x*2-1,1-uv.y*2);
   let n=unproject(vec3f(ndc,1));let d=unproject(vec3f(ndc,0.5))-n;let stretch=length(d)/dot(d,volume.plane.xyz);
   var light=vec3f(0);var optical=0.0;let texel=0.5/volume.grid.xyz;
-  for(var z=0u;z<size.z;z++){
+  for(var z=0u;z<${own ? '=id' : 'size'}.z;z++){
     // 3x3 tent filter across the column (four bilinear taps): steadies jittered shadow edges between frames.
     let w=(f32(z)+0.5)/volume.grid.z;
     let s=0.25*(textureSampleLevel(scattering,linearSampler,vec3f(uv-texel.xy,w),0)+textureSampleLevel(scattering,linearSampler,vec3f(uv+vec2f(texel.x,-texel.y),w),0)
       +textureSampleLevel(scattering,linearSampler,vec3f(uv+vec2f(-texel.x,texel.y),w),0)+textureSampleLevel(scattering,linearSampler,vec3f(uv+texel.xy,w),0));let step=(sliceDepth(f32(z+1))-sliceDepth(f32(z)))*stretch;
     let through=exp(-s.a*step);
     light+=exp(-optical)*select(s.rgb*step,(s.rgb-s.rgb*through)/s.a,s.a>0.00001);optical+=s.a*step;
-    textureStore(integrated,vec3u(id.xy,z),vec4f(light,optical));
-  }
+  ${own ? '}\n  textureStore(integrated,id,vec4f(light,optical));' : '  textureStore(integrated,vec3u(id.xy,z),vec4f(light,optical));\n  }'}
 }`;
 // Opacity 1 - exp(-tau): Beer-Lambert.
 // Premultiplied over the scene: rgb = in-scattered light, a = 1 - transmittance. Tone mapped like sky fog on a display target.
@@ -546,9 +557,16 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       shadows = o.shadows?.pbr(lights ? 2 : 1).declarations,
       medium = o.volumes?.medium(1 + +!!lights + +!!shadows),
       ms = (o.multipleScattering ?? 0) > 0,
-      key = (lights ?? '') + '\0' + (shadows ?? '') + (medium === undefined ? '' : '\0' + medium) + (ms ? '\0ms' : '');
+      own = compatTier(device) === 'webgl2',
+      key =
+        (lights ?? '') +
+        '\0' +
+        (shadows ?? '') +
+        (medium === undefined ? '' : '\0' + medium) +
+        (ms ? '\0ms' : '') +
+        (own ? '\0own' : '');
     if (key !== this.computeKey || !this.inject) {
-      const module = device.createShaderModule({ code: compute(lights, shadows, medium, ms) });
+      const module = device.createShaderModule({ code: compute(lights, shadows, medium, ms, own) });
       this.inject = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'inject' } });
       this.integrateStep = device.createComputePipeline({
         layout: 'auto',
@@ -649,7 +667,8 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     pass.dispatchWorkgroups(Math.ceil(grid[0] / 4), Math.ceil(grid[1] / 4), Math.ceil(grid[2] / 4));
     pass.setPipeline(this.integrateStep!);
     pass.setBindGroup(0, this.integrateGroups[parity]);
-    pass.dispatchWorkgroups(Math.ceil(grid[0] / 8), Math.ceil(grid[1] / 8));
+    if (own) pass.dispatchWorkgroups(Math.ceil(grid[0] / 4), Math.ceil(grid[1] / 4), Math.ceil(grid[2] / 4));
+    else pass.dispatchWorkgroups(Math.ceil(grid[0] / 8), Math.ceil(grid[1] / 8));
     pass.end();
     // Composite over the scene target (per sample when the depth is multisampled).
     const samples = c.descriptor.multisample?.count ?? 1,

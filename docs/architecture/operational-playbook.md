@@ -1,3 +1,18 @@
+### Section 5 evidence: volumetric fog integration on the WebGL2 layer's GPU (bug sweep L6b, KB5663a, 2026-11-11)
+
+The layer runs a compute entry point on the GPU only when every store writes the invocation's own texel; VolumetricFog's
+column integration stores at each slice of a loop, so it ran on the layer's CPU tier (scattering volume read back,
+14,400 columns of 64 steps in JavaScript, result uploaded), about 1 s a frame at the default 160 x 90 x 64 grid. On a
+layer device the fog now integrates each froxel by itself (steps 0 to z in the column's order, one store), which plans
+to the fragment tier; native WebGPU keeps the column kernel byte for byte. Work count: CPU-tier dispatches per fog
+frame 1 to 0 (layer counters), GPU steps per column 64 to 2,080 ((n + 1) / 2 times, the fragment-era prefix cost of
+Horn 2005 and Sengupta et al. 2007; a log-step scan would add in another order and round differently). Evidence:
+`packages/environment/tests/volumetric-compat-route.test.js` (CPU: every fog stack plans to the fragment tier),
+`npm run test:fog-route:browser` (A6000: the two kernels store the same 16 x 12 x 32 volume value for value on native
+WebGPU; on the layer the GPU route and the CPU-tier column agree within one half-float step), and the quality features
+check on the layer, which now ends with every knob restored (fog step saved 11.8 ms where it saved about 1,050 ms).
+Missing: a run on a real laptop iGPU on the layer.
+
 ### Section 5 evidence: WebGL2 layer resources in Firefox and in one draw (bug sweep L3a, 2026-11-11)
 
 The layer writes zeros into every new texture level and layer at allocation (clears for renderable formats, whole-level
