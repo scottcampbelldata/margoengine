@@ -103,7 +103,7 @@ fn shade(c:vec3f,r:f32,m:f32,n:vec3f,v:vec3f)->Light {
  let a=r*r;let a2=a*a;let d=${ggxDFloat};
  let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),c,m);let f=f0+(1.0-f0)*pow(1.0-vh,5.0);
- let direct=((1.0-f)*(1.0-m)*c/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;
+ let direct=((1.0-(0.04+0.96*pow(1.0-vh,5.0)))*(1.0-m)*c/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;
  return Light(direct*u.radiance.xyz*u.light.w,c*(1.0-m)*u.radiance.w*u.ambient.rgb);
 }
 @fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {

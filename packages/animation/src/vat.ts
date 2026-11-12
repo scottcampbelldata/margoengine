@@ -314,7 +314,7 @@ const unlitShader = (
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=rough*rough;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('nn', 'h')};let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
- var color=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w
+ var color=((1.0-(0.04+0.96*pow(1.0-vh,5.0)))*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w
   +(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*f.radiance.w;
  if(f.vat.z<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}
  return vec4f(color,1.0);
@@ -334,7 +334,7 @@ fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return 
  let nl=clamp(dot(s.n,l),0.0,1.0);let nv=clamp(dot(s.n,v),0.0001,1.0);let nh=clamp(dot(s.n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=s.roughness*s.roughness;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('s.n', 'h')};let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),s.base.rgb,s.metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
- let direct=((1.0-fresnel)*(1.0-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
+ let direct=((1.0-(0.04+0.96*pow(1.0-vh,5.0)))*(1.0-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
  var color=direct+ambient(s)+s.emissive;
  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=srgb(color);}
  return vec4f(color,1.0);

@@ -142,7 +142,7 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
  let nl=clamp(dot(s.n,l),0.0,1.0);let nv=clamp(dot(s.n,v),0.0001,1.0);let nh=clamp(dot(s.n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=s.roughness*s.roughness;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('s.n', 'h')};
  let g=${smithGCorrelatedFloat};
- let base=s.base.rgb;let metal=s.metal;let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
+ let base=s.base.rgb;let metal=s.metal;let dielectricF0=vec3f(0.04);let dielectricF90=1.0;let f0=mix(dielectricF0,base,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
  return ${clusterBrdf}*nl*f.radiance.rgb*f.light.w;
 }
 `;

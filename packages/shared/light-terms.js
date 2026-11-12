@@ -12,9 +12,14 @@ export const legacyTerms =
 export const decayTerms =
   'let kind=light.params.y;let reach=distance/light.positionRange.w;let fade=clamp(1.0-reach*reach*reach*reach,0.0,1.0);let fresh=kind<-0.5||kind>1.5;let power=select(distance*distance,pow(max(distance,0.000001),select(-1.0-kind,kind-2.0,kind>1.5)),fresh);let falloff=fade*fade/max(power,0.000244140625);var cone=1.0;if(kind>0.5){let along=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;if(fresh){cone=select(select(0.0,1.0,along>=lo),smoothstep(lo,hi,along),hi>lo);}else{let ramp=clamp((along-lo)/max(hi-lo,0.000001),0.0,1.0);cone=ramp*ramp*(3.0-2.0*ramp);}}';
 // The per-light BRDF of clustered's light loop (GGX with Fresnel, as gltf-pro's direct light), in the loop's locals (n, v,
-// l, h, base, metal, nl, nv, d, g, fresnel). @margoengine/materials' Lambert and Phong put their own BRDF in its place.
-// Lambert/pi + D G F / (4 nl nv): glTF 2.0 specification, Appendix B (B.3.5).
-export const clusterBrdf = '((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))';
+// l, h, vh, base, metal, nl, nv, d, g, fresnel, dielectricF0, dielectricF90). @margoengine/materials' Lambert and Phong
+// put their own BRDF in its place. glTF 2.0 Appendix B: material = mix(dielectric_brdf, metal_brdf, metallic), so the
+// specular parts sum to D G F / (4 nl nv) with `fresnel` at the metal-mixed F0, and the Lambert/pi lobe belongs to the
+// dielectric alone, weighted by 1 minus the dielectric Fresnel (KB3240b). That Fresnel is KHR_materials_specular's
+// dielectricF0 + (dielectricF90 - dielectricF0) (1 - vh)^5 (F0 0.04, F90 1 without the extension); what lies under it
+// keeps 1 minus its largest channel (shared/pbr-fresnel.js), written mix(max channel of F0, F90, (1 - vh)^5).
+export const clusterBrdf =
+  '((1-mix(max(dielectricF0.r,max(dielectricF0.g,dielectricF0.b)),dielectricF90,pow(1-vh,5.0)))*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))';
 // The cluster lookup that opens clustered's light loop and environment's volumetric local lights: from the pixel and
 // world point `p` (a WGSL name), returns vec3f(0) outside the cluster depth range, else declares `cell`, `count` and
 // `var result=vec3f(0)`.

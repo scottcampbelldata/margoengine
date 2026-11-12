@@ -1,22 +1,32 @@
 # Known bugs and unverified features
 
-### Open: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
+### Open in core only: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
 
 - **What:** glTF 2.0 Appendix B defines material = mix(dielectric_brdf, metal_brdf, metallic); only the dielectric has a
   diffuse lobe, weighted by 1 minus the dielectric Fresnel (F0 0.04). gltf-pro's base direct light was fixed for this in
-  864051383 (KB3240, MetalRoughSpheresNoTextures MAE 1.7865 to 0.6997), but these direct lights still write
+  864051383 (KB3240, MetalRoughSpheresNoTextures MAE 1.7865 to 0.6997), but the other copies of the direct light wrote
   `(1 - F(mix(0.04, base, metallic))) * (1 - metallic) * base / pi`, which darkens every part-metal surface (at
-  metallic 5/6 the smooth diffuse is half the spec's):
-  `packages/core/src/shaders.ts` (core's WGSL direct light), `packages/shared/light-terms.js` `clusterBrdf` (clustered,
-  materials), `packages/animation/src/vat.ts` (two sites), `packages/lod/src/imposter.ts`,
-  `packages/post/src/material-decals.ts` and `packages/webgl2-compat/src/preview.ts` (core's WebGL2 twin).
-- **Repro:** read each site: its `f0` is `mix(vec3f(0.04), base, metal)` and the diffuse takes `(1.0 - f)` of that f0.
-  `packages/gltf-pro/tests/metal-dielectric-mix.test.js` holds the expected weight.
+  metallic 5/6 the smooth diffuse is half the spec's).
 - **Cause:** the KB3240 fix was made in gltf-pro only; the other copies of the same direct light kept the old weight.
-- **Fix to build:** each site weights the diffuse by `1 - (0.04 + 0.96 (1 - vh)^5)` (the dielectric Schlick term; an IOR
-  extension's own F0 where the package has one), with a test per site like gltf-pro's. Every lit picture with a
-  part-metal surface moves: the visual baselines and the batch 160 proofs that hold such surfaces are re-recorded on the
-  dev PC (baselines are per machine), and core's site is a core change (Scott's call).
+- **Fixed 2026-11-12 outside core (hunt K1):** every non-core site weights the diffuse by 1 minus the dielectric Fresnel
+  `0.04 + 0.96 (1 - vh)^5`: `packages/shared/light-terms.js` `clusterBrdf` (clustered's point, spot and extra
+  directional loops; materials, shader and rigging key on its text; voxel's sun), `packages/animation/src/vat.ts` (unlit
+  and lit), `packages/lod/src/imposter.ts`, `packages/post/src/material-decals.ts` and
+  `packages/webgl2-compat/src/preview.ts`. `clusterBrdf` takes the dielectric F0 and F90 its loop already has, so a
+  KHR_materials_specular or IOR F0 weighs the diffuse by its largest channel, as gltf-pro's physical shader does.
+  Regression tests run each shipped text on the CPU against the specification's mix (a head-on part-metal case has the
+  closed form ((1 - metal) 0.96 base + F0 / 4) / pi: 0.0978817 at base 0.5, metal 0.5, against 0.0795775 before):
+  packages/clustered/test/metal-mix.test.js, packages/animation/tests/vat-metal-mix.test.js,
+  packages/lod/test/imposter-metal-mix.test.js, packages/post/test/material-decals-metal-mix.test.js,
+  packages/webgl2-compat/test/preview-metal-mix.test.js, packages/voxel/tests/metal-mix.test.js (helper
+  tests/support/metal-mix.js). Clustered's sampling-text pins and materials' GGX loop text moved with the BRDF text
+  (the clustered sampling text with the old BRDF text put back hashes to the old pins); six --current proofs advance.
+- **Still open, core (Scott's call):** `packages/core/src/shaders.ts` keeps the metal-mixed weight until its held core
+  commit lands. Until then a part-metal core mesh is darker than the same surface lit by a clustered light, a
+  material decal relit over it, or its imposter (which now match the specification).
+- **Re-record on the dev PC:** every lit picture with a part-metal surface moves, so the visual baselines of part-metal
+  views (baselines are per machine) and any batch 160 budget that holds such a surface outside gltf-pro are re-recorded
+  there.
 
 ### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 

@@ -751,7 +751,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=rough*rough;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('nn', 'h')};let g=${smithGCorrelatedFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
- var direct=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
+ var direct=((1.0-(0.04+0.96*pow(1.0-vh,5.0)))*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
  /*lod:direct*/
  var color:vec3f;
  // Match the source's renderer: gltf-pro (hemisphere fill) or core (flat ambient), both Khronos PBR Neutral.

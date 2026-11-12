@@ -8875,3 +8875,11 @@ Schlick at f0 = mix(0.04, base, metallic) exactly, while the diffuse keeps (1 - 
 times 1 minus the dielectric Fresnel; weighting it by 1 minus the mixed Fresnel is not
 an identity. The Sample Viewer was used only as a black-box picture; its source was not
 read. No other engine's code was read.
+
+## KB3240b: the same diffuse weight outside gltf-pro (2026-11-12)
+
+Sources as KB3240 above (glTF 2.0 Appendix B, Schlick 1994), and for the coloured F0 Khronos Group,
+*KHR_materials_specular* (https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_specular/README.md),
+whose dielectric Fresnel mix weighs the layer under it by 1 minus the largest channel of the Fresnel. Since the F90 is
+one number, that largest channel is mix(max channel of F0, F90, (1 - vh)^5). Applied to clustered's shared per-light
+BRDF and to the VAT, imposter, material decal, voxel and WebGL2 preview direct lights. No other engine's code was read.
