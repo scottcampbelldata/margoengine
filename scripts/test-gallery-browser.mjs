@@ -126,7 +126,7 @@ try {
       titles.add(facts.title);
       descriptions.add(facts.description);
       assert.ok(facts.description, `${name}: no description`);
-      assert.ok(!/[–—]/.test(facts.text), `${name}: a long dash in the visible text`);
+      assert.ok(!/[\u2013\u2014]/.test(facts.text), `${name}: a long dash in the visible text`);
       assert.ok(facts.sideways <= 0, `${name} at ${width}: ${facts.sideways} px of sideways scroll`);
       assert.ok(facts.body >= 16, `${name}: body text ${facts.body} px`);
       assert.deepEqual(facts.small, [], `${name} at ${width}: text under 16 px`);

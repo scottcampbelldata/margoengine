@@ -859,7 +859,7 @@ async function phone() {
       assert.equal(seen.overflow, 0);
       for (const word of [/walk/, /look/, /Jump/, /Fly/, /place/, /break/, /choose a block/])
         assert.match(seen.help, word);
-      assert.doesNotMatch(seen.text, /Click to play|[–—]/);
+      assert.doesNotMatch(seen.text, /Click to play|[- - ]/);
     };
   if (shots) await tab.screenshot({ path: `${shots}/phone-before-play.png` });
   await instructions();

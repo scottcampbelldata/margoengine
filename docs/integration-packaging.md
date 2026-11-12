@@ -18,7 +18,7 @@ check:merge picks the project for a change to any package, because the file impo
 Left out until done, each with its reason in the script's `PENDING` list (it must end empty): sciviz entries and the
 kit entries that re-export them (work list 5: sciviz batches 175, 176 and 178).
 
-Measured on the Beelink (2026-11-10): 4,725 entries from 101 packages, 5,543 files in the program, 367 MB, no
+Measured on the AMD mini PC (2026-11-10): 4,725 entries from 101 packages, 5,543 files in the program, 367 MB, no
 errors. Byte and file counts only; no timing.
 
 ## Contract groups bundled in two orders

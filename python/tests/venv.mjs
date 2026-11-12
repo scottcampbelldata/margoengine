@@ -88,7 +88,7 @@ const tail = (text, lines = 12) => (text ?? '').trim().split('\n').slice(-lines)
 /**
  * The Python minor versions the pinned python/requirements-notebook.txt has wheels for on Windows, macOS and Linux, best
  * first (PyYAML has none for 3.15). 3.14 checked with pip download --only-binary on win_amd64, macosx_11_0_arm64 and
- * manylinux x86_64 (2026-11-07): it is the Python python.org installs on the M6 Mac mini.
+ * manylinux x86_64 (2026-11-07): it is the Python python.org installs on the Apple silicon Mac.
  */
 export const SUPPORTED_PYTHON = ['3.13', '3.12', '3.14'];
 export const PYTHON_FIX = 'install Python 3.12, 3.13 or 3.14 from https://www.python.org/downloads/, or set MARGO_PYTHON to one';

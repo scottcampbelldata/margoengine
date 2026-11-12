@@ -8,6 +8,6 @@ Why. Water's own surface-driven pipe pushes the whole surface difference through
 
 Defaults: substeps 8 (Water's coast uses 3), maxFroude 4, no sources. Ranges are in the TSDoc and docs/limits.md.
 
-Proof (M6 Mac mini, Metal WebGPU and the compatibility run): packages/water/test/rivers.browser.mjs runs a 24 x 8 map with a 10 m fall and a 0.5 slope chute fed by 6 m^3/s near the brink for 240 frames at 8 substeps and compares the GPU depth with the float64 model in rivers-reference.js: worst 9.2e-6 m (bound 1e-3); the chute holds 0.173 m on both; after dispose the coast restarts dry. Cost on a 256 x 256 map of 2 m cells with a 200 m^3/s source: 0.168 ms per frame for rivers against 0.155 ms for Water's own coast (Metal WebGPU, other lanes running; diagnostic).
+Proof (Apple silicon Mac, Metal WebGPU and the compatibility run): packages/water/test/rivers.browser.mjs runs a 24 x 8 map with a 10 m fall and a 0.5 slope chute fed by 6 m^3/s near the brink for 240 frames at 8 substeps and compares the GPU depth with the float64 model in rivers-reference.js: worst 9.2e-6 m (bound 1e-3); the chute holds 0.173 m on both; after dispose the coast restarts dry. Cost on a 256 x 256 map of 2 m cells with a 200 m^3/s source: 0.168 ms per frame for rivers against 0.155 ms for Water's own coast (Metal WebGPU, other lanes running; diagnostic).
 
 Not done (the finish-later list): a bed-slope term so chute fronts reach the slope's gravity speed, bed friction, larger-map cost, and flow shading from the pipe flux.

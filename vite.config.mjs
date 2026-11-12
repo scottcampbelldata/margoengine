@@ -26,7 +26,7 @@ export function ignoredRootFolders() {
  * The dev server's file watcher sees only the files it has served. Vite watches its whole root by default, and chokidar
  * opens one native watch for every file it finds there: 62,864 paths in a lane checkout with built packages, examples and
  * tests, all opened before the first page could be served. Three sciviz tabs open at `npm run dev:examples` start took
- * 56.4 s to load on the dev PC, 1.2 to 1.7 s with this (docs/limits.md). Here the root's entries are
+ * 56.4 s to load on the workstation, 1.2 to 1.7 s with this (docs/limits.md). Here the root's entries are
  * ignored, and each file is added to the watcher when the server first transforms it (the page's html, its modules,
  * the package builds they import), so editing a page or rebuilding a package still reloads it. A file that is removed
  * (a clean rebuild) is dropped and added again on its next request.

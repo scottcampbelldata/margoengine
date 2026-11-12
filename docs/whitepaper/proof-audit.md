@@ -161,7 +161,7 @@ These were in the tables above until batch 121 ran them.
 
 ## Apple proofs on the Mac, list 4 (2026-11-10)
 
-Batch 121 again, on the M6 Mac mini, Apple tools first. The screen was locked from 08:06, which matters: Safari's page reported itself hidden, so it drew and decoded but presented no canvas frames, and `qlmanage` hung where `QLThumbnailGenerator` did not.
+Batch 121 again, on the Apple silicon Mac, Apple tools first. The screen was locked from 08:06, which matters: Safari's page reported itself hidden, so it drew and decoded but presented no canvas frames, and `qlmanage` hung where `QLThumbnailGenerator` did not.
 
 | What ran | Tool | Result |
 | --- | --- | --- |
@@ -182,7 +182,7 @@ An agent has no phone, no headset and no account, so these wait for a person. Ea
 
 | Test | What it closes | What to look at |
 | --- | --- | --- |
-| Open the static and animated USDZ files on an iPhone in AR Quick Look: the set made on 2026-11-10 is in `~/Development/Projects/margo-device-tests/2026-11-10/` on the Mac (`static`, `animated` at set heights, `textured`), AirDrop the folder | LIM-253, LIM-265, "Animated USDZ: the fix for the first iPhone failure awaits a retest", "RiggedFigure first loads off the floor" | Right size against the room, standing on the floor, clip plays, textures right. |
+| Open the static and animated USDZ files on an iPhone in AR Quick Look: the set made on 2026-11-10 is in `the 2026-11-10 device-test folder` on the Mac (`static`, `animated` at set heights, `textured`), AirDrop the folder | LIM-253, LIM-265, "Animated USDZ: the fix for the first iPhone failure awaits a retest", "RiggedFigure first loads off the floor" | Right size against the room, standing on the floor, clip plays, textures right. |
 | Open the eight files of `scripts/make-usdz-quicklook-kit.mjs` on an iPhone | "USDZ export with textures: Quick Look on a Mac only" | Compare with the file descriptions at the top of that script. |
 | Open the stage XR example in a headset browser with WebXR and WebGPU, and the WebGL2 layer example in one with WebGL2 | LIM-120, LIM-151, "WebXR AR hit testing: never run on an AR device" | The session starts, the view tracks the head, a hit test lands on a real surface. |
 | Unlock the Mac, keep Safari in front, and open `http://127.0.0.1:18765/index.html?only=record` while `python3 tools/real-proof/safari/server.py tools/real-proof/safari/dist 18765 report.json` runs | LIM-571 in Safari | `record.mp4` beside `report.json` opens in QuickTime Player, about 3 s, Fox turning. |

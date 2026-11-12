@@ -71,7 +71,7 @@ try {
     };
   }
   console.log('mean brightening in sRGB levels', report);
-  // M6 Mac mini, Metal: plain trail 19.4 levels, reactive -1.4; square 49.9 plain against 63.5 reactive. A pixel the
+  // Apple silicon Mac, Metal: plain trail 19.4 levels, reactive -1.4; square 49.9 plain against 63.5 reactive. A pixel the
   // square left one frame ago keeps 0.9 of a history up to 0.27 brighter in linear light, so a plain trail of 10
   // levels or more is the ghost; a reactive pixel restarts from this frame's own sample, whose jitter error averages
   // out over the band.

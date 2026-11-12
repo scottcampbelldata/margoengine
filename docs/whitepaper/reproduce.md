@@ -527,7 +527,7 @@ run invalid. Every before-and-after comparison also follows the quiet speed-phas
 ("Quiet speed-phase protocol"): both revisions built before either is timed, an A/A run of one build in both roles
 first, 1000 samples for any p99, and the GPU clock, power limit and throttle state recorded before and after each
 side. A run that misses one of these is diagnostic, not a published number. An official label on an invalid run stays invalid. The head-to-head with three.js and other engines runs
-the same scenes from `C:DevelopmentProjectsengine-bench` (`--engines=all`, see docs/benchmarking.md "Comparing
+the same scenes from `the projects folderengine-bench` (`--engines=all`, see docs/benchmarking.md "Comparing
 engines").
 
 ## The five-minute quickstart
@@ -739,7 +739,7 @@ npm run check:readme-run -- --packages=physics,physics2d
 cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --lib -- --nocapture
 ~~~
 
-The last command prints `FACE_INTERVAL_TOTAL` for frames 60–99; the ordinary parallel unit test asserts positive
+The last command prints `FACE_INTERVAL_TOTAL` for frames 60-99; the ordinary parallel unit test asserts positive
 whole-window work reduction. Interpret the bound as `32*hits - 2*attempts` squared-distance candidates, not saved
 sqrt calls. `tests/manifold_exact.rs` compares all fields against the unchanged kept reference, including the
 new nextafter thresholds and public mutations. `tests/common.rs` checks IEEE lane equality, including NaN and zeros.
@@ -1552,7 +1552,7 @@ measured on the Radeon adapter gates AMD proofs (proof-contract.mjs `viewerBudge
 transmission and volume the AMD receipt `results/batch-160-amd-<case>.json` gates every reference of an AMD proof
 (`amdReceiptBudgets`); `run.mjs` prints its RESULT before the budget check, so a run over budget still reports. All
 budgets were measured on main's area-filter mip chain (65098f33fe); earlier measurements on other mip
-chains are void. SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11 after the height-correlated Smith G, from 877,419 and 877,434), 879,353 and 873,565 on AMD (re-measured 2026-11-11 on the dev PC's RDNA2 iGPU, KB3584, from 879,167 and 873,364); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (from 2,425,911), 2,409,579 native and 2,411,871 compatibility on AMD (re-measured 2026-11-11, from 2,424,867 and 2,426,643). Proof report hashes: results/batch-160-job5-proofs.json.
+chains are void. SpecularTest (24 primitives) absolute 877,623 native and 877,629 compatibility on NVIDIA (re-recorded 2026-11-11 after the height-correlated Smith G, from 877,419 and 877,434), 879,353 and 873,565 on AMD (re-measured 2026-11-11 on the workstation's RDNA2 iGPU, KB3584, from 879,167 and 873,364); IORTestGrid (23 primitives) 2,411,082 on both NVIDIA backends (from 2,425,911), 2,409,579 native and 2,411,871 compatibility on AMD (re-measured 2026-11-11, from 2,424,867 and 2,426,643). Proof report hashes: results/batch-160-job5-proofs.json.
 
 ## Batch 65 roads
 

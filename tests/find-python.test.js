@@ -36,7 +36,7 @@ test('no Python is undefined, and the first command that answers is used', () =>
   );
 });
 
-// Regression (2026-11-09, M6 Mac mini): packages/lightmap/tests/cornell-box.test.js spawned a bare 'python', which
+// Regression (2026-11-09, Apple silicon Mac): packages/lightmap/tests/cornell-box.test.js spawned a bare 'python', which
 // macOS does not have (only python3), so verify failed there with spawnSync python ENOENT. Tests and checks start
 // Python through findPython (or a list of candidates), never a hard-coded 'python'.
 test('no test or check spawns a hard-coded python command', async () => {

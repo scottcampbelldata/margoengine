@@ -321,7 +321,7 @@ test('changing playback rate mid-play keeps the playhead consistent and is smoot
 });
 
 test('detune moves the playhead like Web Audio: 1200 cents plays the buffer twice as fast', () => {
-  // Chromium on the M6 Mac mini, OfflineAudioContext, ramp buffer: detune 1200 at rate 1 reads buffer second 2 at
+  // Chromium on the Apple silicon Mac, OfflineAudioContext, ramp buffer: detune 1200 at rate 1 reads buffer second 2 at
   // context second 1. The playhead used to count playbackRate only, so it read 1 and a resume jumped back 1 s.
   const context = new FakeAudioContext({ state: 'running' }),
     listener = new AudioListener({ context });

@@ -123,7 +123,7 @@ console.log(town.villages.length, town.roads.length, town.villages[0]?.houses.le
 - **Same layout everywhere.** The decisions use only + - * / and square roots, which IEEE 754 rounds the same way on
   every engine, integer hashes for the jitter, integer CORDIC for the lane angles and a heap that breaks ties by cell, so
   the same world and options give the same JSON on every machine.
-- **Cost.** About 1.4 s on the busy Beelink for the default 4 km world at the 16 m cell (66,049 height reads, three
+- **Cost.** About 1.4 s on the busy AMD mini PC for the default 4 km world at the 16 m cell (66,049 height reads, three
   villages; diagnostic, not a timed result). The work grows with the cells and with the links: each link is one search.
 
 `tests/settlements.test.js` checks the site choice, the pass, the bridge, the sea, the network, the lots, the placement

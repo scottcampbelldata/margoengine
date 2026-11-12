@@ -12,7 +12,7 @@ test('the timing panel prints each phase in order, seconds and the gap since the
   assert.match(row('Welcome'), / - *$/);
   assert.equal(lines.at(-1), 'extra');
   assert.ok(
-    lines.every((line) => line.length <= 52 && !/[–—]/.test(line)),
+    lines.every((line) => line.length <= 52 && !/[\u2013\u2014]/.test(line)),
     'fits a phone, no long dashes',
   );
 });

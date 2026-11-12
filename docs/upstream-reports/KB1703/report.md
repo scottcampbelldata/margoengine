@@ -5,7 +5,7 @@ Draft for Microsoft (Feedback Hub, Windows kernel / graphics) with a copy for Ch
 ## Environment
 
 - Windows 11 Pro 10.0.26300, RTX A6000 (driver 32.0.16.1742, 617.42), AMD Ryzen 9 9950X; Microsoft Edge 157.0.4341.42 (headless, WebGPU on).
-- Margo's failures (2026-11-09 and 11-10): on the dev PC with 8 to 12 agent lanes and 3 GPU test slots busy, every browser check passed and then the
+- Margo's failures (2026-11-09 and 11-10): on the workstation with 8 to 12 agent lanes and 3 GPU test slots busy, every browser check passed and then the
   process object of the ended browser was signalled only 8.7 s to over 30 s after `TerminateProcess`. Never on a quiet machine.
 
 ## Steps
@@ -33,7 +33,7 @@ Does not reproduce the multi-second case on an otherwise quiet machine; the late
 | 4 | 12 | 104 ms | 124 ms | 0 | 0 |
 | 12 | 36 | 253 ms | 470 ms | 0 | 0 |
 
-The slow cases need the machine state of the dev PC under full load (many CPU lanes plus GPU slots), which this script does not recreate on its own.
+The slow cases need the machine state of the workstation under full load (many CPU lanes plus GPU slots), which this script does not recreate on its own.
 A report to Microsoft would carry this script plus an ETW trace (Microsoft-Windows-Kernel-Process, GPU video memory manager) from a run that does take over 10 s; that trace has not been recorded.
 Margo's workaround (a separate host process that owns the browser and waits on the kernel; `scripts/support/browser-host.mjs`) is in place, so the suite no longer waits on it.
 

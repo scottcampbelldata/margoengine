@@ -91,7 +91,7 @@ export class GPUProfiler {
       const timestamps = new Uint32Array(buffer.getMappedRange(0, this.count * 16));
       // Passes need not start in the order they were recorded: WebGPU section 20.4 makes timestamp values
       // implementation-defined, and Metal on Apple GPUs samples a pass's start at its first stage boundary without
-      // waiting for earlier commands, so the GPU overlaps passes (the M6 Mac mini under Chrome starts the second pass
+      // waiting for earlier commands, so the GPU overlaps passes (the Apple silicon Mac under Chrome starts the second pass
       // up to 26 us before the first ends, or about 9.5 us before the first starts). Time going backwards, as after
       // the counter reset that section names, is an end before its own start or a pass that ends before the
       // previous pass starts (no overlap at all). The elapsed time runs from the earliest start to the latest end.

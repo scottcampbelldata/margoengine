@@ -1,7 +1,7 @@
 {
   "date": "2026-10-25",
   "engine": "5.8.4-58902052+++UE5+Release-5.8",
-  "machine": "scott dev PC (RTX A6000), UnrealEditor-Cmd -unattended -nop4 -nosplash -NullRHI",
+  "machine": "scott workstation (RTX A6000), UnrealEditor-Cmd -unattended -nop4 -nosplash -NullRHI",
   "fixture": "MargoTile precision appearance fixture (scripts/prepare-unreal-precision-appearance.mjs), layout objects, transformMode preserve, static",
   "importer": {
     "package": "@margoengine/exporters/unreal-precision-importer",

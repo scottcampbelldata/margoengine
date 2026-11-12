@@ -38,7 +38,7 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}tests/audio.html`);
   await page.waitForFunction(() => typeof window.runOfflineTests === 'function');
   // Each page call has a hard limit and a name (KB5029b: a run sat 211 s in one of these with nothing named, until the
-  // GPU monitor reclaimed it). Far past what each takes (9 s for the whole suite on the dev PC, 2026-11-11). On a
+  // GPU monitor reclaimed it). Far past what each takes (9 s for the whole suite on the workstation, 2026-11-11). On a
   // stall the AudioContext states the page can see are printed with the step's name.
   const CALL_LIMIT = 60_000;
   const call = async (name, run) => {

@@ -210,7 +210,7 @@ test('closeKind: only the idle code stops the page; every other close goes back 
     assert.equal(closeKind({ code, byClient: false }), 'rejoin', String(code));
   assert.equal(closeKind({ code: 1005, byClient: true }), 'unreadable');
   assert.equal(closeKind({ code: IDLE_CLOSE_CODE, byClient: true }), 'unreadable');
-  assert.ok(!/[–—]/.test(IDLE_BANNER), 'no dashes in visible copy');
+  assert.ok(!/[\u2013\u2014]/.test(IDLE_BANNER), 'no dashes in visible copy');
 });
 
 test('the page asks the rule the shard asks', () => {

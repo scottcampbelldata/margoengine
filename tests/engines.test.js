@@ -1,5 +1,5 @@
 // Bug 23 (2026-10-27): the root package.json declared Node >=22.12.0, but 14 test files use `using` declarations, which
-// Node 22.22.1 cannot parse (106 to 110 unit tests failed on the Windows Beelink), and the packed React tests need
+// Node 22.22.1 cannot parse (106 to 110 unit tests failed on the Windows AMD mini PC), and the packed React tests need
 // Node 24's mock.module timing (bug 18). The repository now declares the minimum its tests need (24.18.0) and the
 // packages keep theirs (22.12.0: every shipped file parses and every entry imports there). scripts/check-engines.mjs
 // keeps the fields, CI and the syntax the files use in step; CI runs its --run checks on each minimum.

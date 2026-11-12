@@ -1,4 +1,4 @@
-// Type-checks every Margo snippet (```ts block) in docs/from-threejs.md and docs/guides/*.md against the built packages,
+// Type-checks every Margo snippet (```ts block) in docs/guides/*.md against the built packages,
 // so a guide fails the unit run when an API it shows is renamed or removed. Needs `npm run build:packages` first.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,6 @@ import { GUIDES, program } from '../scripts/support/doc-snippets.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const guides = [
-  'docs/from-threejs.md',
   ...readdirSync(resolve(root, 'docs/guides'))
     .filter((name) => name.endsWith('.md'))
     .map((name) => `docs/guides/${name}`),
@@ -30,7 +29,7 @@ for (const file of guides)
           line: doc.slice(0, match.index).split('\n').length + 1,
         }));
     assert.ok(
-      snippets.length >= (file === 'docs/from-threejs.md' ? 20 : 1),
+      snippets.length >= 1,
       `expected the guide's snippets, found ${snippets.length}`,
     );
     for (const { code, line } of snippets)

@@ -345,7 +345,7 @@ test('the laptop profile loads, has a heat watch and excludes nothing', () => {
   assert.deepEqual(profile.exclude, {});
 });
 
-test('the dev PC (RTX A6000 beside the 9950X iGPU) names no profile and still runs every planned test as one step', () => {
+test('the workstation (RTX A6000 beside the 9950X iGPU) names no profile and still runs every planned test as one step', () => {
   const profile = machineProfile({}, PROFILES_FILE, DEV_PC),
     tests = plan(),
     steps = planSteps(tests, profile);
@@ -454,7 +454,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
   );
 });
 
-// Bug (M6 Mac mini, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile
+// Bug (Apple silicon Mac, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile
 // "workstation", described as the maintainer's RTX A6000 PC. An unnamed run now takes the profile matching its platform.
 test('an Apple silicon Mac gets its own profile, not the workstation; a name still wins; no other host falls back to one', () => {
   const mac = machineProfile({}, PROFILES_FILE, MAC);
@@ -522,11 +522,11 @@ test('profiles are chosen by name, are checked, and hold no machine names or hom
   }
 });
 
-// Bug (Beelink, Radeon 680M, 2026-11-09 and 2026-11-10): lane scripts that did not set MARGO_MACHINE_PROFILE ran as the
+// Bug (AMD mini PC, Radeon 680M, 2026-11-09 and 2026-11-10): lane scripts that did not set MARGO_MACHINE_PROFILE ran as the
 // file's default "workstation" (no heat watch, nothing excluded), so the voxel path tracer this machine's profile bans
 // ran and the machine crashed twice (bugcheck 0x133). Unnamed runs are now matched by hardware, and there is no
 // fallback profile. Each of these fails on the old code: it chose "workstation" for every Windows x64 host.
-test('the Beelink names no profile and is the mini PC: heat watch on, the voxel path tracer excluded', () => {
+test('the AMD mini PC names no profile and is the mini PC: heat watch on, the voxel path tracer excluded', () => {
   const profile = machineProfile({}, PROFILES_FILE, BEELINK);
   assert.equal(profile.name, 'mini-pc');
   assert.ok(profile.heat && profile.heat.stopC === 88);
@@ -544,7 +544,7 @@ test('the Beelink names no profile and is the mini PC: heat watch on, the voxel 
   );
 });
 
-test('the dev PC is the workstation and the Mac is apple-silicon with no variable set', () => {
+test('the workstation is the workstation and the Mac is apple-silicon with no variable set', () => {
   const dev = machineProfile({}, PROFILES_FILE, DEV_PC);
   assert.equal(dev.name, 'workstation');
   assert.equal(dev.heat, null);

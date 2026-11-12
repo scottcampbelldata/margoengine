@@ -1,5 +1,5 @@
 // docs/known-bugs.md, "biomes test:gpu on the Intel Arc laptop: every check OK, then killed at 600 s". The kill could not
-// be reproduced on the dev PC, so this bounds it where it can be checked without a GPU: no browser check may be able to
+// be reproduced on the workstation, so this bounds it where it can be checked without a GPU: no browser check may be able to
 // sit past its step limit unnoticed. Every biomes GPU step (a) has a measured time on the RTX A6000 that fits its limit
 // with a margin for a machine several times slower, (b) runs only check files that end through `runSuite` (a failed
 // check exits at once, teardown bounded) and `watchExit` (a finished suite that does not end in 30 s exits 1 naming the

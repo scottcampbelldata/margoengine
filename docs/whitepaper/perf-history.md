@@ -438,12 +438,12 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
 
 ### 7. Voxel sandbox world fill
 
-- **Loss:** at render distance 16 the world took 8.8–9.2 s to fill (`71f5c376` message; RTX A6000, quiet-gated).
+- **Loss:** at render distance 16 the world took 8.8-9.2 s to fill (`71f5c376` message; RTX A6000, quiet-gated).
 - **Cause:** while the world filled, the sandbox joined only 0.5 ms of chunks per frame. That caused about 20,433
   remeshes for 2,435 meshed chunks.
 - **Trade-off:** fill frames cost more (p95 11.1 ms at distance 16).
 - **Fix:** `71f5c376` perf(voxel-sandbox): render distance 16 fills in 3.6 s.
-- **After:** 3.59–3.67 s over 3 loads; render distance 8 takes 1.06–1.22 s (was 2.45–2.50 s).
+- **After:** 3.59-3.67 s over 3 loads; render distance 8 takes 1.06-1.22 s (was 2.45-2.50 s).
   - Sources: `examples/voxel-sandbox/README.md` and `examples/package-benchmarks/results/voxel-sandbox-bench.json`.
 - **Rerun:** `node examples/voxel-sandbox/bench.mjs --distances=8,16 --loads=3`.
 - **Guard:** none beyond the benchmark.
@@ -1717,7 +1717,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Fix:** one raw offset curve per ring, filled by winding number (Chen and McMains, 2005). The same sweep runs over
   far fewer crossings. Nothing is skipped: the area matches the first method to all printed digits, 390.8455 outset and
   282.9276 inset.
-- **Result (dev PC, node, other sessions running, so diagnostic and not gated):** 59.0 s to 1.9 s for the round outset,
+- **Result (workstation, node, other sessions running, so diagnostic and not gated):** 59.0 s to 1.9 s for the round outset,
   16.5 s to 1.8 s for the miter inset. Intersecting two 100,000-point outlines takes 0.9 to 1.7 s.
 - **Rerun:** `node packages/geometry/scripts/polygon-bench.mjs` after `npm run build` in `packages/geometry`.
 - **Guard:** `packages/geometry/tests/polygon.test.js`.
@@ -1903,7 +1903,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 
 ### 64. Light tier: 50 FPS on a 100 Hz display
 
-- **Loss:** the voxel sandbox ran at 50 FPS on an Apple M6 Mac mini in Safari and Chrome, on a monitor that gives 60 on Windows. macOS runs that monitor (Dell S2725HS) at 100 Hz by default: all 18 mode changes in a week of WindowServer logs set 1920 x 1080 at 100 Hz.
+- **Loss:** the voxel sandbox ran at 50 FPS on an Apple Apple silicon Mac in Safari and Chrome, on a monitor that gives 60 on Windows. macOS runs that monitor (Dell S2725HS) at 100 Hz by default: all 18 mode changes in a week of WindowServer logs set 1920 x 1080 at 100 Hz.
 - **Cause:** `capFrameRate` skipped every refresh sooner than 12.67 ms after the last frame, so at 100 Hz it dropped every other one. The light tier is the only paced desktop tier, and the Mac stayed on it because the GPU reading added up passes that run side by side (31.9 ms of passes in 8.5 ms of GPU time).
 - **Fix:** each frame spans the most whole refreshes that still reach the rate, and the reading counts the time passes cover. Same work per frame, same quality. No `FAST_GPU_MS` change.
 - **After:** real page, simulated 100 Hz clock, Apple M6, 1920 x 1000: 50.0 to 100.1 FPS in Chrome 157, 50.0 to 100.0 in Playwright WebKit 27.2. Reading at 60 Hz: 31.4 to 8.8 ms in Chrome, 18.8 to 8.7 ms in WebKit. Not yet measured on a physical 100 Hz panel or in Safari itself.
@@ -1993,7 +1993,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **After:** 4.4 ms against three's WebGL 3.2, 496,187 B against 444,202 B (run `20261106-021338-817228d0c-dev`, `--no-gate`, other
   jobs running, diagnostic; RTX A6000, Edge 156).
 - **Apple:** a scene with rotation, non-uniform scale, a mirrored node, a blended material and painted nodes, exported
-  shared and with a geometry per node, on a Mac mini with macOS 27.2: `usdchecker --arkit` passes both, RealityKit gives
+  shared and with a geometry per node, on an Apple silicon Mac with macOS 27.2: `usdchecker --arkit` passes both, RealityKit gives
   the same seven models and bounds, and the Quick Look thumbnails are byte-identical.
 - **Difference:** the rest is 52 KB more text and the validated scene collector, which checks every node. A CPU profile
   in Node (2.4 ms best) finds no hot spot: building the text 24%, `compose` and the collector about 20%, numbers 20%, CRC 7%.
@@ -2623,7 +2623,7 @@ pins remain unchanged; **no result-changing hash was re-pinned**.
 The retained-reference suite compared 20,384,784 scene manifolds, 2,400,000 randomized manifolds and 58,560 added
 boundary/mutation manifolds with zero differences, plus the separate axis/mixed/permutation coverage. Native
 scalar/SIMD and Node Wasm hashes pass; Edge WebGPU/WebGL2 and Firefox WebGL2 reproduce them. Firefox WebGPU has
-no adapter and is unrun. Over steps 60–99 of the unchanged 100-row scene, 102,862 of 130,297 attempts certify a
+no adapter and is unrun. Over steps 60-99 of the unchanged 100-row scene, 102,862 of 130,297 attempts certify a
 face. Counting two candidates even for every failed attempt gives a whole-window lower bound of
 `32*102862 - 2*130297 = 3,030,990` removed point-to-edge projection/squared-distance candidates. Certificate
 overhead remains. This is a deterministic geometry-work count, not a sqrt count or a measured speed percentage.
@@ -3038,7 +3038,7 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   normals the file leaves zero, where three copies the zeros.
   `p-export-usdz` 4.4 ms against 3.2 (entry 69, busy machine). Cause and plan:
   [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero).
-- **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
+- **Galaxy S23 Ultra island demo.** A report of 3-5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.
 
@@ -3592,7 +3592,7 @@ The [volume comparison](../sciviz-rivals.md) adds --runs=1 without clocks, full 
 
 ## What our checks caught, and what we got wrong (2026-11-10, the Mac)
 
-This day ran on the M6 Mac mini (Metal through WebGPU, ANGLE on Metal for the WebGL2 layer, Safari and WebKit 27.2).
+This day ran on the Apple silicon Mac (Metal through WebGPU, ANGLE on Metal for the WebGL2 layer, Safari and WebKit 27.2).
 It closed work lists 2 and 3 and ran list 4: batch 121 (Apple proofs), review 5 of the list 2 and 3 packages, and the
 batch 132 research audit. Each entry names commits on `main`; open items stay in [known-bugs.md](../known-bugs.md).
 

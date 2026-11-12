@@ -540,6 +540,16 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 - Automated runs in more places: Android, iPhone, macOS Safari, and more of the suites in Firefox and on Apple silicon.
 - Published benchmark comparisons with their method and raw results.
 
+## How the engine is built
+
+AI agents write the code. Scott Campbell sets the rules they work under. Those rules are in [AGENTS.md](AGENTS.md). A core change, or a change that removes or renames an export of a locked package, waits for his yes. Other work lands when the checks in that file pass.
+
+A bug fix comes with a regression test that fails without the fix. A commit whose subject starts with `fix` changes a test file, or names an existing test in the message. When a change makes a public claim, the same change records the claim and its proof in [docs/whitepaper/claims.md](docs/whitepaper/claims.md).
+
+Runtime dependencies are an allowlist. [scripts/supply-chain.mjs](scripts/supply-chain.mjs) accepts only the licences MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, Zlib and 0BSD, and each external runtime dependency needs a written reason. `node scripts/supply-chain.mjs --check` fails when a new one appears without that record. `npm run check:banned-terms` rejects a separate encoded list of terms ([scripts/banned-terms.json](scripts/banned-terms.json)).
+
+GitHub Actions is not the gate for this repository. `.github/workflows/ci.yml`, `browser.yml` and `biomes-digests.yml` describe checks, and all three are turned off in the repository settings. While `ci.yml` still ran on every push, GitHub recorded a failed run in a few seconds because the workflow was off, not because a test reported a failure. Those three workflows are manual now, so a push does not open another failed run. Turning them back on is a repository setting, and this change does not make it. The checks that gate a change are the ones named in AGENTS.md, run on the machine that has the change.
+
 ## Contributing
 
 Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, tests and what a good pull

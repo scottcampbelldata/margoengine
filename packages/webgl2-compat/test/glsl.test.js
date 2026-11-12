@@ -59,7 +59,7 @@ for (const [dimension, coords, offset] of [
   ])
     for (const shifted of [false, true])
       test(`textureSampleGrad ${dimension} with ${dx}/${dy} of its own coordinate offset=${shifted} samples implicitly`, () => {
-        // Regression (M6 Mac mini, 2026-11-10): ANGLE Metal's textureGrad(c, dFdx(c), dFdy(c)) chose LOD 1.77 where
+        // Regression (Apple silicon Mac, 2026-11-10): ANGLE Metal's textureGrad(c, dFdx(c), dFdy(c)) chose LOD 1.77 where
         // native Metal's textureSampleGrad(c, dpdx(c), dpdy(c)) equals textureSample (LOD 1.86); bias-browser.mjs.
         const source = `${V}\n@group(0) @binding(0) var t:texture_${dimension}<f32>; @group(0) @binding(1) var s:sampler;
     @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {let uv=vec2f(0.173,0.124)*p.x+vec2f(-0.063,0.186)*p.y;

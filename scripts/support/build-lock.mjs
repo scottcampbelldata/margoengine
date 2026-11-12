@@ -14,7 +14,7 @@ import { join } from 'node:path';
 export const BUILD_LOCK_DIR = 'test-results/package-build.lock';
 /** Environment variable a holder passes to the builds it starts itself. */
 export const BUILD_LOCK_ENV = 'MARGOENGINE_BUILD_LOCK';
-/** A full build:packages takes about 40 s on the dev PC and under 5 min on the slowest machine; past this it is hung. */
+/** A full build:packages takes about 40 s on the workstation and under 5 min on the slowest machine; past this it is hung. */
 export const BUILD_LOCK_HARD_LIMIT_MS = 30 * 60_000;
 
 const UNOWNED_LIMIT_MS = 10_000;

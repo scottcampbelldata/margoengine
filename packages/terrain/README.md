@@ -883,7 +883,7 @@ the same picture, pixel for pixel; a 41-frame flight from two radii up to 2.8 m 
 frame, reaches level 20 and rebases once, with no validation error. `test/planet.test.js` checks the cube sphere's
 seams and cell areas, the horizon culling, the screen error, that refining with no budget never leaves a hole, the
 patch limit, sea level and following an origin. Building a patch costs about 1.3 ms of main-thread time at
-resolution 32 with the default ground (Node, Beelink, busy machine: diagnostic); the 1,682 patches a view 100 m above
+resolution 32 with the default ground (Node, AMD mini PC, busy machine: diagnostic); the 1,682 patches a view 100 m above
 the ground at 1280 x 720 needs took 2.2 s, which the `budget` spreads over frames. Frame cost not timed.
 
 ## Far from the origin: `floatingOrigin`

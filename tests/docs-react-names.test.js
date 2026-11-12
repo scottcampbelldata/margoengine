@@ -1,7 +1,7 @@
 // Drift check for the React docs: every name a snippet imports from the React package must be exported by the built
 // package. A renamed or removed component or hook fails `verify` here, before the slower type-check of every prop
 // (scripts/modern-package-tests.js checks the same snippets against the packed package).
-// Snippets read: packages/react/README.md, docs/react-*.md, docs/from-threejs.md, docs/guides/*.md, the root README and
+// Snippets read: packages/react/README.md, docs/react-*.md, docs/guides/*.md, the root README and
 // the examples' source. `import type` and `type X` specifiers are skipped (types have no runtime export).
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -30,7 +30,6 @@ function imports() {
   for (const file of [
     'packages/react/README.md',
     'README.md',
-    'docs/from-threejs.md',
     ...walk('docs', (p) => p.endsWith('.md')).filter((p) => /react|guides/.test(p)),
   ])
     for (const b of blocks(read(file))) if (['ts', 'tsx'].includes(b.lang)) texts.push([file, b.code]);

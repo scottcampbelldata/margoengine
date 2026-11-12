@@ -90,7 +90,7 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
     // A start time that cannot be read means the pid names no process of ours any more, so it is not waited for or
     // reported: either the kernel finished with ours between the lookup and the read (PowerShell's getter then gives
     // $null, and the process object is already signalled), or a newer process this user cannot query (a service:
-    // 135 of 958 processes on the dev PC) took the pid. Every process Chromium starts as this user is readable, during
+    // 135 of 958 processes on the workstation) took the pid. Every process Chromium starts as this user is readable, during
     // its teardown too. Reporting it failed a close with SHUTDOWN_TIMEOUT 677 ms after the end.
     '  $start = $p.StartTime',
     '  if ($null -eq $start -or $start.ToUniversalTime() -gt $since) { continue }',

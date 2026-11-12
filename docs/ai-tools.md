@@ -36,7 +36,7 @@ answers from the docs of the version you installed, and it type-checks code agai
 | `get_package` | Read one package's README or API report. |
 | `list_examples` | Find a runnable example before writing one. |
 | `check_snippet` | Type-check a snippet strictly against the installed packages. |
-| `port_to_margo` | Map a three.js class or task (`OrbitControls`, `InstancedMesh`, "shadow map") to the Margo package and calls, with status, limits and both libraries' code, from the [parity matrix](threejs-parity.md) and [Coming from three.js](from-threejs.md). |
+| `port_to_margo` | Map a class or task (`OrbitControls`, `InstancedMesh`, "shadow map") to the Margo package and calls, with status, limits and code, from the [parity matrix](threejs-parity.md). |
 | `explain_error` | Explain a pasted Margo error (the message, its `errors#<id>` link, the id or the `MargoError` code) with its cause and fix from the [error help page](https://margoengine.com/errors). |
 | `render_snippet` | Only with `--render`: run a snippet on the GPU in Node and see the PNG it draws. Needs `@margoengine/headless`, `@margoengine/stage` and `webgpu` in the project; runs code with your rights. |
 

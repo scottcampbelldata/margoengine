@@ -2,7 +2,7 @@
 // Node and V8 version whose frame allocates over its limit. The middle tier (Maglev) differs between V8 versions: the
 // limits once held only on the Node that set them (Node 26) and failed on the minimum Node (24.18).
 // Nodes: MARGO_NODES (executables separated by the path delimiter, ';' on Windows, ':' elsewhere), this Node, and any
-// under ~/.nvm/versions/node, NVM_HOME (nvm-windows), VOLTA_HOME and ~/margo/node* (the Linux test server). Nodes below
+// under ~/.nvm/versions/node, NVM_HOME (nvm-windows) and VOLTA_HOME. Put any other install in MARGO_NODES. Nodes below
 // the repository's minimum (package.json engines) are listed as skipped: the repository's tests need it.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -32,7 +32,6 @@ const home = homedir(),
     ...inside(join(home, '.nvm', 'versions', 'node')),
     ...(process.env.NVM_HOME ? inside(process.env.NVM_HOME, (name) => /^v\d/.test(name)) : []),
     ...(process.env.VOLTA_HOME ? inside(join(process.env.VOLTA_HOME, 'tools', 'image', 'node')) : []),
-    ...inside(join(home, 'margo'), (name) => /^node\d*$/.test(name)),
   ];
 
 const nodes = new Map();

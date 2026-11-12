@@ -1,5 +1,5 @@
 // scripts/support/pointer-lock.mjs: which native pointer lock refusals a browser check may note instead of fail.
-// Regression for the M6 Mac mini (2026-11-10): Chromium refused requestPointerLock with WrongDocumentError on a locked
+// Regression for the Apple silicon Mac (2026-11-10): Chromium refused requestPointerLock with WrongDocumentError on a locked
 // console, which failed packages/input/test/input-browser.mjs and packages/worker/tests/browser-check.mjs.
 import assert from 'node:assert/strict';
 import test from 'node:test';

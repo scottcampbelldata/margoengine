@@ -50,11 +50,11 @@ All named values below are **experimental evidence only**; native scalar/SIMD an
 
 | Label | Pyramid / joint grid / mixed |
 |---|---|
-| B — original pins | `9ffefc83c3a99be4 /95a47530df180011 /9acb68471fbe6ba0` |
-| J — block Jacobian and SIMD-setup Jacobian | `8204df63f73d17a5 /95a47530df180011 /dffd3c3c2ccb9696` |
-| R — guarded reciprocal | `23cbd73a957d3e5e /95a47530df180011 /9a25cfdedfa2188c` |
-| H — island hybrid, interleaving and its outlining | `e5bfda97b67d1775 /95a47530df180011 /db8ed688217cdf1f` |
-| Q — hybrid point-pair Jacobian | `e8c7f652f1d1257e /95a47530df180011 /6536ce899e2efaeb` |
+| B - original pins | `9ffefc83c3a99be4 /95a47530df180011 /9acb68471fbe6ba0` |
+| J - block Jacobian and SIMD-setup Jacobian | `8204df63f73d17a5 /95a47530df180011 /dffd3c3c2ccb9696` |
+| R - guarded reciprocal | `23cbd73a957d3e5e /95a47530df180011 /9a25cfdedfa2188c` |
+| H - island hybrid, interleaving and its outlining | `e5bfda97b67d1775 /95a47530df180011 /db8ed688217cdf1f` |
+| Q - hybrid point-pair Jacobian | `e8c7f652f1d1257e /95a47530df180011 /6536ce899e2efaeb` |
 
 Original `check()` failures for changed diagnostics were recorded rather than silently re-pinned. Every full accuracy collector retained its nonzero status on failure; no assertion, tolerance, budget or scene was weakened. Exact variants keep B or their explicitly identified H parent. **No diagnostic hash became an accepted production re-pin.** Sources, test logs, raw paired rounds and rejection files remain in the named isolated directories. The initial partial scalar-only residual-cap run is invalid candidate evidence; use `support-residual-cap-v2`. The initial unguarded reciprocal artifact is superseded by the positive-finite guard/setup-proof version. No further solver experiments are planned in this round.
 
@@ -75,7 +75,7 @@ Original `check()` failures for changed diagnostics were recorded rather than si
    and [Soft Constraints, GDC 2011](https://box2d.org/files/ErinCatto_SoftConstraints_GDC2011.pdf): preserve contact
    identity, accumulated-impulse clamping, corrective negative increments, warm starts and Coulomb load bounds.
    Effective mass includes rotation and contact location. Frequency/damping are meaningful spring parameters;
-   stability alone is not sag accuracy. [Understanding Constraints, GDC 2014, slides 27–33](https://box2d.org/files/ErinCatto_UnderstandingConstraints_GDC2014.pdf)
+   stability alone is not sag accuracy. [Understanding Constraints, GDC 2014, slides 27-33](https://box2d.org/files/ErinCatto_UnderstandingConstraints_GDC2014.pdf)
    demonstrates mass-ratio and propagation limits of SI, making long stacks essential evidence.
 4. [Macklin et al., Small Steps, SCA 2019](https://mmacklin.com/smallsteps.pdf): more substeps with one XPBD
    iteration can outperform the same iterations in one large step, including a 1:1000 chain and loaded stacks.
@@ -89,7 +89,7 @@ Original `check()` failures for changed diagnostics were recorded rather than si
    removes load feedback (the seesaw case). Mass freezing is not an acceptable unmeasured sag patch.
 7. [Erleben, PhD thesis 2005, author's abstract](https://researchprofiles.ku.dk/en/publications/stable-robust-and-versatile-multibody-dynamics-animation/)
    covers contact graphs, iterative complementarity and sleep. [Preclik, Iterative Rigid Multibody Dynamics,
-   thesis 2008, sections 4–6](https://www10.cs.fau.de/publications/theses/2008/Preclik_DA_2008.pdf) finds block
+   thesis 2008, sections 4-6](https://www10.cs.fau.de/publications/theses/2008/Preclik_DA_2008.pdf) finds block
    variants can reduce iterations at additional local cost; convergence, velocity error and active-set behaviour
    are distinct measurements. [Andrews, Erleben and Ferguson, SIGGRAPH course 2022](https://erleben.github.io/pubs/2022/andrews.ea22/andrews.ea22.pdf)
    similarly identifies PGS ordering and large mass ratios as convergence risks.

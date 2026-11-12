@@ -175,7 +175,7 @@ function sharedGroup(device) {
   return group;
 }
 
-// Regression (lane L, 2026-11-10, M6 Mac mini): the shared texture's cleanup once held the context strongly, and a real
+// Regression (lane L, 2026-11-10, Apple silicon Mac): the shared texture's cleanup once held the context strongly, and a real
 // context reaches its device (the canvas's context-lost listener), so no device that made such a group was collected.
 test('a device whose bind group made a shared storage texture can be collected', async () => {
   let ref;
