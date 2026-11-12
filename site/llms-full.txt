@@ -10255,6 +10255,31 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
 
 # Known bugs and unverified features
 
+### Radeon 680M: biomes flythrough on the WebGL2 layer takes 0.5 to 0.75 s a frame (AMD GPU hunt row 34, 2026-11-11, open)
+
+- **Repro:** on the Beelink (Radeon 680M, Chromium with ANGLE D3D11),
+  `MARGO_COMPAT=1 MARGO_MACHINE_PROFILE=mini-pc node packages/biomes/tests/flythrough-check.mjs` passes every
+  scheduling check, then is ended by its own 15 minute GPU hold (`acquire({ max: 15 })`) after 916 s, before the
+  packing check and the correctness flights. The suite needs about 2,000 frames; under compat the GPU takes 0.5 to
+  0.75 s a frame, so it cannot fit the 12.5 minute (750 s) limit. On WebGPU the same check passes in 286 s. Not a hang:
+  the cost is the same every frame, so the row is not in busy-retests.md and the limits stay.
+- **Fixed on the way:** `183a68ed1` checkFramebufferStatus ran on every per-frame framebuffer attach (14.9 of 15.7 s of a
+  CPU profile); `b6f23290c` a holder that runs past its gpu-lock hold limit now prints the limit before the heartbeat ends it
+  (the 916 s end printed nothing, exit code 1 from taskkill).
+- **Cause, measured (lane H3 page hooks on the layer):** the main thread is idle 10.6 s and in getError 4.0 s of a 15 s
+  CPU profile: the frame waits on the GPU process. Each frame it runs about 1,300 texSubImage2D from pixel unpack
+  buffers and 360 readPixels into pack buffers, in rows of 2048 RGBA32UI texels (textures up to 2048 x 390, 12.8 MB).
+  `CompatBindGroup.storageTexture()` (webgl2-compat resources.ts) keeps one storage texture per bind group and uploads
+  every bound storage buffer whose version changed into it whole; the ScatterTiles rings (biomes object tiles) are
+  rewritten by the cull every frame and bound by many bind groups (each mesh, pipeline and ring), so the same ring is
+  copied once per group per frame, and the cull's word textures are copied back to buffers before that.
+- **Tried, not landed:** ScatterTiles drawing counted (ring counts copied on the GPU, every ring slot drawn and those
+  past the count dropped in the vertex stage, as `Scatter`'s own route does) removes the 80 indirect read-backs a frame
+  but adds about 570 M vertex invocations a frame, and frames got slower (13 against 18 in 10 s). With every draw capped
+  at 2,048 instances (a measurement only) frames were 19 in 10 s, so the vertex work is not the main cost either.
+- **Next:** in webgl2-compat, mirror a storage buffer into a texture once per buffer version and let bind groups read
+  that one texture (or copy only the changed rows), then measure the flythrough again.
+
 ### Fixed 2026-11-12: the voxel path tracer's tiled capture test flaked on a loaded machine (KB-L4-vpt)
 
 - **What:** `packages/voxel-pathtracer/tests/tracer.test.js` "capture renders the requested size in tiles and encodes a
