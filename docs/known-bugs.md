@@ -155,6 +155,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the workstation and here; or a bound that is the worst over the model, not one sample of it. Either changes what the
   check accepts, so it waits for Scott's ruling; the bound is not raised here.
 
+### Open: savePrefilteredEnvironment can save a file that mixes two lighting states (KB-A3d, found 2026-11-12)
+
+- **What:** `savePrefilteredEnvironment` (`packages/environment/src/prefiltered.ts`) checks only `environment.version`
+  between its awaited reads. `EnvironmentBlend.update` (sets `radianceScale`, the SH and the texels) and
+  `Environment.refresh` rewrite the environment in place without bumping `version`, so a save that spans either one
+  writes a header and SH from one state and mip levels from the other, and resolves as if it succeeded.
+- **Repro:** in `packages/environment/tests/blend-browser.js` section 1, start `savePrefilteredEnvironment(environment)`,
+  set `blend.t = 0.6` before it resolves: it resolves; the saved radiance scale and SH do not match its texels.
+- **Cause:** no public counter changes when the lighting changes in place; `version` moves only on a rebuild.
+- **Fix to build (API change, needs api:update):** a public `Environment.revision` bumped by `EnvironmentBlend.update`
+  and by `refresh` start and end, plus a `refreshPending` getter; the save rejects with code 'state' when either moved.
+  Test: the repro above expects code 'state'. The gate then adds `--page=blend` and `--page=prefiltered` to the GPU chunks.
+
 ### Open: probe reflections over-blur roughness below 0.2; probes-gpu "mirror floor vs walls" p95 4/255 (KB-A3c, found 2026-11-12, needs Scott)
 
 - **What:** `examples/package-benchmarks/probes-gpu.mjs` check 4 compares each mirror floor pixel with the wall its
