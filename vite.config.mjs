@@ -77,10 +77,29 @@ export function servedFilesWatch() {
   };
 }
 
+/**
+ * The root address is the one line `npm run dev:examples` prints, and the repository root has no page: a new reader who
+ * opened it got a blank 404. It now sends them to the quickstart page that README "Build something in 5 minutes" names.
+ * Only the bare root is redirected; every other path is served as before.
+ */
+export const QUICKSTART_PAGE = '/examples/quickstart/';
+export const rootToQuickstart = {
+  name: 'margo-root-to-quickstart',
+  apply: 'serve',
+  configureServer(server) {
+    server.middlewares.use((request, response, next) => {
+      if (request.url !== '/' && !request.url?.startsWith('/?')) return next();
+      response.statusCode = 302;
+      response.setHeader('Location', QUICKSTART_PAGE);
+      response.end();
+    });
+  },
+};
+
 const servedOnly = servedFilesWatch();
 
 export default defineConfig({
-  plugins: [servedOnly.plugin],
+  plugins: [servedOnly.plugin, rootToQuickstart],
   optimizeDeps: {
     entries: [
       '**/*.html',

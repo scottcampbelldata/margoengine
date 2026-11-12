@@ -4,14 +4,23 @@
 // an 8.3 path inside the home folder here) was refused on every page with 403 "outside of Vite serving allow list". This wrapper
 // only changes the directory Vite starts in; the root `vite` command and its arguments are untouched.
 // Extra arguments go to Vite: npm run dev:examples -- --port 5180 --strictPort
+//
+// The example pages import the built packages (packages/*/dist). Started before `npm run build:packages`, every page
+// failed in the browser with Vite's "Failed to resolve import margoengine" overlay and the terminal said nothing, so
+// the server now refuses to start and names the command to run first.
 import { spawn } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const cwd = realpathSync.native(process.cwd());
+if (!existsSync(join(cwd, 'packages', 'margoengine', 'dist', 'index.js'))) {
+  console.error('The packages are not built yet. Run `npm run build:packages` once (no Rust needed), then run this again.');
+  process.exit(1);
+}
 const vite = join(dirname(fileURLToPath(import.meta.resolve('vite/package.json'))), 'bin', 'vite.js');
 const child = spawn(process.execPath, [vite, '--host', '127.0.0.1', ...process.argv.slice(2)], {
-  cwd: realpathSync.native(process.cwd()),
+  cwd,
   stdio: 'inherit',
 });
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));

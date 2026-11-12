@@ -4,7 +4,7 @@
 // from the short path, and checks a file outside the repository is still refused.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -46,4 +46,30 @@ test('serves a page from a short-path working directory and still refuses a file
   assert.equal(page.status, 200, 'an example page is served');
   const file = await fetch(`${url}/@fs/${secret.replaceAll(String.fromCharCode(92), '/')}`);
   assert.equal(file.status, 403, 'a file outside the repository is refused');
+  // The root address is the one the server prints; it had no page and answered a blank 404 (README "Build something
+  // in 5 minutes"). It now redirects to the quickstart page, which is served.
+  const home = await fetch(`${url}/`, { redirect: 'manual' });
+  assert.equal(home.status, 302, 'the printed root address redirects');
+  assert.equal(home.headers.get('location'), '/examples/quickstart/');
+  const quickstart = await fetch(`${url}/examples/quickstart/`);
+  assert.equal(quickstart.status, 200, 'the quickstart page is served');
+  assert.match(await quickstart.text(), /<title>Margo Engine quickstart<\/title>/);
+});
+
+test('refuses to start before the packages are built and names the command to run', () => {
+  // Started before `npm run build:packages`, every page failed in the browser with "Failed to resolve import" and the
+  // terminal said nothing.
+  const empty = mkdtempSync(join(tmpdir(), 'dev-examples-unbuilt-'));
+  try {
+    const run = spawnSync(process.execPath, [join(root, 'scripts/dev-examples.mjs'), '--port', '0'], {
+      cwd: empty,
+      encoding: 'utf8',
+      timeout: 30_000,
+      windowsHide: true,
+    });
+    assert.equal(run.status, 1, 'exits with an error instead of serving pages that cannot load');
+    assert.match(run.stderr, /npm run build:packages/);
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
+  }
 });

@@ -301,5 +301,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "webgpu": "0.6.2"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true,
+    "webgpu@0.6.2": true
   }
 }
