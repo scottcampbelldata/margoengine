@@ -1,0 +1,170 @@
+{
+ "base": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n prepend inherits = </C>\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n def \"a\"\n {\n  prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>]\n }\n}\ndef \"R\"\n{\n over \"a\" (\n  prepend references = @./l1.usda@</M/a>\n )\n {\n }\n}\n"
+  },
+  "want": {
+   "/R/a.r": [
+    "/M/b",
+    "/R/a/x",
+    "/M",
+    "/R/a",
+    "/Z",
+    "/M/b/y",
+    "/R/q"
+   ]
+  }
+ },
+ "refM": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n prepend inherits = </C>\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>]\n def \"a\"\n {\n  prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>]\n }\n}\ndef \"R\" (\n prepend references = @./l1.usda@</M>\n)\n{\n}\n"
+  },
+  "want": {
+   "/R.r": [
+    "/R/b",
+    "/R/a/x",
+    "/R",
+    "/R/a",
+    "/Z",
+    "/R/b/y",
+    "/M/b"
+   ],
+   "/R/a.r": [
+    "/R/b",
+    "/R/a/x",
+    "/R",
+    "/R/a",
+    "/Z",
+    "/R/b/y",
+    "/M/b"
+   ]
+  }
+ },
+ "deep": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n prepend inherits = </C>\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n def \"a\"\n {\n  def \"k\"\n  {\n   prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>, </C/a/k/z>, </C/a/w>]\n  }\n }\n}\ndef \"R\"\n{\n over \"a\" (\n  prepend references = @./l1.usda@</M/a/k>\n )\n {\n }\n}\n"
+  },
+  "want": {
+   "/R/a.r": [
+    "/M/b",
+    "/M/a/x",
+    "/M",
+    "/M/a",
+    "/Z",
+    "/M/b/y",
+    "/R/q",
+    "/R/a/z",
+    "/M/a/w"
+   ]
+  }
+ },
+ "Mhasa": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n prepend inherits = </C>\n)\n{\n def \"a\"\n {\n }\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n def \"a\"\n {\n  prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>]\n }\n}\ndef \"R\"\n{\n over \"a\" (\n  prepend references = @./l1.usda@</M/a>\n )\n {\n }\n}\n"
+  },
+  "want": {
+   "/R/a.r": [
+    "/M/b",
+    "/R/a/x",
+    "/M",
+    "/R/a",
+    "/Z",
+    "/M/b/y",
+    "/R/q"
+   ]
+  }
+ },
+ "nested": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"N\"\n{\ndef \"M\" (\n prepend inherits = </C>\n)\n{\n}\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n def \"a\"\n {\n  prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>]\n }\n}\ndef \"R\"\n{\n over \"a\" (\n  prepend references = @./l1.usda@</N/M/a>\n )\n {\n }\n}\n"
+  },
+  "want": {
+   "/R/a.r": [
+    "/N/M/b",
+    "/R/a/x",
+    "/N/M",
+    "/R/a",
+    "/Z",
+    "/N/M/b/y",
+    "/M/b",
+    "/R/q"
+   ]
+  }
+ },
+ "local": {
+  "files": {
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n def \"a\"\n {\n  prepend rel r = [</C/b>, </C/a/x>, </C>, </C/a>, </Z>, </C/b/y>, </M/b>, </R/q>]\n }\n}\ndef \"M\" (\n prepend inherits = </C>\n)\n{\n}\ndef \"R\"\n{\n over \"a\" (\n  prepend references = </M/a>\n )\n {\n }\n}\n"
+  },
+  "want": {
+   "/M/a.r": [
+    "/M/b",
+    "/M/a/x",
+    "/M",
+    "/M/a",
+    "/Z",
+    "/M/b/y",
+    "/R/q"
+   ],
+   "/R/a.r": [
+    "/M/b",
+    "/R/a/x",
+    "/M",
+    "/R/a",
+    "/Z",
+    "/M/b/y",
+    "/R/q"
+   ]
+  }
+ },
+ "direct": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"M\"\n{\n prepend rel r = [</M/x>, </Z>, </Q/w>, </R/k>, </M>]\n}\n",
+   "root.usda": "#usda 1.0\ndef \"R\" (\n prepend references = @./l1.usda@</M>\n)\n{\n}\n"
+  },
+  "want": {
+   "/R.r": [
+    "/R/x",
+    "/R"
+   ]
+  }
+ },
+ "chain": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    subLayers = [@./l0.usda@ (offset = 5)]\n)\n",
+   "l2.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n)\n{\n    def \"c\" (\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M/a>\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n        add rel r = [</M/a>]\n    }\n}\ndef \"Q\" (\n    references = @./l2.usda@</M> (offset = 10)\n)\n{\n}\n"
+  },
+  "want": {
+   "/Q/c/b.r": [
+    "/M/a"
+   ]
+  }
+ },
+ "payload": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    subLayers = [@./l0.usda@ (offset = 2)]\n)\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\" (\n)\n{\n    def \"a\"\n    {\n        def \"b\"\n        {\n            append rel r = [</M/a>]\n        }\n    }\n}\ndef \"Q\" (\n)\n{\n    over \"b\" (\n        payload = @./l1.usda@</M/a>\n    )\n    {\n    }\n}\n"
+  },
+  "want": {
+   "/Q/b/b.r": []
+  }
+ },
+ "sublayer": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n}\ndef \"Y\"\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nover \"Y\"\n{\n    over \"c\" (\n        prepend references = @./l0.usda@</M/a> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n)\n{\n    def \"a\"\n    {\n        add rel r = [</M/a>]\n    }\n}\n"
+  },
+  "want": {
+   "/M/a.r": [],
+   "/Y/c.r": []
+  }
+ }
+}

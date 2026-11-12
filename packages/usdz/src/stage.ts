@@ -32,6 +32,11 @@ interface Step {
   from: string;
   to: string;
   open: boolean;
+  /**
+   * On an implied class arc: the authored arc's own pair at the prim that authored it, when the arcs above cannot map
+   * that prim. Seen on OpenUSD (black-box stages, KB1942b); the specification does not say.
+   */
+  also?: [string, string][];
 }
 type ArcKind = 'root' | 'inherit' | 'variant' | 'reference' | 'payload' | 'specialize';
 const ORDER: Record<ArcKind, number> = { root: 0, inherit: 1, variant: 2, reference: 3, payload: 4, specialize: 5 };
@@ -105,9 +110,22 @@ const under = (path: string, root: string) =>
 function mapPath(steps: Step[], path: string): string | undefined {
   let out = stripVariants(path);
   for (const step of steps) {
-    if (under(out, step.from)) out = step.to + out.slice(step.from.length);
-    // A path a class arc's own image shadows has no match: mapping back would give another prim.
-    else if (!step.open || under(out, step.to)) return undefined;
+    if (!step.also) {
+      if (under(out, step.from)) out = step.to + out.slice(step.from.length);
+      // A path a class arc's own image shadows has no match: mapping back would give another prim.
+      else if (!step.open || under(out, step.to)) return undefined;
+      continue;
+    }
+    // Several pairs: the longest source that holds the path maps it, and the result must map back by the same pair.
+    const pairs: [string, string][] = [[step.from, step.to], ...step.also];
+    const longest = (side: 0 | 1, at: string) =>
+      pairs.reduce<[string, string] | undefined>((best, pair) => (under(at, pair[side]) && (!best || pair[side].length > best[side].length) ? pair : best), undefined);
+    const by = longest(0, out);
+    if (by) {
+      const mapped = by[1] + out.slice(by[0].length);
+      if (longest(1, mapped) !== by) return undefined;
+      out = mapped;
+    } else if (!step.open || longest(1, out)) return undefined;
   }
   return out;
 }
@@ -403,6 +421,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     target: string,
     order: number,
     implied = false,
+    also?: [string, string][],
   ) {
     const path = stripVariants(target);
     if (under(stripVariants(node.path), path) || under(path, stripVariants(node.path))) return undefined;
@@ -420,7 +439,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       kind,
       depth,
       order,
-      [{ from: path, to: stripVariants(node.path), open: true }, ...node.steps],
+      [{ from: path, to: stripVariants(node.path), open: true, ...(also?.length ? { also } : {}) }, ...node.steps],
       node.offset,
     );
     placed.implied = implied;
@@ -579,10 +598,26 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       }
       return undefined;
     };
+    /**
+     * The pairs an implied arc keeps from the arc it stands for. Seen on OpenUSD (KB1942b): when the authored arc
+     * reaches its prim through an ancestor's class arc, the ancestor's pair goes up with it, its prim mapped by the arcs
+     * on the way where they can and left as authored where they cannot. A target under the class root then maps to the
+     * ancestor's path, and one under the ancestor, which mapping back would not give again, drops.
+     */
+    const carried = (near: Node, arc: Node): [string, string][] => {
+      const step = arc.steps[0];
+      if (!step || !arc.parent) return [];
+      const hop = arc.parent.steps.slice(0, Math.max(0, arc.parent.steps.length - near.steps.length)),
+        up = ([from, to]: [string, string]): [string, string] => [from, mapPath(hop, to) ?? to];
+      const own = (step.also ?? []).map(up);
+      // The first step of a site reached through an ancestor's class arc is that ancestor's pair.
+      if (arc.implied || stripVariants(arc.parent.path) === step.to) return own;
+      return [...own, up([step.from, step.to])];
+    };
     /** Places arc on near and on every stack above it, and the same for the class arcs that class has in turn. */
     const lift = (near: Node, arc: Node, path: string) => {
       const kind = arc.kind as 'inherit' | 'specialize',
-        placed = placeClass(near, depth, kind, path, near.children.length, true);
+        placed = placeClass(near, depth, kind, path, near.children.length, true, carried(near, arc));
       if (!placed) return;
       arc.family ??= {};
       if (placed.implied) {
