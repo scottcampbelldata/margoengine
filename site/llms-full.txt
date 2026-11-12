@@ -19565,7 +19565,7 @@ const extension = clearcoat({factor: 1, roughnessFactor: 0.05});
 
 Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. As KHR_materials_clearcoat defines it, everything under the coat (direct, local, ambient and emitted light) keeps `1 - clearcoat * F(n.v)`, 0.96 of itself at normal incidence and 0.73 at n.v 0.25 with clearcoat 1, and the coat adds its own directional and ambient light on top, the ambient from the same `margoCoatAmbient` as gltf-pro's native materials, so an environment lights it. Its normal affects only the coat; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
 
-The package supports clearcoat factor, roughness, and the optional clearcoat factor, roughness, and normal textures. Missing factor and roughness default to `0`; missing textures do not allocate samplers. Lighting retains bind group 2, while clearcoat resources use the optional material bind group 3.
+The coat takes a factor, a roughness and three optional textures (factor, roughness and normal). Missing factor and roughness default to `0`; missing textures do not allocate samplers. Lighting retains bind group 2, while clearcoat resources use the optional material bind group 3.
 
 The [Khronos clearcoat specification](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat) defines the metadata and texture channels: factor uses red, roughness uses green, and the coat normal uses RGB. Extension textures use linear data. Installed clearcoat, transmission and thickness textures support KTX2, `KHR_texture_transform`, and both UV sets; affine rows share group 3 with lobe factors.
 
