@@ -19,6 +19,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { baselineDemo, CLASSES, classify, FULL_DIRS, CHECK_CODE, RUNNER, workspaceOf } from './file-classes.mjs';
+import { stripComments } from './strip-comments.mjs';
 import { demos } from './visual-demos.js';
 
 export { FULL_DIRS, workspaceOf };
@@ -27,6 +28,7 @@ export { FULL_DIRS, workspaceOf };
 export const MAX_AFFECTED = 12;
 
 const posix = (path) => path.replaceAll('\\', '/');
+const CODE = /\.(m?js|tsx?)$/;
 const TEXT = /\.(html|m?js|tsx?|css)$/;
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -202,7 +204,8 @@ export function scan(root, entries, workspaces) {
     if (files.has(file)) continue;
     files.add(file);
     if (!TEXT.test(file)) continue;
-    const text = readText(root, file),
+    // Comments are documentation: a path named in one is not a dependency (KB-L4-cma).
+    const text = CODE.test(file) ? stripComments(readText(root, file)) : readText(root, file),
       owner = workspaceOf(workspaces, file);
     for (const m of text.matchAll(/@margoengine\/([a-z0-9-]+)/g))
       if (byName.has(`@margoengine/${m[1]}`)) packages.add(`@margoengine/${m[1]}`);
@@ -437,7 +440,12 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
       }
       if (test.name === 'test:catalog:browser') print.patterns.push(/^docs\/(?!.*\.md$)/);
       // The Python package is not a workspace: every file under python/ is this suite's.
-      if (test.name === 'test:python:browser') print.patterns.push(/^python\//);
+      // Its browser code is built from python/frontend by path (`resolve(here, 'frontend/figure.ts')`), which no import
+      // names, so the frontend entries are stated here; the sciviz dependency used to be found in a comment instead.
+      if (test.name === 'test:python:browser') {
+        print.patterns.push(/^python\//);
+        print = merge(print, ...['python/frontend/figure.ts', 'python/frontend/notebook.ts'].map((f) => ofScript(f)));
+      }
       // Generated pages name their imports explicitly. Include each row and its packages, rather than trusting
       // a computed URL in the browser runner to be discovered by the source scanner.
       if (test.name === 'test:composition:browser') {

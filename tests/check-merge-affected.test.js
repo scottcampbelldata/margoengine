@@ -24,6 +24,7 @@ import {
   commandEntries,
   demoSources,
   dependents,
+  scan,
   stepClosure,
   visualIds,
   wgslPackages,
@@ -896,4 +897,43 @@ test('combined voxel and triangle-integrator changes retain the unchanged full-r
     planned,
     steps.map((command) => ({ command })),
   );
+});
+
+test('a path named in a comment is not a dependency, a path in code or a string still is (KB-L4-cma)', async (t) => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { stripComments } = await import('../scripts/support/strip-comments.mjs');
+  const dir = mkdtempSync(resolve(tmpdir(), 'scan-comments-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(resolve(dir, 'packages/taa/src'), { recursive: true });
+  const ws = ['taa', 'dof'].map((d) => ({ name: `@margoengine/${d}`, dir: `packages/${d}` }));
+  let count = 0;
+  const scanSource = (source) => {
+    const file = `packages/taa/src/upscale${count++}.ts`; // scan() reads each path once per process
+    writeFileSync(resolve(dir, file), source);
+    return scan(dir, [file], ws).packages;
+  };
+  // The comment that broke the matrix closure: ca8bbf1026 named packages/dof/src/compat.ts in taa's upscale.ts.
+  assert.ok(!scanSource('// Same fallback as packages/dof/src/compat.ts.\nexport const a = 1;\n').has('@margoengine/dof'));
+  assert.ok(!scanSource('/* see @margoengine/dof\n and packages/dof */\nexport const a = 1;\n').has('@margoengine/dof'));
+  assert.ok(scanSource("import '@margoengine/dof'; // x\n").has('@margoengine/dof'));
+  assert.ok(scanSource("export const url = 'https://x.test/a'; const p = 'packages/dof/src';\n").has('@margoengine/dof'));
+  const bs = String.fromCharCode(92);
+  const quoteRegex = ['const re = /["' + String.fromCharCode(39) + ']', bs, '/', bs, '//; const p = "packages/dof/x";'].join('');
+  assert.ok(scanSource(quoteRegex).has('@margoengine/dof'));
+  // The tokenizer keeps strings, templates and regexes whole and blanks only comments, newlines kept.
+  const tick = String.fromCharCode(96);
+  const regex = ['/', bs, '/', bs, '/[/]/'].join('');
+  const src = [
+    'const a = "// no";',
+    `const b = ${tick}x ${'$'}{ "}" } // no${tick}; // yes`,
+    '/* c',
+    `d */ const r = ${regex};`,
+    '',
+  ].join(String.fromCharCode(10));
+  const out = stripComments(src);
+  assert.equal(out.length, src.length);
+  assert.equal(out.split('\n').length, src.split('\n').length);
+  assert.ok(out.includes('"// no"') && out.includes(`} // no${tick}`) && !out.includes('yes') && !out.includes(' c\n'));
+  assert.ok(out.includes(regex));
 });
