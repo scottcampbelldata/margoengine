@@ -13,7 +13,7 @@ if (!globalThis.navigator?.gpu)
 
 /** Enough of a device and engine to count what `supersample` asks of them. Each render runs the camera's update, as the engine does. */
 function fake({ width = 3, height = 2, onRender } = {}) {
-  const log = { dispatches: 0, destroyed: 0, textures: [], submits: 0, renders: [], matrices: [] },
+  const log = { dispatches: 0, destroyed: 0, textures: [], submits: 0, renders: [], matrices: [], pipelines: 0, modules: 0 },
     pass = {
       setPipeline() {},
       setBindGroup() {},
@@ -36,8 +36,8 @@ function fake({ width = 3, height = 2, onRender } = {}) {
         },
         destroy: () => log.destroyed++,
       }),
-      createShaderModule: () => ({}),
-      createComputePipeline: () => ({ getBindGroupLayout: () => ({}) }),
+      createShaderModule: () => (log.modules++, {}),
+      createComputePipeline: () => (log.pipelines++, { getBindGroupLayout: () => ({}) }),
       createBindGroup: () => ({}),
       createCommandEncoder: () => ({
         beginComputePass: () => pass,
@@ -197,4 +197,18 @@ test('an abort rejects with the reason and stops between batches', async () => {
   const { engine: other, log: none } = fake();
   await assert.rejects(supersample(other, { signal: AbortSignal.abort(reason) }), (error) => error === reason);
   assert.equal(none.renders.length, 0, 'aborted before it began: nothing runs');
+});
+
+test('captures on one device share their compute pipelines (KB5663a)', async () => {
+  const { engine, log } = fake();
+  await supersample(engine, { samples: 1 });
+  assert.deepEqual([log.pipelines, log.modules], [2, 2], 'the first capture builds the add and finish pipelines');
+  await supersample(engine, { samples: 1 });
+  await supersample(engine, { samples: 1 });
+  assert.deepEqual([log.pipelines, log.modules], [2, 2], 'later captures with the same sample count build nothing');
+  await supersample(engine, { samples: 4 });
+  assert.deepEqual([log.pipelines, log.modules], [3, 3], 'another sample count builds only its own finish pipeline');
+  const { engine: other, log: second } = fake();
+  await supersample(other, { samples: 1 });
+  assert.equal(second.pipelines, 2, 'a pipeline belongs to the device that built it');
 });

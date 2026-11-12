@@ -63,6 +63,25 @@ override samples:f32=1;
 // Frames in flight before the page gets a turn, so a long still neither floods the queue nor freezes the page.
 const BATCH = 4;
 
+// The two compute pipelines depend only on the device and the sample count, so every capture on a device shares them.
+// Building them per call cost a shader compile and a link per capture on the WebGL2 compatibility layer (KB5663a).
+const pipelines = new WeakMap<GPUDevice, Map<string, GPUComputePipeline>>();
+function cachedPipeline(device: GPUDevice, code: string, constants?: Record<string, number>): GPUComputePipeline {
+  let byKey = pipelines.get(device);
+  if (!byKey) pipelines.set(device, (byKey = new Map()));
+  const key = constants ? `${code}
+${JSON.stringify(constants)}` : code;
+  let pipeline = byKey.get(key);
+  if (!pipeline) {
+    pipeline = device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code }), entryPoint: 'main', constants },
+    });
+    byKey.set(key, pipeline);
+  }
+  return pipeline;
+}
+
 /** Element `index` (from 1) of the van der Corput sequence in `base`, in [0, 1). */
 function radical(index: number, base: number): number {
   let value = 0,
@@ -108,11 +127,7 @@ export async function supersample(
       made.push(t);
       return t;
     },
-    pipeline = (code: string, constants?: Record<string, number>) =>
-      device.createComputePipeline({
-        layout: 'auto',
-        compute: { module: device.createShaderModule({ code }), entryPoint: 'main', constants },
-      }),
+    pipeline = (code: string, constants?: Record<string, number>) => cachedPipeline(device, code, constants),
     rows = Math.ceil((w * 4) / 256) * 256,
     read = device.createBuffer({ size: rows * h, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
   made.push(read);
