@@ -161,4 +161,15 @@ test('the default distance follows the camera: a scene framed from kilometres ke
   // A caster with no bounds keeps 500 m near the camera, and 20 times the camera's target distance when that is farther.
   assert.equal((await splitsAt(1, true))[3], 500);
   assert.equal((await splitsAt(1024, true))[3], Math.fround(20 * Math.hypot(2, 6) * 1024));
+  // Either side of 25 units, where 20 times the distance passes 500. range() takes the square root only when the squared
+  // length passes 624 (so a nearer camera boxes no Math.sqrt in V8 13's Maglev): 24.5 never takes it, 24.99 takes it
+  // and keeps 500, 25.5 takes it and gets the distance exactly as hypotOf gives it.
+  for (const [reach, expected] of [[24.5, 500], [24.99, 500], [25.5]]) {
+    const scale = reach / Math.hypot(2, 6);
+    assert.equal(
+      (await splitsAt(scale, true))[3],
+      expected ?? Math.fround(20 * Math.hypot(2 * scale, 6 * scale)),
+      `target ${reach} units away`,
+    );
+  }
 });

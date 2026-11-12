@@ -1000,12 +1000,21 @@ export class Shadows implements EnginePlugin {
     // kilometres away is inside the shadowed range as a model framed from metres away is.
     let distance = this.options.distance;
     if (distance === undefined) {
-      const h = hypotTerms;
-      h[0] = camera.target[0] - camera.position[0];
-      h[1] = camera.target[1] - camera.position[1];
-      h[2] = camera.target[2] - camera.position[2];
-      hypotOf(3);
-      distance = h[4] * 20 > 500 ? h[4] * 20 : 500;
+      const dx = camera.target[0] - camera.position[0],
+        dy = camera.target[1] - camera.position[1],
+        dz = camera.target[2] - camera.position[2];
+      distance = 500;
+      // Only a target farther than 25 units moves the default, so a nearer one takes no square root: V8 13's Maglev
+      // calls Math.sqrt with boxed numbers. 624, not 625, leaves room for the rounding of the squared length; a square
+      // that overflows is Infinity and takes the root. The distance is then hypotOf's, bit for bit, as before.
+      if (dx * dx + dy * dy + dz * dz > 624) {
+        const h = hypotTerms;
+        h[0] = dx;
+        h[1] = dy;
+        h[2] = dz;
+        hypotOf(3);
+        if (h[4] * 20 > 500) distance = h[4] * 20;
+      }
     }
     fit.far = camera.far < distance ? camera.far : distance;
     let core = this.options.distance === undefined && this.sources.length > 0;

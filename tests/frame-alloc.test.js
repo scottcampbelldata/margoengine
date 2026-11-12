@@ -113,6 +113,8 @@ test("core's steady-state frame in V8's middle tier allocates at most 780 bytes"
 // renderer allocated a some() closure per draw and emptied the plugin bindings list with length = 0.
 // Regression (Node 24): Math.max and Math.min per caster in range() and worldSphere, Math.fround in validate, and
 // viewMatrix's Math.max added about 1,000 B more on V8 13.
+// Regression (f3af75778, V8 13): 1,177 B against 1,120. range()'s default distance took a square root every frame
+// (32 B), and fitCascades' depth reach, either a computed number or the margin argument, was boxed per cascade (64 B).
 test(`a shadowed frame in the middle tier adds at most ${tier?.shadows} bytes to it`, {
   timeout: 300_000,
   skip: noTier,

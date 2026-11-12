@@ -157,9 +157,11 @@ export function fitCascades(
       cy = anchor ? Math.round((ly + ay) / texel) * texel - ay : Math.round(ly / texel) * texel,
       cz = anchor ? Math.round((lz + az) / texel) * texel - az : Math.round(lz / texel) * texel,
       // With `scene`: the near plane a texel past the scene's nearest point towards the light, never inside the cascade's sphere.
+      // Each branch makes its own depth: one value that is either a computed number or the `margin` argument made
+      // V8 13's Maglev box the computed one into a new heap number every cascade (64 B a shadowed frame).
       sceneNear = scene ? scene[0] * zx + scene[1] * zy + scene[2] * zz - scene[3] : 0,
-      reachLight = scene ? cz - radius - sceneNear + texel : margin,
-      depth = 2 * (radius + (reachLight > 0 ? reachLight : 0)),
+      reachLight = cz - radius - sceneNear + texel,
+      depth = scene ? 2 * (radius + (reachLight > 0 ? reachLight : 0)) : 2 * (radius + margin),
       offset = i * 16;
     matrices.fill(0, offset, offset + 16);
     matrices[offset] = xx / radius;
