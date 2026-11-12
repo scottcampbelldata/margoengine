@@ -64,6 +64,19 @@ test('items of different geometries share one mesh: ranges, offset indices and o
   assert.ok(batch.has(a) && !batch.has(2));
 });
 
+// KB-VIS-bm: since glTF primitives split into parts of 262,144 vertices (f9410d4500), a batch above that size became
+// parts of its all-degenerate placeholder (one vertex each), which threw 'Invalid prepared PBR geometry' and left the
+// batched-mesh demo (398,680 vertices) without its ready signal. A batch is one primitive at any allowed capacity.
+test('a batch larger than one glTF part stays one primitive (KB-VIS-bm)', async () => {
+  const { engine } = await world(),
+    batch = BatchedMesh.attach(engine, new Material(), { maxItems: 2, maxVertices: 400_000, maxIndices: 600_000 });
+  assert.equal(batch.mesh.primitives.length, 1, 'one primitive: one draw per pass');
+  assert.equal(batch.mesh.primitives[0].vertices.length, 400_000 * 20);
+  const far = batch.add(triangle, { matrix: translate(1, 0, 0) });
+  assert.equal(batch.itemOf(0), far);
+  batch.dispose();
+});
+
 test('the compute pass gets source vertices, owners and item records, and runs only after a change', async () => {
   const { engine, context, passes } = await world(),
     batch = BatchedMesh.attach(engine, new Material(), { maxItems: 4, maxVertices: 16 }),

@@ -4481,12 +4481,11 @@ export function createMesh<M extends Material | readonly Material[]>(
     meshes: [{ primitives: groups.map((g) => ({ material: g.materialIndex })) }],
     materials: assigned.map(() => ({})),
   };
-  const model = new PBRModel(
-    engine,
-    new GLTFAsset(doc, [], undefined, { materials: extendedMaterials }),
-    [],
-    [prepared],
-  );
+  const asset = new GLTFAsset(doc, [], undefined, { materials: extendedMaterials });
+  // One primitive per group: the mesh's material slots, geometry writes and BatchedMesh ranges index primitives by
+  // group, so a group must never split into glTF load parts (validatePreparedGeometry still caps the vertex count).
+  asset.partVertices = Math.max(asset.partVertices, data.vertices.length / 20);
+  const model = new PBRModel(engine, asset, [], [prepared]);
   // Per-engine uniform buffers are retained once per material in use and released when the last use goes.
   const held = new Map<Material, () => void>(),
     hold = () => {
