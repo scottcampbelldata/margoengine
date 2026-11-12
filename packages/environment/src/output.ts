@@ -3,7 +3,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { applyView } from '../../shared/view-rect.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -335,6 +335,8 @@ export class ColorOutput {
     v[3] = +(this.context!.getConfiguration?.()?.alphaMode === 'premultiplied');
     device.queue.writeBuffer(state.uniform, 0, v);
     this.attachment.view = this.real!.call(this.context!).createView();
+    // Core runs the graph once per view: only the frame's first view clears the canvas, later ones keep it.
+    this.attachment.loadOp = viewLoadOp(c);
     const pass = c.encoder.beginRenderPass(this.passDescriptor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, state.group);

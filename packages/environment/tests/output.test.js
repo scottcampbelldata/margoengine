@@ -14,7 +14,7 @@ function fakeGPU(t, { display = [], extended = true } = {}) {
       Object.getOwnPropertyDescriptor(globalThis, key),
     ]),
   );
-  const log = { configs: [], calls: [], uniforms: [], modules: [], groups: [], canvasViews: 0 };
+  const log = { configs: [], calls: [], uniforms: [], modules: [], groups: [], canvasViews: 0, loads: [] };
   let config = null;
   const canvasTexture = {
     width: 16,
@@ -56,6 +56,8 @@ function fakeGPU(t, { display = [], extended = true } = {}) {
     setBindGroup() {},
     setVertexBuffer() {},
     setIndexBuffer() {},
+    setViewport() {},
+    setScissorRect() {},
     drawIndexed: record('drawIndexed'),
     draw: record('draw'),
     end: record('end'),
@@ -77,6 +79,8 @@ function fakeGPU(t, { display = [], extended = true } = {}) {
       log.modules.push(d.code);
       return d;
     },
+    createBindGroupLayout: () => ({}),
+    createPipelineLayout: () => ({}),
     createBindGroup: (descriptor) => {
       const group = {};
       log.groups.push({
@@ -112,6 +116,7 @@ function fakeGPU(t, { display = [], extended = true } = {}) {
     createCommandEncoder: () => ({
       beginRenderPass: (d) => {
         const color = d.colorAttachments[0];
+        log.loads.push([d.label, color?.loadOp]);
         log.calls.push([
           'beginRenderPass',
           d.label,
@@ -381,6 +386,28 @@ test('ColorOutput retains its group until image, excess, pipeline or device iden
     assert.equal(groups().length, 8, 'restored device creates a fresh group');
     for (let i = 0; i < 10; i++) engine.render();
     assert.equal(groups().length, 8);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('ColorOutput keeps the earlier views of a split-screen frame: only the first view clears the canvas', async (t) => {
+  // Regression: the last pass cleared the real canvas for every view, so the second view of a frame erased the first.
+  const { canvas, log } = fakeGPU(t, { display: [P3] }),
+    engine = await engineFor(canvas);
+  try {
+    ColorOutput.attach(engine, { hdr: false });
+    log.loads.length = 0;
+    engine.render({
+      views: [
+        { camera: engine.camera, viewport: [0, 0, 0.5, 1] },
+        { camera: engine.camera, viewport: [0.5, 0, 0.5, 1] },
+      ],
+    });
+    assert.deepEqual(
+      log.loads.filter(([label]) => label === 'color output').map(([, load]) => load),
+      ['clear', 'load'],
+    );
   } finally {
     engine.dispose();
   }
