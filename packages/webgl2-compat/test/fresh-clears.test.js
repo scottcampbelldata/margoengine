@@ -100,7 +100,8 @@ test('render pass clears of a layer of a 6-layer texture are draws there; a sing
   assert.equal(named(calls, 'drawArrays').length, 1, 'one draw');
   assert.deepEqual(
     named(calls, 'uniform4f').map((c) => c.slice(2)),
-    [[0.25, 0.5, 0.75, 1]],
+    // Rounded to the rgba8unorm steps a clear stores (drawnClear, the test at the end of this file).
+    [[64 / 255, 128 / 255, 191 / 255, 1]],
     'the clear value',
   );
   calls = pass(plain.createView(), [1, 0, 0, 1]);
@@ -109,4 +110,35 @@ test('render pass clears of a layer of a 6-layer texture are draws there; a sing
     named(calls, 'clearBufferfv').map((c) => c.slice(3)),
     [[[1, 0, 0, 1]]],
   );
+});
+
+// A clear by draw goes through the colour export, which on the Radeon 680M under ANGLE D3D11 narrows the colour to
+// binary16 by truncation before an 8 or 10-bit UNORM conversion: a draw clear of 0.1 into rgba8unorm stored 25 where
+// native WebGPU's clear stores 26 (features-browser.mjs clearByDraw, 16 of 60 clears one step low). The draw now
+// writes the colour rounded to the format's steps, which survives that narrowing on any GPU.
+test('a clear by draw writes the colour rounded to the target format\'s steps', async () => {
+  const gl = losingContext();
+  const { device: d } = await device(gl);
+  const clearOf = (format, clearValue) => {
+    const t = d.createTexture({ size: [4, 4, 2], format, usage: U.RENDER_ATTACHMENT | U.COPY_SRC });
+    const from = gl.calls.length;
+    const e = d.createCommandEncoder();
+    const view = t.createView({ dimension: '2d', baseArrayLayer: 1, arrayLayerCount: 1 });
+    e.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue }] }).end();
+    d.queue.submit([e.finish()]);
+    const set = named(gl.calls.slice(from), 'uniform4f');
+    assert.equal(set.length, 1, `${format}: one clear draw`);
+    return set[0].slice(2);
+  };
+  const colour = [0.1, 0.52 / 255, 0.7, 1 / 3];
+  assert.deepEqual(clearOf('rgba8unorm', colour), [26 / 255, 1 / 255, 178 / 255, 85 / 255]);
+  assert.deepEqual(clearOf('bgra8unorm', [2, -1, 0.5, 0.5]), [1, 0, 128 / 255, 128 / 255]);
+  assert.deepEqual(clearOf('rgb10a2unorm', colour), [102 / 1023, 2 / 1023, 716 / 1023, 1 / 3]);
+  // sRGB: the linear value of the nearest encoded step (0.1 encodes to 0.349, step 89); alpha is linear.
+  const srgb = clearOf('rgba8unorm-srgb', colour),
+    decode = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  assert.deepEqual(srgb, [decode(89 / 255), decode(7 / 255), decode(218 / 255), 85 / 255]);
+  // Float formats keep the colour (as float32).
+  assert.deepEqual(clearOf('rgba16float', colour), colour.map(Math.fround));
+  d.destroy();
 });

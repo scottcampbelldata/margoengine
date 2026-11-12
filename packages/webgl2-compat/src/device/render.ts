@@ -7,6 +7,7 @@ import { translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
 import type { TextureType } from '../wgsl/types.js';
 import { type FormatInfo, glTexelBytes, hasDepth, hasStencil, VERTEX_FORMATS } from './formats.js';
 import type { CompatDevice } from './device.js';
+import { drawnClear } from './fresh-clears.js';
 import { type BoundGroup, CompatComputePassEncoder, type CompatComputePipeline } from './compute.js';
 import {
   type BlockWrite,
@@ -1692,7 +1693,8 @@ export class Replayer {
       const clear = c.loadOp === 'clear' ? c.clearValue : !t.initialized ? [0, 0, 0, 0] : null;
       if (!clear) return;
       if (this.drawsClears(t.info, t.mipLevelCount, t.depthOrArrayLayers)) {
-        this.drawClear(i, clear, width, height, buffers);
+        // Rounded to the target's steps first: the export may narrow the float otherwise than a clear (drawnClear).
+        this.drawClear(i, drawnClear(t.format, clear), width, height, buffers);
         drew = true;
       } else if (t.info.kind === 'uint')
         gl.clearBufferuiv(

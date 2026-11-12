@@ -61,3 +61,26 @@ function probeFreshClears(gl: WebGL2RenderingContext): boolean {
     for (let i = 0; i < 16 && gl.getError() !== 0; i++);
   }
 }
+
+/**
+ * The colour a clear by draw writes for `value` into a target of `format` (drawClears): the value rounded on the CPU to
+ * the step the target's clear stores. A draw goes through the colour export, which narrows the shader's float its own
+ * way: the Radeon 680M under ANGLE D3D11 truncates it to binary16 before the 8 or 10-bit UNORM conversion, so a clear
+ * by draw of 0.1 into rgba8unorm stored 25 where native WebGPU's clear stores round(0.1 x 255) = 26, and sRGB targets
+ * one step off too (features-browser.mjs clearByDraw: 16 of 60 clears differed before). A value on the format's own
+ * grid survives any narrowing to 11 or more significant bits, so every GPU then stores the nearest step, as a clear
+ * does. An sRGB target gets the linear value of its nearest encoded step; float formats keep the value.
+ */
+export function drawnClear(format: string, value: ArrayLike<number>): number[] {
+  const v = Array.from(value, (x) => Math.fround(x));
+  const step = (x: number, steps: number) => Math.round(Math.min(1, Math.max(0, x)) * steps) / steps;
+  if (format === 'rgb10a2unorm') return [step(v[0], 1023), step(v[1], 1023), step(v[2], 1023), step(v[3], 3)];
+  const unorm8 = /^(r|rg|rgba|bgra)8unorm(-srgb)?$/.exec(format);
+  if (!unorm8) return v;
+  if (!unorm8[2]) return v.map((x) => step(x, 255));
+  // sRGB (IEC 61966-2-1): encode, round to the 255 steps, and decode that step back to the linear value the export
+  // encodes; alpha is linear.
+  const encode = (x: number) => (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055);
+  const decode = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return v.map((x, i) => (i === 3 ? step(x, 255) : decode(step(encode(Math.min(1, Math.max(0, x))), 255))));
+}

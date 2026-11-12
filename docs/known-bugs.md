@@ -595,6 +595,13 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   single-subresource textures keep clearBuffer. Regression: `features-browser.mjs` `freshClears` (two rounds over a
   cube, an array and 2D mips; fails without the workaround), `layerView` (a zero draw inside a pass gives the pass its
   viewport back), `test/fresh-clears.test.js`. Depth and stencil clears were not probed.
+- **Follow-up (audit A2, 2026-11-12):** the clear draws stored one step below native WebGPU's clear in 16 of 60 clears
+  (`features-browser.mjs` `clearByDraw`: rgba8unorm 0.1 stored 25, native 26; rgb10a2unorm and rgba8unorm-srgb
+  likewise; rgba16float and rgba32float equal): the colour export narrows the float to binary16 by truncation before
+  the UNORM conversion (the row 25 entry above), where native's clear rounds to the nearest step. The draw now writes
+  the clear colour rounded to the format's own steps on the CPU (`drawnClear` in `fresh-clears.ts`; sRGB targets the
+  linear value of the nearest encoded step), which survives that narrowing. Regressions: `clearByDraw` (fails without
+  the rounding) and `test/fresh-clears.test.js`.
 
 ### Radeon 680M, ANGLE Direct3D 11: acos is 6.75e-5 off (list 5 R6 row 31, 2026-11-11, worked around in webgl2-compat)
 
