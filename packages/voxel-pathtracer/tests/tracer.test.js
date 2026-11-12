@@ -485,57 +485,71 @@ test('a transparent capture writes RGBA: alpha is the coverage, colours unpremul
   tracer.dispose();
 });
 
-test('capture renders the requested size in tiles and encodes a PNG of the tone-mapped image', async () => {
-  const h = fakeEngine(),
-    { tracer, device } = await ready({ toneMapping: 'linear' }, h);
-  // The fake GPU runs no shaders: each read-back of a tile's colour sums is filled with a gradient that encodes the
-  // pixel's position in the full image (the frame uniform says where the tile is), times the sample count.
-  let frame;
-  device.onMap = (b) => {
-    const f = new Float32Array(b.data),
-      u = new Uint32Array(frame.data),
-      [W, H, x0, y0] = u.subarray(32, 36),
-      [w] = u.subarray(36, 38);
-    for (let i = 0; i < f.length / 4; i++) {
-      const x = x0 + (i % w),
-        y = y0 + Math.floor(i / w);
-      f.set([(x / (W - 1)) * 7, (y / (H - 1)) * 7, 0.5 * 7, 7], i * 4);
+// Regression (KB-L4-vpt, 2026-11-12): the trace splits a tile into row bands sized by the measured GPU (dispatch.ts
+// Pacer, from wall-clock times), each band with its own frame uniform written before its submission. The fake GPU used
+// to fill a whole tile's read-back from the uniform as it stood at map time, the last band's, so on a loaded machine
+// (smaller bands) the second tile row read rows further down: "pixel 1024,1024 (tile seams must not show)" flaked.
+// The fake now fills each band from the uniform its submission saw, and the test also forces 8-row bands
+// (`voxelTraceWork`, the browser-check determinism switch), which failed every time with the old fake.
+for (const work of [undefined, 1])
+  test(`capture renders the requested size in tiles and encodes a PNG of the tone-mapped image (${work === undefined ? 'paced' : 'forced'} bands)`, async () => {
+    const h = fakeEngine(),
+      { tracer, device } = await ready({ toneMapping: 'linear' }, h);
+    if (work !== undefined) device.voxelTraceWork = work;
+    // The fake GPU runs no shaders: each read-back of a tile's colour sums is filled with a gradient that encodes the
+    // pixel's position in the full image (each band's frame uniform says where it is), times the sample count.
+    let frame,
+      bands = [];
+    const submit = device.queue.submit.bind(device.queue);
+    device.queue.submit = (items) => {
+      if (frame) bands.push([...new Uint32Array(frame.data).subarray(32, 38)]);
+      return submit(items);
+    };
+    device.onMap = (b) => {
+      const f = new Float32Array(b.data),
+        drawn = bands.filter(([, , , , w, rows]) => w && rows),
+        top = Math.min(...drawn.map((u) => u[3]));
+      for (const [W, H, x0, y0, w, rows] of drawn)
+        for (let y = y0; y < y0 + rows; y++)
+          for (let x = x0; x < x0 + w; x++)
+            f.set([(x / (W - 1)) * 7, (y / (H - 1)) * 7, 0.5 * 7, 7], ((y - top) * w + (x - x0)) * 4);
+      bands = [];
+    };
+    const create = device.createBuffer.bind(device);
+    device.createBuffer = (d) => {
+      const b = create(d);
+      if (d.size === FRAME) frame = b;
+      return b;
+    };
+    const blob = await tracer.capture({ width: 1500, height: 1100, samples: 7 });
+    assert.equal(blob.type, 'image/png');
+    const png = decodePNG(new Uint8Array(await blob.arrayBuffer()));
+    assert.equal(png.width, 1500);
+    assert.equal(png.height, 1100);
+    const srgb = (v) => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
+    for (const [x, y] of [
+      [0, 0],
+      [1499, 0],
+      [1023, 1023],
+      [1024, 1024],
+      [700, 1099],
+    ]) {
+      const p = (y * 1500 + x) * 3;
+      assert.deepEqual(
+        [...png.pixels.subarray(p, p + 3)],
+        [srgb(x / 1499), srgb(y / 1099), srgb(0.5)],
+        `pixel ${x},${y} (tile seams must not show)`,
+      );
     }
-  };
-  const create = device.createBuffer.bind(device);
-  device.createBuffer = (d) => {
-    const b = create(d);
-    if (d.size === FRAME) frame = b;
-    return b;
-  };
-  const blob = await tracer.capture({ width: 1500, height: 1100, samples: 7 });
-  assert.equal(blob.type, 'image/png');
-  const png = decodePNG(new Uint8Array(await blob.arrayBuffer()));
-  assert.equal(png.width, 1500);
-  assert.equal(png.height, 1100);
-  const srgb = (v) => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
-  for (const [x, y] of [
-    [0, 0],
-    [1499, 0],
-    [1023, 1023],
-    [1024, 1024],
-    [700, 1099],
-  ]) {
-    const p = (y * 1500 + x) * 3;
-    assert.deepEqual(
-      [...png.pixels.subarray(p, p + 3)],
-      [srgb(x / 1499), srgb(y / 1099), srgb(0.5)],
-      `pixel ${x},${y} (tile seams must not show)`,
+    assert.ok(device.submits > 4, 'four tiles traced');
+    if (work !== undefined) assert.ok(device.submits > 4 * 1024 / 8, 'the forced budget split each tile into 8-row bands');
+    assert.equal(
+      tracer.stats.gpuBytes,
+      h.device.buffers.filter((b) => !b.destroyed).reduce((n, b) => n + b.size, 0) +
+        h.device.textures.filter((t) => !t.destroyed).reduce((n, t) => n + t.width * t.height * 16, 0),
     );
-  }
-  assert.ok(device.submits > 4, 'four tiles traced');
-  assert.equal(
-    tracer.stats.gpuBytes,
-    h.device.buffers.filter((b) => !b.destroyed).reduce((n, b) => n + b.size, 0) +
-      h.device.textures.filter((t) => !t.destroyed).reduce((n, t) => n + t.width * t.height * 16, 0),
-  );
-  tracer.dispose();
-});
+    tracer.dispose();
+  });
 
 test('renderImage returns linear colour and AOVs mapped back to the caller instance indices', async () => {
   const scene = {

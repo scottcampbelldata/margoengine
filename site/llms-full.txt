@@ -10255,6 +10255,22 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
 
 # Known bugs and unverified features
 
+### Fixed 2026-11-12: the voxel path tracer's tiled capture test flaked on a loaded machine (KB-L4-vpt)
+
+- **What:** `packages/voxel-pathtracer/tests/tracer.test.js` "capture renders the requested size in tiles and encodes a
+  PNG of the tone-mapped image" failed once during a CPU run beside GPU suites ("pixel 1024,1024 (tile seams must not
+  show)", green 253 for 247) and passed alone on the same code.
+- **Cause (the test's fake GPU, not the tracer):** the tracer splits each capture tile into row bands sized by the
+  measured GPU (`Pacer` in `src/dispatch.ts`, from wall-clock submit times; bands change no pixel's sums) and writes the
+  frame uniform before each band's submission, in queue order. The fake GPU filled a tile's whole read-back from the
+  uniform as it stood at map time, the last band's, so when a slow, loaded run shrank the bands the second tile row
+  read rows further down the image.
+- **Fix:** the fake records the frame uniform at each submission and fills each band's rows from the uniform that band
+  saw, as a GPU does. The test runs twice: with the paced bands, and with 8-row bands forced by the `voxelTraceWork`
+  switch that browser-check's determinism case already uses.
+- **Regression:** the forced-band run of that test in `packages/voxel-pathtracer/tests/tracer.test.js` fails every time
+  with the old fake (pixel 0,0) and passes with the new one.
+
 ### Fixed 2026-11-11: the gpu-lock heartbeat knew its holder only by pid (KB-FL4)
 
 - **Bug (found by reading, not seen):** the heartbeat in `scripts/gpu-lock.mjs` asked whether its holder was alive by pid. A
