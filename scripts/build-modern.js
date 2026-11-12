@@ -21,6 +21,7 @@ import { buildCoreKernel, deflateKernel } from './build-core-kernel.mjs';
 import { BLUEPRINTS, blueprintBytes } from './wasm-blueprints.mjs';
 import { acquireBuildLock } from './support/build-lock.mjs';
 import { missingPackageTargets } from './package-export-targets.mjs';
+import { SIZES_FILE, sizeReport, wantsFullSizes } from './support/size-report.mjs';
 // One package build at a time in this checkout: a build removes each dist before writing it, so two at once delete each
 // other's output (KB-RM4). Released when the process exits, whatever the outcome.
 const releaseBuild = acquireBuildLock(process.cwd());
@@ -342,7 +343,7 @@ assert.ok(
 );
 sizes.particlesOnly = { raw: Buffer.byteLength(shaken), gzip: gzipSync(shaken).length };
 await mkdir('test-results', { recursive: true });
-await writeFile('test-results/modern-bundle-sizes.json', JSON.stringify(sizes, null, 2));
-console.error(JSON.stringify(sizes, null, 2));
+await writeFile(SIZES_FILE, JSON.stringify(sizes, null, 2));
+console.error(sizeReport(sizes, { full: wantsFullSizes(process.argv, process.env) }));
 // The catalog reads every built dist, so it is regenerated here and can never trail the packages.
 execFileSync(process.execPath, ['scripts/build-catalog.js'], { stdio: 'inherit' });

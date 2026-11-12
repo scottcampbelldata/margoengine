@@ -18,7 +18,8 @@ The core and the stage together are 24,848 bytes gzip, Wasm kernel and WebGPU ba
 ## Build something in 5 minutes
 
 You need git and Node.js 24.18 or newer, nothing else: no Rust, C++ compiler, Python or GPU setup (the Wasm kernel is
-checked in). The packages are not on npm yet, so you start from a clone.
+checked in). Node 22.12 or newer also builds the packages and runs the examples (npm prints one engine warning), but
+the tests need 24.18. The packages are not on npm yet, so you start from a clone.
 
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/scottcampbelldata/margoengine.git
