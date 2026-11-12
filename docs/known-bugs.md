@@ -470,6 +470,20 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   by the caller or `BROWSER_EXECUTABLE` start as before. Regression: tests/browser-selection.test.js. Checked from the app:
   headed `MARGO_BROWSER=chromium` failed with `spawn UNKNOWN` before and starts now.
 
+### Fixed 2026-11-11: the no-adapter check failed every WebGL2 compatibility leg on ANGLE Vulkan (KB-L5a-7)
+
+- **Repro:** on main at 6e254d26e9, `node packages/voxel-pathtracer/tests/guiding-browser.mjs` passed its native leg and
+  failed its compatibility leg at once with `no-webgpu-adapter` (WebGL renderer "ANGLE (NVIDIA, Vulkan 1.4.351 ...)").
+  27 GPU test files launch a leg with `--use-angle=vulkan` (voxel-pathtracer, staging and others).
+- **Cause:** the KB-C34i check below requires a WebGPU adapter on every Chromium launch, but Chromium gives a page
+  launched on ANGLE Vulkan no WebGPU adapter (Edge 157 on Windows, every such run that day). Those legs test the
+  WebGL2 compatibility layer there on purpose.
+- **Fix:** `scripts/browser.js` `noAdapterReason`: a launch with `--use-angle=vulkan` needs a hardware WebGL renderer
+  instead. A lost GPU process (no renderer, or SwiftShader) still fails at once; every other launch still needs the
+  adapter.
+- **Regression:** `tests/browser-startup.test.js` "an ANGLE Vulkan launch needs a hardware WebGL renderer, not a WebGPU
+  adapter" (fails without the fix).
+
 ### Fixed 2026-11-11: an Edge auto-update swapped the browser under a starting GPU suite (KB-C34i)
 
 - **Repro:** shadows `test:gpu` (`scale-browser.mjs`) at 17:29:02 on 2026-11-11: `engine.create` threw "WebGPU adapter

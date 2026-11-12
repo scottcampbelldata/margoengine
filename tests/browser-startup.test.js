@@ -17,9 +17,15 @@ mock.module('../scripts/support/driver-resets.mjs', {
 });
 const { openBrowser } = await import('../scripts/browser.js');
 
-function fixture(failures, { webgpu = { vendor: process.env.GPU_VENDOR?.toLowerCase() ?? 'test', fallback: false } } = {}) {
+function fixture(
+  failures,
+  {
+    webgpu = { vendor: process.env.GPU_VENDOR?.toLowerCase() ?? 'test', fallback: false },
+    webglRenderer = process.env.GPU_VENDOR ?? 'test',
+  } = {},
+) {
   const result = { probes: 0, waits: 0, browserCloses: 0, serverCloses: 0, reload: null, initScripts: [] };
-  const hardware = { webglRenderer: process.env.GPU_VENDOR ?? 'test', webgpu, userAgent: 'test agent' };
+  const hardware = { webglRenderer, webgpu, userAgent: 'test agent' };
   const socket = {
     on(event, callback) {
       if (event === 'framereceived') result.reload = callback;
@@ -190,4 +196,23 @@ test('a probe with no WebGPU adapter fails openBrowser at once with its code, an
   const session = await openBrowser({ softwareAdapterOk: true });
   assert.equal(session.hardware.webgpu, null);
   await session.close();
+});
+
+// KB-L5a-7 (2026-11-11): the KB-C34i check failed every WebGL2 compatibility leg launched on ANGLE Vulkan, where Chromium
+// gives pages no WebGPU adapter by design (27 GPU test files, e.g. voxel-pathtracer test:gpu:guiding). Such a launch now
+// needs a hardware WebGL renderer instead; a lost GPU process (no renderer, or SwiftShader) still fails at once.
+test('an ANGLE Vulkan launch needs a hardware WebGL renderer, not a WebGPU adapter', async () => {
+  const vulkan = 'ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)';
+  fixture([], { webgpu: null, webglRenderer: vulkan });
+  const session = await openBrowser({ args: ['--use-angle=vulkan'] });
+  assert.equal(session.hardware.webgpu, null);
+  await session.close();
+  for (const webglRenderer of [null, 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)']) {
+    const state = fixture([], { webgpu: null, webglRenderer });
+    await assert.rejects(openBrowser({ args: ['--use-angle=vulkan'] }), (error) => error.code === 'no-webgpu-adapter');
+    assert.equal(state.browserCloses, 1);
+  }
+  // Without the Vulkan launch the WebGPU adapter is still required.
+  fixture([], { webgpu: null, webglRenderer: vulkan });
+  await assert.rejects(openBrowser(), (error) => error.code === 'no-webgpu-adapter');
 });

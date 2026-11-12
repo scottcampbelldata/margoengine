@@ -478,8 +478,13 @@ export const NO_WEBGPU_ADAPTER = 'no-webgpu-adapter';
  * whatever it gets. Before KB-C34i a null adapter passed, and the suite then waited out its ready timeout (120 s) for a
  * page whose engine.create had already thrown "WebGPU adapter unavailable".
  */
-export function noAdapterReason(engine, hardware, { softwareAdapterOk = false } = {}) {
+export function noAdapterReason(engine, hardware, { softwareAdapterOk = false, args = [] } = {}) {
   if (engine !== 'chromium' || softwareAdapterOk || hardware?.webgpu) return null;
+  // A launch on ANGLE Vulkan is a WebGL2-only launch: Chromium gives its pages no WebGPU adapter (Edge 157 on Windows,
+  // 2026-11-11), and the WebGL2 compatibility legs run there on purpose. Its GPU process is up when WebGL has a hardware
+  // renderer; a lost one leaves no renderer or SwiftShader (KB-L5a-7).
+  if (args.includes('--use-angle=vulkan') && hardware?.webglRenderer && !/swiftshader/i.test(hardware.webglRenderer))
+    return null;
   return `${NO_WEBGPU_ADAPTER}: the browser gave no WebGPU adapter (requestAdapter answered null, or navigator.gpu is missing; WebGL renderer ${JSON.stringify(hardware?.webglRenderer ?? null)}; ${hardware?.userAgent ?? 'no user agent'}). The GPU process failed to start or was lost: look for a GPU driver reset (Windows event 4101) or a browser update swapping its files during the launch (docs/known-bugs.md, KB-C34i)`;
 }
 
@@ -617,6 +622,7 @@ export async function openBrowser({
     }
     const missing = noAdapterReason(browserName === 'chromium' ? resolveBrowser({ name: channel }).engine : browserName, hardware, {
       softwareAdapterOk,
+      args,
     });
     if (missing) throw Object.assign(new Error(missing), { code: NO_WEBGPU_ADAPTER });
     if (browserName === 'chromium' && !softwareAdapterOk) {
