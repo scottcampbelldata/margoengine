@@ -25,7 +25,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
-import { pbrNeutral } from '../../packages/shared/display.js';
+import { output } from './parts/display.mjs';
 import { halfToFloat, shBasis, SH_IRRADIANCE_BANDS } from '../../packages/environment/dist/index.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
 
@@ -40,13 +40,6 @@ const failures = [],
       console.log('FAIL ' + message);
     }
   };
-const srgb = (c) =>
-  Math.round(255 * Math.min(1, Math.max(0, c >= 0.0031308 ? 1.055 * c ** (1 / 2.4) - 0.055 : c * 12.92)));
-// gltf-pro's output transform is Khronos PBR Neutral (packages/shared/display.js), mirrored on the CPU there.
-const output = {
-  core: (rgb) => rgb.map((c) => srgb(c / (1 + c))),
-  materials: (rgb) => pbrNeutral(rgb.map((c) => Math.max(c, 0))).map(srgb),
-};
 const pixel = (image, [x, y]) => {
   const i = (y * image.width + x) * 4;
   return [image.data[i], image.data[i + 1], image.data[i + 2]];
