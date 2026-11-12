@@ -25,7 +25,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
-import { output } from './parts/display.mjs';
+import { materialRoughness, output } from './parts/display.mjs';
 import { halfToFloat, shBasis, SH_IRRADIANCE_BANDS } from '../../packages/environment/dist/index.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
 
@@ -354,7 +354,7 @@ const report = {
         if (h.kind === 'floor' && (floor === 'diffuse' || h.p.some((x, k) => k !== 1 && Math.abs(x) > 1.9))) return;
         const metal = h.kind === 'floor' ? 1 : 0,
           rough = h.kind === 'floor' ? (floor === 'mirror' ? 0 : 0.5) : 1;
-        const rgb = m.shade(h.p, h.n, v, [1, 1, 1], metal, h.kind === 'materials' ? Math.max(rough, 0.045) : rough),
+        const rgb = m.shade(h.p, h.n, v, [1, 1, 1], metal, materialRoughness(rough)),
           want = output[h.kind === 'materials' ? 'materials' : 'core'](rgb),
           got = pixel(image, grid[i]);
         // The mirror shows level 0 sharply: reflections of wall points within 0.4 m of a wall edge (2-3 octahedral texels
