@@ -33,3 +33,16 @@ export function pendingLine(pending) {
     ? `Owner/lifetime pending, no fixture yet, NOT checked (${pending.length}): ${pending.join(', ')}`
     : '';
 }
+
+/**
+ * The browser leaves of one package's fixture module: `[undefined]` (one leaf runs every entry), or with the module's
+ * `leafPerEntry` one leaf per entry name. Names must be unique, since a leaf selects its entry by name.
+ */
+export async function ownerLeaves(module) {
+  if (!module.leafPerEntry) return [undefined];
+  const names = (await module.fixtures()).map((fixture) => fixture.name);
+  const twice = names.filter((name, i) => names.indexOf(name) !== i);
+  if (!names.length) throw new Error('OWNER_FIXTURE_EMPTY');
+  if (twice.length) throw new Error(`OWNER_ENTRY_TWICE: ${[...new Set(twice)].join(', ')}`);
+  return names;
+}

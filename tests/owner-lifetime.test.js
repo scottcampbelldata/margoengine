@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { exerciseLifetime, LifetimeObserver, sameView, viewState } from './support/owner-lifetime.js';
+import { exerciseLifetime, leafEntries, LifetimeObserver, sameView, viewState } from './support/owner-lifetime.js';
 import { nodeLifetimeAdapter } from './support/owner-lifetime-node.js';
-import { pendingLine, selectOwnerPackages } from '../scripts/support/owner-lifetime-registry.mjs';
+import { OWNER_FIXTURES, ownerLeaves, pendingLine, selectOwnerPackages } from '../scripts/support/owner-lifetime-registry.mjs';
 import { runOwners } from '../scripts/check-owner-lifetime.mjs';
 
 test('registered package fixtures share every lifetime transition', { timeout: 120000 }, async () => {
@@ -203,3 +203,27 @@ test('view state compares numbers by value and objects by identity, cycles inclu
   view.viewport[0]--; view.device = { ...device };
   assert.ok(!sameView(viewState(view), before));
 });
+
+// post's 31 entries took 208 s in one WebGL2 browser leaf on a Radeon 680M, past the leaf's 180 s limit: check:owners
+// now runs a leafPerEntry fixture one leaf per entry, and a leaf runs exactly the entry it names.
+test('a leafPerEntry fixture gives one leaf per entry; others one leaf for all', async () => {
+  const fixtures = async () => [{ name: 'a' }, { name: 'b' }];
+  assert.deepEqual(await ownerLeaves({ fixtures }), [undefined]);
+  assert.deepEqual(await ownerLeaves({ fixtures, leafPerEntry: true }), ['a', 'b']);
+  await assert.rejects(ownerLeaves({ leafPerEntry: true, fixtures: async () => [{ name: 'a' }, { name: 'a' }] }),
+    /OWNER_ENTRY_TWICE: a/);
+  await assert.rejects(ownerLeaves({ leafPerEntry: true, fixtures: async () => [] }), /OWNER_FIXTURE_EMPTY/);
+  const entries = [{ name: 'a' }, { name: 'b' }];
+  assert.equal(leafEntries(entries), entries);
+  assert.deepEqual(leafEntries(entries, 'b'), [entries[1]]);
+  assert.throws(() => leafEntries(entries, 'c'), /OWNER_ENTRY_UNKNOWN: c/);
+});
+
+// culling's 30 entries passed the same limit in one WebGL2 leaf on 2026-11-12.
+for (const [name, count, sample] of [['post', 31, 'PostStack.attach'], ['culling', 30, 'WebGL2Culling.attach']])
+  test(`${name} runs check:owners one leaf per entry, every entry named once`, async () => {
+    const module = await import(new URL('../' + OWNER_FIXTURES[name], import.meta.url).href);
+    const leaves = await ownerLeaves(module);
+    assert.equal(leaves.length, count);
+    assert.ok(leaves.includes(sample));
+  });

@@ -30,6 +30,10 @@ pass, and a deliberate leak in `addMesh` still fails all 13 (a buffer made per c
 never destroyed: "releases its registration"). `tests/owner-lifetime.test.js` holds the same three cases on a fake
 per-device set.
 
+`export const leafPerEntry = true` makes check:owners run the package's browser leaf once per entry
+(`--entry=<name>` on `scripts/check-owner-lifetime-browser.mjs`), each inside the leaf's 180 s limit, which never
+rises. Entry names must then be unique. post and culling set it: their 31 and 30 entries in one WebGL2 leaf ran past 180 s on a Radeon 680M (post 208 s).
+
 `ctx` is `{ engine, scene, host, dependency }`. `create` runs inside a setup of `scene`, so `engine.use` and
 `X.attach(engine)` join `scene`, as they do for an app. Meshes and textures the caller owns are made inside
 `dependency(fn)`, so they are its, not the plugin's.

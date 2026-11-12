@@ -3375,6 +3375,21 @@ packages/sciviz/src/progressive.ts (`ProgressiveRendering.dispose`) and packages
 and pointcloud were fixed on main by 69eb1e69f.) The OPEN list in scripts/support/plugin-scene-owner.mjs names these two
 calls; drop each row with its fix.
 
+### check:owners browser leaf: "Failed to fetch dynamically imported module" for the fixture (2026-11-12, open)
+
+- **What:** `node scripts/check-owner-lifetime-gate.mjs` on the Beelink (Radeon 680M, WebGL2 compatibility layer),
+  leaf `culling/DynamicInstances`: `page.evaluate` rejected with "Failed to fetch dynamically imported module:
+  .../packages/culling/test/owner-lifetime.fixture.js" before any case ran. The three culling leaves before it in the
+  same run passed with the same module graph, and all 122 culling and post leaves on the same tree passed two
+  hours earlier.
+- **Repro:** not reproduced yet. Lane O helper 12's landing GPU rerun, 2026-11-12 02:23, log
+  `margoengine-lane-O/.lane/logs/gpu.log` (git-excluded).
+- **Cause:** not found. The browser reports only the importing file; the module in its graph that failed and the
+  answer it got were not recorded. `scripts/check-owner-lifetime-browser.mjs` now prints every failed request and
+  every answer of 400 or more (`OWNER_GPU_PAGE:` lines) when a leaf ends this way, so a recurrence names the module
+  and status. Each leaf's dev server has its own optimizer cache and no file watcher (`scripts/browser.js`), and no
+  heat-guard pause or stall fell in the run.
+
 ## Sciviz comparison gaps
 
 Found by the batch 182 feature comparison ([sciviz-vs-rivals](whitepaper/sciviz-vs-rivals.md)). Each is a missing

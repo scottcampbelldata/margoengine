@@ -1,3 +1,6 @@
+// check:owners runs one browser leaf per entry: all 31 in one leaf took 208 s on the WebGL2 layer (Radeon 680M, list 5
+// batch I1), past the leaf's 180 s limit, which never rises.
+export const leafPerEntry = true;
 const entries = {
   afterimage: ['Afterimage'], anamorphic: ['Anamorphic'], bloom: ['Bloom'], blur: ['Blur'],
   'contact-shadows': ['ContactShadows'], curvature: ['Curvature'], decals: ['Decals'], depth: ['DepthTexture'],

@@ -417,3 +417,14 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     }
   }
 }
+
+/**
+ * The fixture entries one browser leaf runs: all of them, or with `name` only the entry of that name. A fixture that
+ * exports `leafPerEntry` is run one leaf per entry by check:owners, so each leaf fits the leaf's own time limit.
+ */
+export function leafEntries(entries, name) {
+  if (name === undefined) return entries;
+  const found = entries.filter((fixture) => fixture.name === name);
+  if (found.length !== 1) throw new Error(`OWNER_ENTRY_UNKNOWN: ${name} (${found.length} entries of that name)`);
+  return found;
+}

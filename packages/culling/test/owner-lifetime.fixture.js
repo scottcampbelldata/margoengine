@@ -1,5 +1,9 @@
 import { box, PbrMaterial } from '../../core/dist/index.js';
 
+// check:owners runs one browser leaf per entry: all 30 in one WebGL2 leaf passed the leaf's 180 s limit on the Radeon
+// 680M (list 5 batch I1, 2026-11-12, after main's webgl2-compat a972e242b and 8c029eb6e), and the limit never rises.
+export const leafPerEntry = true;
+
 const translate = (x, y, z, s = 1) => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, x, y, z, 1];
 const batches = () => [{
   geometry: box(),

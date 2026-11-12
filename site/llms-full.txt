@@ -3004,9 +3004,10 @@ features add no core or stage functionality.
   itself on device restore by design, so the attached device-loss case cannot hold for it.
 - `TAAUpscale` draws one full-canvas view and throws on the harness's two views by design; its scene detach is
   covered by `packages/taa/test/scene-owner.test.js`.
-- `OIT` addMesh: the copy's material makes materials' 1x1 default textures on first use on a device and keeps them for
-  the device's life (a fixed set, not a growth); the harness counts them against the first owner, so addMesh stays out
-  (its scene routing is covered by `packages/oit/test/scene.test.js`).
+- A fixture marked `warmUp` (`OIT.addMesh`: materials' 1x1 default textures, made once per device on first use and
+  kept for the device's life) is attached, drawn and disposed once on each device before the measured attach and again
+  after a device loss, so that fixed set counts against no owner. A set that a package's `onDeviceRestored` makes
+  eagerly under the owner would still be charged to it; a leak or growth per attach still fails.
 - `LayerCompositor` (pixel) runs with a hidden layer: a visible layer draws under the target's default viewport with a
   scissor narrower than the view's (the camera rectangle), pixel-correct but not the exact view viewport and scissor
   the harness requires of each draw.
@@ -13639,6 +13640,21 @@ Open, sciviz held out of list 5 (dev PC owns it). Same cause and repro as above 
 packages/sciviz/src/progressive.ts (`ProgressiveRendering.dispose`) and packages/sciviz/src/render.ts. (axes, media-tiles
 and pointcloud were fixed on main by 69eb1e69f.) The OPEN list in scripts/support/plugin-scene-owner.mjs names these two
 calls; drop each row with its fix.
+
+### check:owners browser leaf: "Failed to fetch dynamically imported module" for the fixture (2026-11-12, open)
+
+- **What:** `node scripts/check-owner-lifetime-gate.mjs` on the Beelink (Radeon 680M, WebGL2 compatibility layer),
+  leaf `culling/DynamicInstances`: `page.evaluate` rejected with "Failed to fetch dynamically imported module:
+  .../packages/culling/test/owner-lifetime.fixture.js" before any case ran. The three culling leaves before it in the
+  same run passed with the same module graph, and all 122 culling and post leaves on the same tree passed two
+  hours earlier.
+- **Repro:** not reproduced yet. Lane O helper 12's landing GPU rerun, 2026-11-12 02:23, log
+  `margoengine-lane-O/.lane/logs/gpu.log` (git-excluded).
+- **Cause:** not found. The browser reports only the importing file; the module in its graph that failed and the
+  answer it got were not recorded. `scripts/check-owner-lifetime-browser.mjs` now prints every failed request and
+  every answer of 400 or more (`OWNER_GPU_PAGE:` lines) when a leaf ends this way, so a recurrence names the module
+  and status. Each leaf's dev server has its own optimizer cache and no file watcher (`scripts/browser.js`), and no
+  heat-guard pause or stall fell in the run.
 
 ## Sciviz comparison gaps
 
