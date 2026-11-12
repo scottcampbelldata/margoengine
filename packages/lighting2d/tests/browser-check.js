@@ -96,6 +96,12 @@ const compare = (actual, want) => {
   return { wrong, first };
 };
 const frame = () => instance.render({ delta: 0 });
+// Core restores a lost device at most 3 times within 120 drawn frames (21ef41b32: a fourth loss reports "GPU lost 4
+// times"). This page loses the device on purpose four times, so after each of the first three it draws 120 frames, as
+// a page would between real losses (scripts/device-recreation-soak.mjs does the same).
+const settle = () => {
+  for (let f = 0; f < 120; f++) frame();
+};
 
 window.check = {
   async run() {
@@ -607,6 +613,7 @@ window.check = {
       );
       pass.dispose();
     }
+    settle();
     await frameRegressions({
       instance,
       engine,
@@ -619,7 +626,9 @@ window.check = {
       width: WIDTH,
       height: HEIGHT,
     });
+    settle();
     await giRegressions({ instance, engine, texture, frame, checks: out.checks, errors });
+    settle();
     await sdfRegressions({ instance, engine, texture, frame, checks: out.checks, errors });
     await giHistoryRegressions({ instance, engine, texture, frame, checks: out.checks, errors });
     out.errors = errors.splice(0);
