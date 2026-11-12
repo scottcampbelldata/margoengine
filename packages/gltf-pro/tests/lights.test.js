@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
 import { parseIES, iesCandela } from '../../clustered/dist/ies.js';
 import { gltfIESLights, gltfImageLight, orientIES, placeIESLights, rotateCube } from '../dist/lights.js';
 import { cubeDocument, dataURI, pngOf } from './support/cube-png.js';
@@ -120,6 +121,45 @@ test('a cube face reads as the sRGB decode of rgb / alpha, its saved rows swappe
   near(faces[0][0], 0.0331, 1e-3, 'the first row is the saved last row');
   near(faces[0][8], 1, 1e-6, 'rgb / alpha');
   assert.equal(faces[0][3], 1);
+});
+
+// KB6284a: the extension says each saved image "must be flipped about its vertical axis"; the reader swaps rows.
+// Settled on the real EnvironmentTest (Adobe Dimension, kept out of the repository): its cube projected onto the real
+// SH basis of Ramamoorthi and Hanrahan (2001) must share the sign of every l = 1 and l = 2 coefficient the file
+// states. Rows swapped, every one does; read as saved, with columns swapped or with both, six or more do not.
+test('KB6284a: the real EnvironmentTest cube, rows swapped, has the signs of the file SH coefficients', async () => {
+  const root = requireExternalAssets('ibl/'),
+    doc = JSON.parse(readFileSync(`${root}/EnvironmentTest.gltf`, 'utf8')),
+    bin = readFileSync(`${root}/EnvironmentTest_binary.bin`),
+    def = doc.extensions.EXT_lights_image_based.lights[0];
+  def.rotation = [0, 0, 0, 1]; // the file states its coefficients in the light's own frame
+  const light = await gltfImageLight({
+      asset: { doc, buffers: [new Uint8Array(bin.buffer, bin.byteOffset, bin.byteLength)] },
+      nodes: [],
+    }),
+    { size, faces } = light.faces;
+  const direction = (f, u, v) => [[1, -v, -u], [-1, -v, u], [u, 1, v], [u, -1, -v], [u, -v, 1], [-u, -v, -1]][f];
+  const basis = ([x, y, z]) => [y, z, x, x * y, y * z, x * z];
+  /** The l = 1 and l = 2 (off-diagonal) projections, per channel, with the read rows or columns mirrored back. */
+  const project = (rows, columns) => {
+    const c = Array.from({ length: 6 }, () => [0, 0, 0]);
+    for (let f = 0; f < 6; f++)
+      for (let y = 0; y < size; y++)
+        for (let x = 0; x < size; x++) {
+          const d = direction(f, ((x + 0.5) / size) * 2 - 1, ((y + 0.5) / size) * 2 - 1),
+            l = Math.hypot(...d),
+            b = basis(d.map((e) => e / l)),
+            texel = ((rows ? size - 1 - y : y) * size + (columns ? size - 1 - x : x)) * 4;
+          for (let k = 0; k < 3; k++) for (let j = 0; j < 6; j++) c[j][k] += (faces[f][texel + k] * b[j]) / l ** 3;
+        }
+    return c;
+  };
+  // The file's rows 1 to 3 (Y1-1 ~ y, Y10 ~ z, Y11 ~ x) and 4, 5, 7 (xy, yz, xz); 6 and 8 do not change with a mirror.
+  const stated = [1, 2, 3, 4, 5, 7].map((row) => def.irradianceCoefficients[row]);
+  const wrong = (c) => c.flatMap((row, j) => row.filter((e, k) => Math.abs(stated[j][k]) > 0.01 && Math.sign(e) !== Math.sign(stated[j][k])));
+  assert.equal(wrong(project(false, false)).length, 0, 'rows swapped: every sign agrees');
+  for (const [rows, columns, reading] of [[true, false, 'as saved'], [true, true, 'columns swapped'], [false, true, 'both swapped']])
+    assert.ok(wrong(project(rows, columns)).length >= 6, `${reading}: ${wrong(project(rows, columns)).length} signs wrong`);
 });
 
 test('the light carries its intensity and rotation, and the cube already turned', async () => {
