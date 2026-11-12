@@ -76,7 +76,8 @@ panel do not overlap. Click "Reset camera" and the status line says so.
   override above.
 - **The panel is taller than the screen.** Set `maxHeight` on `inspector.element`.
 - **Edits in the panel change every mesh that shares a material.** That is the engine's rule: one material, many meshes.
-- **Debug overlays do nothing on the WebGL2 fallback.** Wireframe, normals, bounds and light helpers need WebGPU.
+- **Debug overlays do nothing on the WebGL2 preview.** The inspector's wireframe, normals, bounds and light helpers
+  are WebGPU code. On the `/preview` fallback use `GLInspector` from `@margoengine/inspector/gl`.
 
 ## Next
 

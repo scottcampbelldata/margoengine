@@ -27,17 +27,17 @@ The React adapter also supports React 18. See [package choices and individual in
 
 ## Run and build
 
-Use Node.js 22.12+ or 24+ and a browser with WebGL2. TypeScript consumers need TypeScript 7+ with the DOM library; extension GPU types use its native declarations. WebGPU needs a supported browser on localhost or HTTPS.
+Apps build on Node.js 22.12 or newer; this repository needs 24.18 or newer. The browser needs WebGPU, or the optional `@margoengine/webgl2-compat` layer for WebGL2. TypeScript consumers need TypeScript 7+ with the DOM library; extension GPU types use its native declarations. WebGPU needs a supported browser on localhost or HTTPS.
 
 ```sh
 npm ci
-npm run dev                           # new Vite starter; compiles packages first
+npm run dev                           # Night Citadel showcase; compiles packages first
 npm test                              # compiles packages; runs modern unit checks
 npm run build:packages                # all workspace libraries; precompiled Wasm, no Rust
-npm run typecheck                     # strict checks for all 62 packages after build
+npm run typecheck                     # strict checks for every package after build
 npm run build                         # builds packages and both production starters
 npm run pack:packages                 # rebuilds and packs the public library workspaces
-npm run test:modules:packages          # all 62 packed exports, imports and strict consumers
+npm run test:modules:packages          # every packed package: exports, imports and strict consumers
 npm run modern:test:gltf-compression   # production Draco/Meshopt glTF/GLB browser checks
 npm run modern:test:browser            # after build: real GPU + both production starters
 npm run modern:test:domains            # caps, FX, sorting, depth readback and loss races
@@ -79,11 +79,11 @@ engine.start();
 
 `mesh.position` and `mesh.scale` access Float32 views directly. `mesh.rotation` exposes Euler angles in radians and updates the shared quaternion; `setQuaternion()` is also available. A mesh caches its world-matrix view. The Wasm tick uses fixed scratch memory without runtime allocation. JavaScript float accessors and validation are not guaranteed allocation-free by V8. `engine.stats` counts the last drawn frame: visible meshes and geometry batches, plus what packages that count their draws add. GPU encoding and framework/browser internals still allocate; this is not a whole-application zero-GC claim.
 
-`capacity` is fixed for an engine (1-100,000 entities). All hierarchy nodes, including transform-only nodes, use slots. Each engine has its own Wasm instance/memory. Parent changes reject cycles, another engine's nodes and excessive depth. Disposed refs reject writes even after a slot is reused. Removal detaches surviving children without preserving their old world transform. World matrices update at `render()`. Each active world matrix and sphere is computed once per tick, using affine composition and cached parent results; validation completes before publishing. Fixed scratch costs an additional 81 bytes per capacity slot (285 bytes total per slot, plus the frustum block and Wasm page/stack overhead).
+`capacity` is the initial number of entity slots (1 to 8,388,608, default 1,024); the store doubles when full. All hierarchy nodes, including transform-only nodes, use slots. Each engine has its own Wasm instance/memory. Parent changes reject cycles, another engine's nodes and excessive depth. Disposed refs reject writes even after a slot is reused. Removal detaches surviving children without preserving their old world transform. World matrices update at `render()`. Each active world matrix and sphere is computed once per tick, using affine composition and cached parent results; validation completes before publishing. Fixed scratch costs an additional 81 bytes per capacity slot (285 bytes total per slot, plus the frustum block and Wasm page/stack overhead).
 
 Shared `Geometry` identity produces one instanced draw even when material parameters differ. Buffers retire when the last mesh reference disappears. Geometry arrays and bounds are immutable after attachment; dynamic geometry needs a replacement `Geometry`. Material colors are linear RGB arrays or converted sRGB `#rrggbb`; roughness/metalness are 0-1. Rendering uses one directional light plus ambient radiance. Canvas sizing occurs on render and is capped at 4096 pixels per axis.
 
-`backend: 'auto'` tries WebGPU before WebGL2; `fallbackReason` records initialization failure. Explicit `webgpu` reports an error instead of falling back. Once a WebGPU context is acquired, a context configuration failure can prevent fallback on that same canvas. WebGL2 context loss stops rendering and reports an error. WebGPU device loss starts automatic recovery; see the lifecycle below.
+`backend: 'auto'` tries WebGPU, then the `fallback` renderer when one is passed; `fallbackReason` records initialization failure. Explicit `webgpu` reports an error instead of falling back. Once a WebGPU context is acquired, a context configuration failure can prevent fallback on that same canvas. WebGL2 context loss stops rendering and reports an error. WebGPU device loss starts automatic recovery; see the lifecycle below.
 
 ## Frozen portable API, picking and CAD navigation
 
@@ -223,7 +223,7 @@ Wasm memory, mesh refs, hierarchy, materials and CPU controllers remain intact. 
 
 ## Size and verification
 
-`npm run measure:size` verified core plus stage at **47,983 bytes raw / 19,999 bytes gzip** on 16 October 2026, including embedded Wasm and both rendering backends. CI rejects **25,000 bytes gzip and above** on pushes and pull requests. Core and stage remain feature-frozen; USDZ, PBR and decoder implementations stay in optional packages. The [release notes](CHANGELOG.md#unreleased) record the 931-test Node 24 verification, strict checks and packed imports across all 62 packages, and production compression browser checks.
+`npm run measure:size` verified core plus stage at **47,983 bytes raw / 19,999 bytes gzip** on 16 October 2026, including embedded Wasm and both rendering backends. `npm run build:packages` fails at **25,000 bytes gzip and above**. Core and stage remain feature-frozen; USDZ, PBR and decoder implementations stay in optional packages. The [release notes](CHANGELOG.md#unreleased) record the 931-test Node 24 verification, strict checks and packed imports across all 62 packages, and production compression browser checks.
 
 The table below is the historical 11 October 2026 lock, generated from minified ES library bundles. Its core-only measurements and headroom are separate from the current combined core + stage gate:
 

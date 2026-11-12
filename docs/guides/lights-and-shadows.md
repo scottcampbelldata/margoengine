@@ -51,7 +51,7 @@ shadows.add(floor, { castShadow: false }); // the floor only receives, which sav
 
 ## 4. Add a lamp
 
-`Clustered` adds point and spot lights, up to 1,024. `setLights` replaces the whole list, so call it again each frame
+`Clustered` adds point and spot lights: 1,024 by default, up to 65,536 with `maxLights`. `setLights` replaces the whole list, so call it again each frame
 to move a lamp. A lamp needs a finite `range` in world units (0 means unlimited).
 
 ```ts
@@ -72,7 +72,7 @@ and `cascades` are the exceptions: set them in `Shadows.attach(engine, { ... })`
 
 ```ts
 shadows.options.lightSize = 0.05; // wider soft edge (default 0.02)
-shadows.options.normalBias = 0.03; // push the receiver off the surface to stop speckles (default 0.02)
+shadows.options.normalBias = 0.03; // push the receiver off the surface to stop speckles (default 0)
 ```
 
 ## Options you will use
@@ -84,7 +84,7 @@ shadows.options.normalBias = 0.03; // push the receiver off the surface to stop 
 | `cascades` | Number of map layers, 1 to 4. Fewer is faster and coarser. | 4 |
 | `filter` | `'soft'` (penumbra grows with distance), `'pcf'` (cheaper) or `'hard'`. | `'soft'` |
 | `lightSize` | Width of the soft edge for `'soft'`. | 0.02 |
-| `bias`, `normalBias` | Fix speckled surfaces; too large floats shadows off the ground. | 0.0005, 0.02 |
+| `bias`, `normalBias` | Extra offsets on top of the built-in one-texel offset, for surfaces that still speckle; too large floats shadows off the ground. | 0, 0 |
 | `add(mesh, { static: true })` | Cache a caster that never moves. Call `shadows.invalidate()` if it does move. | `false` |
 
 Every shadow option, the point light shadows (`@margoengine/clustered/shadows`), area lights and image-based lighting
@@ -100,7 +100,8 @@ are in the [shadows](../../packages/shadows/README.md), [clustered](../../packag
 - **The shadow memory is large.** The default four 2048 maps use 128 MiB of GPU memory. On phones use `resolution: 1024`
   or `cascades: 2`.
 - **A lamp lights nothing.** `range` must be large enough to reach the mesh, and `intensity` is not zero.
-- **Shadows need WebGPU.** They are not drawn by the WebGL2 fallback.
+- **Shadows need WebGPU or the WebGL2 layer.** `@margoengine/webgl2-compat` draws them; the small `/preview` fallback
+  does not.
 
 ## Next
 

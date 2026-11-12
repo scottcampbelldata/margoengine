@@ -6,7 +6,7 @@ Thanks for taking a look. Bug reports, fixes, docs and new examples are all welc
 
 You need Node.js 24.18+ to work in this repository (its tests use `using` declarations, and the React unit tests rely
 on Node 24's node:test mock.module timing) and [Git LFS](https://git-lfs.com). End users: Node 22.12 or newer (tested
-on 22.12 and the latest 22.x, 24.18 and 26). CI's node-compat job proves that on 22.12.0, the latest 22.x and 26: the
+on 22.12 and the latest 22.x, 24.18 and 26). The node-compat job in `.github/workflows/ci.yml` checks that on 22.12.0, the latest 22.x and 26: the
 packages build, pack, install in a clean project, import (every exports entry), type-check their README examples, run
 the consumer program and the packed browser test, and build with Vite, webpack, Next.js, Rollup and esbuild. Shipped
 code may not use a JavaScript or Node API that Node 22.12 lacks without a feature test (`npm run check:node-apis`).
@@ -53,7 +53,8 @@ npm run api:check
 npm run measure:size
 ```
 
-CI runs the same commands on every push and pull request.
+`.github/workflows/ci.yml` holds the same commands, but the GitHub workflows are turned off in the repository
+settings, so run them yourself. [AGENTS.md](AGENTS.md) lists the checks that gate a change.
 
 - Keep a pull request to one change. Small is easier to review.
 - Add or update tests for what you change. Most packages have tests in `packages/<name>/tests/`.

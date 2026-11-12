@@ -3,6 +3,10 @@
 AI coding tools write good Margo code when they read the right pages and check what they wrote. Margo gives them
 three ways in, from least to most setup.
 
+Before 1.0.0: margoengine.com does not serve the files below yet, and the packages are not on npm. Use the copies in
+the repository ([site/llms.txt](../site/llms.txt) and [site/llms-full.txt](../site/llms-full.txt)), and run the MCP
+server from a clone after `npm run build:packages`: `node packages/mcp/bin/margoengine-mcp.js --root <your project>`.
+
 ## 1. Point the tool at llms.txt
 
 [`llms.txt`](https://margoengine.com/llms.txt) follows the [llms.txt convention](https://llmstxt.org): a title, a

@@ -5,7 +5,7 @@ things decide whether it keeps working once real headers are in front of it: the
 and the MIME type of `.wasm`. This page gives configs that were tested against the packages, not guessed.
 
 `npm create margo` already ships the Cloudflare Pages / Netlify version as `public/_headers` (Vite copies it into
-`dist/`).
+`dist/`). It works once 1.0.0 is published to npm; until then the templates are in `tools/create-margo/templates/`.
 
 ## The short version
 

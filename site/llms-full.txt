@@ -1053,8 +1053,10 @@ Measured, not estimated (records in `examples/package-benchmarks/results/`):
 
 # Which import do I need?
 
-Choose core/stage alone, a domain profile, or the full engine. Core requires no other engine package; stage adds
-only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
+Choose core/stage alone, a domain profile, or the full engine. The packages are not on npm yet: until 1.0.0 is
+published, the install commands on this page work only with the local tarballs from the
+[README](../../README.md#install) (Route 2), and `npm create margo` and the CDN import map do not work. Core requires no
+other engine package; stage adds only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
 The [kits guide](kits.md) lists the contents and measured install sizes. A new app can use
 `npm create margo@latest my-app -- --template web`; each template installs its profile rather than the umbrella.
 
@@ -1157,7 +1159,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (568 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,623 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -17973,6 +17975,10 @@ Ruled out for KB-FL1 and KB-FL2: a shared temp folder (each test makes its own w
 
 AI coding tools write good Margo code when they read the right pages and check what they wrote. Margo gives them
 three ways in, from least to most setup.
+
+Before 1.0.0: margoengine.com does not serve the files below yet, and the packages are not on npm. Use the copies in
+the repository ([site/llms.txt](../site/llms.txt) and [site/llms-full.txt](../site/llms-full.txt)), and run the MCP
+server from a clone after `npm run build:packages`: `node packages/mcp/bin/margoengine-mcp.js --root <your project>`.
 
 ## 1. Point the tool at llms.txt
 

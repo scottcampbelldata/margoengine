@@ -1,7 +1,9 @@
 # Which import do I need?
 
-Choose core/stage alone, a domain profile, or the full engine. Core requires no other engine package; stage adds
-only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
+Choose core/stage alone, a domain profile, or the full engine. The packages are not on npm yet: until 1.0.0 is
+published, the install commands on this page work only with the local tarballs from the
+[README](../../README.md#install) (Route 2), and `npm create margo` and the CDN import map do not work. Core requires no
+other engine package; stage adds only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
 The [kits guide](kits.md) lists the contents and measured install sizes. A new app can use
 `npm create margo@latest my-app -- --template web`; each template installs its profile rather than the umbrella.
 
@@ -104,7 +106,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (568 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,623 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
