@@ -136,7 +136,7 @@ export class ColorOutput {
       !(peak >= 1 && peak <= 16)
     )
       throw new RangeError(
-        'Invalid ColorOutput options; pass a peak from 1 to 16 and finite exposure and gamma values',
+        "Invalid ColorOutput options; pass gamut 'srgb' or 'p3', boolean hdr and force, and a peak from 1 to 16",
       );
     this.peak = peak;
   }

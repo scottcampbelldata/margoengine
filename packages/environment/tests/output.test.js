@@ -412,3 +412,14 @@ test('ColorOutput keeps the earlier views of a split-screen frame: only the firs
     engine.dispose();
   }
 });
+
+test('the ColorOutput RangeError names the options ColorOutput has', () => {
+  // Regression: the message asked for "finite exposure and gamma values", options ColorOutput never had.
+  assert.throws(
+    () => new ColorOutput({ peak: 0 }),
+    (error) =>
+      error instanceof RangeError &&
+      !/exposure|gamma/.test(error.message) &&
+      ['gamut', 'hdr', 'force', 'peak'].every((name) => error.message.includes(name)),
+  );
+});
