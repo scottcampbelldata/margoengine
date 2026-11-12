@@ -59,10 +59,38 @@ test('KB5339b: exported socket F-curves give Blender\'s own values between frame
     for (const [key, expected] of Object.entries(values))
       live.get(key).forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < 1e-5, `${key}[${i}] at ${seconds}s: ${v} against ${expected[i]}`));
   }
-  assert.equal(curved.parameters['Spring/outputs/0'].curves, undefined);
-  const mutate = (fn) => { const g = structuredClone(curved); fn(g.parameters['Amount/outputs/0'].curves[0]); assert.throws(() => new MargoNodeMaterial(g), /curves of Amount/); };
+  const mutate = (fn, key = 'Amount') => { const g = structuredClone(curved); fn(g.parameters[`${key}/outputs/0`].curves[0]); assert.throws(() => new MargoNodeMaterial(g), new RegExp(`curves of ${key}`)); };
   mutate((c) => (c.extrapolation = 'CYCLIC'));
   mutate((c) => (c.keys[1].t = c.keys[0].t));
   mutate((c) => (c.keys[0].i = 'ELASTIC'));
   mutate((c) => (c.keys[0].l = [0, NaN]));
+  mutate((c) => delete c.keys[0].a, 'Spring');
+  mutate((c) => (c.keys[1].a = -1), 'Spring');
+  mutate((c) => (c.keys[2].p = Infinity), 'Spring');
+});
+test('KB5339c: Elastic spans match Blender, pinned on 135 black-box probes', async () => {
+  // Truth: Blender 5.3 fcurve.evaluate on two-key Elastic spans, 65 or 401 sub-frame samples each
+  // (tools/blender-addon/tests/blender_elastic.py): every easing, amplitude below, at and above the change, default,
+  // short and negative periods, equal keys and a half-frame span. Each span is moved onto 0.1..1.5 s of the curve
+  // fixture's scene; the period scales with it, as Blender's curve depends only on time over span and period over span.
+  const { graph: curved } = JSON.parse(await readFile(new URL('./fixtures/node-curves.json', import.meta.url), 'utf8'));
+  const cases = JSON.parse(await readFile(new URL('./fixtures/elastic-probe.json', import.meta.url), 'utf8'));
+  assert.equal(cases.length, 135);
+  let worst = 0;
+  for (const { easing, amp, per, k: [f0, v0, f1, v1], s } of cases) {
+    const g = structuredClone(curved), scale = 1.4 / (f1 - f0), key = (t, v) => ({ t, v, l: [t, v], r: [t, v], i: 'ELASTIC', e: easing, b: 0, a: amp, p: per * scale });
+    g.parameters['Spring/outputs/0'].curves = [{ extrapolation: 'CONSTANT', keys: [key(0.1, v0), key(1.5, v1)] }];
+    const live = new MargoNodeMaterial(g);
+    for (const [f, v] of s) {
+      live.seek(0.1 + (f - f0) * scale);
+      // Blender evaluates in single precision, so its rounding scales with the value and with the swing: the amplitude
+      // times the decay envelope 2^(10(x - 1)) at x, the distance in span from the start (ease in) or end (ease out)
+      // key, doubled for in-out. The worst miss is under 2e-5 of that scale, on the steepest samples.
+      const x = (f - f0) / (f1 - f0), from = easing === 'EASE_IN' ? x : easing === 'EASE_IN_OUT' ? (x < 0.5 ? 2 * x : 2 - 2 * x) : 1 - x;
+      const miss = Math.abs(live.get('Spring/outputs/0')[0] - v) / Math.max(1, Math.abs(v), amp * 2 ** (10 * (from - 1)));
+      worst = Math.max(worst, miss);
+      assert.ok(miss < 2e-5, `${miss} ${easing} amplitude ${amp} period ${per} keys ${[f0, v0, f1, v1]} at frame ${f}: ${live.get('Spring/outputs/0')[0]} against ${v}`);
+    }
+  }
+  assert.ok(worst > 0 && worst < 2e-5);
 });

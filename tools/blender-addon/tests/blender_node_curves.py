@@ -80,15 +80,20 @@ green.extrapolation = "LINEAR"
 for k in green.keyframe_points:
     k.interpolation = "LINEAR"
 green.update()
-# Elastic has no exact form here, so that socket keeps its per-frame samples only.
-spring = keyed("ShaderNodeValue", "Spring", [(1, 0.0), (20, 1.0)], bsdf.inputs["Metallic"])
-curve_of(spring.outputs[0].path_from_id("default_value")).keyframe_points[0].interpolation = "ELASTIC"
+# Elastic spans (KB5339c): every easing, amplitude below, at and above the change, default, short and negative periods.
+spring = keyed("ShaderNodeValue", "Spring", [(1, 0.0), (9, 1.0), (17, 0.2), (25, 0.9), (29, 0.9), (33, 0.4), (41, 0.5)],
+               bsdf.inputs["Metallic"])
+sc = curve_of(spring.outputs[0].path_from_id("default_value"))
+for n, (easing, amplitude, period) in enumerate([("EASE_IN", 0.0, 0.0), ("EASE_OUT", 0.3, 3.0), ("EASE_IN_OUT", 2.0, 4.0),
+                                                 ("AUTO", 0.25, 2.0), ("EASE_IN", 0.5, -2.5), ("EASE_IN_OUT", 0.05, 0.0)]):
+    k = sc.keyframe_points[n]
+    k.interpolation, k.easing, k.amplitude, k.period = "ELASTIC", easing, amplitude, period
+sc.update()
 
 scene.frame_set(1)
 data = graph(bpy.context, material, plane)
 keys = ["Amount/outputs/0", "Tint/outputs/0", "Spring/outputs/0"]
-assert "curves" in data["parameters"]["Amount/outputs/0"] and "curves" in data["parameters"]["Tint/outputs/0"]
-assert "curves" not in data["parameters"]["Spring/outputs/0"] and "samples" in data["parameters"]["Spring/outputs/0"]
+assert all("curves" in data["parameters"][key] for key in keys)
 truth = []
 for step in range(0, 40 * 8 + 1):
     frame = 1 + step / 8
@@ -96,5 +101,6 @@ for step in range(0, 40 * 8 + 1):
     truth.append({"seconds": (frame - 1) / 24, "values": {
         "Amount/outputs/0": [amount.outputs[0].default_value],
         "Tint/outputs/0": list(color.outputs[0].default_value),
+        "Spring/outputs/0": [spring.outputs[0].default_value],
     }})
 (output / "node-curves.json").write_text(json.dumps({"graph": data, "truth": truth}), encoding="utf-8")

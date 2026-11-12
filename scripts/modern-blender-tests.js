@@ -243,6 +243,17 @@ if (process.env.MARGO_BLENDER) {
     close(fresh.truth, kept.truth, "truth");
     close(fresh.graph.parameters, kept.graph.parameters, "parameters");
   }
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    ["--background", "--factory-startup", "--python-exit-code", "1", "--python", "tools/blender-addon/tests/blender_elastic.py", "--", "test-results/blender/elastic"],
+    { stdio: "inherit" },
+  );
+  // The committed Elastic probes must still be what Blender evaluates (KB5339c).
+  assert.deepEqual(
+    JSON.parse(await readFile("test-results/blender/elastic/elastic-probe.json", "utf8")),
+    JSON.parse(await readFile("packages/blender/tests/fixtures/elastic-probe.json", "utf8")),
+    "fresh Elastic probes differ from packages/blender/tests/fixtures/elastic-probe.json",
+  );
   const { margoComponents } =
     await import("../packages/blender/dist/components.js");
   assert.deepEqual(

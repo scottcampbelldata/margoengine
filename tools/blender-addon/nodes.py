@@ -2,9 +2,10 @@
 import math
 
 # F-curve keys of one live parameter, in seconds from the scene start, when Blender's own evaluation can be reproduced
-# exactly between frames: CONSTANT, LINEAR, BEZIER and the Penner easings other than ELASTIC, with no modifier, driver,
-# NLA or mute. Anything else keeps the per-frame samples alone.
-EXACT_INTERPOLATIONS = {"CONSTANT", "LINEAR", "BEZIER", "SINE", "QUAD", "CUBIC", "QUART", "QUINT", "EXPO", "CIRC", "BACK", "BOUNCE"}
+# exactly between frames: CONSTANT, LINEAR, BEZIER and every easing (ELASTIC with its amplitude, and its period in seconds),
+# with no modifier, driver, NLA or mute. Anything else keeps the per-frame samples alone.
+EXACT_INTERPOLATIONS = {"CONSTANT", "LINEAR", "BEZIER", "SINE", "QUAD", "CUBIC", "QUART", "QUINT", "EXPO", "CIRC", "BACK", "BOUNCE",
+                        "ELASTIC"}
 
 
 def _fcurves(animation):
@@ -42,7 +43,8 @@ def exact_curves(animation, path, width, start, fps):
         seconds = lambda frame: (frame - start) / fps
         curves.append({"extrapolation": fcurve.extrapolation, "keys": [
             {"t": seconds(k.co[0]), "v": k.co[1], "l": [seconds(k.handle_left[0]), k.handle_left[1]],
-             "r": [seconds(k.handle_right[0]), k.handle_right[1]], "i": k.interpolation, "e": k.easing, "b": k.back}
+             "r": [seconds(k.handle_right[0]), k.handle_right[1]], "i": k.interpolation, "e": k.easing, "b": k.back,
+             **({"a": k.amplitude, "p": k.period / fps} if k.interpolation == "ELASTIC" else {})}
             for k in points]})
     return curves if any(c is not None for c in curves) else None
 

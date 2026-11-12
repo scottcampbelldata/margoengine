@@ -33,15 +33,19 @@ function reject(detail: string): never {
 const finiteValue = (v: unknown): v is number[] => Array.isArray(v) && [1, 3, 4].includes(v.length) && v.every(n => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 1e20);
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 /** One F-curve key in seconds from the scene start, with its handles and the interpolation of the span it starts. */
-interface CurveKey { t: number; v: number; l: [number, number]; r: [number, number]; i: string; e: string; b: number }
+interface CurveKey {
+  t: number; v: number; l: [number, number]; r: [number, number]; i: string; e: string; b: number;
+  /** Elastic spans only: Blender's amplitude in value units and period in seconds (0 picks the default). */
+  a?: number; p?: number;
+}
 /** An F-curve the exporter could carry exactly; Blender evaluates the same curve between frames. */
 interface SocketCurve { extrapolation: 'CONSTANT' | 'LINEAR'; keys: CurveKey[] }
 const EASED = ['SINE', 'QUAD', 'CUBIC', 'QUART', 'QUINT', 'EXPO', 'CIRC', 'BACK', 'BOUNCE'];
-const SPANS = new Set(['CONSTANT', 'LINEAR', 'BEZIER', ...EASED]), EASINGS = new Set(['AUTO', 'EASE_IN', 'EASE_OUT', 'EASE_IN_OUT']);
+const SPANS = new Set(['CONSTANT', 'LINEAR', 'BEZIER', 'ELASTIC', ...EASED]), EASINGS = new Set(['AUTO', 'EASE_IN', 'EASE_OUT', 'EASE_IN_OUT']);
 function validCurve(c: unknown): c is SocketCurve {
   if (!record(c) || (c.extrapolation !== 'CONSTANT' && c.extrapolation !== 'LINEAR') || !Array.isArray(c.keys) || !c.keys.length || c.keys.length > 65536) return false;
   const pair = (p: unknown) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite);
-  return (c.keys as unknown[]).every((k, n, all) => record(k) && Number.isFinite(k.t) && Number.isFinite(k.v) && pair(k.l) && pair(k.r) && SPANS.has(k.i as string) && EASINGS.has(k.e as string) && Number.isFinite(k.b) && (n === 0 || (k.t as number) > ((all[n - 1] as CurveKey).t)));
+  return (c.keys as unknown[]).every((k, n, all) => record(k) && Number.isFinite(k.t) && Number.isFinite(k.v) && pair(k.l) && pair(k.r) && SPANS.has(k.i as string) && EASINGS.has(k.e as string) && Number.isFinite(k.b) && (k.i !== 'ELASTIC' || (Number.isFinite(k.a) && (k.a as number) >= 0 && Number.isFinite(k.p))) && (n === 0 || (k.t as number) > ((all[n - 1] as CurveKey).t)));
 }
 // Penner's easing equations (R. Penner, Programming Macromedia Flash MX, 2002, ch. 7) as ease-in on 0..1. Blender's exponential
 // one is rescaled to meet both ends, as observed against its own evaluation.
@@ -69,6 +73,29 @@ function eased(kind: string, easing: string, x: number, back: number): number {
   // Penner's in-out Back widens the overshoot by 1.525 on both halves.
   if (mode === 'EASE_IN_OUT') { const s = kind === 'BACK' ? back * 1.525 : back; return x < 0.5 ? easeIn(kind, 2 * x, s) / 2 : 1 - easeIn(kind, 2 - 2 * x, s) / 2; }
   return mode === 'EASE_IN' ? easeIn(kind, x, back) : 1 - easeIn(kind, 1 - x, back);
+}
+// Blender's Elastic span, fitted black box from Blender 5.3 probes (docs/clean-room.md, KB5339c). Ease-in is Penner's
+// easeInElastic (Programming Macromedia Flash MX, 2002) while the amplitude reaches the change; below it the phase is
+// p/4 and the swing scales from amplitude / |change| up to 1 along a linear ramp over the last p/4 of the span. Ease-out
+// and the second half of in-out are point mirrors; in-out's first half is half an ease-in on doubled time, default
+// period 0.45 of the span (0.3 otherwise). AUTO eases out. A negative period keeps its sign; the ramp spans |p| / 4.
+function elasticIn(t: number, c: number, d: number, amp: number, p: number): number {
+  if (t <= 0) return 0;
+  if (t >= d) return c;
+  let s: number, swing: number, scale = 1;
+  if (amp < Math.abs(c) || amp === 0) {
+    s = p / 4; swing = c;
+    scale = amp / Math.abs(c || 1) + (1 - amp / Math.abs(c || 1)) * Math.min(1, Math.max(0, 1 - (d - t) / Math.abs(s)));
+  } else { s = (p / (2 * Math.PI)) * Math.asin(c / amp); swing = amp; }
+  const u = t / d - 1;
+  return -scale * swing * 2 ** (10 * u) * Math.sin(((u * d - s) * 2 * Math.PI) / p);
+}
+function elastic(a: CurveKey, b: CurveKey, at: number): number {
+  const d = b.t - a.t, c = b.v - a.v, t = at - a.t, amp = a.a!, mode = a.e === 'AUTO' ? 'EASE_OUT' : a.e;
+  const p = a.p! || (mode === 'EASE_IN_OUT' ? 0.45 : 0.3) * d;
+  if (mode === 'EASE_IN') return a.v + elasticIn(t, c, d, amp, p);
+  if (mode === 'EASE_OUT') return b.v - elasticIn(d - t, c, d, amp, p);
+  return t <= d / 2 ? a.v + elasticIn(2 * t, c, d, amp, p) / 2 : b.v - elasticIn(2 * (d - t), c, d, amp, p) / 2;
 }
 // A Bezier span as Blender evaluates it: each handle is shortened along itself to reach at most the span's length in
 // time, which keeps time monotonic, then time is solved for the curve parameter.
@@ -100,6 +127,7 @@ function evaluateCurve(c: SocketCurve, s: number): number {
   if (a.i === 'CONSTANT') return a.v;
   if (a.i === 'LINEAR') return a.v + (b.v - a.v) * x;
   if (a.i === 'BEZIER') return bezier(a, b, s);
+  if (a.i === 'ELASTIC') return elastic(a, b, s);
   return a.v + (b.v - a.v) * eased(a.i, a.e, x, a.b);
 }
 const scalar = (e: string, type: string) => type === 'color' ? `dot(${e}.rgb,vec3f(0.3333333333))` : `${e}.x`;

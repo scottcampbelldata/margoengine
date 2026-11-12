@@ -53,6 +53,8 @@ interface CurveKey {
     i: string;
     e: string;
     b: number;
+    a?: number;
+    p?: number;
 }
 
 interface GraphNode {
