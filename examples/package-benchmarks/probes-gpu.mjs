@@ -11,7 +11,9 @@
 //    a mirror metal floor and a rough (0.5) metal floor, within 3/255 (mirror: 95th percentile; its sharp level 0 flips a texel
 //    at a wall-colour boundary for a sub-pixel shift between the CPU ray and the raster, so the maximum is only reported).
 // 4. Box projection is physical: on the mirror floor each pixel shows the wall its reflected ray hits (the probe box is the
-//    room, at bake-time wall radiance), 95th percentile within 3/255, for wall points 0.4 m or more from a wall edge.
+//    room, at bake-time wall radiance), 95th percentile within 3/255, for wall points 0.4 m or more from a wall edge. The
+//    truth is the room radiance seen from the floor point, GGX-prefiltered at the floor's real roughness (core's 0.045
+//    floor) times the split-sum weight (parts/probe-truth.mjs).
 // 5. Zero cost: an attached, unbaked LightProbes leaves core meshes bit-identical and gltf-pro within 1/255.
 // 6. SSR (post/ssr) over the probes on the mirror floor, two views: where the mirrored wall is on screen the floor shows it as
 //    rendered now (the probe specular was replaced, not added: the probe holds the bake-time radiance, which differs);
@@ -26,6 +28,7 @@ import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { materialRoughness, output } from './parts/display.mjs';
+import { mirrorWallTruth, room, splitSum, wallAt } from './parts/probe-truth.mjs';
 import { halfToFloat, shBasis, SH_IRRADIANCE_BANDS } from '../../packages/environment/dist/index.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
 
@@ -49,20 +52,6 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
     const l = Math.hypot(...a);
     return a.map((v) => v / l);
   };
-const room = { min: [-2, 0, -2], max: [2, 3, 2] };
-const wallAt = (p, d) => {
-  let t = Infinity,
-    wall = '';
-  for (let i = 0; i < 3; i++) {
-    if (!d[i]) continue;
-    const ti = ((d[i] > 0 ? room.max[i] : room.min[i]) - p[i]) / d[i];
-    if (ti < t) {
-      t = ti;
-      wall = (d[i] > 0 ? 'p' : 'n') + 'xyz'[i];
-    }
-  }
-  return { t, wall, hit: p.map((v, i) => v + d[i] * t) };
-};
 // Cube-face sampling shared with the bake: forward, up (right = forward x up).
 const FACES = [
   [
@@ -171,9 +160,7 @@ const mirror = (bake, R = 128) => {
     const nv = Math.min(1, Math.max(1e-4, dot(n, v))),
       f0 = base.map((b) => 0.04 + (b - 0.04) * metal),
       r = n.map((x, i) => 2 * dot(n, v) * x - v[i]);
-    const c = [-1, -0.0275, -0.572, 0.022].map((x, i) => rough * x + [1, 0.0425, 1.04, -0.04][i]),
-      a = Math.min(c[0] * c[0], 2 ** (-9.28 * nv)) * c[0] + c[1],
-      sw = f0.map((x) => x * (c[2] - 1.04 * a) + (c[3] + 1.04 * a));
+    const sw = splitSum(f0, nv, rough);
     const e = irradiance(p, n),
       q = r.map((x) => (Math.abs(x) < 1e-6 ? x + 1e-6 : x)),
       t3 = q.map((x, i) => ((x > 0 ? room.max[i] : room.min[i]) - p[i]) / x),
@@ -359,7 +346,7 @@ const report = {
           got = pixel(image, grid[i]);
         // The mirror shows level 0 sharply: reflections of wall points within 0.4 m of a wall edge (2-3 octahedral texels
         // seen from the probe) cross a colour boundary that bilinear filtering steps across; those pixels are counted apart.
-        const { wall, hit } = h.kind === 'floor' ? wallAt(h.p, [d[0], -d[1], d[2]]) : {},
+        const { hit } = h.kind === 'floor' ? wallAt(h.p, [d[0], -d[1], d[2]]) : {},
           edge = hit
             ? hit.map((x, k) => Math.min(Math.abs(x - room.min[k]), Math.abs(x - room.max[k]))).sort((a, q) => a - q)[1]
             : Infinity;
@@ -372,7 +359,8 @@ const report = {
         samples++;
         if (diff > 3 && worstPixels.length < 5) worstPixels.push({ pixel: grid[i], kind: h.kind, got, want });
         if (h.kind === 'floor' && floor === 'mirror') {
-          const truth = output.core(colors[wall]);
+          // The physical truth at the floor's real roughness (core's 0.045 floor, KB-A3c ruling: option a).
+          const truth = mirrorWallTruth(colors, h.p, [d[0], -d[1], d[2]], dot(h.n, v), materialRoughness(rough));
           wallDiffs.push(Math.max(...got.map((g, k) => Math.abs(g - truth[k]))));
         }
       });

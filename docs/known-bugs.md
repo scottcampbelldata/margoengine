@@ -155,24 +155,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the workstation and here; or a bound that is the worst over the model, not one sample of it. Either changes what the
   check accepts, so it waits for Scott's ruling; the bound is not raised here.
 
-### Open: probes-gpu "mirror floor vs walls" needs a perfect mirror that core cannot draw (KB-A3c, found 2026-11-12, needs Scott)
+### Open: probe reflections over-blur roughness below 0.2; probes-gpu "mirror floor vs walls" p95 4/255 (KB-A3c, found 2026-11-12, needs Scott)
 
-- **What:** `examples/package-benchmarks/probes-gpu.mjs` check 4 compares each mirror floor pixel with the wall colour its
-  reflected ray hits, through the display curve, p95 within 3/255. Core clamps every PbrMaterial roughness to at least
-  0.045 (`packages/core/src/geometry.ts`, the published minimum), so the "roughness 0" floor shades at 0.045: the probe
-  lookup blends 22.5 % of the 0.2 level and the split-sum weight is 0.975, not 1. Under Reinhard (before b4675ba36) that
-  gap was median 1, p95 2/255; under PBR Neutral, about three times steeper at wall brightness, it is median 3, p95 4,
-  max 8/255 (Radeon 680M, WebGPU, 2026-11-12). The GPU is right: against the CPU mirror of the WGSL at roughness 0.045
-  the same pixels agree within 1/255 (median 0, p95 1, max 1), and the diffuse, mirror and rough checks pass.
-- **Repro:** `node examples/package-benchmarks/probes-gpu.mjs` (GPU lock) with the two probes-gpu mirror fixes (display
-  curve, 0.045 floor): one line, `FAIL mirror floor vs walls: p95 4/255`. Folding the 0.975 weight into the wall truth
-  alone still gives p95 4 (median 1, max 9): the rest is the 0.2 level blend.
-- **Cause:** the check's truth is a perfect mirror; the scene's floor is a 0.045 roughness metal. b4675ba36 made the
-  difference visible and the check was not changed with it.
-- **Needs a ruling (a check's expected values and tolerance are not a helper's call):** (a) the wall truth becomes the
-  analytic room radiance prefiltered at the material's real roughness (a CPU GGX convolution, as the level 1 to 5 checks
-  already do) times the split-sum weight, tolerance kept at 3/255; or (b) core lets metals reach roughness 0 (a core
-  change). Until then the probes-bench gate step fails on every GPU and blocks environment landings that run it.
+- **What:** `examples/package-benchmarks/probes-gpu.mjs` check 4 compares each mirror floor pixel with the wall its
+  reflected ray hits, p95 within 3/255. Ruling applied (Scott, option a, tolerance kept): the truth is now the room
+  radiance seen from the floor point, GGX-prefiltered at the floor's real roughness (core's 0.045 floor) times the
+  split-sum weight 0.975 (`examples/package-benchmarks/parts/probe-truth.mjs`, test `tests/probes-wall-truth.test.js`).
+  The corrected check still fails: median 1, p95 4, p99 7, max 9/255 over 2657 pixels (2406 near wall edges skipped),
+  Radeon 680M, WebGPU, 2026-11-12. The GPU matches the CPU mirror of the WGSL within 1/255 (median 0, p95 1, max 1) and
+  the diffuse, mirror and rough checks pass, so the probe shader does what it says; what it says is not physical.
+- **Repro:** `node examples/package-benchmarks/probes-gpu.mjs` (GPU lock): one line, `FAIL mirror floor vs walls: p95 4/255`.
+- **Cause:** `probeRadiance` in `packages/environment/src/probes.ts` maps roughness linearly to the level,
+  `lod = roughness * (levels - 1)`, and a 128 probe has 6 levels prefiltered at roughness 0, 0.2, 0.4, ... So roughness
+  0.045 reads lod 0.225: 22.5 % of the level prefiltered at roughness 0.2 (GGX alpha 0.04), about 20 times wider than
+  the material's lobe (alpha 0.002, narrower than a level 0 texel). The physical truth at 0.045 equals the wall colour
+  times 0.975 (the same p95 4, max 9 as folding only the 0.975 weight in), so the whole gap is that level 1 blend
+  pulling neighbouring wall colours in. Every probe-lit surface below roughness 0.2 is too blurry the same way.
+  b4675ba36's PBR Neutral made it visible (Reinhard showed median 1, p95 2).
+- **Needs Scott:** the fix is an environment change to the lod curve or the level roughness spacing, and it moves every
+  probe-lit low-roughness pixel (CPU mirror in probes-gpu.mjs, browser checks, baselines). Until then the probes-bench
+  gate step fails on every GPU and blocks landings that run it.
 
 ### Open in core only: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
 
