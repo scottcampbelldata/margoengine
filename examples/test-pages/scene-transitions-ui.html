@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scene transitions and UI - Margo Engine</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel-bg: rgba(15, 23, 42, 0.88);
+      --border: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 360px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 50;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .hud-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: #1e293b;
+      color: #38bdf8;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.gpu { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+    .badge.gl2 { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .stat-card {
+      background: rgba(30, 41, 59, 0.6);
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.68rem;
+    }
+    .stat-val {
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: monospace;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .group-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex: 1 1 auto;
+      text-align: center;
+    }
+    button:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+    button.active {
+      background: var(--accent);
+      color: #0f172a;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    button.danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+    button.danger:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+    .slider-val {
+      min-width: 44px;
+      font-family: monospace;
+      text-align: right;
+    }
+    select {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+    }
+    #subtitles-box {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.75);
+      color: #fef08a;
+      padding: 8px 24px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      pointer-events: none;
+      z-index: 40;
+      display: none;
+      text-align: center;
+      max-width: 80%;
+      border: 1px solid rgba(254, 240, 138, 0.2);
+    }
+    .custom-label-2d {
+      background: rgba(15, 23, 42, 0.85);
+      color: #38bdf8;
+      border: 1px solid #38bdf8;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      pointer-events: auto;
+      white-space: nowrap;
+    }
+    .custom-label-3d {
+      width: 140px;
+      padding: 8px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 2px solid #818cf8;
+      border-radius: 6px;
+      color: white;
+      text-align: center;
+      font-size: 12px;
+    }
+    .custom-html-anchor {
+      background: rgba(245, 158, 11, 0.9);
+      color: #0f172a;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    #media-sources {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="subtitles-box"></div>
+
+  <div id="hud">
+    <div class="hud-title">
+      <span>Scene & UI Playground</span>
+      <span id="backend-badge" class="badge">WebGPU</span>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">FPS</div>
+        <div id="stat-fps" class="stat-val">60</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Frame Time</div>
+        <div id="stat-ms" class="stat-val">16.6 ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Memory</div>
+        <div id="stat-mem" class="stat-val">-- MB</div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Scenes</div>
+      <div class="btn-row">
+        <button id="btn-scene-1" class="active">1: City Text</button>
+        <button id="btn-scene-2">2: Video Expo</button>
+        <button id="btn-scene-3">3: Cutscene</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Transition</div>
+      <div style="display: flex; gap: 6px;">
+        <select id="select-transition" style="flex: 1;">
+          <option value="wipe">Wipe</option>
+          <option value="dissolve">Dissolve (PCG)</option>
+          <option value="radial">Radial Sweep</option>
+          <option value="chromatic">Chromatic Split</option>
+          <option value="mask">Texture Mask</option>
+          <option value="live">Live Crossfade</option>
+        </select>
+        <button id="btn-trigger-transition" style="flex: 0 0 auto;">Trigger</button>
+      </div>
+      <div class="slider-row">
+        <span>Duration:</span>
+        <input type="range" id="slider-duration" min="0.1" max="3.0" step="0.1" value="0.8">
+        <span id="val-duration" class="slider-val">0.8 s</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Cinematic & Audio</div>
+      <div class="btn-row">
+        <button id="btn-shake">Camera Shake</button>
+        <button id="btn-audio-pool">Voice Pool SFX</button>
+      </div>
+      <div class="slider-row">
+        <span>Volume:</span>
+        <input type="range" id="slider-volume" min="0" max="1" step="0.05" value="0.7">
+        <span id="val-volume" class="slider-val">70%</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Cutscene Controls</div>
+      <div class="btn-row">
+        <button id="btn-cutscene-play">Play / Pause</button>
+        <button id="btn-cutscene-skip">Skip</button>
+      </div>
+      <div class="slider-row">
+        <span>Scrub:</span>
+        <input type="range" id="slider-cutscene" min="0" max="6.0" step="0.05" value="0">
+        <span id="val-cutscene" class="slider-val">0.0 s</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Stress & Lifecycle</div>
+      <div class="btn-row">
+        <button id="btn-stress" class="danger">Stress Rapid Switch</button>
+        <button id="btn-recreate">Dispose & Recreate</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-res-mobile">390x844 (Mobile)</button>
+        <button id="btn-res-reset">Reset Window</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="media-sources">
+    <!-- Test video source -->
+    <video id="test-video" loop muted playsinline crossOrigin="anonymous" src="/examples/assets/parity-clip.webm"></video>
+  </div>
+
+  <script type="module" src="./scene-transitions-ui.ts"></script>
+</body>
+</html>

@@ -42,3 +42,17 @@ and additionally asserts the correct full selection for cameras; the threshold a
 The scientific dashboard scene is documented in [integration-sciviz.md](integration-sciviz.md); run with --scene=sciviz. It composes sciviz, points, lines, labels, compute, loaders, video and html on the same engine.
 
 The public CAD-format scene is documented in [integration-engineering.md](integration-engineering.md); run with --scene=engineering. It imports only public mesh-format, editing, camera/navigation, selection, LOD, culling and export APIs.
+
+## User test pages
+
+The other pages in `examples/test-pages/` (city roads, character playground, product viewer and the rest) each use a
+few packages the way an application would, with buttons for edge cases and stress. `npm run test:pages:browser` opens
+every page, waits for its start, clicks every enabled button in order and waits for the work each click starts
+(`examples/test-pages/page-harness.ts` tracks it; there is no fixed sleep). A page fails on an uncaught error, a
+rejected promise, a console error or a console warning that says BUG. `--page=<name>` runs one page and
+`MARGO_COMPAT=1` runs them on the WebGL2 layer. Each page has a two minute limit (five for the path-traced still,
+whose tracer programs compile for up to about two minutes on ANGLE Direct3D 11; see docs/limits.md); results go to
+`test-results/test-pages-<page or all>-<backend>.json`. A bug a page still shows is listed in `KNOWN` in
+`scripts/test-pages-browser.mjs` with its KB id and reported as a known failure; the run fails once it stops showing,
+so the entry is removed with the fix. `examples/test-pages/BUGS.md` indexes what the pages found.
+`npm run check:examples-types -- --projects=test-pages` type-checks them. This suite has no speed assertion.

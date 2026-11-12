@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product viewer - Margo Engine Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+    #appContainer {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #viewportWrapper {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background: #05070a;
+      transition: width 0.25s ease;
+    }
+    #viewportWrapper.mobile-view {
+      flex: none;
+      width: 390px !important;
+      margin: 0 auto;
+      border-left: 2px solid #30363d;
+      border-right: 2px solid #30363d;
+    }
+    canvas#viewport {
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+    /* Left Sidebar */
+    #sidebar {
+      width: 410px;
+      height: 100%;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.4);
+    }
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #30363d;
+      background: #0d1117;
+    }
+    .panel-header h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 4px;
+    }
+    .panel-header p {
+      font-size: 0.78rem;
+      color: #8b949e;
+      line-height: 1.3;
+    }
+    .badge-bar {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #58a6ff;
+    }
+    .btn-toggle-backend {
+      font-size: 0.72rem;
+      color: #f0883e;
+      text-decoration: none;
+      padding: 3px 8px;
+      border: 1px solid #f0883e44;
+      border-radius: 6px;
+      background: #f0883e11;
+      cursor: pointer;
+    }
+    .btn-toggle-backend:hover {
+      background: #f0883e22;
+    }
+    .panel-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #8b949e;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .control-group {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+    .row label {
+      color: #c9d1d9;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .row span.val {
+      font-family: monospace;
+      color: #58a6ff;
+      font-weight: bold;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #58a6ff;
+      cursor: pointer;
+    }
+    input[type="checkbox"] {
+      accent-color: #58a6ff;
+      cursor: pointer;
+    }
+    select {
+      width: 100%;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+    }
+    select:focus {
+      border-color: #58a6ff;
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .btn-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    button.btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    button.btn:hover {
+      background: #30363d;
+      color: #f0f6fc;
+      border-color: #8b949e;
+    }
+    button.btn.active {
+      background: #1f6feb22;
+      border-color: #1f6feb;
+      color: #58a6ff;
+    }
+    button.btn.stress-btn {
+      background: #f8514915;
+      border-color: #f8514944;
+      color: #ff7b72;
+    }
+    button.btn.stress-btn:hover {
+      background: #f8514933;
+      border-color: #f85149;
+    }
+    /* In-page Log Box */
+    #logBox {
+      height: 130px;
+      background: #05070a;
+      border-top: 1px solid #30363d;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+      overflow-y: auto;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-entry-info { color: #8b949e; }
+    .log-entry-warn { color: #d29922; }
+    .log-entry-error { color: #f85149; font-weight: bold; }
+
+    /* Floating Viewport HUD */
+    #hudOverlay {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(13, 17, 23, 0.85);
+      border: 1px solid #30363d;
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      padding: 10px 14px;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #8b949e;
+      z-index: 5;
+    }
+    #hudOverlay span.val {
+      color: #58a6ff;
+      font-weight: bold;
+    }
+
+    #postOverlay {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(13, 17, 23, 0.85);
+      border: 1px solid #30363d;
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      padding: 10px 14px;
+      pointer-events: none;
+      font-family: monospace;
+      font-size: 0.76rem;
+      color: #8b949e;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    #postOverlay span.val {
+      color: #3fb950;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="appContainer">
+    <!-- Left Sidebar -->
+    <aside id="sidebar">
+      <div class="panel-header">
+        <h1>Product viewer</h1>
+        <p>Stress-testing staging, environment, shadows, post, dof, taa, tonemap, oit, materials, decoders.</p>
+        <div class="badge-bar">
+          <span class="badge" id="backendBadge">Backend: Auto</span>
+          <a class="btn-toggle-backend" id="btnToggleBackend" href="?backend=webgl2">Switch to WebGL2</a>
+        </div>
+      </div>
+
+      <div class="panel-scroll">
+        <!-- 1. Model Loading & Turntable -->
+        <div>
+          <div class="section-title">Model & Turntable</div>
+          <div class="control-group">
+            <select id="selProductModel">
+              <option value="flight-helmet">Flight Helmet (5.5 MB, Multi-PBR)</option>
+              <option value="scifi-helmet">Sci-Fi Helmet (5.1 MB, Emissive/Metal)</option>
+              <option value="mobile-helmet">Flight Helmet Mobile (1.3 MB)</option>
+            </select>
+            <div class="btn-grid">
+              <button class="btn" id="btnToggleTurntable">Turntable: ON</button>
+              <button class="btn stress-btn" id="btnRapidLoadUnload">⚡ Load/Unload 10x</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. HDRI Environment -->
+        <div>
+          <div class="section-title">HDRI Environment</div>
+          <div class="control-group">
+            <select id="selHdri">
+              <option value="workshop">Real Workshop HDR (1.7 MB .hdr)</option>
+              <option value="studio-warm">Procedural Warm Studio</option>
+              <option value="studio-cyber">Procedural Cyber / Sunset</option>
+            </select>
+            <div class="row">
+              <label for="rngEnvIntensity">Environment Intensity:</label>
+              <span class="val" id="valEnvIntensity">1.00</span>
+            </div>
+            <input type="range" id="rngEnvIntensity" min="0" max="3" step="0.1" value="1.0">
+            <div class="row">
+              <label for="rngEnvRotation">Environment Rotation:</label>
+              <span class="val" id="valEnvRotation">0.0°</span>
+            </div>
+            <input type="range" id="rngEnvRotation" min="0" max="360" step="5" value="0">
+          </div>
+        </div>
+
+        <!-- 3. Materials Tuning (Clearcoat, Transmission, Roughness) -->
+        <div>
+          <div class="section-title">Materials Live Tuning</div>
+          <div class="control-group">
+            <div class="row">
+              <label for="rngRoughness">Roughness Factor:</label>
+              <span class="val" id="valRoughness">0.50</span>
+            </div>
+            <input type="range" id="rngRoughness" min="0" max="1" step="0.05" value="0.5">
+
+            <div class="row">
+              <label for="rngMetallic">Metallic Factor:</label>
+              <span class="val" id="valMetallic">0.50</span>
+            </div>
+            <input type="range" id="rngMetallic" min="0" max="1" step="0.05" value="0.5">
+
+            <div class="row">
+              <label for="rngClearcoat">Clearcoat Factor:</label>
+              <span class="val" id="valClearcoat">0.00</span>
+            </div>
+            <input type="range" id="rngClearcoat" min="0" max="1" step="0.05" value="0.0">
+
+            <div class="row">
+              <label for="rngTransmission">Transmission (Glass):</label>
+              <span class="val" id="valTransmission">0.00</span>
+            </div>
+            <input type="range" id="rngTransmission" min="0" max="1" step="0.05" value="0.0">
+
+            <div class="section-title" style="margin-top: 4px;">Color Presets</div>
+            <div class="btn-grid-3">
+              <button class="btn" id="btnMatDefault">Original</button>
+              <button class="btn" id="btnMatGold">Gold</button>
+              <button class="btn" id="btnMatChrome">Chrome</button>
+              <button class="btn" id="btnMatRuby">Ruby</button>
+              <button class="btn" id="btnMatEmerald">Emerald</button>
+              <button class="btn" id="btnMatCeramic">Ceramic</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Post-Processing Stack & Individual Toggles -->
+        <div>
+          <div class="section-title">Post Effects & Shadows</div>
+          <div class="control-group">
+            <div class="row">
+              <label><input type="checkbox" id="chkPostStack" checked> PostStack Master</label>
+              <button class="btn stress-btn" id="btnStressTogglePost" style="padding: 2px 8px; font-size: 0.72rem;">⚡ Rapid Toggle 20x</button>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="chkSsao" checked> SSAO (Ambient Occlusion)</label>
+              <span class="val" id="valSsao">Active</span>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="chkDof" checked> Depth of Field (DOF)</label>
+              <span class="val" id="valDof">Active</span>
+            </div>
+            <div class="row">
+              <label for="rngDofDistance">DOF Focal Distance:</label>
+              <span class="val" id="valDofDistance">2.5 m</span>
+            </div>
+            <input type="range" id="rngDofDistance" min="0.5" max="8.0" step="0.1" value="2.5">
+
+            <div class="row">
+              <label><input type="checkbox" id="chkBloom" checked> HDR Bloom</label>
+              <span class="val" id="valBloom">Active</span>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="chkTaa" checked> TAA (Temporal Anti-Aliasing)</label>
+              <span class="val" id="valTaa">Active</span>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="chkContactShadows" checked> Contact Shadows (Staging)</label>
+              <span class="val" id="valContactShadows">Active</span>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="chkDirectionalShadows" checked> Directional Shadows (Cascades)</label>
+              <span class="val" id="valDirShadows">Active</span>
+            </div>
+            <div class="row">
+              <label><input type="checkbox" id="chkOit" checked> OIT (Order-Indep. Transparency)</label>
+              <span class="val" id="valOit">Active</span>
+            </div>
+
+            <div class="section-title" style="margin-top: 4px;">Tone Mapping</div>
+            <select id="selTonemapCurve">
+              <option value="neutral">Khronos PBR Neutral (Default)</option>
+              <option value="agx">AgX (High Dynamic Range)</option>
+              <option value="acescg">ACEScg (Cinematic)</option>
+            </select>
+            <div class="row">
+              <label for="rngExposure">Exposure (Stops):</label>
+              <span class="val" id="valExposure">0.0</span>
+            </div>
+            <input type="range" id="rngExposure" min="-3" max="3" step="0.2" value="0">
+          </div>
+        </div>
+
+        <!-- 5. Draco & KTX2 Compressed Decoders -->
+        <div>
+          <div class="section-title">Decoders (Draco & KTX2)</div>
+          <div class="control-group">
+            <button class="btn" id="btnTestDecoders">Decode Draco Mesh & KTX2 Texture</button>
+            <div class="row">
+              <span>Draco Mesh Status:</span>
+              <span class="val" id="valDracoStatus">Idle</span>
+            </div>
+            <div class="row">
+              <span>KTX2 Transcode Status:</span>
+              <span class="val" id="valKtx2Status">Idle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Stress & Lifecycle -->
+        <div>
+          <div class="section-title">Stress & Lifecycle</div>
+          <div class="control-group">
+            <button class="btn stress-btn" id="btnToggleStressAnimation">⚡ 60 FPS Continuous Stress Loop</button>
+            <button class="btn" id="btnResizeMobile">Toggle 390px Mobile View</button>
+            <button class="btn" id="btnSimulateFocusLoss">Simulate Focus Loss & Restore</button>
+            <button class="btn" id="btnRecreateScene">Re-create Stage & Scene</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-page Log Box -->
+      <div id="logBox">
+        <div class="log-entry-info">Product viewer ready. Monitoring telemetry…</div>
+      </div>
+    </aside>
+
+    <!-- Viewport Area -->
+    <main id="viewportWrapper">
+      <canvas id="viewport" tabindex="0"></canvas>
+
+      <!-- Viewport HUD Overlay -->
+      <div id="hudOverlay">
+        <div>FPS: <span class="val" id="hudFps">--</span> (<span class="val" id="hudFrameTime">-- ms</span>)</div>
+        <div>Memory: <span class="val" id="hudMemory">-- MB</span></div>
+        <div>Active Model: <span class="val" id="hudModelName">--</span></div>
+        <div>Primitives: <span class="val" id="hudPrimitives">--</span></div>
+        <div>HDRI: <span class="val" id="hudHdri">--</span></div>
+      </div>
+
+      <div id="postOverlay">
+        <div>Stack: <span class="val" id="hudPostStack">On</span></div>
+        <div>SSAO: <span class="val" id="hudSsao">On</span> | DOF: <span class="val" id="hudDof">On</span></div>
+        <div>Bloom: <span class="val" id="hudBloom">On</span> | TAA: <span class="val" id="hudTaa">On</span></div>
+        <div>Contact: <span class="val" id="hudContact">On</span> | DirShadow: <span class="val" id="hudDirShadow">On</span></div>
+        <div>OIT: <span class="val" id="hudOit">On</span> | Tone: <span class="val" id="hudTone">Neutral</span></div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./product-viewer.ts"></script>
+</body>
+</html>

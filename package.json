@@ -283,6 +283,7 @@
     "modern:test:bundlers": "node scripts/bundler-matrix.mjs",
     "test:speed": "node scripts/speed-suite.mjs",
     "test:integration:browser": "node scripts/integration-browser-tests.mjs",
+    "test:pages:browser": "node scripts/test-pages-browser.mjs",
     "check:owners": "node scripts/check-owner-lifetime-gate.mjs"
   },
   "devDependencies": {

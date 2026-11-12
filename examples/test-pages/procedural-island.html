@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procedural island - Margo Engine Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+    #appContainer {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #viewportWrapper {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background: #05070a;
+      transition: width 0.25s ease;
+    }
+    #viewportWrapper.mobile-view {
+      flex: none;
+      width: 390px !important;
+      margin: 0 auto;
+      border-left: 2px solid #30363d;
+      border-right: 2px solid #30363d;
+    }
+    canvas#viewport {
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+    /* Control Panel */
+    #sidebar {
+      width: 380px;
+      height: 100%;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.4);
+    }
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #30363d;
+      background: #0d1117;
+    }
+    .panel-header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+    .panel-header p {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #79c0ff;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 4px;
+      margin-top: 6px;
+    }
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #c9d1d9;
+    }
+    .val-badge {
+      font-family: monospace;
+      color: #58a6ff;
+      font-size: 11px;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #1f6feb;
+      background: #21262d;
+      height: 6px;
+      border-radius: 3px;
+      outline: none;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    button, .btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button:hover, .btn:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #f0f6fc;
+    }
+    button:active, button.active {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #ffffff;
+    }
+    button.stress-btn {
+      background: #23161a;
+      border-color: #8b1a2b;
+      color: #ff7b72;
+    }
+    button.stress-btn:hover {
+      background: #3e1b24;
+      border-color: #f85149;
+    }
+    select {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      outline: none;
+    }
+    /* Toggle Checkboxes */
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .toggle-grid label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      background: #0d1117;
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid #21262d;
+    }
+    .toggle-grid input[type="checkbox"] {
+      accent-color: #1f6feb;
+    }
+    /* HUD Overlay */
+    #hudOverlay {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .hud-card {
+      background: rgba(13, 17, 23, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      pointer-events: auto;
+      min-width: 250px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .hud-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #8b949e;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hud-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #1f6feb22;
+      color: #58a6ff;
+      border: 1px solid #1f6feb66;
+    }
+    .hud-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .hud-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .hud-stat-lbl {
+      font-size: 10px;
+      color: #8b949e;
+    }
+    .hud-stat-val {
+      font-size: 13px;
+      font-weight: 600;
+      font-family: monospace;
+      color: #f0f6fc;
+    }
+    /* Log Box */
+    #logBox {
+      height: 140px;
+      background: #0d1117;
+      border-top: 1px solid #30363d;
+      padding: 8px 12px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 2px;
+    }
+    .log-entry-info { color: #8b949e; }
+    .log-entry-warn { color: #d29922; }
+    .log-entry-error { color: #f85149; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="appContainer">
+    <!-- Sidebar Controls -->
+    <div id="sidebar">
+      <div class="panel-header">
+        <h1>Procedural island</h1>
+        <p>Stress test for @margoengine/procedural, biomes, scatter, terrain, water, sky, and weather.</p>
+      </div>
+
+      <div class="panel-content">
+        <!-- Seed & Generation -->
+        <div class="section-title">World Seed</div>
+        <div class="control-row">
+          <div class="control-label-row">
+            <span>Seed Slider (Rapid Scrub)</span>
+            <span id="lblSeed" class="val-badge">731</span>
+          </div>
+          <input type="range" id="rngSeed" min="1" max="1000" value="731" step="1">
+        </div>
+        <div class="btn-group">
+          <button id="btnRandomSeed">Random Seed</button>
+          <button id="btnRapidSeedScrub" class="stress-btn">Scrub 25 Seeds / Sec</button>
+        </div>
+
+        <!-- Day / Night Cycle & Sky -->
+        <div class="section-title">Sky & Atmosphere</div>
+        <div class="control-row">
+          <div class="control-label-row">
+            <span>Time of Day (Hours)</span>
+            <span id="lblHours" class="val-badge">14.0 h</span>
+          </div>
+          <input type="range" id="rngHours" min="0" max="24" value="14" step="0.1">
+        </div>
+        <div class="btn-group">
+          <button id="btnToggleDayNightCycle">Animate 24h Cycle (60 FPS)</button>
+          <button id="btnSkyNoon">Noon</button>
+          <button id="btnSkySunset">Sunset</button>
+          <button id="btnSkyMidnight">Midnight</button>
+        </div>
+
+        <!-- Weather State Machine -->
+        <div class="section-title">Weather Machine</div>
+        <div class="control-row">
+          <div class="control-label-row">
+            <span>Active Preset</span>
+            <span id="lblWeatherPreset" class="val-badge">clear</span>
+          </div>
+          <select id="selWeatherPreset">
+            <option value="clear">Clear</option>
+            <option value="partlyCloudy">Partly Cloudy</option>
+            <option value="overcast">Overcast</option>
+            <option value="fog">Fog</option>
+            <option value="drizzle">Drizzle</option>
+            <option value="rain">Rain</option>
+            <option value="thunderstorm">Thunderstorm</option>
+            <option value="hail">Hail</option>
+            <option value="snow">Snow</option>
+            <option value="blizzard">Blizzard</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="btnWeatherRapidCycle" class="stress-btn">Cycle All Weathers</button>
+        </div>
+
+        <!-- Procedural Features Toggle -->
+        <div class="section-title">Procedural Features</div>
+        <div class="toggle-grid">
+          <label><input type="checkbox" id="chkTerrain" checked> Island Terrain</label>
+          <label><input type="checkbox" id="chkWater" checked> Ocean Water</label>
+          <label><input type="checkbox" id="chkSky" checked> Dynamic Sky</label>
+          <label><input type="checkbox" id="chkWeather" checked> Rain / Snow</label>
+          <label><input type="checkbox" id="chkPoissonScatter" checked> Poisson Disk</label>
+          <label><input type="checkbox" id="chkSpaceTrees" checked> Colonization Tree</label>
+          <label><input type="checkbox" id="chkDungeon" checked> Dungeon (Cave)</label>
+          <label><input type="checkbox" id="chkMarchingCaves" checked> Marching Grotto</label>
+          <label><input type="checkbox" id="chkSdfMonolith" checked> Sharp SDF CSG</label>
+          <label><input type="checkbox" id="chkBldgs" checked> Grammar Building</label>
+          <label><input type="checkbox" id="chkWaterfront" checked> Jetty & Boat</label>
+          <label><input type="checkbox" id="chkGpuTextures" checked> GPU Texture Bake</label>
+        </div>
+
+        <!-- Stress Testing Actions -->
+        <div class="section-title">Stress & Edge Cases</div>
+        <div class="btn-group">
+          <button id="btnResizeMobile" class="stress-btn">Toggle 390px Mobile View</button>
+          <button id="btnSimulateFocusLoss">Simulate Focus Loss / Restore</button>
+          <button id="btnRecreateScene" class="stress-btn">Dispose & Re-create Scene</button>
+        </div>
+      </div>
+
+      <!-- In-Page Log Output -->
+      <div id="logBox"></div>
+    </div>
+
+    <!-- Viewport Container -->
+    <div id="viewportWrapper">
+      <canvas id="viewport"></canvas>
+
+      <!-- HUD Telemetry -->
+      <div id="hudOverlay">
+        <div class="hud-card">
+          <div class="hud-title">
+            <span>Renderer Telemetry</span>
+            <span id="backendBadge" class="hud-badge">Detecting…</span>
+          </div>
+          <div class="hud-grid">
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">FPS</span>
+              <span id="hudFps" class="hud-stat-val">--</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Frame Time</span>
+              <span id="hudFrameTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">JS Heap Memory</span>
+              <span id="hudMemory" class="hud-stat-val">-- MB</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Total Triangles</span>
+              <span id="hudTriangles" class="hud-stat-val">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-card">
+          <div class="hud-title">
+            <span>Procedural Benchmarks</span>
+            <span id="hudGenTotal" class="hud-badge">0 ms</span>
+          </div>
+          <div class="hud-grid">
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Poisson Disk</span>
+              <span id="hudPoissonTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Dungeon Wasm</span>
+              <span id="hudDungeonTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Trees Wasm</span>
+              <span id="hudTreesTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Sharp SDF CSG</span>
+              <span id="hudSdfTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Building Grammar</span>
+              <span id="hudBldgTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Marching Cubes</span>
+              <span id="hudMarchingTime" class="hud-stat-val">-- ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-card">
+          <div class="hud-title">
+            <span>Biome Classification</span>
+            <span id="hudBiomeType" class="hud-badge">--</span>
+          </div>
+          <div class="hud-grid">
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Elevation</span>
+              <span id="hudElevation" class="hud-stat-val">-- m</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Temperature</span>
+              <span id="hudTemperature" class="hud-stat-val">-- °C</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Rainfall</span>
+              <span id="hudRainfall" class="hud-stat-val">-- mm</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Soil & Moisture</span>
+              <span id="hudMoisture" class="hud-stat-val">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: right; pointer-events: auto;">
+          <a id="btnToggleBackend" class="btn" href="?backend=webgl2" style="font-size: 11px;">Switch to WebGL2</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./procedural-island.ts"></script>
+</body>
+</html>

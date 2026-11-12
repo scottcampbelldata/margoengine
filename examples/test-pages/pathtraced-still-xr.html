@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Path-Traced Still & XR Fallback - Margo Engine Test</title>
+  <style>
+    :root {
+      --bg: #040711;
+      --panel-bg: rgba(13, 20, 36, 0.94);
+      --border: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transition: width 0.25s ease;
+    }
+    #viewport.mobile-view {
+      width: 390px !important;
+      height: 844px !important;
+      margin: 0 auto;
+      border-left: 2px solid var(--border);
+      border-right: 2px solid var(--border);
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 340px;
+      max-height: calc(100vh - 32px);
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    .hud-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      background: #1e293b;
+      color: var(--accent);
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .val {
+      font-family: monospace;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .btn-group-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    button {
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    button:hover:not(:disabled) {
+      background: #334155;
+      border-color: var(--accent);
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    button.active {
+      background: var(--accent);
+      color: #07090e;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    .progress-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.1s linear;
+    }
+    #log {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: monospace;
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #1e293b;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="hud">
+    <div class="hud-title">
+      <span>Path-Traced Still & XR</span>
+      <span id="badge-backend" class="badge">detecting...</span>
+    </div>
+
+    <!-- Path Tracer Section -->
+    <div class="section-title">Path Tracer (@margoengine/voxel-pathtracer)</div>
+    <div class="row">
+      <span>Tracer Status:</span>
+      <span id="val-tracer-status" class="val">Initializing...</span>
+    </div>
+    <div class="row">
+      <span>Accumulated Samples:</span>
+      <span id="val-samples-count" class="val">0 / 256</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div id="bar-samples-progress" class="progress-bar"></div>
+    </div>
+    <div class="btn-group">
+      <button id="btn-toggle-trace" class="active">Pause Trace</button>
+      <button id="btn-reset-trace">Reset Trace</button>
+    </div>
+    <button id="btn-capture-still" style="margin-top: 2px;">Capture PNG Still (64s)</button>
+
+    <!-- WebXR Section -->
+    <div class="section-title">WebXR Fallback (@margoengine/xr)</div>
+    <div class="row">
+      <span>Immersive VR Support:</span>
+      <span id="val-xr-support" class="val">Checking...</span>
+    </div>
+    <div class="row">
+      <span>XR Error Code:</span>
+      <span id="val-xr-error" class="val">None</span>
+    </div>
+    <button id="btn-start-xr" style="margin-top: 2px;">Start XR Session (Headset Check)</button>
+
+    <!-- Input Validation & Coded Errors -->
+    <div class="section-title">Input Validation Stress</div>
+    <div class="btn-group">
+      <button id="btn-test-bad-scene">Bad Scene Test</button>
+      <button id="btn-test-bad-xr">Bad XR Mode Test</button>
+    </div>
+
+    <!-- Diagnostics & Stress Tests -->
+    <div class="section-title">Diagnostics & Stress Tests</div>
+    <div class="btn-group-3">
+      <button id="btn-stress-pause">5x Toggle</button>
+      <button id="btn-test-mobile">Mobile 390px</button>
+      <button id="btn-recreate">Recreate</button>
+    </div>
+
+    <!-- Telemetry -->
+    <div class="section-title">Telemetry</div>
+    <div class="row">
+      <span>FPS / Frame:</span>
+      <span id="val-fps" class="val">60 fps (16.6ms)</span>
+    </div>
+
+    <div id="log">Ready.</div>
+  </div>
+
+  <script type="module" src="./pathtraced-still-xr.ts"></script>
+</body>
+</html>

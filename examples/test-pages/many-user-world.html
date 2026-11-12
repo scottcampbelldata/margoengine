@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Many-user world - Margo Engine</title>
+  <style>
+    :root {
+      --bg: #07090e;
+      --panel-bg: rgba(15, 23, 42, 0.88);
+      --border: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 380px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 50;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .hud-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: #1e293b;
+      color: var(--muted);
+      border: 1px solid #334155;
+    }
+    .badge.active {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .badge.warn {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .metric-card {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .metric-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-val {
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 4px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .control-value {
+      color: var(--text);
+      font-family: monospace;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #1e293b;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      flex: 1;
+      padding: 8px 12px;
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #030712;
+      border-color: var(--accent);
+    }
+    button.primary:hover {
+      background: var(--accent-hover);
+    }
+    button.danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+    button.danger:hover {
+      background: rgba(239, 68, 68, 0.4);
+    }
+    #worker-panel {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 220px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .worker-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+    }
+    #worker-canvas {
+      width: 200px;
+      height: 120px;
+      border-radius: 4px;
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #log-box {
+      font-family: monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      line-height: 1.3;
+    }
+    @media (max-width: 600px) {
+      #hud {
+        width: calc(100vw - 32px);
+        max-height: 60vh;
+      }
+      #worker-panel {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="hud">
+    <div class="hud-title">
+      <span>Many-user world</span>
+      <span class="badge" id="backend-badge">WebGPU</span>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <span class="metric-label">FPS / Time</span>
+        <span class="metric-val" id="fps-val">60 / 16.6ms</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Memory</span>
+        <span class="metric-val" id="mem-val">-- MB</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Active Clients</span>
+        <span class="metric-val" id="clients-val">0 / 50</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Server Tick</span>
+        <span class="metric-val" id="tick-val">0 (30t/s)</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">NavMesh Agents</span>
+        <span class="metric-val" id="agents-val">50 agents</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Obstacles</span>
+        <span class="metric-val" id="obstacles-val">4 obstacles</span>
+      </div>
+    </div>
+
+    <div class="section-title">Network & Server (net, netcode)</div>
+
+    <div class="control-group">
+      <div class="control-header">
+        <span>Target Clients</span>
+        <span class="control-value" id="target-clients-num">50</span>
+      </div>
+      <input type="range" id="target-clients" min="0" max="64" value="50" step="1">
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-join10">Join +10</button>
+      <button id="btn-leave10">Leave -10</button>
+      <button class="primary" id="btn-burst">Burst 50</button>
+    </div>
+
+    <div class="control-group">
+      <div class="control-header">
+        <span>Simulated Latency</span>
+        <span class="control-value" id="latency-num">30 ms</span>
+      </div>
+      <input type="range" id="latency" min="0" max="200" value="30" step="5">
+    </div>
+
+    <div class="control-group">
+      <div class="control-header">
+        <span>Packet Loss</span>
+        <span class="control-value" id="loss-num">0%</span>
+      </div>
+      <input type="range" id="loss" min="0" max="20" value="0" step="1">
+    </div>
+
+    <div class="section-title">Navigation & AI (navmesh, ecs, fsm, behavior)</div>
+
+    <div class="control-group">
+      <div class="control-header">
+        <span>Dynamic Obstacles</span>
+        <span class="control-value" id="obstacle-count-num">4</span>
+      </div>
+      <input type="range" id="obstacle-count" min="0" max="8" value="4" step="1">
+    </div>
+
+    <div class="btn-row">
+      <button id="btn-toggle-obstacles">Move Obstacles</button>
+      <button id="btn-shuffle-goals">Shuffle Goals</button>
+    </div>
+
+    <div class="control-group">
+      <div class="control-header">
+        <span>Agent Speed</span>
+        <span class="control-value" id="speed-num">4.0 m/s</span>
+      </div>
+      <input type="range" id="speed" min="1" max="10" value="4" step="0.5">
+    </div>
+
+    <div class="section-title">Integration (voxel-net, worker)</div>
+
+    <div class="btn-row">
+      <button id="btn-voxel-test">Test Voxel-Net</button>
+      <button id="btn-worker-toggle">Toggle Worker</button>
+    </div>
+
+    <div class="section-title">Lifecycle & Stress</div>
+
+    <div class="btn-row">
+      <button class="danger" id="btn-recreate">Dispose & Re-create</button>
+    </div>
+
+    <div id="log-box">Initializing Many-user world...</div>
+  </div>
+
+  <div id="worker-panel">
+    <div class="worker-title">
+      <span>Worker Canvas</span>
+      <span class="badge" id="worker-badge">Offscreen</span>
+    </div>
+    <canvas id="worker-canvas"></canvas>
+  </div>
+
+  <script type="module" src="./many-user-world.ts"></script>
+</body>
+</html>

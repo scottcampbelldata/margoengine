@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baked Lighting Room - Margo Engine Test</title>
+  <style>
+    :root {
+      --bg: #050811;
+      --panel-bg: rgba(13, 20, 36, 0.94);
+      --border: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transition: width 0.25s ease;
+    }
+    #viewport.mobile-view {
+      width: 390px !important;
+      height: 844px !important;
+      margin: 0 auto;
+      border-left: 2px solid var(--border);
+      border-right: 2px solid var(--border);
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 340px;
+      max-height: calc(100vh - 32px);
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    .hud-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      background: #1e293b;
+      color: var(--accent);
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .val {
+      font-family: monospace;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .btn-group-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    button {
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    button:hover:not(:disabled) {
+      background: #334155;
+      border-color: var(--accent);
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    button.active {
+      background: var(--accent);
+      color: #07090e;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    .progress-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.1s linear;
+    }
+    #log {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: monospace;
+      max-height: 80px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #1e293b;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="hud">
+    <div class="hud-title">
+      <span>Baked Lighting Room</span>
+      <span id="badge-backend" class="badge">detecting...</span>
+    </div>
+
+    <!-- Lightmap Baking Section -->
+    <div class="section-title">Lightmap Baker (@margoengine/lightmap)</div>
+    <div class="row">
+      <span>Bake Status:</span>
+      <span id="val-bake-status" class="val">Unbaked</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div id="bar-bake-progress" class="progress-bar"></div>
+    </div>
+    <div class="btn-group">
+      <button id="btn-bake">Bake Lightmap</button>
+      <button id="btn-cancel-bake" disabled>Cancel</button>
+    </div>
+
+    <!-- Scenery Moon & Sky Section -->
+    <div class="section-title">Night Scenery (@margoengine/scenery)</div>
+    <div class="row">
+      <span>Moon Phase:</span>
+      <span id="val-moon-phase" class="val">0.85</span>
+    </div>
+    <div class="btn-group">
+      <button id="btn-toggle-sky" class="active">SkyMoon Active</button>
+      <button id="btn-cycle-moon">Cycle Moon</button>
+    </div>
+
+    <!-- Scatter Props Section -->
+    <div class="section-title">Prop Scatter (@margoengine/scatter)</div>
+    <div class="row">
+      <span>Scattered Props:</span>
+      <span id="val-scatter-count" class="val">5,000 instances</span>
+    </div>
+    <div class="btn-group">
+      <button id="btn-toggle-scatter" class="active">Scatter Layer</button>
+      <button id="btn-jitter-scatter">Jitter Props</button>
+    </div>
+
+    <!-- GPU Culling Section -->
+    <div class="section-title">GPU Culling (@margoengine/culling)</div>
+    <div class="row">
+      <span>Culled / Drawn:</span>
+      <span id="val-culled-counts" class="val">0 drawn</span>
+    </div>
+    <div class="btn-group">
+      <button id="btn-toggle-cull-mode">Mode: Frustum</button>
+      <button id="btn-read-cull">Read Counts</button>
+    </div>
+
+    <!-- Offline Asset Cache Section -->
+    <div class="section-title">Asset Cache (@margoengine/cache)</div>
+    <div class="row">
+      <span>Cache Stats:</span>
+      <span id="val-cache-stats" class="val">Hits: 0, Miss: 0</span>
+    </div>
+    <div class="btn-group">
+      <button id="btn-cache-save">Cache Bake</button>
+      <button id="btn-cache-reload">Reload Cache</button>
+    </div>
+    <button id="btn-cache-clear" style="margin-top: 4px;">Clear Cache DB</button>
+
+    <!-- Diagnostics & Stress -->
+    <div class="section-title">Diagnostics & Stress Tests</div>
+    <div class="btn-group-3">
+      <button id="btn-stress-cull">Orbit Stress</button>
+      <button id="btn-test-mobile">Mobile 390px</button>
+      <button id="btn-recreate">Recreate</button>
+    </div>
+
+    <!-- Telemetry -->
+    <div class="section-title">Telemetry</div>
+    <div class="row">
+      <span>FPS / Frame:</span>
+      <span id="val-fps" class="val">60 fps (16.6ms)</span>
+    </div>
+
+    <div id="log">Ready.</div>
+  </div>
+
+  <script type="module" src="./baked-lighting-room.ts"></script>
+</body>
+</html>

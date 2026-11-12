@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City roads · Margo Engine Test</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font: 14px system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 8px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0;
+      color: #f0f6fc;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: #1f6feb22;
+      border: 1px solid #388bfd66;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+      flex: 1;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .controls-panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 82vh;
+      overflow-y: auto;
+    }
+    .viewport-box {
+      position: relative;
+      background: #080c10;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.3s ease;
+    }
+    .viewport-box.mobile-view {
+      width: 390px !important;
+      margin: 0 auto;
+    }
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      min-height: 500px;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8b949e;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 3px;
+      margin-top: 4px;
+    }
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .btn {
+      padding: 6px 12px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+    .btn:hover {
+      background: #30363d;
+      color: #f0f6fc;
+    }
+    .btn-danger {
+      background: #da363322;
+      border-color: #f8514966;
+      color: #f85149;
+    }
+    .btn-danger:hover {
+      background: #da363344;
+    }
+    .btn-active {
+      background: #238636;
+      border-color: #2ea043;
+      color: #ffffff;
+    }
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    input[type="range"] {
+      flex: 1;
+      accent-color: #58a6ff;
+    }
+    select {
+      background: #0d1117;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
+    .hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #0d1117cc;
+      backdrop-filter: blur(6px);
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: #8b949e;
+      line-height: 1.5;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud strong {
+      color: #58a6ff;
+    }
+    .log-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      max-height: 140px;
+      overflow-y: auto;
+      color: #c9d1d9;
+    }
+    .log-entry-error {
+      color: #f85149;
+    }
+    .log-entry-warn {
+      color: #d29922;
+    }
+    .log-entry-info {
+      color: #58a6ff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>City roads · Engine Test Page</h1>
+      <span style="font-size:12px; color:#8b949e;">Packages: <code>@margoengine/road</code>, <code>@margoengine/terrain</code>, <code>@margoengine/splines</code></span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span class="badge" id="backendBadge">Backend: auto</span>
+      <a class="btn" id="btnToggleBackend" href="?backend=webgl2">Switch to WebGL2</a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="controls-panel">
+      <!-- Network & Routing -->
+      <span class="section-title">1. Road Network & Shortest Path Routing</span>
+      <div class="control-row">
+        <span>Shortest Path:</span>
+        <strong id="shortestPathInfo" style="color:#58a6ff;">A → B → C (32.4 m)</strong>
+      </div>
+      <div class="control-row">
+        <span>Car Speed:</span>
+        <input type="range" id="carSpeedRange" min="5" max="60" value="25">
+        <span id="carSpeedVal" style="min-width:40px; text-align:right;">25 m/s</span>
+      </div>
+      <div class="button-grid">
+        <button type="button" class="btn" id="btnToggleRoadblock">Toggle Roadblock (Detour)</button>
+        <button type="button" class="btn" id="btnRecomputePath">Re-route Car</button>
+      </div>
+
+      <!-- Spline Dragging & Loop Closure -->
+      <span class="section-title">2. Spline Knots & Loop Testing</span>
+      <div class="control-row">
+        <label for="knotSelect">Selected Knot:</label>
+        <select id="knotSelect">
+          <option value="0">Knot 0 (Junction A)</option>
+          <option value="1">Knot 1 (Midpoint B)</option>
+          <option value="2">Knot 2 (Junction C)</option>
+          <option value="3">Knot 3 (Loop D)</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <span>Knot X Offset:</span>
+        <input type="range" id="knotXRange" min="-30" max="30" value="0">
+        <span id="knotXVal" style="min-width:35px; text-align:right;">0 m</span>
+      </div>
+      <div class="control-row">
+        <span>Knot Z Offset:</span>
+        <input type="range" id="knotZRange" min="-30" max="30" value="0">
+        <span id="knotZVal" style="min-width:35px; text-align:right;">0 m</span>
+      </div>
+      <div class="button-grid">
+        <button type="button" class="btn" id="btnCloseLoop">Close Loop (Test Seam)</button>
+        <button type="button" class="btn" id="btnSharpBend">Sharp Hairpin (R→0)</button>
+      </div>
+      <div class="button-grid">
+        <button type="button" class="btn btn-danger" id="btnVerticalTangent">Vertical Tangent (Crash)</button>
+        <button type="button" class="btn btn-danger" id="btnZeroLength">Duplicate Knot (L=0)</button>
+      </div>
+
+      <!-- Road Geometry & Banking -->
+      <span class="section-title">3. Road Geometry & Banking Stress</span>
+      <div class="control-row">
+        <span>Width:</span>
+        <input type="range" id="widthRange" min="2" max="24" step="0.5" value="6">
+        <span id="widthVal" style="min-width:35px; text-align:right;">6 m</span>
+      </div>
+      <div class="control-row">
+        <span>Segments:</span>
+        <input type="range" id="segmentsRange" min="4" max="512" step="4" value="128">
+        <span id="segmentsVal" style="min-width:35px; text-align:right;">128</span>
+      </div>
+      <div class="control-row">
+        <span>Banking Tilt:</span>
+        <input type="range" id="bankingRange" min="-45" max="45" step="1" value="0">
+        <span id="bankingVal" style="min-width:35px; text-align:right;">0°</span>
+      </div>
+      <div class="control-row">
+        <label><input type="checkbox" id="terrainFitCheck" checked> Fit Road Knots to Terrain Height</label>
+      </div>
+
+      <!-- Stress & Reliability -->
+      <span class="section-title">4. Engine & Lifecycle Stress</span>
+      <div class="button-grid">
+        <button type="button" class="btn" id="btnStressAnimate">Start 60 FPS Animate</button>
+        <button type="button" class="btn" id="btnRecreateScene">Dispose & Re-create</button>
+      </div>
+      <div class="button-grid">
+        <button type="button" class="btn" id="btnResizeMobile">Toggle 390px Mobile</button>
+        <button type="button" class="btn" id="btnSimulateBlur">Simulate Focus Loss</button>
+      </div>
+
+      <!-- Live Diagnostics Log -->
+      <span class="section-title">5. In-Page Error & Diagnostics Log</span>
+      <div class="log-box" id="logBox" role="log" aria-live="polite">
+        <div class="log-entry-info">[Init] Logging started.</div>
+      </div>
+      <button type="button" class="btn" id="btnClearLog">Clear Log</button>
+    </aside>
+
+    <main class="viewport-box" id="viewportBox">
+      <div class="hud" id="hud">
+        <div>FPS: <strong id="hudFps">--</strong> | Frame Time: <strong id="hudFrameTime">-- ms</strong></div>
+        <div>JS Heap: <strong id="hudMemory">-- MB</strong> | Triangles: <strong id="hudTriangles">--</strong></div>
+        <div>Active Roads: <strong id="hudRoads">4 segments</strong></div>
+        <div>Car Distance: <strong id="hudCarDist">0.0 m</strong></div>
+      </div>
+      <div class="canvas-container">
+        <canvas id="viewport" aria-label="City roads test canvas"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./city-roads.ts"></script>
+</body>
+</html>

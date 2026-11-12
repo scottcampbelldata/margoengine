@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particles and effects - Margo Engine</title>
+  <style>
+    :root {
+      --bg: #07090e;
+      --panel-bg: rgba(15, 23, 42, 0.88);
+      --border: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #viewport {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 380px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 50;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .hud-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: #1e293b;
+      color: #38bdf8;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.gpu { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+    .badge.gl2 { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .stat-card {
+      background: rgba(30, 41, 59, 0.6);
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.68rem;
+    }
+    .stat-val {
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: monospace;
+    }
+    .benchmark-result {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.82rem;
+      display: none;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .group-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex: 1 1 auto;
+      text-align: center;
+    }
+    button:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+    button.active {
+      background: var(--accent);
+      color: #0f172a;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    button.danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+    button.danger:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+    .slider-val {
+      min-width: 65px;
+      font-family: monospace;
+      text-align: right;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="hud">
+    <div class="hud-title">
+      <span>Particles & Effects</span>
+      <span id="backend-badge" class="badge">WebGPU</span>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">FPS</div>
+        <div id="stat-fps" class="stat-val">60</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Frame Time</div>
+        <div id="stat-ms" class="stat-val">16.6 ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Elements</div>
+        <div id="stat-total" class="stat-val">0</div>
+      </div>
+    </div>
+
+    <div id="benchmark-card" class="benchmark-result">
+      <strong>33 ms Limit Benchmark:</strong>
+      <div id="benchmark-text">Not run yet</div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">VFX Particles (Compute)</div>
+      <div class="slider-row">
+        <span>Capacity:</span>
+        <input type="range" id="slider-vfx-cap" min="1000" max="1000000" step="10000" value="50000">
+        <span id="val-vfx-cap" class="slider-val">50,000</span>
+      </div>
+      <div class="slider-row">
+        <span>Rate/s:</span>
+        <input type="range" id="slider-vfx-rate" min="0" max="200000" step="5000" value="25000">
+        <span id="val-vfx-rate" class="slider-val">25,000</span>
+      </div>
+      <div class="btn-row">
+        <button id="btn-vfx-burst">Burst 10k</button>
+        <button id="btn-vfx-toggle">Pause Emitter</button>
+        <button id="btn-vfx-rapid" class="danger">Rapid Toggle (100ms)</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Point Cloud (@margoengine/points)</div>
+      <div class="slider-row">
+        <span>Points:</span>
+        <input type="range" id="slider-points" min="1000" max="500000" step="5000" value="30000">
+        <span id="val-points" class="slider-val">30,000</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Gaussian Splats (@margoengine/splats)</div>
+      <div class="slider-row">
+        <span>Splats:</span>
+        <input type="range" id="slider-splats" min="500" max="100000" step="1000" value="8000">
+        <span id="val-splats" class="slider-val">8,000</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Sprites & Fat Lines</div>
+      <div class="slider-row">
+        <span>Sprites:</span>
+        <input type="range" id="slider-sprites" min="100" max="10000" step="200" value="1000">
+        <span id="val-sprites" class="slider-val">1,000</span>
+      </div>
+      <div class="slider-row">
+        <span>Line Segments:</span>
+        <input type="range" id="slider-lines" min="50" max="5000" step="100" value="500">
+        <span id="val-lines" class="slider-val">500</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Shading & Compositing</div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="chk-toon" checked>
+        <label for="chk-toon">Toon Inverted Hull Outline</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="chk-lighting2d" checked>
+        <label for="chk-lighting2d">2D Lighting & Shadows</label>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Stress Benchmark & Lifecycle</div>
+      <div class="btn-row">
+        <button id="btn-benchmark-33ms" class="active">Benchmark to 33 ms</button>
+        <button id="btn-recreate">Dispose & Recreate</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-res-mobile">390x844 (Mobile)</button>
+        <button id="btn-res-reset">Reset Window</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./particles-effects.ts"></script>
+</body>
+</html>

@@ -454,6 +454,12 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
         print.files.add('tests/composition/generated.json');
         print.files.add('scripts/generate-composition.mjs');
       }
+      if (test.name === 'test:pages:browser') {
+        const pages = readdirSync(join(root, 'examples/test-pages')).filter(
+          (f) => /\.(html|tsx?)$/.test(f) && !f.startsWith('integration-'),
+        );
+        print = merge(print, ...pages.map((page) => ofScript(`examples/test-pages/${page}`)));
+      }
       if (test.name === 'test:integration:browser') {
         const pages = readdirSync(join(root, 'examples/test-pages')).filter((f) => /^integration-.*\.html$/.test(f));
         print = merge(print, ...pages.map((page) => ofScript(`examples/test-pages/${page}`)));

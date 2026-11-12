@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tile and voxel editor - Margo Engine Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+    #appContainer {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #viewportWrapper {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background: #05070a;
+      transition: width 0.25s ease;
+    }
+    #viewportWrapper.mobile-view {
+      flex: none;
+      width: 390px !important;
+      margin: 0 auto;
+      border-left: 2px solid #30363d;
+      border-right: 2px solid #30363d;
+    }
+    canvas#viewport {
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+    /* Left Toolbar */
+    #sidebar {
+      width: 380px;
+      height: 100%;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.4);
+    }
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #30363d;
+      background: #0d1117;
+    }
+    .panel-header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+    .panel-header p {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #79c0ff;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 4px;
+      margin-top: 6px;
+    }
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #c9d1d9;
+    }
+    .val-badge {
+      font-family: monospace;
+      color: #58a6ff;
+      font-size: 11px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    button, .btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button:hover, .btn:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #f0f6fc;
+    }
+    button:active, button.active {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #ffffff;
+    }
+    button.stress-btn {
+      background: #23161a;
+      border-color: #8b1a2b;
+      color: #ff7b72;
+    }
+    button.stress-btn:hover {
+      background: #3e1b24;
+      border-color: #f85149;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    /* Palette Swatches */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .swatch {
+      height: 32px;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .swatch:hover {
+      transform: scale(1.08);
+    }
+    .swatch.selected {
+      border-color: #ffffff;
+      box-shadow: 0 0 6px rgba(255,255,255,0.6);
+    }
+    /* Tilemap Preview Canvas */
+    #tilemapCanvas {
+      width: 100%;
+      height: 120px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      image-rendering: pixelated;
+    }
+    /* Inspector Container */
+    #inspectorContainer {
+      min-height: 160px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    /* HUD Overlay */
+    #hudOverlay {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .hud-card {
+      background: rgba(13, 17, 23, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      pointer-events: auto;
+      min-width: 250px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .hud-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #8b949e;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hud-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #1f6feb22;
+      color: #58a6ff;
+      border: 1px solid #1f6feb66;
+    }
+    .hud-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .hud-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .hud-stat-lbl {
+      font-size: 10px;
+      color: #8b949e;
+    }
+    .hud-stat-val {
+      font-size: 13px;
+      font-weight: 600;
+      font-family: monospace;
+      color: #f0f6fc;
+    }
+    /* Log Box */
+    #logBox {
+      height: 140px;
+      background: #0d1117;
+      border-top: 1px solid #30363d;
+      padding: 8px 12px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 2px;
+    }
+    .log-entry-info { color: #8b949e; }
+    .log-entry-warn { color: #d29922; }
+    .log-entry-error { color: #f85149; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="appContainer">
+    <!-- Sidebar Controls -->
+    <div id="sidebar">
+      <div class="panel-header">
+        <h1>Tile and voxel editor</h1>
+        <p>Stress test for @margoengine/voxel, voxel-edit, tilemap, wfc, selection, inspector, and save.</p>
+      </div>
+
+      <div class="panel-content">
+        <!-- Palette & Tools -->
+        <div class="section-title">Voxel Palette & Tools</div>
+        <div class="palette-grid" id="paletteGrid"></div>
+
+        <div class="control-row">
+          <div class="control-label-row">
+            <span>Current Tool</span>
+            <span id="lblCurrentTool" class="val-badge">Add Block</span>
+          </div>
+          <div class="btn-group">
+            <button id="btnToolAdd" class="active">Add</button>
+            <button id="btnToolErase">Erase</button>
+            <button id="btnToolPaint">Paint</button>
+            <button id="btnToolSphere">Sphere (r=3)</button>
+            <button id="btnToolFill">Flood Fill</button>
+          </div>
+        </div>
+
+        <!-- Undo / Redo -->
+        <div class="section-title">History Stack</div>
+        <div class="btn-group">
+          <button id="btnUndo">Undo (Ctrl+Z)</button>
+          <button id="btnRedo">Redo (Ctrl+Y)</button>
+          <button id="btnStressHistory" class="stress-btn">Stress 50x Paint / Undo / Redo</button>
+        </div>
+
+        <!-- Wave Function Collapse -->
+        <div class="section-title">Wave Function Collapse (WFC)</div>
+        <p style="font-size: 11px; color: #8b949e;">Generate 2D/3D patterns. Test mid-solve cancellation via AbortSignal.</p>
+        <div class="btn-group">
+          <button id="btnWfcSolveFull">WFC Solve Full</button>
+          <button id="btnWfcCancelHalfway" class="stress-btn">WFC Cancel Halfway</button>
+        </div>
+        <div id="wfcProgress" style="font-size: 11px; font-family: monospace; color: #58a6ff;">Ready</div>
+
+        <!-- Save and Reload -->
+        <div class="section-title">Save & Reload (@margoengine/save)</div>
+        <div class="btn-group">
+          <button id="btnSaveScene">Save Document</button>
+          <button id="btnClearScene">Clear Scene</button>
+          <button id="btnReloadScene">Reload Document</button>
+        </div>
+
+        <!-- 2D Tilemap View -->
+        <div class="section-title">2D Tilemap Layer (@margoengine/tilemap)</div>
+        <canvas id="tilemapCanvas"></canvas>
+
+        <!-- Inspector Panel Dock -->
+        <div class="section-title">DOM Scene Inspector (@margoengine/inspector)</div>
+        <div id="inspectorContainer"></div>
+
+        <!-- Stress Testing Actions -->
+        <div class="section-title">Stress & Edge Cases</div>
+        <div class="btn-group">
+          <button id="btnToggleTurntable">Toggle 60 FPS Turntable</button>
+          <button id="btnResizeMobile" class="stress-btn">Toggle 390px Mobile View</button>
+          <button id="btnSimulateFocusLoss">Simulate Focus Loss / Restore</button>
+          <button id="btnRecreateScene" class="stress-btn">Dispose & Re-create Scene</button>
+        </div>
+      </div>
+
+      <!-- In-Page Log Output -->
+      <div id="logBox"></div>
+    </div>
+
+    <!-- Viewport Container -->
+    <div id="viewportWrapper">
+      <canvas id="viewport"></canvas>
+
+      <!-- HUD Telemetry -->
+      <div id="hudOverlay">
+        <div class="hud-card">
+          <div class="hud-title">
+            <span>Editor Telemetry</span>
+            <span id="backendBadge" class="hud-badge">Detecting…</span>
+          </div>
+          <div class="hud-grid">
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">FPS</span>
+              <span id="hudFps" class="hud-stat-val">--</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Frame Time</span>
+              <span id="hudFrameTime" class="hud-stat-val">-- ms</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">JS Heap Memory</span>
+              <span id="hudMemory" class="hud-stat-val">-- MB</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Mesh Quads</span>
+              <span id="hudQuads" class="hud-stat-val">--</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">Active Voxels</span>
+              <span id="hudVoxels" class="hud-stat-val">--</span>
+            </div>
+            <div class="hud-stat">
+              <span class="hud-stat-lbl">History Depth</span>
+              <span id="hudHistoryDepth" class="hud-stat-val">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: right; pointer-events: auto;">
+          <a id="btnToggleBackend" class="btn" href="?backend=webgl2" style="font-size: 11px;">Switch to WebGL2</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./tile-voxel-editor.ts"></script>
+</body>
+</html>
