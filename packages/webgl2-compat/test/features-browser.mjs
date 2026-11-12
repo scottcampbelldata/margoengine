@@ -147,6 +147,10 @@ try {
         for (const mode of ['implicit', 'bias', 'level', 'grad', 'lazyAnd', 'lazyOr', 'discard'])
           assert.deepEqual(r[`${filter}/${mode}`], [1, mode.startsWith('lazy') ? 0 : mode === 'implicit' ? 1 : mode === 'grad' ? 1101 : 11, 0, 1], `${filter}/${mode}: each argument evaluated once`);
     }
+    if (name === 'freshClears')
+      for (const kind of ['cube', 'array'])
+        for (const [round, want] of [[0, 0, 0, 255], [0, 0, 255, 255]].entries())
+          assert.deepEqual(r[`${kind} round ${round} 2/4`], want, `freshClears: ${kind} level 2 layer 4 keeps its round ${round} clear`);
     if (name === 'msaaAspects')
       assert.deepEqual(
         r.map((v, i) => (i % 4 === 1 || i % 4 === 2 ? v : Math.abs(v - 0.5) < 1e-6)),

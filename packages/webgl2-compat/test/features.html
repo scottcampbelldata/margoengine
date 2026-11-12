@@ -488,6 +488,39 @@ const cases = {
    * D3D11, whose export truncates to binary16 (docs/known-bugs.md): without the layer's rounding it stores the half
    * below for every value just under a step.
    */
+  /**
+   * Fresh rgba8unorm textures (a 4 x 4 cube and a 2D array of 6 layers, 3 levels each, and plain 2D mips), every level
+   * and layer cleared by a render pass to its own colour (creative's test:gpu:targets rule) and read back, twice.
+   * Regression for the Radeon 680M under ANGLE D3D11 (docs/known-bugs.md): a clear of a level or layer whose last write
+   * was a clear was lost there (level 2 of face 4 read 0, 0, 0, 0 for 0, 0, 0, 1).
+   */
+  async freshClears(device) {
+    const out = {};
+    for (const [kind, layers] of [['cube', 6], ['array', 6], ['2d', 1]]) {
+      const t = device.createTexture({
+        size: [4, 4, layers],
+        mipLevelCount: 3,
+        format: 'rgba8unorm',
+        usage: U.RENDER_ATTACHMENT | U.COPY_SRC | U.TEXTURE_BINDING,
+        ...(kind === 'cube' ? { textureBindingViewDimension: 'cube' } : {}),
+      });
+      // Two rounds: the second clears every subresource again, to another colour, right after its first clear.
+      const colours = [
+        (level, layer) => [((layer + level) % 3) / 2, layer % 2, level % 2, 1],
+        (level, layer) => [layer % 2, ((layer + level) % 3) / 2, 1 - (level % 2), 1],
+      ];
+      for (const [round, colour] of colours.entries()) {
+        for (let level = 0; level < 3; level++)
+          for (let layer = 0; layer < layers; layer++)
+            clearView(device, t.createView({ dimension: '2d', baseMipLevel: level, mipLevelCount: 1, baseArrayLayer: layer, arrayLayerCount: 1 }), colour(level, layer));
+        for (let level = 0; level < 3; level++)
+          for (let layer = 0; layer < layers; layer++) out[`${kind} round ${round} ${level}/${layer}`] = [...(await read(device, t, { bytes: 4, level, layer, w: 1, h: 1 }))];
+      }
+      t.destroy();
+    }
+    return out;
+  },
+
   async halfExport(device) {
     const values = new Float32Array(HALF_EXPORT_VALUES);
     const data = device.createBuffer({ size: 128, usage: B.UNIFORM | B.COPY_DST });

@@ -68,6 +68,7 @@ export class CompatAdapter {
     readonly cpuWorkBudget: number;
     readonly tierFormats?: TierFormats | undefined;
     readonly halfExportRounding: boolean;
+    readonly drawClears: boolean;
     readonly features: ReadonlySet<string>;
     readonly limits: Readonly<Record<string, number>>;
     readonly info: {
@@ -80,7 +81,8 @@ export class CompatAdapter {
     constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities,
     cpuWorkBudget?: number,
     tierFormats?: TierFormats | undefined,
-    halfExportRounding?: boolean);
+    halfExportRounding?: boolean,
+    drawClears?: boolean);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;
 }
 
@@ -1308,6 +1310,7 @@ class GLState {
     forgetProgram(p: WebGLProgram): void;
     enable(cap: number, on: boolean): void;
     set(key: string, value: string, set: () => void): void;
+    value(key: string): string | undefined;
     forget(key: string): void;
     uniformBuffer(point: number, buffer: WebGLBuffer, id: number, offset: number, size: number): void;
     unit(index: number, target: number, texture: WebGLTexture | null, sampler: WebGLSampler | null): void;

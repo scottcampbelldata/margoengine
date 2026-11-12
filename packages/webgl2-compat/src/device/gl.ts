@@ -115,6 +115,10 @@ export class GLState {
     this.keys.set(key, value);
     set();
   }
+  /** The value last stored under `key` by `set`, while it is cached. */
+  value(key: string): string | undefined {
+    return this.keys.get(key);
+  }
   /** Drops a cached key, so the next `set` of it runs. */
   forget(key: string): void {
     this.keys.delete(key);

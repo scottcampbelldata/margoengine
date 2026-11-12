@@ -1098,7 +1098,9 @@ export class Replayer {
    * been initialized prior to a partial upload, forcing the browser to clear it"). Colour-renderable, depth and
    * stencil formats are cleared through a framebuffer; other formats are uploaded whole, one call per level (a partial
    * upload would start the browser's own initialisation), from a zero-filled pixel unpack buffer. Block-compressed
-   * formats are left to the browser: an all-zero block is not a zero texel (ASTC's is its error colour).
+   * formats are left to the browser: an all-zero block is not a zero texel (ASTC's is its error colour). Where the
+   * adapter finds clears lost (device/fresh-clears.ts, Radeon 680M under ANGLE D3D11), the float and normalized colour
+   * subresources of a texture with more than one level or layer get their zeros from draws instead.
    */
   zero(texture: WebGLTexture, target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): void {
     if (info.block) return;
@@ -1141,6 +1143,9 @@ export class Replayer {
     };
     const layersAt = (level: number) =>
       target === gl.TEXTURE_CUBE_MAP ? 6 : target === gl.TEXTURE_3D ? Math.max(1, d >> level) : d;
+    const draw = point === gl.COLOR_ATTACHMENT0 && this.drawsClears(info, levels, layersAt(0)),
+      // A view copy made at a draw zeroes its storage inside a pass: the pass's viewport comes back after the draws.
+      viewport = draw && this.pass ? s.value('viewport') : undefined;
     let complete = true;
     for (let level = 0; level < levels && complete; level++)
       for (let layer = 0, n = layersAt(level); layer < n; layer++) {
@@ -1153,13 +1158,42 @@ export class Replayer {
         else if (hasStencil(info)) gl.clearBufferiv(gl.STENCIL, 0, [0]);
         else if (info.kind === 'uint') gl.clearBufferuiv(gl.COLOR, 0, [0, 0, 0, 0]);
         else if (info.kind === 'sint') gl.clearBufferiv(gl.COLOR, 0, [0, 0, 0, 0]);
+        else if (draw)
+          this.drawClear(0, [0, 0, 0, 0], Math.max(1, w >> level), Math.max(1, h >> level), [gl.COLOR_ATTACHMENT0]);
         else gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
       }
+    if (viewport) {
+      const [x, y, vw, vh] = viewport.split(',').map(Number);
+      s.set('viewport', viewport, () => gl.viewport(x, y, vw, vh));
+    }
     // Detach (a texture attached to no framebuffer can be deleted at once), and give a pass in replay (a view copy made
     // at a draw) its framebuffer and state back.
     attach(0, 0, null);
     this.rebind();
     return complete;
+  }
+
+  /**
+   * Whether colour clears of this texture are draws: on an adapter that loses clears (adapter.drawClears,
+   * device/fresh-clears.ts), for a float or normalized format with more than one level or layer. There a texture
+   * keeps the clears of one subresource only; integer formats keep clearBuffer.
+   */
+  private drawsClears(info: FormatInfo, levels: number, layers: number): boolean {
+    return this.device.adapter.drawClears && info.kind !== 'uint' && info.kind !== 'sint' && levels * layers > 1;
+  }
+
+  /**
+   * Writes `value` to colour attachment `i` of the bound draw framebuffer over (0, 0, w, h) with a draw instead of
+   * clearBufferfv (drawsClears). `buffers` is the framebuffer's draw buffer list, which comes back after the draw.
+   */
+  private drawClear(i: number, value: ArrayLike<number>, w: number, h: number, buffers: readonly number[]): void {
+    const gl = this.gl,
+      helper = this.helper(`clear${i}`, `uniform highp vec4 v;\nlayout(location = ${i}) out highp vec4 c;\nvoid main() { c = v; }`);
+    this.helperState(helper, w, h);
+    gl.uniform4f(helper.value, value[0], value[1], value[2], value[3]);
+    gl.drawBuffers(buffers.map((b, k) => (k === i ? b : gl.NONE)));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.drawBuffers(buffers);
   }
 
   /** zero() by whole-level uploads from a zero-filled pixel unpack buffer. */
@@ -1660,12 +1694,17 @@ export class Replayer {
     s.set('viewport', `0,0,${width},${height}`, () => gl.viewport(0, 0, width, height));
     s.set('depthRange', '0,1', () => gl.depthRange(0, 1));
     s.set('blendColor', '0,0,0,0', () => gl.blendColor(0, 0, 0, 0));
+    const buffers = desc.colors.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE));
+    let drew = false;
     desc.colors.forEach((c, i) => {
       if (!c) return;
       const t = c.view.texture;
       const clear = c.loadOp === 'clear' ? c.clearValue : !t.initialized ? [0, 0, 0, 0] : null;
       if (!clear) return;
-      if (t.info.kind === 'uint')
+      if (this.drawsClears(t.info, t.mipLevelCount, t.depthOrArrayLayers)) {
+        this.drawClear(i, clear, width, height, buffers);
+        drew = true;
+      } else if (t.info.kind === 'uint')
         gl.clearBufferuiv(
           gl.COLOR,
           i,
@@ -1679,6 +1718,8 @@ export class Replayer {
         );
       else gl.clearBufferfv(gl.COLOR, i, clear);
     });
+    // The clear draws keep the pass's viewport (the attachment size) but turn the scissor test off.
+    if (drew) s.enable(gl.SCISSOR_TEST, true);
     const d = desc.depth;
     if (d) {
       const info = d.view.texture.info,

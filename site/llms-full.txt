@@ -10776,6 +10776,27 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
+### Radeon 680M, ANGLE Direct3D 11: a clear of a texture level or layer whose last write was a clear is lost (list 5 R6 row 26, 2026-11-11, worked around in webgl2-compat)
+
+- **What:** `packages/creative` `test:gpu:targets` under compatibility mode on the Beelink (Radeon 680M, driver
+  32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): `cube texel 0,0 layer 4: 0 != 255`. Every level and layer of an
+  rgba8unorm cube is cleared once by a render pass to its own colour and read back; native WebGPU passes.
+- **Repro (raw WebGL2, no Margo code):** a fresh 4 x 4 RGBA8 2D array or cube (3 levels, 6 layers), each subresource
+  attached in turn to one framebuffer and cleared with clearBufferfv to (0, 0, 0, 1), reads 17 of its 18 subresources
+  back unchanged; 2D mips lose levels 1 and 2 when each level was cleared before. After a draw or an upload into every
+  subresource the first round of clears lands, and a second round (to white) again keeps 1 of 18. Uploads after a draw
+  or a clear all land.
+- **Cause:** below Margo: the driver keeps the clears of one subresource of a texture only, where the subresource's
+  last write was a clear (a fresh texture counts as cleared). A clear followed by a draw is not affected, so a pass that
+  clears and draws each frame works; clear-only passes over levels or layers lose their clears.
+- **Workaround (`packages/webgl2-compat/src/device/fresh-clears.ts`, `render.ts`):** the adapter probes once (a 4 x 4
+  texture with 2 levels, both cleared to 0 and then to (0, 0, 0, 1); level 1 reads 0 where clears are lost). There the
+  layer clears the colour subresources of float and normalized textures with more than one level or layer by draws,
+  both its own zeroing of new textures and render pass `loadOp: 'clear'`; integer, depth and stencil formats and
+  single-subresource textures keep clearBuffer. Regression: `features-browser.mjs` `freshClears` (two rounds over a
+  cube, an array and 2D mips; fails without the workaround), `layerView` (a zero draw inside a pass gives the pass its
+  viewport back), `test/fresh-clears.test.js`. Depth and stencil clears were not probed.
+
 ### Fixed 2026-11-11: in WebKit a check's first run could be the previous document's, at 300 x 150 (KB-L4-W1)
 
 - **Repro:** on the Apple M6 Mac, `MARGO_BROWSER=webkit node packages/sky/test/browser-check.mjs` in a freshly copied

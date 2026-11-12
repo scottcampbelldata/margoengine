@@ -10,6 +10,7 @@ import { extensions, type Extensions, GLObjects, GLState } from './gl.js';
 import { fence, fenceDone, nextGPUTask } from './tasks.js';
 import { ExternalCopies } from './externals.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
+import { clearsLost } from './fresh-clears.js';
 import { exportTruncatesHalf } from './half-export.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
@@ -191,7 +192,7 @@ export class CompatGPU {
       return Promise.resolve(null);
     }
     const formats = caps.tier === 'full' ? undefined : (await import('../tiers.js')).tierFormats(caps.tier);
-    return new CompatAdapter(gl, caps, budget, formats, !formats && exportTruncatesHalf(gl));
+    return new CompatAdapter(gl, caps, budget, formats, !formats && exportTruncatesHalf(gl), clearsLost(gl));
   }
 
   /** The canvas format the layer renders fastest: WebGL2 stores rgba. */
@@ -220,6 +221,11 @@ export class CompatAdapter {
      * pipelines then round their narrowed outputs to the nearest half in the shader.
      */
     readonly halfExportRounding = false,
+    /**
+     * @internal True when this GPU drops a clear of a texture level or layer whose last write was a clear
+     * (device/fresh-clears.ts): colour textures of more than one level or layer are then cleared by draws.
+     */
+    readonly drawClears = false,
   ) {
     this.features = featuresOf(capabilities);
     this.limits = Object.freeze(limitsOf(capabilities));
