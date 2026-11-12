@@ -44,10 +44,12 @@ const flat={color:[0,0,0],toneMapped:false,doubleSided:true};
 const colour=vec3(uv(),0.4),show=(geometry,extra={})=>{dark();return createMesh(engine,geometry,new NodeMaterial({...flat,emissiveNode:colour,positionNormals:'keep',...extra}));};
 // Lit by the sun, so the picture depends on the normal the shading actually used.
 const lit=(geometry,extra={})=>{engine.lighting.direction.set([0.6,0,0.8,Math.PI*2]);engine.lighting.radiance.set([1,1,1,0]);return createMesh(engine,geometry,new NodeMaterial({color:[0.5,0.5,0.5],toneMapped:false,roughness:1,metalness:0,doubleSided:true,positionNormals:'keep',...extra}));};
+// A fixed distance: unset, Shadows fits the still CPU-posed mesh to its bounds and keeps 500 units for the node-skinned
+// one (its vertices move), so the two pictures would compare two cascade fits, not the skinning.
 const shadowed=(geometry,extra)=>{
   engine.lighting.direction.set([0.6,0,0.8,Math.PI*2]);engine.lighting.radiance.set([1,1,1,0]);
   const look={color:[0.25,0.25,0.25],toneMapped:false,roughness:1,metalness:0,doubleSided:true},back=createMesh(engine,planeGeometry(8,8),new Material(look));back.root.setPosition([0,0,-1.5]);
-  const front=createMesh(engine,geometry,new NodeMaterial({...look,positionNormals:'keep',...extra})),shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'});shadows.add(back);shadows.add(front);
+  const front=createMesh(engine,geometry,new NodeMaterial({...look,positionNormals:'keep',...extra})),shadows=Shadows.attach(engine,{resolution:1024,filter:'hard',distance:8});shadows.add(back);shadows.add(front);
   return {destroy(){engine.removePlugin(shadows.name);back.destroy();front.destroy();}};
 };
 const scaled=mesh=>{mesh.root.setScale([-1,0.5,1]);return mesh;};

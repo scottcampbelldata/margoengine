@@ -14,7 +14,9 @@ const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const flat={color:[0.25,0.25,0.25],toneMapped:false,roughness:1,metalness:0};
 const sun=(intensity,direction=[0,0,1])=>{engine.lighting.direction.set([...direction,intensity]);engine.lighting.radiance.set([1,1,1,0]);};
-const slant=[0.6,0,0.8],plainMap=()=>Shadows.attach(engine,{resolution:1024,filter:'hard'}),pages=()=>VirtualShadows.attach(engine,{distance:20,filter:'hard'});
+// A fixed distance: unset, Shadows fits a scene of still casters to their bounds and keeps 500 units when a caster's
+// vertices move (positionNode, discard), so the plain and the moved scene would compare two cascade fits, not the move.
+const slant=[0.6,0,0.8],plainMap=()=>Shadows.attach(engine,{resolution:1024,filter:'hard',distance:8}),pages=()=>VirtualShadows.attach(engine,{distance:20,filter:'hard'});
 // A wall behind a small caster at z = 0.5, drawn beside the shadow it throws under the slanted sun.
 const wall=()=>createMesh(engine,planeGeometry(4,4),new Material(flat));
 const caster=(material,at=[0.6,0,0.5],width=0.5)=>{const mesh=createMesh(engine,planeGeometry(width,0.5),material);mesh.root.setPosition(at);return mesh;};

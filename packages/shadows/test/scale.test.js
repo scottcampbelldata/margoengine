@@ -135,6 +135,39 @@ test('a model fits the cascades as core meshes do, and its box is read once, not
   }
 });
 
+// AMD GPU hunt R7 row 43: shader passes-check and deform-check compared a still caster's shadow with a NodeMaterial
+// positionNode or node-skinned one under default options. The still scene fits its bounds and the moved one keeps the
+// default distance, so the two compared two cascade fits; both checks now set one distance. This pins the side of the
+// rule those checks rely on: a material whose shader moves vertices (a shader patch, not a map) has no fixed box.
+test('a model whose material moves its vertices in a shader keeps the default distance', async () => {
+  const { engine, buffers, frame } = await rig(1);
+  const floor = engine
+      .createMesh()
+      .setGeometry(box(6, 0.1, 6))
+      .setPosition([0, -0.05, 0]),
+    toy = model(engine, buffers, 0.02),
+    shadows = new Shadows({ resolution: 64 });
+  try {
+    shadows.setup(engine);
+    shadows.add(toy.source);
+    shadows.add(floor, { castShadow: false });
+    const still = frame(shadows)[3];
+    assert.ok(still >= 9 && still < 12, `fitted far ${still}`);
+    // NodeMaterial's caster record (materials' live displacement): a patch with a key and a depth shader edit.
+    toy.record.primitives[0].material = {
+      shading: {},
+      displacement: { key: 'n1', depth: (code) => code, cuts: false },
+    };
+    assert.equal(frame(shadows)[3], 500);
+    toy.record.primitives[0].material = { shading: {} };
+    assert.equal(frame(shadows)[3], still, 'the fit comes back once the material moves nothing');
+  } finally {
+    shadows.dispose();
+    toy.dispose();
+    engine.dispose();
+  }
+});
+
 test('the default distance follows the camera: a scene framed from kilometres keeps its shadows', async () => {
   // The same scene at 1 m and at 1024 m (a power of two, so the quarter-octave rounding scales exactly): the fitted
   // cascades scale with it. Before, the 500 m default cut a model framed from 6 km out of the shadowed range.
