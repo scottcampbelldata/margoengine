@@ -1,5 +1,9 @@
 # Project instructions
 
+This is the working instruction file every AI coding agent reads before each task.
+Dated entries are decisions by Scott Campbell, the project lead.
+It is published as is, so you can see how the engine is built.
+
 ## v1.0.0 core freeze
 
 - Treat `@margoengine/core` and the stage facade as feature-frozen for v1.0.0. Do not add features to either, including material graphs, skinning math, or post-processing passes.
@@ -85,20 +89,20 @@ Scott's decision (2026-11-06, replacing the 2026-10-29 no-CAD rule): CAD file im
 
 ## How work lands
 
-Scott's rule (2026-11-05): no landing queue, no integrator, no hooks that block edits or commits. That setup cost a week of downtime and is gone. Do not rebuild it.
+Scott's rule (2026-11-05): no landing queue, no integrator, no hooks that block edits or commits. Do not add any of them back.
 
 - Work in your chat's worktree, on a branch cut from current `main`. One worktree per chat, reused for every job in that chat: do not create a new worktree per job. Rebase onto `main` before each push.
 - Run api:check after the final rebase; a new or extended API needs api:update in the same commit; removing, renaming or changing an existing export of a locked package needs a line in api/breaks.json and Scott's yes before the push; never edit api/*.api.md or lock.json by hand. Day 0 locks core/stage; other reported packages warn in watch mode. See docs/conventions.md#api-lock.
 - Before you push, run the fast gate: `npm run lint`, `npm run hygiene`, `npm run check:banned-terms`, `npm run build:packages`, `npm run api:check`, `npm run quality`, the tests of the packages you changed and of the packages that depend on them, `npm run check:owners -- --packages=<changed packages>` (owner/lifetime fixtures, CPU then a GPU slot per package on WebGPU and the WebGL2 compatibility layer; it prints the packages still pending a fixture), and the GPU tests (WebGPU and the WebGL2 compatibility layer) of the packages you changed only (Scott, 2026-11-10: skip every test that is not necessary; the scheduled full GPU check in CI covers the dependents on `main`). A change that alters exports commits the `npm run api:update` output. Never run `npm run verify` before a push (Scott, 2026-11-09: "no more full verifies unless they're absolutely necessary", never doubled; "If CI takes care of the full verifies, you have no business running them"). No exception: local CI runs the only full verify.
 - The one full `npm run verify` runs after the push, once per newest `main`, in local CI on the dev PC (scheduled task "Margo CI (CPU)", result in the local CI status record on the dev PC). Nothing waits for it. A red run on `main` is fixed forward by the lane whose commit caused it within about 2 hours, with a regression test, or that commit is reverted. Nothing is released from a commit local CI has not passed.
-- README examples (Scott, 2026-11-10: "we only have 16 things left besides the physics engine ... start polishing and fixing and testing", replacing the 2026-11-09 wait): when you change a package or its README, write or fix its examples so they run as written and run `npm run check:readme-run -- --packages=<changed>` before the push. README debt still open is listed in `work-lists/readme-owed.md` in the untracked private folder.
+- README examples (Scott, 2026-11-10, replacing the 2026-11-09 wait): when you change a package or its README, write or fix its examples so they run as written and run `npm run check:readme-run -- --packages=<changed>` before the push. README debt still open is listed in `work-lists/readme-owed.md` in the untracked private folder.
 - Agents push to `main` themselves once the checks above pass (Scott, 2026-11-05): rebase onto current `main`, fast-forward push, then keep your worktree for the next job (creating one takes minutes: dependencies and LFS). Remove the worktree and its branch when the task is finished (see "Branches and folders"). Never force-push.
 - Never delete or rewrite another session's branch or uncommitted work without Scott's say-so.
 - Never write git config from a worktree; add worktrees with `--no-track`.
 
 ## Branches and folders
 
-Scott's rule (2026-11-10, after the third pile-up of over 100 branches and folders): the drive holds one folder per agent that is working right now, plus the local CI folder, and nothing else.
+Scott's rule (2026-11-10): the drive holds one folder per agent that is working right now, plus the local CI folder, and nothing else.
 
 - Finished work goes to `main` and comes off the drive the same day: push, confirm the commit is on `origin/main`, then `git worktree remove` the folder and `git branch -D` the branch once the agent's task is done. An agent reuses its folder for its next job in the same task instead of making a new one.
 - Unfinished work worth keeping is never deleted: an agent is put on it to finish and land it, then its folder and branch are deleted. Work that is not worth landing (dead ends, duplicates, anything already on `main`) is deleted.
@@ -125,7 +129,7 @@ Scott's rule (2026-11-05): nothing lands undocumented. A change is not done unti
 - Own files only: keep scripts and logs in your own worktree, never a shared scratch folder.
 - Timeouts: every test, check, benchmark and wait has a hard time limit. On a hang, kill the process tree and report it.
 - Nothing is skipped, loosened or retried until green. A failing step is resolved by finding the root cause and fixing it in the owning package with a regression test.
-- Busy machines (Scott, 2026-11-07): every PC is busy with the batches, so a test that fails only on time (a timing assertion, a speed budget or a benchmark) while the machine is loaded is not a blocker. Record it in `work-lists/busy-retests.md` in the untracked private folder (test, commit, machine, measured number against its budget, CPU load at the time) and move on; it is rerun on a quiet machine before release and the list must be empty then. The budget is never raised and the test is never skipped or edited. Any failure that is not purely about time (a wrong value, a crash, a hang past its hard limit) still stops the stream.
+- Busy machines (Scott, 2026-11-07): a test that fails only on time (a timing assertion, a speed budget or a benchmark) while the machine is loaded is not a blocker. Record it in `work-lists/busy-retests.md` in the untracked private folder (test, commit, machine, measured number against its budget, CPU load at the time) and move on; it is rerun on a quiet machine before release and the list must be empty then. The budget is never raised and the test is never skipped or edited. Any failure that is not purely about time (a wrong value, a crash, a hang past its hard limit) still stops the stream.
 - Busy is never an excuse for a big or proven slowdown (Scott, 2026-11-07). A time failure is a real bug, fixed now with its root cause, when it misses its budget by more than 2 times, or when a side-by-side run against the parent commit (the same test, old and new taking turns in one session, compared by per-round minimums) shows the new commit slower beyond the round-to-round spread. Only a small miss with no regression against the parent goes on the retest list. Local CI also keeps every timed test's duration per `main` commit and flags a jump of 1.5 times or more between neighbouring commits run under similar load; a flagged jump is investigated as a bug.
 - Never wait for a quiet machine, and never tune speed against wall-clock timings on a loaded one (Scott, 2026-11-07). Accuracy work, proven by its bars, comes first. A speed change is proven by a deterministic work count (contacts, rows, bytes, allocations) or a paired A/B run that interleaves old and new in one process and compares per-round minimums, with identical results either way. Spend about 30 minutes measuring one speed item; if the gain cannot be shown, land it only when it provably does less work with identical output, otherwise record it in `work-lists/busy-retests.md` in the untracked private folder and move on. Published speed numbers come from the quiet rerun before release.
 - This ships publicly: any bug you find, related to your task or not, is tracked to its root cause and fixed in the owning package. If it cannot be fixed now, it goes in `docs/known-bugs.md` with a repro and cause.
@@ -133,6 +137,6 @@ Scott's rule (2026-11-05): nothing lands undocumented. A change is not done unti
 - Never skip, weaken or shrink work to match another engine's speed. A speed fix does the same work with the same output. If a rival is faster because it does less, keep the work, publish the number as an accepted difference with its cause, what Margo does extra and the trade-off, and add a like-for-like row. Never change a benchmark scene so Margo does less.
 - Being slower than three.js is acceptable only with a measured, documented reason. A row with no valid reason is a loss to fix.
 - Model and effort: choose both for the job. Chores: Haiku or Sonnet, low or medium. Normal feature work: Sonnet or Opus, medium. Hard work: Opus high. Switch a stuck job to a stronger model.
-- Run at most 5 GPU jobs at once (Scott, 2026-11-10: "make 4 or 5 if the gpu can handle it"; measured at 3 slots: 5.8 of 48 GB, 36% load, 104 of 300 W, no driver resets in 3 days). If the driver resets (Windows event 4101) or a device is lost under load, go back to 3. Benchmarks take the GPU alone.
+- Run at most 5 GPU jobs at once (Scott, 2026-11-10). If the driver resets (Windows event 4101) or a device is lost under load, go back to 3. Benchmarks take the GPU alone.
 - Pictures over 3,932,160 bytes are re-encoded with a reduced palette when read by an agent, which shows false bands. Run `scripts/review-png.mjs` first, or compare numbers.
-- New features come from the missing-features list (kept outside the repository) or from Scott's request. Each is a new optional entry of a package, never core.
+- New features come from the project's missing-features list or from a request by Scott. Each is a new optional entry of a package, never core.
