@@ -25,7 +25,7 @@ export interface ScatterBatch {
   indices: Uint32Array;
   /** Column-major affine matrices, 16 floats per instance. */
   transforms: Float32Array;
-  /** Core PBR material shared by the batch; values are re-uploaded every frame. */
+  /** Core PBR material shared by the batch. Its values are copied into the instance buffer at upload and device restoration only; a change after attach shows once a new ScatterInstances is attached. */
   material: PbrMaterial;
   /** Linear HDR emission, added after lighting and baked occlusion. */
   emissive?: readonly [number, number, number];
