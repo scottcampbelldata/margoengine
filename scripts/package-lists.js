@@ -24,7 +24,7 @@ export function packageList(catalog, packagesPath) {
   };
   return [
     START,
-    `${catalog.length} packages in ${layers.length} layers, the same as the [catalog](https://margoengine.com/catalog/).`,
+    `${catalog.length} packages in ${layers.length} layers, the same layers as the searchable catalog that \`npm run catalog\` serves.`,
     ...layers.map(section),
     END,
   ].join('\n\n');

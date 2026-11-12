@@ -9,6 +9,7 @@
  * - `unsupported`: the browser or device lacks something the feature needs (WebGPU, OffscreenCanvas, a shader hook).
  * - `failed`: the operation ran and could not produce a result (no solution within the budget, a failed request).
  * - `timeout`: a step that should have finished never settled within its time limit (a stalled WebGPU startup).
+ * - `version`: two copies of core met: a package built against one core version was given an engine from another.
  */
 export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' | 'failed' | 'timeout' | 'version';
 

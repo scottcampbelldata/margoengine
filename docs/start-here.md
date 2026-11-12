@@ -42,20 +42,24 @@ to be written.
 
 ## Four facts to know first
 
-- **WebGPU.** The engine draws with WebGPU. Chrome and Edge on desktop are the tested browsers. The optional WebGL2
-  fallback draws plain meshes only. See [Browser support](../README.md#browser-support).
-- **Small core, optional packages.** The core and the stage together are 23,626 bytes gzip (not your whole app: React, models and optional packages add to it; see [limits](limits.md)). Shadows, glTF, physics and the
-  rest are packages you import when you need them: `import { Shadows } from 'margoengine/shadows'`.
+- **WebGPU.** The engine draws with WebGPU. Chrome and Edge on desktop are the most tested browsers; Firefox is partly
+  tested. Where WebGPU is missing, the optional `@margoengine/webgl2-compat` layer runs the same scene on WebGL2. See
+  [Browser support](../README.md#browser-support).
+- **Small core, optional packages.** The core and the stage together are 24,848 bytes gzip. That is the engine, not
+  your whole app: React, models and optional packages add to it (see [limits](limits.md)). Shadows, glTF, physics and
+  the rest are packages you import when you need them: `import { Shadows } from 'margoengine/shadows'`.
 - **Not on npm yet.** 1.0.0 is the first planned release. Run examples from a clone until then.
 - **Units are metres, Y is up.** The same as glTF.
 
 ## When not to use Margo
 
-- You need to support browsers without WebGPU. The fallback is a preview of plain meshes.
+- Most of your users have neither WebGPU nor WebGL2, or you need an effect that the WebGL2 layer cannot run (the
+  [demo comparison](webgl2-compat-demos.md) shows what it runs).
 - You need a large ecosystem of third-party plug-ins, tutorials and answers. Margo is new and has few.
 - You need features the [limits](limits.md) page lists as missing.
 
 ## Next
 
-- Stuck? Errors carry a code and a help link; the codes are listed on [margoengine.com/errors](https://margoengine.com/errors.html).
+- Stuck? A `MargoError` carries a stable `code`, and its message names the fix. The codes are listed under
+  [Errors](conventions.md#errors) in the conventions.
 - Found a bug in a guide? Open an issue; every code block here is meant to run as written.

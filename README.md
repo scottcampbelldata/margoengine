@@ -247,7 +247,7 @@ change the kernel.
 
 ```sh
 npm run dev               # Night Citadel showcase
-npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html (root vite.config.mjs keeps the rival comparison pages out of the dependency scan)
+npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html
 npm run lint              # Biome
 npm run typecheck         # strict TypeScript for all packages
 npm run test:all          # every Node test in the repo
@@ -272,17 +272,17 @@ More examples are in [examples/](examples/README.md).
 
 ## Browser support
 
-Margo Engine needs WebGPU. Without it, the optional `@margoengine/webgl2-compat` layer runs the WebGPU code of core and the
-packages on WebGL2 (every site demo loads it; [docs/webgl2-compat-demos.md](docs/webgl2-compat-demos.md) lists how each one compares with native).
-Or pass the `@margoengine/webgl2-compat/preview` fallback to get a basic WebGL2 preview of plain meshes (no textures or effects; picking is its optional `/pick` entry),
-which stays for v1.0.
+Margo Engine needs WebGPU. Without it, the optional `@margoengine/webgl2-compat` layer runs the WebGPU code of core and
+the packages on WebGL2. Every site demo loads it; [docs/webgl2-compat-demos.md](docs/webgl2-compat-demos.md) lists how
+each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/preview` fallback draws plain meshes only
+(no textures or effects; picking is its optional `/pick` entry).
 
 | Browser | Status |
 | --- | --- |
-| Chrome and Edge (desktop) | Tested. The browser suites run in Chromium on a real GPU (Intel Arc 140V) and on SwiftShader in the manual browser workflow. |
+| Chrome and Edge (desktop) | Tested. The automated browser suites run in Chromium on real GPUs: an NVIDIA RTX A6000 and an Intel Arc 140V on Windows 11, and an AMD Radeon 680M that ran every package GPU suite on WebGPU and on the WebGL2 layer. Chrome on an Apple M6 Mac mini (Metal) runs some checks by script. |
+| Firefox | Partly tested. Playwright Firefox 157 on Windows runs the core, stage and WebGL2 layer GPU suites, on WebGPU and on the layer. Open Firefox bugs are in [docs/known-bugs.md](docs/known-bugs.md). |
+| Safari on macOS | Checked by hand: Safari 27.2 on an Apple M6 draws five real models as Edge does. No suite runs in Safari itself. |
 | Safari on iPhone | Demos run, checked by hand only. |
-| Safari on macOS | Draws five real models as Edge does, checked by hand. No test suite runs there. |
-| Firefox | Not tested. |
 | Android | Not tested. |
 
 [docs/limits.md](docs/limits.md) lists the hardware these results come from and what has not been checked.
@@ -298,8 +298,11 @@ the size of every other package entry. `npm run measure:size` bundles the entry 
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
 core + stage reaches 25,000 B gzip.
 
-`npm run bench` runs the render, load, assembly, physics and memory suites with medians, p95 and machine checks. See
-[docs/benchmarking.md](docs/benchmarking.md). No comparisons with other engines are published here yet.
+`npm run bench` runs every benchmark suite (size, startup, rendering, loading, physics, memory and more;
+`npm run bench -- --list` names them) and reports medians, p95 and machine checks. See
+[docs/benchmarking.md](docs/benchmarking.md). Sizes of other engines, measured the same way, are in
+[docs/whitepaper/claims.md](docs/whitepaper/claims.md#smallest-core-measured-2026-11-10). No speed comparison with
+other engines is claimed.
 
 ## Architecture
 
@@ -317,14 +320,14 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 [MODERN-ENGINE.md](MODERN-ENGINE.md) covers the architecture, lifecycle rules and limits in detail.
 [docs/api-overview.md](docs/api-overview.md) is a short tour of the API. AI coding tools can read
-[margoengine.com/llms.txt](https://margoengine.com/llms.txt) or run the `@margoengine/mcp` server
-([docs/ai-tools.md](docs/ai-tools.md)).
+[site/llms.txt](site/llms.txt) (an index) or [site/llms-full.txt](site/llms-full.txt) (all the docs in one file), or run
+the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 ## Packages
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-102 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+102 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 
@@ -494,7 +497,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 - Publish 1.0.0 to npm.
 - The WebGL2 compatibility layer is an optional package that WebGPU users never load ([docs/webgl2-compat-roadmap.md](docs/webgl2-compat-roadmap.md)); the voxel path tracer refuses it. `@margoengine/webgl2-compat/preview` is the small preview; in the React Canvas, `loadFallback` loads it and `fallbackContent` replaces the plain message.
-- Testing on more hardware: Apple silicon, AMD, Android, Firefox and macOS Safari.
+- Automated runs in more places: Android, iPhone, macOS Safari, and more of the suites in Firefox and on Apple silicon.
 - Published benchmark comparisons with their method and raw results.
 
 ## Contributing

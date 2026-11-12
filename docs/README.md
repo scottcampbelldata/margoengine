@@ -1,12 +1,12 @@
 # Margo Engine module catalog
 
-[Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
+The searchable catalog is this folder's `index.html`. Run `npm run catalog` (below) to open it.
 
 Search all 102 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the four standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
-Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The core and the stage
-together measure **60,792 bytes raw / 24,630 bytes gzip**, below the 25,000-byte combined gzip ceiling. That figure is the engine, not an app: React, models and optional packages add to it. The
+Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The core and the stage together measure
+**61,345 bytes raw / 24,848 bytes gzip**, below the 25,000-byte combined gzip ceiling. That figure is the engine, not an app: React, models and optional packages add to it. The
 [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) list every package entry, and the measured size of a React page is in
 [limits](limits.md).
 
@@ -17,8 +17,7 @@ Publishing uses the manual, gated [Publish workflow](../.github/workflows/publis
 from `main`; see the [release guide](releasing.md). `npm run publish:dry-run` checks
 and previews the workspace tarballs locally without publishing.
 
-To preview a checkout, use Node.js 24.18+ and run this command from the repository root (End users: Node 22.12 or
-newer, tested on 22.12 and the latest 22.x, 24.18 and 26. Contributors: Node 24.18 or newer.):
+To preview a checkout, use Node.js 24.18 or newer and run this command from the repository root:
 
 ```sh
 npm run catalog
@@ -28,7 +27,7 @@ Open [localhost:5184](http://127.0.0.1:5184). No dependency installation or pack
 
 The catalog uses plain HTML, CSS, JavaScript and `catalog.json`. It loads no engine packages. Examples fetch pinned distribution files from jsDelivr; React also uses esm.sh. Serve copied examples over localhost or HTTPS rather than opening them with `file://`. Examples include pause/play controls, respect reduced-motion preferences and dispose resources when the page closes. Creative rendering requires WebGPU. CDN examples need their Margo packages to be published first.
 
-GitHub Pages serves this directory from `main` at `/margoengine/`; the website build also copies it into `/catalog/`. Run `npm run build:packages` and `npm run catalog:build` to refresh package names, versions, runtime exports and exact-version registry availability. Add runnable examples to the matching `catalog.json` entry; the generator retains that metadata. TypeScript-only types and the advanced core `/extension` entry are covered in the [API guide](../MODERN-ENGINE.md).
+The website build (`npm run build:site`) copies this directory into `/catalog/`. Run `npm run build:packages` and `npm run catalog:build` to refresh package names, versions, runtime exports and exact-version registry availability. Add runnable examples to the matching `catalog.json` entry; the generator retains that metadata. TypeScript-only types and the advanced core `/extension` entry are covered in the [API guide](../MODERN-ENGINE.md).
 
 Run the catalog checks after installing workspace development dependencies:
 
@@ -41,7 +40,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-102 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+102 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 

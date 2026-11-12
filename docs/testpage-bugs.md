@@ -48,7 +48,7 @@ Texture GPU proof passes on both native backends: 88,830 oracle channel checks,
 maximum error one RGBA8 step, five WebGL2 patterns and no page errors. A prior
 harness hung restoring the lost GL context from the loss-event dispatch. It now
 waits for the next task, and event waits have a 10 s hard limit; loss and actual
-restoration both pass. Core + stage currently measures 23,837 B gzip, below the
+restoration both pass. Core + stage then measured 23,837 B gzip, below the
 unchanged 25,000 B gate. SDF entry: 1,856 B gzip; sdf.wasm: 40,798 B raw / 17,310 B
 gzip. Textures joined entry (including lazy fragment code): 5,030 B gzip; complete
 tree helper: 3,144 B gzip. These are size measurements, with no speed claim.

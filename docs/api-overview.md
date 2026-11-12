@@ -39,7 +39,8 @@ stage.dispose();
 ```ts
 import { Engine, box } from '@margoengine/core';
 
-// WebGPU; pass { fallback } from @margoengine/webgl2-compat/preview to fall back to WebGL2
+// WebGPU. Without it, `await install()` from @margoengine/webgl2-compat before this call runs the same code on
+// WebGL2, or `fallback: webglRenderer` from @margoengine/webgl2-compat/preview draws plain meshes.
 const engine = await Engine.create(canvas, { camera: { position: [0, 2, 5], target: [0, 0, 0] } });
 const cube = engine.createMesh().setGeometry(box()).setPosition([0, 0.5, 0]);
 engine.start();
@@ -70,8 +71,8 @@ The [package list](../README.md#packages) and the [catalog](README.md) describe 
 ## Errors
 
 Bad arguments throw `TypeError` or `RangeError`. Everything else throws a `MargoError` with a stable `code`:
-`disposed`, `attached`, `state`, `unsupported` or `failed`. Branch on the code, not the message. The conventions are in
-[conventions.md](conventions.md).
+`disposed`, `attached`, `state`, `unsupported`, `failed`, `timeout` or `version`. Branch on the code, not the message.
+The conventions are in [conventions.md](conventions.md).
 
 ## Limits
 

@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
+import { documents } from '../scripts/docs-links.mjs';
 import { measureCore, measureCoreStage } from '../scripts/measure-size.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -19,13 +20,22 @@ const WINDOW = 110;
 /** Five-digit sizes that follow `phrase` on its line (two at most), or precede it as "N B gzip", with file and line. */
 function sizeClaims(text, file, phrase) {
   const found = [];
-  text.split('\n').forEach((line, index) => {
-    // Markup reads as prose once tags are gone: "<dt>24,209 B gzip</dt><dd>Core plus" becomes one sentence.
-    const plain = line.replace(/<\/d[td]><d[td][^>]*>/g, ' ').replace(/<[^>]+>/g, '');
+  // Markup reads as prose once tags are gone: "<dt>24,209 B gzip</dt><dd>Core plus" becomes one sentence.
+  const prose = (line = '') => line.replace(/<\/d[td]><d[td][^>]*>/g, ' ').replace(/<[^>]+>/g, '');
+  const lines = text.split('\n');
+  lines.forEach((line, index) => {
+    // A wrapped paragraph puts the figure on the next line ("The core and the stage" / "together measure 24,630"), so
+    // the window runs on into it; only a phrase that starts on this line counts, so no claim is found twice.
+    const own = prose(line),
+      plain = `${own} ${prose(lines[index + 1])}`;
     for (const match of plain.matchAll(phrase)) {
+      if (match.index >= own.length) continue;
       const end = match.index + match[0].length;
-      for (const hit of [...plain.slice(end, end + WINDOW).matchAll(number)].slice(0, 2))
-        found.push({ file, line: index + 1, value: hit[0] });
+      // The window stops where the phrase starts again: those figures are the next claim's.
+      let window = plain.slice(end, end + WINDOW);
+      const again = new RegExp(phrase.source, 'i').exec(window);
+      if (again) window = window.slice(0, again.index);
+      for (const hit of [...window.matchAll(number)].slice(0, 2)) found.push({ file, line: index + 1, value: hit[0] });
       const from = Math.max(0, match.index - 30);
       const before = [...plain.slice(from, match.index).matchAll(number)].pop();
       // Only within one sentence: "caves.wasm 11564 B gzip. Core plus stage 24432 B" is not the stage's figure.
@@ -44,7 +54,7 @@ test('every core + stage size in the public docs equals what measure:size prints
   const core = await measureCore();
   const allowed = new Set([raw, gzip, 25_000, core.raw, core.gzip, CORE_ONLY_CEILING]);
 
-  const files = ['README.md', 'docs/README.md', 'site/index.html'];
+  const files = ['README.md', 'docs/README.md', 'docs/start-here.md', 'docs/api-overview.md', 'site/index.html'];
   for (const entry of readdirSync(new URL('../docs/guides/', import.meta.url)))
     if (entry.endsWith('.md')) files.push(`docs/guides/${entry}`);
   for (const entry of readdirSync(new URL('../packages/', import.meta.url), { withFileTypes: true }))
@@ -89,9 +99,41 @@ test('every core + stage size in the public docs equals what measure:size prints
 test('the size scan reads prose, tables and tag soup, and ignores unrelated numbers', () => {
   const hit = (text, phrase = stagePhrase) => sizeClaims(text, 'f', phrase).map((claim) => claim.value);
   assert.deepEqual(hit('The core and the stage together are 24,209 bytes gzip, Wasm.'), ['24,209']);
-  assert.deepEqual(hit("| core + stage (`import { createStage } from 'x'`) | 24,209 B | 59,802 B |"), ['24,209', '59,802']);
+  assert.deepEqual(hit("| core + stage (`import { createStage } from 'x'`) | 24,209 B | 59,802 B |"), [
+    '24,209',
+    '59,802',
+  ]);
   assert.deepEqual(hit('<dt>23,626 B gzip</dt><dd>Core plus the stage facade, with</dd>'), ['23,626']);
   assert.deepEqual(hit('<h1>starts at 24,209 bytes gzipped.</h1>'), ['24,209']);
   assert.deepEqual(hit('core alone is 21,584 B of its cap', corePhrase), ['21,584']);
   assert.deepEqual(hit('The stage needs core and 1,024 entity slots.'), []);
+  // Bug (2026-11-12): docs/README.md wrapped "The core and the stage" and its figures onto two lines, so the per-line
+  // scan never saw the stale 24,630; docs/start-here.md was not scanned at all and said 23,626.
+  assert.deepEqual(hit('The core and the stage\ntogether measure **60,792 bytes raw / 24,630 bytes gzip**.'), [
+    '60,792',
+    '24,630',
+  ]);
+  assert.deepEqual(hit('core + stage 24,209 B\nand core + stage 24,848 B'), ['24,209', '24,848']);
+});
+
+// Bug (2026-11-12): docs/demo-loading.md, docs/desktop-frame-rate.md, MODERN-ENGINE.md and benchmarks/README.md each
+// said "the current build measures core at ... and core plus stage at ...", with figures from weeks before. A page that
+// calls a size current states the measured one, or points at `npm run measure:size` instead of a number.
+test('a reader page that calls a core size current states the measured figure', async () => {
+  const { raw, gzip } = await measureCoreStage();
+  const core = await measureCore();
+  const allowed = new Set([raw, gzip, 25_000, core.raw, core.gzip, CORE_ONLY_CEILING]);
+  const current = /\b(?:the current (?:consolidated )?build measures|currently measures)\b/i;
+  const stale = [];
+  for (const file of [...documents(), 'benchmarks/README.md']) {
+    const lines = read(file).split('\n');
+    lines.forEach((line, index) => {
+      if (!current.test(line)) return;
+      const text = `${line}\n${lines[index + 1] ?? ''}`;
+      for (const claim of [...sizeClaims(text, file, stagePhrase), ...sizeClaims(text, file, corePhrase)])
+        if (claim.line === 1 && !allowed.has(digits(claim.value)))
+          stale.push(`${file}:${index + 1} says ${claim.value}`);
+    });
+  }
+  assert.deepEqual(stale, [], `measured: core + stage ${gzip} B gzip, core ${core.gzip} B gzip`);
 });
