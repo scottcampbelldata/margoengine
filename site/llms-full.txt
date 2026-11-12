@@ -11583,6 +11583,21 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   KTX2 version 2, materials envMap). Now 3.6e-7 and 1.9e-4. Regression: `packages/environment/tests/bright-browser.js`
   and `packages/environment/tests/half-upload.test.js`.
 
+### Fixed 2026-11-12: LightProbes live capture, readback and restore state (lane A3 environment audit)
+
+- **Shared capture target:** reflection probes and the irradiance volume shared one six-layer capture target when
+  `volume.resolution` equalled `resolution` (16, 32 or 64). A live or refreshed reflection probe takes several frames
+  for its six faces while the live volume captures whole probes every frame, so the probe's prefilter read the volume
+  probes' views. Each user now has its own target.
+- **Restore after readback:** `readback()` filled the CPU snapshot, and a device restore treated any snapshot as a bake
+  and turned every probe on, so a reflection probe never captured live (zero radiance) replaced the environment
+  fallback with black and an unswept live volume lit nothing. The snapshot now records which probes it holds light for.
+- **Bake joined an older copy:** `bake()` reused a `readback()` copy still mapping, submitted before the bake's
+  capture, and resolved with the old light in the snapshot. A bake now queues its own copy.
+- **Disposal during a copy:** the aborted `mapAsync` reached the caller as a raw AbortError; it is now MargoError
+  `disposed` (or `state` after a device restore) like the other interrupted paths.
+- Regressions: `packages/environment/tests/probes-live.test.js`, the last four tests (each fails without its fix).
+
 ### Fixed 2026-11-11: EnvironmentBlend output overflowed half floats when unscaled sources' intensities summed above 1
 
 - **What:** the blend output holds `(1 - t) * from.intensity * A + t * to.intensity * B` in rgba16float. Only a source

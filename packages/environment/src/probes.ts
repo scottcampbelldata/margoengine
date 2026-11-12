@@ -70,7 +70,8 @@ type CaptureResources = {
   read?: GPUBuffer;
   depthUniform?: GPUBuffer;
   sampler: GPUSampler;
-  targets: Map<number, CaptureTarget>;
+  /** One capture target per user, so a live reflection probe's faces survive the live volume's captures between frames. */
+  targets: Map<'volume' | 'reflection', CaptureTarget>;
   values: Float32Array;
   slots: Uint32Array;
   floats: Float32Array;
@@ -622,6 +623,9 @@ export class LightProbes extends ShaderEffect {
   private restorePending = false;
   private snapshot?: Uint32Array;
   private snapshotExposed = false;
+  // Which probes the snapshot holds light for, as lit when its copy was submitted: every probe after a bake, else the
+  // live-captured ones (a readback between live refreshes). A device restore lights only these again.
+  private snapshotLit?: { baked: boolean; volume: boolean; reflections: Uint8Array };
   private pending = false;
   private baking = false;
   private bakeSamples = 0;
@@ -1054,8 +1058,16 @@ export class LightProbes extends ShaderEffect {
     this.entry = [{ binding: PROBE_BINDING, resource: { buffer: this.buffer } }];
     this.cached = undefined;
     // A restored device gets the last bake back (kept on the CPU), so the lighting survives device loss.
-    if (this.snapshot) device.queue.writeBuffer(this.buffer, HEADER_BYTES, this.snapshot as Uint32Array<ArrayBuffer>);
-    this.writeHeader(!!this.snapshot);
+    const lit = this.snapshot && this.snapshotLit;
+    if (lit) {
+      device.queue.writeBuffer(this.buffer, HEADER_BYTES, this.snapshot as Uint32Array<ArrayBuffer>);
+      // The uploaded radiance of a probe captured live is current again; a probe the copy held no light for stays dark.
+      if (!lit.baked) {
+        this.active.set(lit.reflections);
+        this.volumeLive = lit.volume;
+      }
+    }
+    this.writeHeader(!!lit?.baked);
   }
   private writeHeader(baked: boolean): void {
     this.headerBaked = baked;
@@ -1179,7 +1191,7 @@ export class LightProbes extends ShaderEffect {
         if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
         this.writeHeader(true);
       }
-      await this.copyBack(device);
+      await this.copyBack(device, true);
     } finally {
       this.pending = false;
       this.baking = false;
@@ -1262,9 +1274,10 @@ export class LightProbes extends ShaderEffect {
       const frame = track(device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
         params = track(device.createBuffer({ size: 256 * 8, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
         sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
-        targets = new Map<number, CaptureTarget>();
-      const makeTarget = (size: number) => {
-        if (targets.has(size)) return;
+        targets = new Map<'volume' | 'reflection', CaptureTarget>();
+      // Not shared at equal sizes: a live reflection probe spends several frames on its six faces while the live volume
+      // captures whole probes every frame, and its prefilter reads all six layers back.
+      const makeTarget = (user: 'volume' | 'reflection', size: number) => {
         const color = track(
             device.createTexture({
               size: [size, size, 6],
@@ -1296,7 +1309,7 @@ export class LightProbes extends ShaderEffect {
             },
           });
         }
-        targets.set(size, {
+        targets.set(user, {
           color,
           depth,
           array: color.createView({ dimension: '2d-array' }),
@@ -1306,8 +1319,8 @@ export class LightProbes extends ShaderEffect {
           groups: new Map(),
         });
       };
-      if (this.volume) makeTarget(this.volume.resolution ?? 16);
-      if (this.reflections.length) makeTarget(this.resolution);
+      if (this.volume) makeTarget('volume', this.volume.resolution ?? 16);
+      if (this.reflections.length) makeTarget('reflection', this.resolution);
       const cameras: Camera[] = [],
         positions: [number, number, number][] = [],
         aims: [number, number, number][] = [];
@@ -1398,12 +1411,20 @@ export class LightProbes extends ShaderEffect {
     return bake;
   }
   // Copies the probe data (after the header) from the GPU into the CPU snapshot. One copy at a time: a call while one
-  // runs waits for that one, since both would map the same buffer.
-  private copyBack(device: GPUDevice): Promise<void> {
-    this.copying ??= this.copyOnce(device).finally(() => {
-      this.copying = undefined;
+  // runs waits for that one, since both would map the same buffer. `fresh` (a bake) needs a copy of what it just
+  // captured, so it queues its own copy after a running one instead of taking that one's older data.
+  private copyBack(device: GPUDevice, fresh = false): Promise<void> {
+    const running = this.copying;
+    if (running && !fresh) return running;
+    const start = () => {
+      if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+      return this.copyOnce(device);
+    };
+    const promise: Promise<void> = (running ? running.catch(() => undefined).then(start) : start()).finally(() => {
+      if (this.copying === promise) this.copying = undefined;
     });
-    return this.copying;
+    this.copying = promise;
+    return promise;
   }
   private async copyOnce(device: GPUDevice): Promise<void> {
     // Pooled with the capture resources; before any capture, a buffer of its own for this copy.
@@ -1424,7 +1445,14 @@ export class LightProbes extends ShaderEffect {
       const encoder = device.createCommandEncoder();
       encoder.copyBufferToBuffer(this.buffer!, HEADER_BYTES, read, 0, this.texelCount * 8);
       device.queue.submit([encoder.finish()]);
-      await read.mapAsync(GPUMapMode.READ);
+      const lit = { baked: this.headerBaked, volume: this.volumeLive, reflections: this.active.slice() };
+      try {
+        await read.mapAsync(GPUMapMode.READ);
+      } catch (error) {
+        // Disposal or a device restore destroys the read buffer, which aborts the map: report that, not the abort.
+        if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+        throw error;
+      }
       mapped = true;
       if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
       const words = new Uint32Array(read.getMappedRange());
@@ -1432,6 +1460,7 @@ export class LightProbes extends ShaderEffect {
       // reuse its large backing store until the getter actually publishes it.
       if (this.snapshot && !this.snapshotExposed && this.snapshot.length === words.length) this.snapshot.set(words);
       else this.snapshot = words.slice();
+      this.snapshotLit = lit;
       this.snapshotExposed = false;
     } finally {
       if (mapped) read.unmap();
@@ -1637,7 +1666,7 @@ export class LightProbes extends ShaderEffect {
     samples: number,
   ): void {
     const device = c.device,
-      target = resources.targets.get(size)!,
+      target = resources.targets.get(reflectionIndex >= 0 ? 'reflection' : 'volume')!,
       lighting = engineRuntime(this.engine!).lighting,
       values = resources.values,
       view = resources.view!;

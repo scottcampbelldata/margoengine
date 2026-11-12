@@ -445,3 +445,139 @@ test('readback copies the GPU probe data to the CPU, one copy at a time, and nee
   h.probes.dispose();
   await assert.rejects(h.probes.readback(), /disposed/);
 });
+
+test('a live reflection probe keeps its own capture faces while the live volume sweeps at the same resolution', () => {
+  // Regression: one capture target per size was shared when volume.resolution equalled resolution, so the volume probes
+  // a frame captured overwrote the reflection faces still waiting for the probe's prefilter in a later frame.
+  const h = harness({
+    volume: { ...room, counts: [2, 1, 1], resolution: 16 },
+    live: { facesPerFrame: 1 },
+    liveVolume: { probesPerFrame: 1 },
+  });
+  const d = h.gpu.device,
+    createTexture = d.createTexture,
+    owner = new Map();
+  h.probes.dispose();
+  const probes = new LightProbes({
+    volume: { ...room, counts: [2, 1, 1], resolution: 16 },
+    reflections: [{ position: [0, 1, 0], ...room }],
+    resolution: 16,
+    live: { facesPerFrame: 1 },
+    liveVolume: { probesPerFrame: 1 },
+  });
+  d.createTexture = (descriptor) => {
+    const texture = createTexture(descriptor);
+    if (descriptor.size[2] === 6) {
+      const createView = texture.createView;
+      texture.createView = (...args) => {
+        const view = createView(...args);
+        owner.set(view, texture);
+        return view;
+      };
+    }
+    return texture;
+  };
+  const encoder = h.gpu.encoder,
+    beginRenderPass = encoder.beginRenderPass,
+    used = [];
+  encoder.beginRenderPass = (descriptor) => {
+    const texture = owner.get(descriptor.colorAttachments?.[0]?.view);
+    if (texture && descriptor.depthStencilAttachment?.depthLoadOp === 'clear') used.push(texture);
+    return beginRenderPass(descriptor);
+  };
+  const frame = context(h.gpu, { shader: coreShader }),
+    run = passes(probes);
+  h.engine.render = () => h.gpu.record(() => run(frame.c));
+  probes.setup(h.engine);
+  for (let i = 0; i < 2; i++) h.gpu.record(() => (frame.begin(i), run(frame.c)));
+  // Per frame: one reflection face clear, then six volume face clears.
+  assert.equal(used.length, 14);
+  const reflection = new Set([used[0], used[7]]),
+    volume = new Set([...used.slice(1, 7), ...used.slice(8)]);
+  assert.equal(reflection.size, 1);
+  assert.equal(volume.size, 1);
+  assert.ok(!volume.has(used[0]), 'the live volume captures into the reflection probe target');
+  d.createTexture = createTexture;
+  encoder.beginRenderPass = beginRenderPass;
+  probes.dispose();
+});
+
+test('a device restore after readback lights again only the probes the copy held light for', async () => {
+  // Regression: allocate() treated any CPU snapshot as a bake and turned every probe on, so a reflection probe never
+  // captured live (zero radiance in the copy) replaced the environment fallback with black after the restore.
+  const h = harness({
+    reflections: [
+      { position: [0, 1, 0], ...room },
+      { position: [5, 1, 0], min: [3, 0, -2], max: [7, 3, 2] },
+    ],
+    live: { facesPerFrame: 6 },
+  });
+  h.render();
+  await Promise.resolve();
+  await h.probes.readback();
+  const fresh = mockGPU();
+  fresh.encoder.finish = () => ({});
+  Object.assign(fresh.device, {
+    createCommandEncoder: () => fresh.encoder,
+    queue: Object.assign(fresh.device.queue, { onSubmittedWorkDone: async () => undefined }),
+  });
+  h.engine.gpu = fresh.device;
+  const restore = fresh.record(() => h.probes.onDeviceRestored(h.engine));
+  const header = Buffer.from(restore.find((e) => e[0] === 'writeBuffer' && e[2] === 0)[3], 'hex');
+  assert.ok(restore.some((e) => e[0] === 'writeBuffer' && e[2] === 1088), 'the copy is uploaded again');
+  assert.equal(header.readUInt32LE(64 + 60), 1, 'the probe captured live lights again from the copy');
+  assert.equal(header.readUInt32LE(64 + 64 + 60), 0, 'the probe never captured stays on the fallback');
+  h.probes.dispose();
+});
+
+test('a bake started while a readback copy maps takes its own copy of what it captured', async () => {
+  // Regression: bake() joined the readback's copy, submitted before the bake's capture, and resolved with the old light
+  // in the CPU snapshot (irradianceAt, texels and the data a device restore uploads).
+  const h = harness({ volume: sweepRoom, reflections: [] }),
+    d = h.gpu.device,
+    createBuffer = d.createBuffer;
+  d.createBuffer = (descriptor) => {
+    const buffer = createBuffer(descriptor);
+    if (descriptor.usage & GPUBufferUsage.MAP_READ)
+      buffer.mapAsync = () => new Promise((resolve) => setTimeout(resolve, 20));
+    return buffer;
+  };
+  // bake() renders through the recorder itself, so the order is taken from the encoder and the queue directly.
+  const order = [],
+    encoder = h.gpu.encoder,
+    copyBufferToBuffer = encoder.copyBufferToBuffer,
+    submit = d.queue.submit;
+  encoder.copyBufferToBuffer = (...args) => (order.push('copyBufferToBuffer'), copyBufferToBuffer(...args));
+  d.queue.submit = (...args) => (order.push('submit'), submit(...args));
+  const copy = h.probes.readback();
+  await h.probes.bake();
+  await copy;
+  encoder.copyBufferToBuffer = copyBufferToBuffer;
+  d.queue.submit = submit;
+  assert.equal(order.filter((e) => e === 'copyBufferToBuffer').length, 2, 'the bake copies after its capture');
+  assert.equal(order.at(-2), 'copyBufferToBuffer', 'the last copy follows every capture submit');
+  d.createBuffer = createBuffer;
+  h.probes.dispose();
+});
+
+test('disposing during a readback rejects it as disposed, not with the aborted map', async () => {
+  // Regression: dispose() destroys the pooled read buffer, its pending mapAsync rejects with an AbortError, and that raw
+  // DOMException reached the caller instead of the MargoError the other interrupted paths give.
+  const h = harness({ live: { facesPerFrame: 6 } }),
+    d = h.gpu.device,
+    createBuffer = d.createBuffer;
+  d.createBuffer = (descriptor) => {
+    const buffer = createBuffer(descriptor);
+    if (descriptor.usage & GPUBufferUsage.MAP_READ) {
+      let abort;
+      buffer.mapAsync = () => new Promise((_, reject) => (abort = reject));
+      buffer.destroy = () => abort?.(new DOMException('Buffer destroyed before mapping', 'AbortError'));
+    }
+    return buffer;
+  };
+  h.render();
+  const copy = h.probes.readback();
+  h.probes.dispose();
+  await assert.rejects(copy, (error) => error.code === 'disposed');
+  d.createBuffer = createBuffer;
+});
