@@ -521,6 +521,35 @@ const cases = {
     return out;
   },
 
+  /**
+   * acos, asin and atan2 over their whole domain, each pixel (input, results) in float32, 4096 values a sweep over two
+   * rows of 2048: sweep 0 x from -1 to 1 in 4095 even steps, sweep 1 the 4096 largest float32 values up to 1, sweep 2 their negatives, sweep 3 atan2 around the
+   * circle at magnitudes 1e-30, 1 and 1e30 (and the axes and zeros first). features-browser.mjs checks every result
+   * against float64 to 1e-5. Regression for the Radeon 680M under ANGLE D3D11, whose acos(0) is 1.5707288: the layer
+   * calls its own functions there (src/device/inverse-trig.ts).
+   */
+  async inverseTrig(device) {
+    const code = `@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+      let i = u32(p.x) + 2048u * (u32(p.y) % 2u);
+      let kind = u32(p.y) / 2u;
+      if (kind < 3u) {
+        // Clamped: a driver's division need not round exactly (ANGLE D3D11 gives 4095 / 4095 = 1.0000001).
+        var x = clamp(-1.0 + 2.0 * (f32(i) / 4095.0), -1.0, 1.0);
+        if (kind > 0u) { x = bitcast<f32>(0x3f800000u - i); }
+        if (kind > 1u) { x = -x; }
+        return vec4f(x, acos(x), asin(x), 0.0);
+      }
+      var edges = array<vec2f, 12>(vec2f(0.0, 1.0), vec2f(-0.0, 1.0), vec2f(0.0, -1.0), vec2f(-0.0, -1.0), vec2f(1.0, 0.0),
+        vec2f(-1.0, 0.0), vec2f(1.0, -0.0), vec2f(-1.0, -0.0), vec2f(1.0, 1.0), vec2f(-1.0, -1.0), vec2f(1e-30, 1.0), vec2f(1.0, 1e-30));
+      let angle = -3.14159265 + 6.2831853 * ((f32(i) + 0.5) / 4096.0);
+      let r = select(select(1e30, 1.0, i % 3u == 1u), 1e-30, i % 3u == 0u);
+      var yx = r * vec2f(sin(angle), cos(angle));
+      if (i < 12u) { yx = edges[i]; }
+      return vec4f(yx.x, yx.y, atan2(yx.x, yx.y), 0.0);
+    }`;
+    return shade(device, { w: 2048, h: 8, code });
+  },
+
   async halfExport(device) {
     const values = new Float32Array(HALF_EXPORT_VALUES);
     const data = device.createBuffer({ size: 128, usage: B.UNIFORM | B.COPY_DST });

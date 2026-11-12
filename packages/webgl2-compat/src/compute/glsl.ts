@@ -48,6 +48,8 @@ interface ComputeEmitOptions {
   readonly sharedStorage?: (group: number, binding: number) => boolean;
   /** Bytes a GLSL uniform block holds; a larger uniform buffer reads from a data texture. */
   readonly uniformBlockSize?: number;
+  /** The layer's own acos, asin and atan2 (as the render emitter's option of the same name). */
+  readonly accurateInverseTrig?: boolean;
 }
 
 const SWIZZLE = 'xyzw';
@@ -130,6 +132,7 @@ class ComputeEmitter extends StageEmitter {
         prefix: 'c',
         sharedStorage: options.sharedStorage,
         uniformBlockSize: options.uniformBlockSize,
+        accurateInverseTrig: options.accurateInverseTrig,
       },
       tier === 'fragment' ? 'fragment' : 'vertex',
     );

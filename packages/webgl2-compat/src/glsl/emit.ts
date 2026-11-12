@@ -169,6 +169,11 @@ interface EmitOptions {
   readonly sharedStorage?: (group: number, binding: number) => boolean;
   /** Bytes a uniform block may hold (MAX_UNIFORM_BLOCK_SIZE); a larger uniform buffer reads from a data texture. */
   readonly uniformBlockSize?: number;
+  /**
+   * acos, asin and atan2 call the layer's own (helpers `_acos`, `_asin`, `_atan2`), for a driver whose built-ins miss
+   * 1e-5 (src/device/inverse-trig.ts). Default false: GLSL's built-ins.
+   */
+  readonly accurateInverseTrig?: boolean;
 }
 
 /** @internal A memory reference: a GLSL lvalue, or a place in a uniform or storage buffer. */
@@ -1784,6 +1789,10 @@ export class StageEmitter {
       unpack2x16snorm: 'unpackSnorm2x16',
       unpack2x16unorm: 'unpackUnorm2x16',
     };
+    if (this.options.accurateInverseTrig && (name === 'acos' || name === 'asin' || name === 'atan2'))
+      return name === 'atan2'
+        ? this.componentwise('_atan2', result, a[0], a[1], t0, storeOf(args[1].type))
+        : this.mapped(`_${name}`, a[0], t0, result);
     if (name in direct) return `${direct[name]}(${a.join(', ')})`;
     const isScalarInt = s0 && (isInt(s0) || isUint(s0));
     switch (name) {

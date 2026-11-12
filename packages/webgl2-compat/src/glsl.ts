@@ -20,6 +20,8 @@ export type {
 export { encodeName as glslName, floatLiteral as glslFloat } from './glsl/emit.js';
 /** @internal The render pipelines' binary16 export rounding (device/half-export.ts), exported for its tests. */
 export { HALF_ROUND_GLSL, roundHalfExports } from './device/half-export.js';
+export { INVERSE_TRIG_IMPLAUSIBLE, INVERSE_TRIG_PROBE, INVERSE_TRIG_TOLERANCE, inverseTrigError } from './device/inverse-trig.js';
+export { ATAN_UNIT, HELPERS as GLSL_HELPERS } from './glsl/helpers.js';
 
 /** One stage of a pipeline to translate: a module (source or checked IR) and its entry point. */
 export interface TranslateStage {
@@ -56,6 +58,12 @@ export interface TranslateOptions {
    * 64 KiB, is read through a data texture as a storage buffer is. Default 65,536.
    */
   readonly uniformBlockSize?: number;
+  /**
+   * acos, asin and atan2 call the layer's own float32 versions (error under 1e-6) instead of GLSL's built-ins. The
+   * device sets it where a startup probe finds the driver's built-ins more than 1e-5 off (ANGLE Direct3D 11: acos(0)
+   * is 1.5707288). Default false.
+   */
+  readonly accurateInverseTrig?: boolean;
 }
 
 /** A translated pipeline: GLSL ES 3.00 sources and what each stage binds. */
@@ -136,6 +144,7 @@ export function translateWGSL(options: TranslateOptions): GLSLProgram {
     points: options.points ?? false,
     sharedStorage: options.sharedStorage,
     uniformBlockSize: options.uniformBlockSize,
+    accurateInverseTrig: options.accurateInverseTrig,
   };
   let fragment = EMPTY_FRAGMENT;
   if (options.fragment) {

@@ -10,6 +10,27 @@ interface Helper {
   readonly deps?: readonly string[];
 }
 
+/**
+ * atan(a) / a for a in [0, 1] as a polynomial in a^2, the coefficient of a^(2k) at index k (Abramowitz and Stegun,
+ * Handbook of Mathematical Functions, formula 4.4.49: error at most 2e-8). The `_atanu` helper evaluates it by Horner's
+ * rule.
+ * @internal
+ */
+export const ATAN_UNIT: readonly number[] = [
+  1, -0.3333314528, 0.1999355085, -0.1420889944, 0.1065626393, -0.07528964, 0.0429096138, -0.0161657367, 0.0028662257,
+];
+
+const glslNumber = (c: number): string => (Number.isInteger(c) ? `${c}.0` : String(c));
+const ATAN_HORNER = ATAN_UNIT.reduceRight(
+  (inner: string, c, k) => (k === ATAN_UNIT.length - 1 ? glslNumber(c) : `${glslNumber(c)} + t * (${inner})`),
+  '',
+);
+
+/**
+ * The helper functions by name (`_divi`, `_acos`, ...): each one's GLSL source and the helpers it calls. Exported from
+ * `glsl.js` as `GLSL_HELPERS` for the layer's tests.
+ * @internal
+ */
 export const HELPERS: Readonly<Record<string, Helper>> = {
   // WGSL: e1 / 0 is e1; the most negative value / -1 is itself. Truncating division on magnitudes (GLSL ES leaves
   // signed division of negative operands unspecified).
@@ -93,4 +114,15 @@ export const HELPERS: Readonly<Record<string, Helper>> = {
     source: `int _d4i8(uint a, uint b) { ivec4 x = _u4i8(a), y = _u4i8(b); return x.x * y.x + x.y * y.y + x.z * y.z + x.w * y.w; }`,
     deps: ['_u4i8'],
   },
+  // The layer's own inverse trigonometry, for drivers whose built-ins miss 1e-5 (src/device/inverse-trig.ts: the D3D11
+  // compiler under ANGLE gives acos(0) = 1.5707288). atan2 reduces to atan on [0, 1] by octant (the smaller magnitude
+  // over the larger) and keeps the signs of zero as IEEE atan2 does; asin and acos are atan2 of x and
+  // sqrt((1 - x)(1 + x)), which stays accurate next to +-1, where 1 - x is exact.
+  _atanu: { source: `float _atanu(float a) { float t = a * a; return a * (${ATAN_HORNER}); }` },
+  _atan2: {
+    source: `float _atan2(float y, float x) { float ax = abs(x), ay = abs(y), hi = max(ax, ay); float r = _atanu(hi > 0.0 ? min(ax, ay) / hi : 0.0); if (ay > ax) r = 1.5707964 - r; if ((floatBitsToUint(x) & 0x80000000u) != 0u) r = 3.1415927 - r; return (floatBitsToUint(y) & 0x80000000u) != 0u ? -r : r; }`,
+    deps: ['_atanu'],
+  },
+  _asin: { source: `float _asin(float x) { return _atan2(x, sqrt((1.0 - x) * (1.0 + x))); }`, deps: ['_atan2'] },
+  _acos: { source: `float _acos(float x) { return _atan2(sqrt((1.0 - x) * (1.0 + x)), x); }`, deps: ['_atan2'] },
 };

@@ -147,6 +147,7 @@ class Runtime implements ComputeRuntime {
         target,
         sharedStorage: p.shared,
         uniformBlockSize: this.device.adapter.capabilities.limits.MAX_UNIFORM_BLOCK_SIZE,
+        accurateInverseTrig: this.device.adapter.accurateInverseTrig,
       });
       const format = target.kind === 'buffer' ? 'r32uint' : (target.format as GPUTextureFormat);
       const pipeline = new CompatRenderPipeline(

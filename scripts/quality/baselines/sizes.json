@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15170488,
+  "total": 15184635,
   "history": [
     {
       "date": "2026-10-24",
@@ -8687,6 +8687,18 @@
       "commit": "f18d137251",
       "reason": "Scott 2026-11-11: createStage background option, stage entry 3222 to 3236 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "b3f91d1c1",
+      "reason": "webgl2-compat: the layer's own acos, asin and atan2 and their startup probe (list 5 R6 row 31)",
+      "grew": 4
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "f4ebc54ac",
+      "reason": "webgl2-compat: the layer's own acos, asin and atan2 and their startup probe (list 5 R6 row 31)",
+      "grew": 1
     }
   ],
   "items": {
@@ -9992,19 +10004,19 @@
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
     "@margoengine/webgl2-compat": 116098,
-    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 83539,
+    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 86415,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
-    "@margoengine/webgl2-compat/device": 115255,
+    "@margoengine/webgl2-compat/device": 119019,
     "@margoengine/webgl2-compat/glsl": 45011,
     "@margoengine/webgl2-compat/pick": 5054,
     "@margoengine/webgl2-compat/preview": 3699,
     "@margoengine/webgl2-compat/restore": 1106,
-    "@margoengine/webgl2-compat/tiers": 114930,
+    "@margoengine/webgl2-compat/tiers": 118741,
     "@margoengine/webgl2-compat/wgsl": 27240,
-    "@margoengine/webgl2-compat/xr": 115152,
+    "@margoengine/webgl2-compat/xr": 118848,
     "@margoengine/wfc": 2154,
     "@margoengine/wfc dist/workers/wfc.js": 3601,
     "@margoengine/wfc/assemble": 1721,

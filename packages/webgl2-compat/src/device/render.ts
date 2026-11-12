@@ -413,6 +413,7 @@ export class CompatRenderPipeline {
           sharedStorage: (group, binding) =>
             !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
           uniformBlockSize: device.adapter.capabilities.limits.MAX_UNIFORM_BLOCK_SIZE,
+          accurateInverseTrig: device.adapter.accurateInverseTrig,
         });
     } catch (error) {
       if ((error as { code?: string }).code === 'unsupported') throw error;

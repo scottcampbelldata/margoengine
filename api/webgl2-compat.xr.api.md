@@ -127,6 +127,7 @@ class CompatAdapter {
     readonly tierFormats?: TierFormats | undefined;
     readonly halfExportRounding: boolean;
     readonly drawClears: boolean;
+    readonly accurateInverseTrig: boolean;
     readonly features: ReadonlySet<string>;
     readonly limits: Readonly<Record<string, number>>;
     readonly info: {
@@ -140,7 +141,8 @@ class CompatAdapter {
     cpuWorkBudget?: number,
     tierFormats?: TierFormats | undefined,
     halfExportRounding?: boolean,
-    drawClears?: boolean);
+    drawClears?: boolean,
+    accurateInverseTrig?: boolean);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;
 }
 

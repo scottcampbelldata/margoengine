@@ -12,6 +12,7 @@ import { ExternalCopies } from './externals.js';
 import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { clearsLost } from './fresh-clears.js';
 import { exportTruncatesHalf } from './half-export.js';
+import { inverseTrigInaccurate } from './inverse-trig.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import {
   CompatBindGroup,
@@ -192,7 +193,15 @@ export class CompatGPU {
       return Promise.resolve(null);
     }
     const formats = caps.tier === 'full' ? undefined : (await import('../tiers.js')).tierFormats(caps.tier);
-    return new CompatAdapter(gl, caps, budget, formats, !formats && exportTruncatesHalf(gl), clearsLost(gl));
+    return new CompatAdapter(
+      gl,
+      caps,
+      budget,
+      formats,
+      !formats && exportTruncatesHalf(gl),
+      clearsLost(gl),
+      inverseTrigInaccurate(gl),
+    );
   }
 
   /** The canvas format the layer renders fastest: WebGL2 stores rgba. */
@@ -226,6 +235,11 @@ export class CompatAdapter {
      * (device/fresh-clears.ts): colour textures of more than one level or layer are then cleared by draws.
      */
     readonly drawClears = false,
+    /**
+     * @internal True when this GPU's acos, asin or atan misses 1e-5 (device/inverse-trig.ts): shaders then call the
+     * layer's own.
+     */
+    readonly accurateInverseTrig = false,
   ) {
     this.features = featuresOf(capabilities);
     this.limits = Object.freeze(limitsOf(capabilities));

@@ -567,6 +567,26 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   cube, an array and 2D mips; fails without the workaround), `layerView` (a zero draw inside a pass gives the pass its
   viewport back), `test/fresh-clears.test.js`. Depth and stencil clears were not probed.
 
+### Radeon 680M, ANGLE Direct3D 11: acos is 6.75e-5 off (list 5 R6 row 31, 2026-11-11, worked around in webgl2-compat)
+
+- **What:** `packages/shader` `test:gpu` `utils-check.mjs` under compatibility mode on the Beelink (Radeon 680M, driver
+  32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): the equirect of the forward axis is (0.5, 0.5000215), 2.2e-5 off in
+  v against the check's 1e-5; native WebGPU passes.
+- **Repro (raw WebGL2, no Margo code):** a fragment shader writing `floatBitsToUint(acos(x))` into an RGBA32UI target
+  reads acos(0) = 1.5707288, 6.75e-5 below pi / 2; asin is 6.76e-5 off at 0 and 4.6e-5 at 0.5, atan2 up to 1.1e-5.
+  The equirect's v is 1 - acos(0) / pi = 0.5000215.
+- **Cause:** below Margo: the Direct3D HLSL compiler under ANGLE evaluates acos and asin with a short polynomial. WGSL
+  takes acos's accuracy from atan2 (4096 ULP, about 4.9e-4 here) and GLSL ES 3.00 leaves it unspecified, so the driver
+  is within both specs; Margo's shaders expect 1e-5, which native WebGPU gives on every GPU measured.
+- **Workaround (Scott's ruling 2026-11-11, `packages/webgl2-compat/src/device/inverse-trig.ts`,
+  `glsl/helpers.ts`):** the adapter probes once (acos, asin and atan2 at 65 inputs against float64); where any result
+  is more than 1e-5 off, every translated shader calls the layer's own `_acos`, `_asin` and `_atan2` (octant
+  reduction and an odd polynomial of degree 17 for atan on [0, 1], error under 1e-6 in a float32 model over the whole
+  domain). Other drivers compile unchanged shaders; the utils-check tolerance stays 1e-5, and utils-check passes under
+  compatibility mode with the workaround. Regression: `features-browser.mjs` `inverseTrig` (the whole domain against
+  float64 to 1e-5: 2.86e-7 on the 680M; without the workaround it fails, atan2(-0, -1) reads +pi), and
+  `test/inverse-trig.test.js`.
+
 ### Fixed 2026-11-11: in WebKit a check's first run could be the previous document's, at 300 x 150 (KB-L4-W1)
 
 - **Repro:** on the Apple M6 Mac, `MARGO_BROWSER=webkit node packages/sky/test/browser-check.mjs` in a freshly copied
