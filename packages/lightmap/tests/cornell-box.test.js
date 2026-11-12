@@ -29,6 +29,8 @@ test('Cycles retains all receivers during every bake', () => {
   const run = spawnSync(python, [fileURLToPath(new URL('./cornell-cycles-lifecycle.py', import.meta.url))], {
     encoding: 'utf8',
     timeout: 20_000,
+    // No __pycache__ under packages/lightmap/scripts: a test leaves the package's sources as it found them (KB-RM4).
+    env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
   });
   assert.equal(run.status, 0, run.stderr || String(run.error));
 });

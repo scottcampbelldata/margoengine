@@ -29,7 +29,9 @@ export const STAMP_DIR = 'test-results/package-stamps';
 const BUILD_ENTRY = 'scripts/build-modern.js';
 /** Folders under a package that its build reads; `native` and `kernel` hold the Rust crates compiled to Wasm. */
 const PACKAGE_INPUTS = ['package.json', 'tsconfig.json', 'src', 'scripts', 'native', 'kernel'];
-const SKIP = new Set(['node_modules', 'dist', 'test-results', 'target']);
+// __pycache__: Python writes compiled bytecode beside a script it imports (lightmap's Cycles test imports
+// scripts/cornell-cycles.py), so a test run made lightmap and every package built after it look stale (KB-RM4).
+const SKIP = new Set(['node_modules', 'dist', 'test-results', 'target', '__pycache__']);
 // Relative module specifiers after `from`, `import` or `import(` (static, side-effect and dynamic imports, re-exports).
 // A specifier built in a template literal names no fixed file, so one holding `$` is left out.
 const RELATIVE_IMPORT = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.{1,2}\/[^'"\n$]+)['"]/g;

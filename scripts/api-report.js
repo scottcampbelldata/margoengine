@@ -35,6 +35,7 @@ import {
 } from './api-report-scope.mjs';
 import { createGlobalReports } from './api-report-globals.mjs';
 import { stalePackages } from './package-stamps.mjs';
+import { BUILD_LOCK_ENV, acquireBuildLock } from './support/build-lock.mjs';
 import { execFileSync } from 'node:child_process';
 import { assessChange, checkCoverage, classify, enrollWatch, readLock } from './api-lock.mjs';
 
@@ -52,13 +53,23 @@ const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 // holds its old build: a new entry had no .d.ts and a changed one its old declarations, so the report failed on packages
 // nobody touched until build:packages ran again. Rebuild just the packages whose dist does not match their sources
 // (scripts/package-stamps.mjs); a current build is left alone.
-const stale = stalePackages(root);
-if (stale.length) {
-  console.error(`API report: rebuilding ${stale.length} package(s) whose dist does not match their sources: ${stale.join(', ')}`);
-  execFileSync(process.execPath, ['scripts/build-modern.js', '--precompiled', `--only=${stale.join(',')}`], {
-    cwd: root,
-    stdio: ['ignore', 'inherit', 'inherit'],
-  });
+// Stale packages are found and rebuilt under the build lock (scripts/support/build-lock.mjs): two reports at once (two
+// root tests in one CI run) both rebuilt the same packages side by side and deleted each other's dist (KB-RM4).
+const releaseBuild = acquireBuildLock(root);
+try {
+  const stale = stalePackages(root);
+  if (stale.length) {
+    console.error(
+      `API report: rebuilding ${stale.length} package(s) whose dist does not match their sources: ${stale.join(', ')}`,
+    );
+    execFileSync(process.execPath, ['scripts/build-modern.js', '--precompiled', `--only=${stale.join(',')}`], {
+      cwd: root,
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env: { ...process.env, [BUILD_LOCK_ENV]: String(process.pid) },
+    });
+  }
+} finally {
+  releaseBuild();
 }
 
 // Packages and their entries, in directory order.
@@ -432,7 +443,17 @@ const summary = scopedPackage
   : surface();
 if (update) {
   mkdirSync(apiDir, { recursive: true });
-  writeIfChanged(join(apiDir, 'lock.json'), JSON.stringify(enrollWatch(lock, selectedReports.map((item) => item.pkg.name)), null, 2) + '\n');
+  writeIfChanged(
+    join(apiDir, 'lock.json'),
+    JSON.stringify(
+      enrollWatch(
+        lock,
+        selectedReports.map((item) => item.pkg.name),
+      ),
+      null,
+      2,
+    ) + '\n',
+  );
   if (!scopedPackage)
     for (const file of readdirSync(apiDir))
       if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));
@@ -470,7 +491,10 @@ if (update) {
     else problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
   }
   const allEntriesPath = join(root, ALL_ENTRIES);
-  if ((existsSync(allEntriesPath) ? readFileSync(allEntriesPath, 'utf8').replaceAll('\r\n', '\n') : '') !== entriesSource(root))
+  if (
+    (existsSync(allEntriesPath) ? readFileSync(allEntriesPath, 'utf8').replaceAll('\r\n', '\n') : '') !==
+    entriesSource(root)
+  )
     problems.push(`${ALL_ENTRIES} no longer matches the exports maps (scripts/generate-all-entries.mjs)`);
   if (problems.length) {
     console.error(problems.join('\n\n'));

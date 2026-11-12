@@ -3,13 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import {
-  clearStamp,
-  packageStamps,
-  readStamp,
-  stalePackages,
-  writeStamp,
-} from '../scripts/package-stamps.mjs';
+import { clearStamp, packageStamps, readStamp, stalePackages, writeStamp } from '../scripts/package-stamps.mjs';
 
 // A small workspace: b builds after a, c stands alone.
 function fixture() {
@@ -141,4 +135,17 @@ test('the build writes a stamp after each package and clears it before', () => {
   );
   const report = readFileSync(new URL('../scripts/api-report.js', import.meta.url), 'utf8');
   assert.match(report, /const stale = stalePackages\(root\);/, 'the API report checks the stamps before it reads dist');
+});
+
+// Regression (KB-RM4, 2026-11-11): lightmap's Cycles test imports scripts/cornell-cycles.py, and Python wrote
+// scripts/__pycache__/cornell-cycles.cpython-311.pyc. The stamp hashed it, so mid-run lightmap and the five packages
+// built after it looked stale, two API reports rebuilt them at once and packages/web/dist was left deleted.
+test('Python bytecode written beside a package script leaves the stamp alone', (t) => {
+  const { root, write, built, cleanup } = fixture();
+  t.after(cleanup);
+  write('packages/a/scripts/bake.py', 'print(1)\n');
+  built();
+  write('packages/a/scripts/__pycache__/bake.cpython-311.pyc', 'bytecode');
+  write('packages/shared/__pycache__/helper.cpython-311.pyc', 'bytecode');
+  assert.deepEqual(stalePackages(root), []);
 });

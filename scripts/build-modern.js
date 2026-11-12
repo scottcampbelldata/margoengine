@@ -18,6 +18,12 @@ import { recordJob, recordScope } from './support/record-reads.mjs';
 import { clearStamp, packageStamps, writeStamp } from './package-stamps.mjs';
 import { buildCoreKernel, deflateKernel } from './build-core-kernel.mjs';
 import { BLUEPRINTS, blueprintBytes } from './wasm-blueprints.mjs';
+import { acquireBuildLock } from './support/build-lock.mjs';
+import { missingPackageTargets } from './package-export-targets.mjs';
+// One package build at a time in this checkout: a build removes each dist before writing it, so two at once delete each
+// other's output (KB-RM4). Released when the process exits, whatever the outcome.
+const releaseBuild = acquireBuildLock(process.cwd());
+process.on('exit', releaseBuild);
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -186,6 +192,12 @@ await buildInDependencyOrder(
       writeStamp(process.cwd(), name, stamps.get(name));
     }),
 );
+// Every file each built package's `exports` promises must exist now. A run that ends with a package missing its dist
+// stops here instead of failing forty minutes later in whatever reads it first (KB-RM4: no packages/web/dist).
+const missingTargets = packageOrder(manifests)
+  .filter((name) => !only || only.includes(name))
+  .flatMap((name) => missingPackageTargets(resolve(`packages/${name}`)));
+assert.deepEqual(missingTargets, [], 'build:packages finished without these declared export targets');
 if (only) process.exit(0);
 recordScope('size-records');
 // Size records and leak checks only; build order comes from package.json above.

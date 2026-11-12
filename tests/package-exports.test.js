@@ -1,32 +1,23 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, statSync, globSync } from 'node:fs';
-import { join } from 'node:path';
-
-function targets(value) {
-  if (typeof value === 'string') return [value];
-  if (!value) return [];
-  return Object.values(value).flatMap(targets);
-}
-function missing(exports, hasFile) {
-  return targets(exports).filter((target) => !hasFile(target));
-}
+import { readFileSync, globSync } from 'node:fs';
+import { missingPackageTargets, missingTargets } from '../scripts/package-export-targets.mjs';
 
 test('every declared package export target exists after build, including all conditional and type targets', () => {
   const root = JSON.parse(readFileSync('package.json', 'utf8'));
   const problems = [];
   for (const workspace of root.workspaces.filter((path) => path.startsWith('packages/')))
-    for (const directory of globSync(workspace)) {
-      const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
-      const hasFile = (target) => {
-        const candidates = target.includes('*')
-          ? globSync(target, { cwd: directory }).map((path) => join(directory, path))
-          : [join(directory, target)];
-        return candidates.length > 0 && candidates.every((path) => existsSync(path) && statSync(path).isFile());
-      };
-      for (const target of missing(manifest.exports, hasFile)) problems.push(`${manifest.name}: ${target}`);
-    }
+    for (const directory of globSync(workspace)) problems.push(...missingPackageTargets(directory));
   assert.deepEqual(problems, [], 'run npm run build:packages; every declared export branch must emit its target');
+});
+
+// KB-RM4 (2026-11-11): a full CI run went on for forty minutes with no packages/web/dist. build-modern now checks every
+// package it built with the same function and stops.
+test('build:packages checks the export targets of every package it built before it ends', () => {
+  const build = readFileSync('scripts/build-modern.js', 'utf8');
+  const check = build.indexOf('missingPackageTargets(');
+  assert.ok(check > 0, 'build-modern calls missingPackageTargets');
+  assert.ok(check < build.indexOf('if (only) process.exit(0);'), 'before an --only build returns');
 });
 
 test('the export gate detects missing runtime, declaration and nested condition outputs', () => {
@@ -40,11 +31,11 @@ test('the export gate detects missing runtime, declaration and nested condition 
     './choice': [null, './dist/choice.js'],
   };
   assert.deepEqual(
-    missing(exports, (target) => target === './dist/index.js'),
+    missingTargets(exports, (target) => target === './dist/index.js'),
     ['./dist/index.d.ts', './dist/browser.js', './dist/node.js', './dist/choice.js'],
   );
   assert.deepEqual(
-    missing(exports, () => true),
+    missingTargets(exports, () => true),
     [],
   );
 });
