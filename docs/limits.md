@@ -6635,6 +6635,23 @@ Batch 175 job 3 measured optional entry: sciviz/aggregate 0 -> 28201 B gzip, cei
 - Batch 174 job 6: optional sciviz/views absent to 4786 B min+gzip, ceiling 5042 B. Current sciviz root 60851 B; this job changes no root source. Core + stage remains 24209 B. Each FigureLayout cell owns one engine and canvas; there is no shared GPU-resource or single-canvas claim. Defaults: ceil(sqrt(count)) columns, 320px cell height, 12px gap; labels default View N. Links default to 3D cameras or 2D x/y physical ranges, with first-figure initial state; selected axes, programmatic sync and AbortSignal are supported. Polling follows changes on the next active engine frame; call sync for stopped engines. All linked figures must have the same dimensionality. Camera projection overrides are borrowed functions. ComparativeGrid uses independent FilterPipeline caches with a shared registry; complete node params replace per-cell params, time defaults to zero, and all outputs are released by the owning pipeline's operator contracts. VolumeQuad owns three orthographic nearest-sample heatmaps and a 3D volume plus three slice planes. It clamps and snaps the crosshair to exact sample centres, retains voxel IDs/orientation, and keeps physical screen scale isotropic across resize. Source CPU samples are borrowed, dimensions must each be >=2, and total voxel count must fit uint32 provenance IDs. Default colormap gray; one shared colour range comes from the 3D volume. Box extent/spacing is axis aligned; no oblique reslicing or patient-space registration is added. Layouts/controllers are disposable; individual setCrosshair signals cancel unpublished work and ready accepts an abortable wait. No timing or clinical claim.
 
 
+## Web template bundle
+
+The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must stay below
+81,500 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). It measured 79,789 B after
+9b65053b0f, 81,697 B on 4bba6c3b6f and 80,833 B after KB-RM1. Of the 81,697, 858 B was waste and came out: WGSL
+comments inside the environment shader strings the template bundles (`IBL_WGSL`, the cube, prefilter, SH and BRDF LUT
+bakes; 705 B gzip; the comments now sit in the JavaScript around the strings, and the test fails if a WGSL comment
+ships again) and a second pass over the EXR header for `chromaticities` in the lazily loaded decoders (153 B;
+`readEXRHeader` now reads it in its one pass). The 1,908 B of growth since 9b65053b0f are bug fixes, measured per commit
+by rebuilding the template's packages at each one: shadows at any model scale +456 B (f3af757782), the floating-origin
+snap +325 B (48f3a6625d), virtual-shadow scale and EXR chromaticities +348 B (9ae0388ee5, before the 153 B above),
+environment lost-device and restore reports +219 B (d477882a68), disposed rebuilds released at once +126 B
+(4ff97f56d1), sweep L4 rows +97 B, out-of-memory recovery +74 B, scene-owned plugins +62 B, and smaller core and
+shadows fixes. Splitting would not remove them: the fixes sit in code every shadowed or image-lit page runs, so a lazy
+chunk would still count here and add a request at start-up. The web template's install and first frame are unchanged;
+core + stage stays below 25,000 B.
+
 ## Batch 120 scaffold profile routing
 
 The five create-margo starters install one engine profile each: web 40 engine packages, game 70, viz 42, React and Next 42 in the packed rehearsal. React, React DOM, Next and development tools remain explicit app dependencies as appropriate; Rapier's 3D solver comes with `@margoengine/physics`, and the game starter imports it from `@margoengine/game/physics` so its root ships no Wasm. All five production builds draw a first frame; Next runs its own production server. Profile entry sizes and core + stage remain unchanged. scripts/template-install-check.mjs and template-browser-check.mjs reproduce this route from packed engine and CLI tarballs with no workspace engine symlink. The starting-path review is docs/guides/kit-migration.md. Timing is deferred to the speed phase; template README examples remain owed.

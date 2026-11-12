@@ -1,7 +1,7 @@
 // OpenEXR scanline decoder for single-part scanline files with
 // NONE, RLE, ZIPS, ZIP or PIZ compression and HALF, FLOAT or UINT channels.
 import { halfFloats } from './half.js';
-import { convertRGBA, exrChromaticities, exrToSRGB } from './exr-primaries.js';
+import { convertRGBA, exrToSRGB } from './exr-primaries.js';
 import { inflateZlib } from '../../shared/inflate.js';
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -69,6 +69,11 @@ export interface EXRHeader {
   dataWindow: [number, number, number, number];
   displayWindow: [number, number, number, number];
   lineOrder: number;
+  /**
+   * The `chromaticities` attribute (red, green, blue and white CIE xy), null when absent or not eight finite numbers
+   * (the last one counts when a header repeats it). Read in this one pass over the attributes.
+   */
+  primaries: number[] | null;
   /** The `tiles` attribute (tiledesc), present only in tiled files: tile size and the raw mode byte. */
   tiles?: { xSize: number; ySize: number; mode: number };
   width: number;
@@ -132,6 +137,7 @@ export function readEXRHeader(
     displayWindow: [number, number, number, number] | undefined;
   let lineOrder = 0;
   let tiles: EXRHeader['tiles'];
+  let primaries: number[] | null = null;
   for (let attributes = 0; ; attributes++) {
     if (attributes > 1024)
       throw new RangeError('Invalid EXR: too many header attributes; the decoder reads at most 1024');
@@ -186,6 +192,9 @@ export function readEXRHeader(
         ySize: view.getUint32(position + 4, true),
         mode: bytes[position + 8],
       };
+    } else if (name === 'chromaticities' && type === 'chromaticities' && size === 32) {
+      const values = Array.from({ length: 8 }, (_, i) => view.getFloat32(position + i * 4, true));
+      primaries = values.every(Number.isFinite) ? values : null;
     } else if (name === 'type' && type === 'string') {
       // Spread only a short value: a long one would overflow the call stack (and cannot be a known part type).
       const value = size <= 64 ? String.fromCharCode(...bytes.subarray(position, end)) : '(too long)';
@@ -234,6 +243,7 @@ export function readEXRHeader(
     dataWindow,
     displayWindow: displayWindow ?? dataWindow,
     lineOrder,
+    primaries,
     tiles,
     width,
     height,
@@ -323,7 +333,7 @@ export function copyEXRLines(
 export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   const bytes = toBytes(source);
   const header = readEXRHeader(bytes, false);
-  const { view, channels, compression, dataWindow, displayWindow, width, height, indices, layout } = header;
+  const { view, channels, compression, dataWindow, displayWindow, width, height, indices, layout, primaries } = header;
   let position = header.position;
   const yMin = dataWindow[1];
 
@@ -381,8 +391,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     const raw = decodeEXRChunk(packed, lines * lineBytes, compression, channels, width, lines, `chunk ${block}`);
     copyEXRLines(raw, lines, width, channels, indices, data, width, 0, index * linesPerBlock);
   }
-  const primaries = exrChromaticities(bytes),
-    convert = layout === 'Y' ? null : exrToSRGB(primaries);
+  const convert = layout === 'Y' ? null : exrToSRGB(primaries);
   if (convert) convertRGBA(data, convert);
   return {
     width,

@@ -13,25 +13,29 @@ declare const GPUShaderStage: { FRAGMENT: number };
  *   var<uniform> iblSh: array<vec4f, 9>;     // environment.shBuffer, offset 0, size 144
  *   var<uniform> iblParams: vec4f;           // environment.paramsBuffer: cos(rot), sin(rot), maxLod, intensity
  */
-export const IBL_WGSL = /* wgsl */ `
+export const IBL_WGSL =
+  /* wgsl */ `
 fn iblRotate(d: vec3f, params: vec4f) -> vec3f {
   return vec3f(params.x * d.x - params.y * d.z, d.y, params.y * d.x + params.x * d.z);
 }
-// Diffuse-ready irradiance / PI for a unit world normal (already rotated). Multiply by albedo.
-fn iblIrradiance(sh: array<vec4f, 9>, n: vec3f) -> vec3f {
+` +
+  // Diffuse-ready irradiance / PI for a unit world normal (already rotated). Multiply by albedo.
+  `fn iblIrradiance(sh: array<vec4f, 9>, n: vec3f) -> vec3f {
   return max(sh[0].rgb * 0.282094792
     + sh[1].rgb * (0.488602512 * n.y) + sh[2].rgb * (0.488602512 * n.z) + sh[3].rgb * (0.488602512 * n.x)
     + sh[4].rgb * (1.092548431 * n.x * n.y) + sh[5].rgb * (1.092548431 * n.y * n.z)
     + sh[6].rgb * (0.315391565 * (3.0 * n.z * n.z - 1.0)) + sh[7].rgb * (1.092548431 * n.x * n.z)
     + sh[8].rgb * (0.546274215 * (n.x * n.x - n.y * n.y)), vec3f(0.0));
 }
-// Prefiltered radiance for perceptual roughness (0..1) along a world direction (rotation applied here).
-fn iblPrefiltered(specular: texture_cube<f32>, s: sampler, params: vec4f, r: vec3f, roughness: f32) -> vec3f {
+` +
+  // Prefiltered radiance for perceptual roughness (0..1) along a world direction (rotation applied here).
+  `fn iblPrefiltered(specular: texture_cube<f32>, s: sampler, params: vec4f, r: vec3f, roughness: f32) -> vec3f {
   return textureSampleLevel(specular, s, iblRotate(r, params), clamp(roughness, 0.0, 1.0) * params.z).rgb;
 }
-// Split-sum scale and bias for F0: specular = prefiltered * (F0 * x + y). Bilinear, clamp to edge, like sampling the
-// LUT as a texture; a buffer keeps IBL to one sampled texture (physical glTF + every light fits WebGPU's 16).
-fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f {
+` +
+  // Split-sum scale and bias for F0: specular = prefiltered * (F0 * x + y). Bilinear, clamp to edge, like sampling the
+  // LUT as a texture; a buffer keeps IBL to one sampled texture (physical glTF + every light fits WebGPU's 16).
+  `fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f {
   let n = i32(round(sqrt(f32(arrayLength(&iblBrdf)))));
   let p = clamp(vec2f(nv, roughness), vec2f(0.0), vec2f(1.0)) * f32(n) - 0.5;
   let a = vec2i(floor(p)); let t = p - floor(p);
@@ -40,12 +44,13 @@ fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f {
   return mix(mix(unpack2x16float(iblBrdf[lut.x]), unpack2x16float(iblBrdf[lut.y]), t.x),
              mix(unpack2x16float(iblBrdf[lut.z]), unpack2x16float(iblBrdf[lut.w]), t.x), t.y);
 }
-// Complete ambient term for a metallic-roughness material. n and v are unit world vectors (v points to the eye).
-// Multiple scattering (Fdez-Aguera 2019): single-scattering GGX loses the energy of light that bounces between
-// microfacets, so rough metals came out dark; the lost share (1 - Ess) returns as diffuse-like light tinted by the
-// average Fresnel, and the diffuse keeps what neither specular term reflects. dielectricF0 and dielectricF90 are the
-// dielectric Fresnel ends (0.04 and 1 by default; KHR_materials_ior and KHR_materials_specular change them).
-fn iblShade(specular: texture_cube<f32>, s: sampler, sh: array<vec4f, 9>, params: vec4f,
+` +
+  // Complete ambient term for a metallic-roughness material. n and v are unit world vectors (v points to the eye).
+  // Multiple scattering (Fdez-Aguera 2019): single-scattering GGX loses the energy of light that bounces between
+  // microfacets, so rough metals came out dark; the lost share (1 - Ess) returns as diffuse-like light tinted by the
+  // average Fresnel, and the diffuse keeps what neither specular term reflects. dielectricF0 and dielectricF90 are the
+  // dielectric Fresnel ends (0.04 and 1 by default; KHR_materials_ior and KHR_materials_specular change them).
+  `fn iblShade(specular: texture_cube<f32>, s: sampler, sh: array<vec4f, 9>, params: vec4f,
             n: vec3f, v: vec3f, baseColor: vec3f, metalness: f32, roughness: f32,
             dielectricF0: vec3f, dielectricF90: f32) -> vec3f {
   let nv = clamp(dot(n, v), 1e-4, 1.0);

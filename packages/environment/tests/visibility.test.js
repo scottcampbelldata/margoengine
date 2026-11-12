@@ -23,7 +23,9 @@ test('visibility is a boolean option and adds 24 bins of two floats per probe af
 // and with one. A volume without `visibility` must give this exact text, so no other LightProbes user changes.
 const MAIN_SHADING = {
   plain: '7dac762f30886648606a951f80b2d3f0bc5f7798b279626c2a0407705cac9bd4',
-  environment: '3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea',
+  // The bef64ee0a text with IBL_WGSL's nine comment lines gone (KB-RM1): swapping the old IBL_WGSL back in gives
+  // 3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea, the hash pinned before.
+  environment: '9d7b8332c161cfd0bb9bbacb518a8dffc9e6af1297a5e8a7d11044dcf4b3bae3',
 };
 const coreShader = readFileSync(new URL('../../core/src/shaders.ts', import.meta.url), 'utf8').split('`')[1];
 function shading(environment, extra) {

@@ -72,10 +72,11 @@ export function rotateSH(
 
 // One full-screen triangle per (mip, face): the output texel's direction, rotated into each source, sampled at the
 // source mip that matches the output level, weighted. Fragment, not compute: explicit-LOD cube sampling in compute
-// reads stale seam texels on some Vulkan implementations (see the prefilter in environment.ts).
+// reads stale seam texels on some Vulkan implementations (see the prefilter in environment.ts). Weights a and b:
+// cos(rotation), sin(rotation), weight.
 const BLEND_WGSL = /* wgsl */ `${common}
 struct Level { size: f32, face: u32, lodA: f32, lodB: f32 }
-struct Weights { a: vec4f, b: vec4f } // cos(rotation), sin(rotation), weight
+struct Weights { a: vec4f, b: vec4f }
 @group(0) @binding(0) var sourceA: texture_cube<f32>;
 @group(0) @binding(1) var sourceB: texture_cube<f32>;
 @group(0) @binding(2) var linearSampler: sampler;

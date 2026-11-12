@@ -1,7 +1,9 @@
 // The `chromaticities` header attribute of an OpenEXR file (OpenEXR "Technical Introduction", standard attributes:
 // red, green, blue and white CIE xy as eight float32 values; a file without it is Rec.709 with the D65 white) and the
 // conversion of its RGB to linear sRGB / Rec.709 (D65), white adapted with the Bradford transform, as parseHDR does for
-// Radiance PRIMARIES (SMPTE RP 177 for the primaries matrix). Shared by parseEXR, parseTiledEXR and the exr-codecs worker.
+// Radiance PRIMARIES (SMPTE RP 177 for the primaries matrix). Shared by parseEXR, parseTiledEXR and the exr-codecs worker;
+// parseEXR and parseTiledEXR take the attribute from their own header pass (readEXRHeader), the worker from
+// exrChromaticities, since the prebuilt decoder's header leaves it out.
 import { primariesToLinearSRGB } from '@margoengine/math/color';
 
 // Rec.709 / sRGB primaries with the D65 white (ITU-R BT.709-6, IEC 61966-2-1).

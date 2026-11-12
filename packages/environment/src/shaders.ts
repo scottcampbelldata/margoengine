@@ -9,13 +9,14 @@ import { common } from './shader-common.js';
 
 export { common } from './shader-common.js';
 
+// params: size, supersampling.
 export const equirectToCube =
   common +
   /* wgsl */ `
 @group(0) @binding(0) var source: texture_2d<f32>;
 @group(0) @binding(1) var linearSampler: sampler;
 @group(0) @binding(2) var destination: texture_storage_2d_array<rgba16float, write>;
-@group(0) @binding(3) var<uniform> params: vec4u; // size, supersampling
+@group(0) @binding(3) var<uniform> params: vec4u;
 @compute @workgroup_size(8, 8, 1) fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = params.x;
   if (id.x >= size || id.y >= size) { return; }
@@ -81,7 +82,7 @@ struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: 
       let nl = dot(n, l);
       if (nl > 0.0) {
         let q = ${/* @__PURE__ */ ggxDenominator('hl.z')};
-        let pdf = a2 / (PI * q * q) * 0.25; // D * NdotH / (4 VdotH) with V = N
+        let pdf = a2 / (PI * q * q) * 0.25;
         let sampleSolidAngle = 1.0 / (f32(params.samples) * pdf + 1e-6);
         let lod = max(0.5 * log2(sampleSolidAngle / texelSolidAngle) + 1.0, params.lod0);
         color += textureSampleLevel(source, linearSampler, l, lod).rgb * nl;
@@ -99,13 +100,14 @@ struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: 
 // result[16..24] = radiance coefficients.
 // Ramamoorthi & Hanrahan 2001 eq. 3 (real SH basis constants) and eq. 8 (irradiance bands 1, 2/3, 1/4); Sloan 2008,
 // "Stupid Spherical Harmonics Tricks". The per-texel solid angle (atan area element) is exact cube geometry.
+// partial: 64 threads x 9 coefficients. areaElement uses atan(xy / r) rather than atan2: r > 0, and atan2(-0.0, r)
+// returns PI on some implementations.
 export const sphericalHarmonics =
   common +
   /* wgsl */ `
 @group(0) @binding(0) var source: texture_2d_array<f32>;
 @group(0) @binding(1) var<storage, read_write> result: array<vec4f, 32>;
-var<workgroup> partial: array<vec4f, 576>; // 64 threads x 9 coefficients
-// atan(xy / r) rather than atan2: r > 0, and atan2(-0.0, r) returns PI on some implementations.
+var<workgroup> partial: array<vec4f, 576>;
 fn areaElement(x: f32, y: f32) -> f32 { return atan(x * y / sqrt(x * x + y * y + 1.0)); }
 @compute @workgroup_size(64) fn main(@builtin(local_invocation_index) li: u32) {
   let size = textureDimensions(source).x;
@@ -157,11 +159,12 @@ fn areaElement(x: f32, y: f32) -> f32 { return atan(x * y / sqrt(x * x + y * y +
 // Karis 2013 eq. 8-9 (split-sum scale and bias); Walter et al. 2007 eq. 33-35 (GGX D, Smith G1, sampling);
 // Schlick 1994 Fresnel weight (1 - v.h)^5.
 // Written as size x size f16 pairs into a storage buffer (not a texture): IBL then binds one sampled texture.
+// params: samples, size.
 export const brdfLut =
   common +
   /* wgsl */ `
 @group(0) @binding(0) var<storage, read_write> destination: array<u32>;
-@group(0) @binding(1) var<uniform> params: vec4u; // samples, size
+@group(0) @binding(1) var<uniform> params: vec4u;
 fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) * x * x)); }
 @compute @workgroup_size(8, 8, 1) fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = params.y;

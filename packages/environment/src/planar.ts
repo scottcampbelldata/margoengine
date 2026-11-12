@@ -106,11 +106,11 @@ struct Out { @builtin(position) position:vec4f, @location(0) world:vec3f, @locat
   if(u.flags.y>0.5){return vec4f(c,1.0);}
   return vec4f(toDisplay(c),1.0);
 }`;
-// 2x2 box reduction of the previous mip, for the roughness blur.
+// 2x2 box reduction of the previous mip, for the roughness blur. nearestHalf returns an exactly representable binary16
+// value before the render-target conversion: its allowed rounding direction must not accumulate a dark bias through
+// successive mip reductions.
 const REDUCE = /* wgsl */ `
 @group(0) @binding(0) var source:texture_2d<f32>;
-// Return an exactly representable binary16 value before the render-target conversion. Its allowed
-// rounding direction must not accumulate a dark bias through successive mip reductions.
 fn nearestHalf(c:vec4f)->vec4f {
   let a=abs(c);let bits=bitcast<vec4u>(a);
   let normal=bitcast<vec4f>((bits+vec4u(4095)+((bits>>vec4u(13))&vec4u(1)))&vec4u(0xffffe000));

@@ -60,7 +60,9 @@ test("a sphere probe's capture point moves inside its sphere, which stays where 
 // and with one: box probes in the default order give this exact text, so no other LightProbes user changes.
 const MAIN_SHADING = {
   plain: '7dac762f30886648606a951f80b2d3f0bc5f7798b279626c2a0407705cac9bd4',
-  environment: '3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea',
+  // The bef64ee0a text with IBL_WGSL's nine comment lines gone (KB-RM1): swapping the old IBL_WGSL back in gives
+  // 3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea, the hash pinned before.
+  environment: '9d7b8332c161cfd0bb9bbacb518a8dffc9e6af1297a5e8a7d11044dcf4b3bae3',
 };
 const sha = (text) => createHash('sha256').update(text).digest('hex');
 function declarations(environment, options) {

@@ -117,8 +117,18 @@ for (const [template, { main, imports }] of Object.entries(templates))
       0,
     );
     console.log(`create-margo ${template} app: ${scripts.length} JS file(s), ${gzip} bytes gzip`);
-    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 80_000, `unexpected bundle size ${gzip}`);
+    // Every JS chunk counts, lazy ones included (docs/limits.md, "Web template bundle"). 81,500 since KB-RM1: 80,833 B
+    // measured after the WGSL comment and EXR header waste came out; the bytes over 80,000 are bug fixes.
+    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 81_500, `unexpected bundle size ${gzip}`);
     else assert.ok(gzip > 10_000, `unexpected bundle size ${gzip}`);
+    // WGSL comments are documentation for the source, not bytes for the user: they once cost the web template 698 B.
+    if (template === 'web')
+      for (const file of scripts) {
+        const code = readFileSync(join(assets, file), 'utf8');
+        for (const [literal] of code.matchAll(/`(?:[^`\\]|\\.)*`/gs))
+          if (/@(vertex|fragment|compute|group)\b|\bfn \w+\(/.test(literal))
+            assert.doesNotMatch(literal, /\/\/|\/\*/, `${file} ships a WGSL comment: ${literal.slice(0, 120)}`);
+      }
   });
 
 // Type-checked here; Next's own build needs a real install (linked copies of next and react break its prerender), so
