@@ -59,10 +59,13 @@ test("a sphere probe's capture point moves inside its sphere, which stays where 
 // SHA-256 of LightProbes' shading declarations (pbr(2)) at 54438d86f (main before sphere probes), without an environment
 // and with one: box probes in the default order give this exact text, so no other LightProbes user changes.
 const MAIN_SHADING = {
-  plain: '7dac762f30886648606a951f80b2d3f0bc5f7798b279626c2a0407705cac9bd4',
-  // The bef64ee0a text with IBL_WGSL's nine comment lines gone (KB-RM1): swapping the old IBL_WGSL back in gives
-  // 3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea, the hash pinned before.
-  environment: '9d7b8332c161cfd0bb9bbacb518a8dffc9e6af1297a5e8a7d11044dcf4b3bae3',
+  // probeRadiance blends its two levels by GGX alpha (KB-A3c): swapping the old roughness-linear probeRadiance back in
+  // gives 7dac762f30886648606a951f80b2d3f0bc5f7798b279626c2a0407705cac9bd4 (plain) and
+  // 9d7b8332c161cfd0bb9bbacb518a8dffc9e6af1297a5e8a7d11044dcf4b3bae3 (environment), the hashes pinned before. That
+  // environment text was bef64ee0a's with IBL_WGSL's nine comment lines gone (KB-RM1); the old IBL_WGSL gave
+  // 3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea.
+  plain: 'a1169cea65852ccb4621169a86537239a78a6120baad6f5bd9eeef91451ff258',
+  environment: '48a522e352451c7779df65b6d492169404b572406f0ecc4efe520257dd513aa4',
 };
 const sha = (text) => createHash('sha256').update(text).digest('hex');
 function declarations(environment, options) {

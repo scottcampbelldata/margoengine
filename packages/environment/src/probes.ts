@@ -340,6 +340,10 @@ ${project}    sum+=w*probeRadiance(b,select(r,d,dot(d,d)>1e-12),rough);${weighte
   return ${weighted ? 'select(vec4f(sum,total),vec4f(sum/total,1.0),total>1.0)' : 'vec4f(sum,1.0-left)'};
 }`;
 };
+// probeRadiance: level k is prefiltered at roughness k / (levels - 1). A roughness between two levels reads both,
+// weighted by GGX alpha (roughness^2, the lobe width) so the blend's width matches the lobe's: in level units x, weight
+// (x^2 - k^2) / (2k + 1). Weighting by roughness itself gave 0.045 (alpha 0.002) 22.5% of the 0.2 level (alpha 0.04),
+// 20 times too wide (KB-A3c).
 const shadingWgsl = (group: number, environment: boolean, visibility: boolean, sphere = false, weighted = false) =>
   dataWgsl('read', group, PROBE_BINDING) +
   (visibility ? binWgsl : '') +
@@ -390,9 +394,9 @@ fn probeLevel(o:u32,s:u32,uv:vec2f)->vec3f {
   return mix(mix(probeTexel(o+i.y*s+i.x),probeTexel(o+i.y*s+j.x),f.x),mix(probeTexel(o+j.y*s+i.x),probeTexel(o+j.y*s+j.x),f.x),f.y);
 }
 fn probeRadiance(b:ProbeBox,d:vec3f,rough:f32)->vec3f {
-  let levels=b.data.z;let lod=clamp(rough,0.0,1.0)*f32(levels-1u);let k0=u32(lod);let k1=min(k0+1u,levels-1u);let uv=probeOct(d);
+  let levels=b.data.z;let x=clamp(rough,0.0,1.0)*f32(levels-1u);let k0=min(u32(x),levels-2u);let k=f32(k0);let uv=probeOct(d);
   var o0=b.data.x;for(var j=0u;j<k0;j++){let s=b.data.y>>j;o0+=s*s;}let s0=b.data.y>>k0;
-  return mix(probeLevel(o0,s0,uv),probeLevel(select(o0+s0*s0,o0,k1==k0),b.data.y>>k1,uv),lod-f32(k0));
+  return mix(probeLevel(o0,s0,uv),probeLevel(o0+s0*s0,b.data.y>>(k0+1u),uv),(x*x-k*k)/(2.0*k+1.0));
 }
 ${reflectionWgsl(sphere, weighted)}
 ${

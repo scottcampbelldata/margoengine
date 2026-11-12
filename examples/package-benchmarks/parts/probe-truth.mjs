@@ -30,6 +30,14 @@ export const splitSum = (f0, nv, rough) => {
   return f0.map((x) => x * (c[2] - 1.04 * a) + (c[3] + 1.04 * a));
 };
 
+// probeRadiance's level pick (packages/environment/src/probes.ts): level k holds roughness k / (levels - 1); a roughness
+// between two levels blends them by GGX alpha (roughness^2), weight (x^2 - k^2) / (2k + 1) in level units x (KB-A3c).
+export const probeLevelBlend = (rough, levels) => {
+  const x = Math.min(1, Math.max(0, rough)) * (levels - 1),
+    k0 = Math.min(Math.floor(x), levels - 2);
+  return { k0, weight: (x * x - k0 * k0) / (2 * k0 + 1) };
+};
+
 // GGX prefilter of radiance(d) around r at roughness rough (alpha = rough^2), with n = v = r as the bake convolves its
 // levels: half vectors stratified by the GGX distribution (an n x n grid), each light direction weighted by n.l.
 export const ggxPrefiltered = (radiance, r, rough, n = 32) => {

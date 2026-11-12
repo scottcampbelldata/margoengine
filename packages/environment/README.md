@@ -186,7 +186,8 @@ await probes.refresh(0);                                                  // re-
 - **Reflection probes.** Up to 16, each captured at `position` (`resolution`, default 128 px faces) and stored as
   octahedral radiance levels down to 4 x 4: level 0 resampled from the faces, each rougher level a GGX convolution of
   level 0 at roughness level / (levels - 1) (n = v = r, as the environment's prefilter). A surface's reflected ray is
-  intersected with the probe's box (box projection) and the radiance read trilinearly over the levels by roughness. The
+  intersected with the probe's box (box projection) and the radiance read from the two levels around its roughness,
+  bilinear in each and blended by GGX alpha (roughness squared, so the mix is as wide as the lobe). The
   box is also the influence volume (its faces included, so a room box lights its own walls); the probe fades out over
   `blend` (default 10% of its smallest side) outside it, and
   where boxes overlap the earlier probe in the list wins, so list nested boxes first. `setReflectionPosition(index,

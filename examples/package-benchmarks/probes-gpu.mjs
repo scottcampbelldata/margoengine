@@ -6,10 +6,11 @@
 //    (6 x 256^2 cube samples), error relative to the probe's DC term.
 // 2. Reflection probe: octahedral level 0 vs the analytic radiance per texel; levels 1-5 vs a CPU GGX convolution of the
 //    analytic radiance at the level's roughness (the bake's n = v = r prefilter).
-// 3. Shading, from the read-back texels through a CPU mirror of the WGSL (trilinear SH, box projection, trilinear octahedral
-//    levels, analytic split-sum) and each path's tone map: a white core sphere and a white materials sphere (gltf-pro hook),
-//    a mirror metal floor and a rough (0.5) metal floor, within 3/255 (mirror: 95th percentile; its sharp level 0 flips a texel
-//    at a wall-colour boundary for a sub-pixel shift between the CPU ray and the raster, so the maximum is only reported).
+// 3. Shading, from the read-back texels through a CPU mirror of the WGSL (trilinear SH, box projection, octahedral levels
+//    blended by GGX alpha, analytic split-sum) and each path's tone map: a white core sphere and a white materials
+//    sphere (gltf-pro hook), a mirror metal floor and a rough (0.5) metal floor, within 3/255 (mirror: 95th percentile;
+//    its sharp level 0 flips a texel at a wall-colour boundary for a sub-pixel shift between the CPU ray and the raster,
+//    so the maximum is only reported).
 // 4. Box projection is physical: on the mirror floor each pixel shows the wall its reflected ray hits (the probe box is the
 //    room, at bake-time wall radiance), 95th percentile within 3/255, for wall points 0.4 m or more from a wall edge. The
 //    truth is the room radiance seen from the floor point, GGX-prefiltered at the floor's real roughness (core's 0.045
@@ -28,7 +29,7 @@ import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { materialRoughness, output } from './parts/display.mjs';
-import { mirrorWallTruth, room, splitSum, wallAt } from './parts/probe-truth.mjs';
+import { mirrorWallTruth, probeLevelBlend, room, splitSum, wallAt } from './parts/probe-truth.mjs';
 import { halfToFloat, shBasis, SH_IRRADIANCE_BANDS } from '../../packages/environment/dist/index.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
 
@@ -128,16 +129,14 @@ const mirror = (bake, R = 128) => {
     return mix(mix(at(i[0], i[1]), at(j[0], i[1]), f[0]), mix(at(i[0], j[1]), at(j[0], j[1]), f[0]), f[1]);
   };
   const radiance = (d, rough) => {
-    const lod = Math.min(1, Math.max(0, rough)) * (levels - 1),
-      k0 = Math.floor(lod),
-      k1 = Math.min(k0 + 1, levels - 1);
+    const { k0, weight } = probeLevelBlend(rough, levels);
     let o0 = bake.offset;
     for (let j = 0; j < k0; j++) o0 += (R >> j) ** 2;
     const s0 = R >> k0,
       uv = octEncode(d),
       a = level(o0, s0, uv),
-      b = level(k1 === k0 ? o0 : o0 + s0 * s0, R >> k1, uv);
-    return a.map((v, k) => v + (b[k] - v) * (lod - k0));
+      b = level(o0 + s0 * s0, R >> (k0 + 1), uv);
+    return a.map((v, k) => v + (b[k] - v) * weight);
   };
   const irradiance = (p, n) => {
     const counts = [2, 2, 2],
