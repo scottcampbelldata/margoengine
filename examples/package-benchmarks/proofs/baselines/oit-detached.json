@@ -1,12 +1,12 @@
 {
  "proof": "oit-detached",
- "ref": "864051383",
- "revision": "864051383c72c5c1536b84902ef3542174b929fd",
- "capturedAt": "864051383c72c5c1536b84902ef3542174b929fd",
- "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
+ "ref": "675ee2476e",
+ "revision": "675ee2476ea7b594256c2888f7d0bbd85cb1755d",
+ "capturedAt": "675ee2476ea7b594256c2888f7d0bbd85cb1755d",
+ "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
  "facts": {},
  "outputs": {
-  "1x": "6a01cdc16e454f725fcb551f562ee0c8f5cb20b7ab4e636b3d2a4a1534bb8520",
-  "4x": "13fe6faf65d1f9870c66a9d014c35266addaa361ca8bbf9e2e60df0996142b30"
+  "1x": "f7c87c3269ff5ab0333feb9552c31ff854e89d2f518352e33e117a439f88e6b2",
+  "4x": "32dcec0be76ba6f7b6c7c49dbe4ceb9e8dec7143a70e5ad6541a2612a3081ebf"
  }
 }

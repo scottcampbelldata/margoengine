@@ -1,9 +1,9 @@
 {
  "proof": "quality-presets",
- "ref": "379431fcb8",
- "revision": "379431fcb8d0867558b694d282ca1272bf9996e9",
- "capturedAt": "b0efe42d12657818cc319fe0782e0cf2a1f209fa",
- "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
+ "ref": "675ee2476e",
+ "revision": "675ee2476ea7b594256c2888f7d0bbd85cb1755d",
+ "capturedAt": "675ee2476ea7b594256c2888f7d0bbd85cb1755d",
+ "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
  "facts": {},
  "outputs": {
   "shadows 1x": "ef799b0600ce86f1ffbf395503a404636132a675ed731945816da9503961b62f",
@@ -14,8 +14,8 @@
   "ssr 4x": "1c351b81849d7b8446c3645be703b41d9bb41a288abce0ea4f84e95832019f5a",
   "volumetric 1x": "8640ca21941f9eaf881f383fb13a8c01d7b8717f455023155c27e18e1d492012",
   "volumetric 4x": "5bc0ed03ba647992bc8b0ad12f9caef8d7261bffbd0bf0d9e09a3e8fa0f96889",
-  "localShadows 1x": "354f7ede2dc76b274efdd035fa226dbb16cfaa94ae8e471759478c69f6e93c40",
-  "localShadows 4x": "f40374e074de3b4c60936787b8968633fd1686678de9d12033a4606c81465e0c",
+  "localShadows 1x": "f2f33990ac213f0d8d76c85d5fe62f336a5d6ec4a579be6b5e4747932dc28472",
+  "localShadows 4x": "e3b50d6f94335be967a2aca66676e3b4561640bc6471dfbc160f4daa93bd1bf5",
   "vfx 1x": "001d391c4eef5d6efb39971d0dec235c89c46f06b3bf70f7a4ebd2c4aa3ddb0c",
   "vfx 4x": "d893c44a196cd0cdd822f2694d891d32853de764dd808b71ef1cc0b0a5088557"
  }
