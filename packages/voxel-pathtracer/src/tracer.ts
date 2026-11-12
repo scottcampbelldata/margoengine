@@ -1666,7 +1666,7 @@ export class VoxelPathTracer implements EnginePlugin {
 
   // The viewport's samples on the WebGL2 route: its dispatches run one after another on their own (each part reads
   // its census back between windows, so the frame cannot wait for them); nothing else is traced, and the frame
-  // uniforms are not rewritten, until a later frame adds the finished sums (#execute). A restart meanwhile (camera,
+  // uniforms are not rewritten, until a later frame adds the finished sums and starts the next (#execute). A restart (camera,
   // scene, options, dispose, a lost device) stops it at its next window and its sums are dropped.
   #routeViewport(
     gpu: Gpu,
@@ -1770,23 +1770,27 @@ export class VoxelPathTracer implements EnginePlugin {
       view.traceKey = key;
       view.denoisedAt = -1;
     }
+    // A WebGL2 route trace that has landed (#routeViewport) is added and counted first, so the image and its count change
+    // together. It traced the image as it was, so after a restart it is dropped. Its add goes to the GPU in a submission
+    // of its own, ahead of this frame's frame-uniform writes: the add reads the frame uniform the trace was given, and the
+    // same frame then starts the next trace (KB-L6b-ti: waiting a frame more for that cost one frame in three or four).
+    const landed = gpu.routeJob?.landed ? gpu.routeJob : undefined;
+    if (landed) {
+      gpu.routeJob = undefined;
+      if (landed.epoch === this.#epoch) {
+        const e = device.createCommandEncoder({ label: 'voxel-pathtracer route add' });
+        for (const [i, a] of landed.adds.entries())
+          (gpu.routeReady as TraceRoute).add(e, a.inputs, landed.width, a.rows, i);
+        device.queue.submit([e.finish()]);
+        this.#samples += landed.count;
+      }
+    }
     if (this.#previewing) {
       // Until the full tracer is compiled: one preview sample per frame, written over the image.
       if (!this.#traceViewport(gpu, view, c, gpu.preview!, width, height, 0, 1, o.seed, false)) return;
       this.#samples = 1;
     } else if (gpu.routeJob) {
-      // The WebGL2 route's trace is still running (#routeViewport): nothing new this frame. Once it has landed its sums
-      // are added in this frame's commands and its samples counted, so the image and its count change together; it
-      // traced the image as it was, so after a restart it is dropped.
-      const job = gpu.routeJob;
-      if (job.landed) {
-        gpu.routeJob = undefined;
-        if (job.epoch === this.#epoch) {
-          for (const [i, a] of job.adds.entries())
-            (gpu.routeReady as TraceRoute).add(c.encoder, a.inputs, job.width, a.rows, i);
-          this.#samples += job.count;
-        }
-      }
+      // The WebGL2 route's trace is still running (#routeViewport): nothing new this frame.
     } else if (!this.#capturing && this.#samples < o.maxSamples) {
       const pipeline = (this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace,
         count = Math.min(

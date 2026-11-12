@@ -527,8 +527,10 @@ kernel is not compiled (on Direct3D 11 it took longer than the whole staged trac
 until `ready`. Disposing the engine while the programs still compile waits for the driver to finish the one it is on
 (30.8 s measured, `test:gpu:d3d11-dispose`); `docs/limits.md` has the numbers.
 Frames before `ready` show the raster image, so nothing stops working in the meantime. In the viewport a frame starts a
-batch of `samplesPerFrame` samples that runs on its own and is added to the image (and counted in `stats.samples`) by
-the first frame after it lands; frames in between show the image as it was. Speed, diagnostic because other jobs ran:
+batch of `samplesPerFrame` samples, submitted within that frame, that runs on its own and is added to the image (and
+counted in `stats.samples`) by the first frame after it lands, which starts the next batch; frames in between show the
+image as it was. A loop that waits for `onSubmittedWorkDone` after each frame counts a batch every 2 frames on ANGLE
+Vulkan (96 x 96, one sample a batch; 3 to 4 frames before 2026-11-11, KB-L6b-ti). Speed, diagnostic because other jobs ran:
 on ANGLE Vulkan a 320 x 240 batch of 4 samples takes 123 to 135 ms after a tracer's first (357 ms), one census read a
 batch, against 894 to 979 ms and 46 reads before the stencil census (107 to 128 ms on Direct3D 11, against 930 ms); a
 1024 x 1024, 4-sample render 1.25 to 1.51 s against 9.2 to 9.3 s, the same image bit for bit (`docs/limits.md`). The

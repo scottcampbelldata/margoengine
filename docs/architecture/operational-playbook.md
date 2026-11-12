@@ -1984,7 +1984,11 @@ loop program tests, so they are rejected before their fragment runs (early ray m
 occlusion query counts the paths still running (Harris and Buck 2005). A readback costs Chromium about 15 ms whatever the
 work, so after a tracer's first dispatch each part runs for the iterations the dispatch before needed and every part's
 last censuses come back in one read at the end; a part still running there makes the dispatch run again with a read
-after every window (no synchronous GPU read, `device.stalls` 0). The compat `queue.submit` ends with `gl.flush()`, so
+after every window (no synchronous GPU read, `device.stalls` 0). A viewport batch makes its first submissions inside
+the frame that starts it, and the frame that adds a landed batch starts the next (KB-L6b-ti, 2026-11-11; regression
+`packages/voxel-pathtracer/tests/route-pace.test.js`): a frame loop that waits for the GPU now counts a sample every 2
+frames on ANGLE Vulkan at 96 x 96, against 3 to 4 before (the staging TAA still check, measured 3 runs each at main and
+with the change). The compat `queue.submit` ends with `gl.flush()`, so
 submitted work starts at once as WebGPU's does; `device.passes` counts
 the passes replayed. The layer owns every GL object it creates and keeps one program per GLSL text (up to 64 idle,
 `IDLE_PROGRAMS`), so nothing is left for the browser to delete at garbage collection: on ANGLE Vulkan such deletions

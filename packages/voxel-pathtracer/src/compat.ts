@@ -143,6 +143,8 @@ export class TraceRoute {
   #scratch: SumsTargets | undefined;
   /** The run in progress (runs share the pages, the census and the scratch sums, so each waits for the one before). */
   #queue: Promise<void> = Promise.resolve();
+  /** Runs started or queued and not yet settled. */
+  #pending = 0;
   #destroyed = false;
   #pages: Pages | undefined;
 
@@ -490,11 +492,16 @@ export class TraceRoute {
     key: number | string,
     add: boolean,
   ): Promise<void> {
-    const job = this.#queue.then(() => this.#run(kernel, inputs, width, rows, count, maxBounces, check, key, add));
-    this.#queue = job.then(
-      () => {},
-      () => {},
-    );
+    // With no run in progress this one starts at once, so its first submissions are made before `run` returns, as a
+    // compute dispatch is submitted inside the frame that records it: `onSubmittedWorkDone` asked right after that frame
+    // covers them (KB-L6b-ti: they waited for a microtask, and a frame loop then saw each batch land a frame later).
+    const start = () => this.#run(kernel, inputs, width, rows, count, maxBounces, check, key, add),
+      job = this.#pending ? this.#queue.then(start) : start(),
+      settled = () => {
+        this.#pending--;
+      };
+    this.#pending++;
+    this.#queue = job.then(settled, settled);
     return job;
   }
 
