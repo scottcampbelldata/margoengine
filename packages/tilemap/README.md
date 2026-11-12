@@ -37,6 +37,10 @@ const tiles = TileMap.attach(engine, {map, atlases: {grass: image}, camera: {x: 
 tiles.setTile('ground', 1, 0, 1); // only this cell's chunk goes up again
 engine.render({delta: 1 / 60});
 console.log(tiles.stats.draws); // 1
+tiles.visible = false; // draws nothing and costs no draw calls, uploads or target clears
+engine.render({delta: 1 / 60});
+console.log(tiles.stats.draws); // 0
+tiles.visible = true; // draws exactly as before
 ```
 
 | Option | Default | What it does |
@@ -52,6 +56,8 @@ console.log(tiles.stats.draws); // 1
 | `order` | `10` | Frame-graph order |
 | `layers` | `1` | Render-layer bits |
 | `name` | `tilemap-1`, ... | Plugin name, unique per scene |
+
+The `visible` property (default `true`) can be set at any time: a hidden map draws nothing, so with a `target` that target is not cleared either; setting it back to true draws the same pixels. It does not change the map's own layer `visible` flags.
 
 To draw into a compositor layer of `margoengine/pixel`, pass `target: layer.target, camera: layer.camera, parallax: false, mapLayers: ['ground']`, with one `TileMap` per layer that scrolls on its own.
 

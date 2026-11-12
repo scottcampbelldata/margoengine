@@ -25,6 +25,8 @@ try {
   assert.equal(result.edit.uploadedBytes, 16384, 'one tile edit uploads one chunk');
   assert.equal(result.culling.draws, 1, 'a camera in one corner draws one chunk of four');
   assert.equal(result.culling.allDraws, 4, 'a camera on the chunk corner draws all four');
+  assert.equal(result.hidden.draws, 0, 'a hidden map costs no draw calls');
+  assert.equal(result.hidden.shownDraws, 1, 'showing it again draws it');
   assert.equal(result.idleUpload, 0, 'a frame with no edit uploads nothing');
   assert.equal(result.animatedUpload, 0, 'an animated tile sends no cells');
   assert.equal(result.lostPlainAtlas, 'state', 'a plain GPUTexture atlas names its fix after a device loss');

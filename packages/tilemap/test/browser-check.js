@@ -179,6 +179,14 @@ window.check = {
           for (let y = 0; y < 2; y++)
             for (let x = 0; x < 2; x++) expected.set([...BACKGROUND, 255], ((5 + y) * WIDTH + 3 + x) * 4);
           record('invalidate', difference(cleared, expected));
+          // A hidden map leaves the frame as the background alone, with no draws; showing it restores the same pixels.
+          tiles.visible = false;
+          const hidden = frame();
+          record('hidden', difference(hidden, blank()));
+          out.hidden = { draws: tiles.stats.draws };
+          tiles.visible = true;
+          record('shown again', difference(frame(), cleared));
+          out.hidden.shownDraws = tiles.stats.draws;
         },
       );
     }

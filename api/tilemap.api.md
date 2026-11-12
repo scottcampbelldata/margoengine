@@ -196,6 +196,7 @@ export class TileMap implements EnginePlugin {
     snap: boolean;
     parallax: boolean;
     time: number;
+    visible: boolean;
     readonly stats: TileMapStats;
     constructor(options: TileMapOptions);
     static attach(instance: EngineKernel, options: TileMapOptions): TileMap;

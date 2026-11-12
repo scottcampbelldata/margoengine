@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15169983,
+  "total": 15170218,
   "history": [
     {
       "date": "2026-10-24",
@@ -8675,6 +8675,12 @@
       "commit": "4cb6fb1913",
       "reason": "KB5339b: live socket F-curves evaluated as Blender does (Bezier with handle clamp, nine Penner easings, extrapolation, validation): blender/nodes 10102 to 11169 B gzip. Not split: every animated live graph needs it, so a lazy chunk would add a request for about 1 KB.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "162009f4ed",
+      "reason": "tilemap-visible-5-bytes",
+      "grew": 1
     }
   ],
   "items": {
@@ -9153,7 +9159,7 @@
     "@margoengine/lighting2d": 5895,
     "@margoengine/lighting2d/cookie": 7875,
     "@margoengine/lighting2d/emissive": 4410,
-    "@margoengine/lighting2d/gi": 10659,
+    "@margoengine/lighting2d/gi": 10635,
     "@margoengine/lighting2d/height": 7337,
     "@margoengine/lighting2d/sdf": 2923,
     "@margoengine/lighting2d/soft": 6392,
@@ -9622,7 +9628,7 @@
     "@margoengine/sciviz/vtk": 6744,
     "@margoengine/sciviz/workers": 1841,
     "@margoengine/sciviz/xdmf": 19832,
-    "@margoengine/selection": 22816,
+    "@margoengine/selection": 22815,
     "@margoengine/selection/area": 15746,
     "@margoengine/selection/highlight": 14000,
     "@margoengine/selection/hit-details": 16055,
@@ -9765,7 +9771,7 @@
     "@margoengine/text/rich": 12041,
     "@margoengine/text/selection": 958,
     "@margoengine/text/vector": 31785,
-    "@margoengine/tilemap": 7435,
+    "@margoengine/tilemap": 7696,
     "@margoengine/tilemap/autotile": 2087,
     "@margoengine/tilemap/fov": 1843,
     "@margoengine/tilemap/hex": 2287,
@@ -9774,7 +9780,7 @@
     "@margoengine/tilemap/objects": 7294,
     "@margoengine/tilemap/path": 2842,
     "@margoengine/tilemap/plane": 7741,
-    "@margoengine/tilemap/tiled": 7483,
+    "@margoengine/tilemap/tiled": 7482,
     "@margoengine/tiles": 16288,
     "@margoengine/tiles/fade": 2015,
     "@margoengine/tiles/features": 10268,

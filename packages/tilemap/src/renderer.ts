@@ -189,6 +189,8 @@ export class TileMap implements EnginePlugin {
   parallax: boolean;
   /** The animation clock in milliseconds. Each frame adds its delta; set it to jump or to hold a frame. */
   time = 0;
+  /** False draws nothing and costs no draw calls, uploads or target clears; true draws as before. Default true. */
+  visible = true;
   /** What the last frame cost. */
   readonly stats: TileMapStats = { draws: 0, uploadedBytes: 0 };
   private readonly order: number;
@@ -565,6 +567,7 @@ export class TileMap implements EnginePlugin {
     return this.snap ? Math.round(pixels) : pixels;
   }
   private draw(c: TilePassContext): void {
+    if (!this.visible) return;
     const view = c.view;
     if (view?.layers !== undefined && !(view.layers & this.layerMask)) return;
     const own = this.target && (typeof this.target === 'function' ? this.target() : this.target);
