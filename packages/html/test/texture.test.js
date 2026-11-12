@@ -197,3 +197,56 @@ test('HTMLTexture element-image opts the holder canvas and element in, draws in 
     dom.window.close();
   }
 });
+
+// Batch 132b (lane N, 2026-11-12). (1) The bind group was cached once per surface, but each pipeline has its own 'auto'
+// layout (W3C WebGPU, "Default pipeline layout": a bind group made from one pipeline's auto layout is invalid with
+// another), so a new target format or sample count made every later draw a validation error. (2) On a linear HDR target
+// (rgba16float under post-processing) the element's sRGB bytes were written as linear light; they are decoded there now.
+test('HTMLTexture remakes the bind group for a new pipeline and decodes sRGB on a linear HDR target', () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  globalThis.CanvasRenderingContext2D ??= dom.window.CanvasRenderingContext2D;
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  const gpu = h.engine.gpu,
+    createPipeline = gpu.createRenderPipeline,
+    createGroup = gpu.createBindGroup;
+  gpu.createRenderPipeline = (descriptor) => {
+    const pipeline = createPipeline(descriptor),
+      layout = {};
+    pipeline.getBindGroupLayout = () => layout;
+    return pipeline;
+  };
+  gpu.createBindGroup = (descriptor) => ({ ...createGroup(descriptor), layout: descriptor.layout });
+  let format = 'bgra8unorm';
+  Object.defineProperty(h.context, 'format', { get: () => format, set() {}, configurable: true });
+  const bound = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    let current;
+    pass.setPipeline = (pipeline) => (current = pipeline);
+    pass.setBindGroup = (index, group) => bound.push(group.layout === current.getBindGroupLayout(index));
+    return pass;
+  };
+  const textures = HTMLTexture.attach(h.engine),
+    surface = textures.add(dom.window.document.createElement('div'), { width: 1, height: 1, pixelRatio: 1 });
+  try {
+    surface.busy = true;
+    surface.texture = gpu.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 4 });
+    h.frame();
+    format = 'rgba16float';
+    h.frame();
+    h.context.descriptor.multisample.count = 1;
+    h.frame();
+    assert.deepEqual(bound, [true, true, true], 'Each draw binds a group made from its own pipeline');
+    const own = h.pipelines.filter((p) => p.fragment?.constants && 'hdr' in p.fragment.constants);
+    assert.deepEqual(
+      own.map((p) => p.fragment.constants.hdr),
+      [0, 1, 1],
+      'Display-encoded on bgra8unorm, decoded to linear on rgba16float',
+    );
+  } finally {
+    textures.dispose();
+    dom.window.close();
+  }
+});

@@ -225,10 +225,9 @@ export class HTML extends LabelRenderer {
   override add(element: HTMLElement, options: LabelOptions = {}): Label {
     if (this.disposed) throw margoError('disposed', 'HTML is disposed; create a new HTML renderer');
     // Freed slots first, lowest last freed; then the next new one.
-    const index = this.free.length ? this.free.pop()! : this.used;
+    const index = this.free.length ? this.free[this.free.length - 1] : this.used;
     if (index >= this.capacity) throw new RangeError('HTML anchor capacity exceeded; raise capacity or remove anchors');
-    if (index === this.used) this.used++;
-    if (index >= this.allocated) this.grow(index + 1);
+    // The slot is taken only once the label exists: a refused element or option leaves it free.
     const label = super.add(element, {
       ...options,
       occlude: (item, info) => {
@@ -251,6 +250,9 @@ export class HTML extends LabelRenderer {
         return !!(options.occlude ?? this.settings.occlude)?.(item, info) || record.hidden;
       },
     });
+    if (index === this.used) this.used++;
+    else this.free.pop();
+    if (index >= this.allocated) this.grow(index + 1);
     const record = { label, index, hidden: false, x: 0, y: 0, z: 0, target: 1, opacity: 1, written: 1 };
     this.records.set(label, record);
     this.slots[index] = record;

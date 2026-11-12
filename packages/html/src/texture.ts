@@ -8,6 +8,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { margoError } from '../../shared/errors.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { inlineCopy } from './dom.js';
@@ -41,11 +42,14 @@ export interface HTMLTextureOptions {
   prepare?: HTMLResourceInliner;
 }
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+// `hdr`: a linear HDR target holds light, not display values, so the element's sRGB colour is decoded there
+// (IEC 61966-2-1 inverse, on the un-premultiplied colour), as ColorBackground does; the post chain encodes it again.
 const shader = `
 struct Surface {camera:mat4x4f,model:mat4x4f,size:vec4f}
 @group(0) @binding(0) var<uniform> surface:Surface;
 @group(0) @binding(1) var image:texture_2d<f32>;
 @group(0) @binding(2) var linearSampler:sampler;
+override hdr=false;
 struct Varyings {@builtin(position) position:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) index:u32)->Varyings {
  let c=array<vec2f,6>(vec2f(0,0),vec2f(1,0),vec2f(0,1),vec2f(0,1),vec2f(1,0),vec2f(1,1))[index];
@@ -55,6 +59,7 @@ struct Varyings {@builtin(position) position:vec4f,@location(0) uv:vec2f}
 @fragment fn fragment(v:Varyings)->@location(0) vec4f {
  let color=textureSample(image,linearSampler,v.uv);
  if(color.a<0.004){discard;}
+ if(hdr){let c=color.rgb/color.a;return vec4f(select(pow((c+.055)/1.055,vec3f(2.4)),c/12.92,c<=vec3f(.04045))*color.a,color.a);}
  return color;
 }`;
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -113,6 +118,8 @@ export class HTMLSurface {
   scratch?: HTMLCanvasElement;
   /** @internal */ texture?: GPUTexture;
   /** @internal */ group?: GPUBindGroup;
+  /** @internal The pipeline `group` was made for: an 'auto' layout fits only the pipeline it came from. */
+  pipeline?: GPURenderPipeline;
   /** @internal */ uniform?: GPUBuffer;
   /** @internal */ dirty = true;
   /** @internal */ busy = false;
@@ -366,6 +373,7 @@ export class HTMLTexture {
         fragment: {
           module,
           entryPoint: 'fragment',
+          constants: { hdr: linearHdr(c.format) ? 1 : 0 },
           targets: [
             {
               format: c.format,
@@ -485,6 +493,11 @@ export class HTMLTexture {
       this.refresh(surface);
       if (!surface.texture) continue;
       surface.uniform ??= c.device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      // A new pipeline (another target format or sample count) has its own 'auto' layout: the old group is invalid there.
+      if (surface.pipeline !== pipeline) {
+        surface.group = undefined;
+        surface.pipeline = pipeline;
+      }
       surface.group ??= c.device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [

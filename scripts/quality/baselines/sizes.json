@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15184635,
+  "total": 15182947,
   "history": [
     {
       "date": "2026-10-24",
@@ -8699,6 +8699,12 @@
       "commit": "f4ebc54ac",
       "reason": "webgl2-compat: the layer's own acos, asin and atan2 and their startup probe (list 5 R6 row 31)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "13b5d6ab2",
+      "reason": "batch 132b html: HTMLTexture bind group per pipeline and sRGB decode on HDR targets (html/texture 4,766 to 4,911 B, texture-gl 6,455 to 6,602 B, html 7,287 to 7,296 B; docs/limits.md)",
+      "grew": 2
     }
   ],
   "items": {
@@ -9132,8 +9138,8 @@
     "@margoengine/html": 7487,
     "@margoengine/html/blend": 3698,
     "@margoengine/html/inline": 2744,
-    "@margoengine/html/texture": 4779,
-    "@margoengine/html/texture-gl": 6494,
+    "@margoengine/html/texture": 5167,
+    "@margoengine/html/texture-gl": 6858,
     "@margoengine/input": 5722,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
@@ -9732,7 +9738,7 @@
     "@margoengine/sprites/skeletal": 8208,
     "@margoengine/sprites/slice": 9259,
     "@margoengine/sprites/spine": 16920,
-    "@margoengine/stage": 3492,
+    "@margoengine/stage": 3489,
     "@margoengine/stage/effects": 764,
     "@margoengine/stage/environment": 784,
     "@margoengine/stage/gltf": 4050,
@@ -10004,19 +10010,19 @@
     "@margoengine/weather/snow": 3300,
     "@margoengine/web": 577,
     "@margoengine/webgl2-compat": 116098,
-    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 86415,
+    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 85772,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 32709,
     "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
-    "@margoengine/webgl2-compat/device": 119019,
+    "@margoengine/webgl2-compat/device": 118408,
     "@margoengine/webgl2-compat/glsl": 45011,
     "@margoengine/webgl2-compat/pick": 5054,
     "@margoengine/webgl2-compat/preview": 3699,
     "@margoengine/webgl2-compat/restore": 1106,
-    "@margoengine/webgl2-compat/tiers": 118741,
+    "@margoengine/webgl2-compat/tiers": 118110,
     "@margoengine/webgl2-compat/wgsl": 27240,
-    "@margoengine/webgl2-compat/xr": 118848,
+    "@margoengine/webgl2-compat/xr": 118296,
     "@margoengine/wfc": 2154,
     "@margoengine/wfc dist/workers/wfc.js": 3601,
     "@margoengine/wfc/assemble": 1721,

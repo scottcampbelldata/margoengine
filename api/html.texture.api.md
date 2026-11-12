@@ -20,6 +20,7 @@ export class HTMLSurface {
     scratch?: HTMLCanvasElement;
     texture?: GPUTexture;
     group?: GPUBindGroup;
+    pipeline?: GPURenderPipeline;
     uniform?: GPUBuffer;
     dirty: boolean;
     busy: boolean;

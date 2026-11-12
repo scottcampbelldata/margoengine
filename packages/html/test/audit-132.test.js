@@ -66,3 +66,28 @@ test('a copied select keeps the option the user picked, not the default one', as
     dom.window.close();
   }
 });
+
+// Batch 132b (lane N, 2026-11-12): HTML.add took its anchor slot before LabelRenderer.add validated the element and
+// options, so a refused add (a non-element, a non-finite screenOffset) lost the slot for good and a full overlay
+// refused every later anchor.
+test('HTML.add leaves the anchor slot free when the label is refused', () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  const overlay = new HTML({ capacity: 1, depth: false });
+  h.engine.use(overlay);
+  try {
+    const span = () => dom.window.document.createElement('span');
+    assert.throws(() => overlay.add({}), TypeError);
+    assert.throws(() => overlay.add(span(), { screenOffset: [Number.NaN, 0] }), /screenOffset/);
+    const first = overlay.add(span(), { position: [0, 0, 0.5] });
+    overlay.remove(first);
+    // A freed slot survives a refused add too.
+    assert.throws(() => overlay.add(span(), { screenOffset: [0, Number.POSITIVE_INFINITY] }), /screenOffset/);
+    overlay.add(span(), { position: [0, 0, 0.5] });
+    assert.throws(() => overlay.add(span()), /capacity/);
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
+});
