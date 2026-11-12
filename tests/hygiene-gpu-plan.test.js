@@ -16,5 +16,9 @@ test('every browser test file in the repository is run by a GPU suite script', (
 
 test('hygiene plans the GPU suites before its scored gates', () => {
   const hygiene = readFileSync(new URL('../scripts/hygiene.js', import.meta.url), 'utf8');
-  assert.match(hygiene, /\r?\ngpuPlan\(\);\r?\nconst quick/);
+  // Other checks sit between the plan and the scored gates (the plugin-scene check), so pin the order, not adjacency.
+  const plan = hygiene.search(/\r?\ngpuPlan\(\);/);
+  assert.ok(plan > 0, 'hygiene.js calls gpuPlan()');
+  assert.ok(plan < hygiene.search(/\r?\nconst quick/), 'gpuPlan() runs before the scored gates');
+  assert.ok(plan < hygiene.indexOf('execFileSync(process.execPath'), 'gpuPlan() runs before Biome');
 });
