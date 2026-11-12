@@ -16,7 +16,7 @@ import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { box } from '../../../packages/core/dist/index.js';
 
-const { ref, pin } = refs('38d448e', '282e751', '675ee2476e'); // 38d448e: the commit before 5l.j
+const { ref, pin } = refs('38d448e', '282e751', '1fdb559080'); // 38d448e: the commit before 5l.j
 async function rig() {
   const gpu = mockGPU(),
     store = await TransformStore.create(32),

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15186623,
+  "total": 15187344,
   "history": [
     {
       "date": "2026-10-24",
@@ -8711,6 +8711,12 @@
       "commit": "f00a0e55e",
       "reason": "webgl2-compat +187 B: audit A2 bug fixes, clear-by-draw rounding to the format steps (drawnClear) and the layer's own one-argument atan (_atan helper)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "3a7867c74",
+      "reason": "KB3240b: the shared direct BRDF weights diffuse by 1 minus the dielectric Fresnel (a few bytes of shader text in materials mips and skin)",
+      "grew": 2
     }
   ],
   "items": {
@@ -9264,11 +9270,11 @@
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 2011,
     "@margoengine/materials/layered": 3230,
-    "@margoengine/materials/mips": 11525,
+    "@margoengine/materials/mips": 11875,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/serialization": 38798,
-    "@margoengine/materials/skin": 12008,
+    "@margoengine/materials/skin": 12379,
     "@margoengine/materials/stochastic": 2802,
     "@margoengine/materials/transmission": 8673,
     "@margoengine/materials/transmission-layers": 5464,
