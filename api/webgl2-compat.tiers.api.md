@@ -319,7 +319,7 @@ class CompatDevice extends EventTarget {
         present(): void;
     }): void;
     flushPresents(): void;
-    framebuffer(key: string, textures: readonly CompatTexture[], build: (fbo: WebGLFramebuffer) => void): WebGLFramebuffer;
+    framebuffer(key: string, textures: readonly CompatTexture[], build: (fbo: WebGLFramebuffer, made: boolean) => void): WebGLFramebuffer;
     dropFramebuffers(texture: CompatTexture): void;
     createBuffer(descriptor: GPUBufferDescriptor): CompatBuffer;
     createTexture(descriptor: GPUTextureDescriptor): CompatTexture;
