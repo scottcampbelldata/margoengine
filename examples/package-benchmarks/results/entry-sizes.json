@@ -3,8 +3,8 @@
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 61288,
-    "gzip": 24825,
+    "raw": 61345,
+    "gzip": 24848,
     "limit": 25000
   },
   "packages": {

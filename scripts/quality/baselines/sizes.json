@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15170218,
+  "total": 15170488,
   "history": [
     {
       "date": "2026-10-24",
@@ -8681,6 +8681,12 @@
       "commit": "162009f4ed",
       "reason": "tilemap-visible-5-bytes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "f18d137251",
+      "reason": "Scott 2026-11-11: createStage background option, stage entry 3222 to 3236 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -9714,7 +9720,7 @@
     "@margoengine/sprites/skeletal": 8208,
     "@margoengine/sprites/slice": 9259,
     "@margoengine/sprites/spine": 16920,
-    "@margoengine/stage": 3222,
+    "@margoengine/stage": 3492,
     "@margoengine/stage/effects": 764,
     "@margoengine/stage/environment": 784,
     "@margoengine/stage/gltf": 4050,

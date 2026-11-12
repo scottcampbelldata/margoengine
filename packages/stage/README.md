@@ -14,7 +14,7 @@ Give the container a height, for example `<div id="scene" style="height:400px"><
 
 ```ts
 import {createStage} from 'margoengine';
-const app = await createStage('#scene');
+const app = await createStage('#scene', {background: '#202024'});
 const orb = app.sphere({color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1]});
 app.onTick(delta => {orb.rotation.z += delta;});
 window.addEventListener('pagehide', () => app.dispose(), {once: true});
@@ -22,7 +22,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});
 
 Use a selector, an HTMLElement container or an existing canvas. The wrapper appends its own accessible canvas to containers. `app.dispose()` stops rendering, aborts active imports, removes controls and removes an owned canvas. Existing canvases and their styles remain available after disposal. Call disposal when your page or component unmounts. `onTick` returns an unsubscribe function.
 
-`createStage(target, options)` accepts core camera/backend/capacity options and `controls`, `autoStart`, `label` and `onError`. Controls and rendering start by default. Use `autoStart: false` for manual rendering through `app.engine`. Camera validation and initial rendering finish before creation resolves.
+`createStage(target, options)` accepts core camera/backend/capacity options and `controls`, `autoStart`, `label`, `onError` and `background`. Controls and rendering start by default. Use `autoStart: false` for manual rendering through `app.engine`. Camera validation and initial rendering finish before creation resolves.
 
 | API | Behavior |
 | --- | --- |
@@ -38,7 +38,7 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 ### Options and defaults
 
 `createStage(target, options)` takes every [core engine option](../core/README.md) (`backend`, `camera`, `capacity`,
-`fallback`, `features`, `exactSize`, `signal`, `startupWarning`, `startupTimeout`, `powerPreference`) and four of its own:
+`fallback`, `features`, `exactSize`, `signal`, `startupWarning`, `startupTimeout`, `powerPreference`) and five of its own:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -46,6 +46,7 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `autoStart` | `true` | Start the frame loop at once; `false` renders only when you call `app.engine.render()`. |
 | `label` | `'Interactive 3D scene'` | Accessible label of a canvas the stage creates. |
 | `onError` | none | Receives engine errors, such as a lost WebGL2 context. |
+| `background` | core's clear colour | Clear colour of the default scene, `#rgb` or `#rrggbb`, set once at creation as `engine.scene.background`; `null` keeps the colour below. An invalid colour rejects `createStage`. |
 
 Mesh options (`box`, `sphere`, `mesh`): `color` `'#4f46e5'`, `roughness` 0.5, `metalness` 0, `doubleSided` true, `position`,
 `rotation` and `scale` unset (origin, no rotation, scale 1), `parent` none (a root mesh), `name` `''`, `scene` the default

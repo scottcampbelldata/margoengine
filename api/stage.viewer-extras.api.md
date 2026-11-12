@@ -106,6 +106,7 @@ interface StageOptions extends EngineOptions {
     autoStart?: boolean;
     label?: string;
     onError?: (error: unknown) => void;
+    background?: string | null;
 }
 
 interface TurntableOptions {

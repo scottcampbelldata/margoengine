@@ -90,6 +90,7 @@ export interface StageOptions extends EngineOptions {
     autoStart?: boolean;
     label?: string;
     onError?: (error: unknown) => void;
+    background?: string | null;
 }
 
 export { Vec3 } from "@margoengine/core";
@@ -98,7 +99,7 @@ export { VectorRef } from "@margoengine/core";
 
 export { box } from "@margoengine/core";
 
-export function createStage(target: string | HTMLElement, { controls, autoStart, label, onError, ...options }?: StageOptions): Promise<Stage>;
+export function createStage(target: string | HTMLElement, { controls, autoStart, label, onError, background, ...options }?: StageOptions): Promise<Stage>;
 
 export function sphere(radius?: number, segments?: number): Geometry;
 

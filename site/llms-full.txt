@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 24,825 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,848 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -297,7 +297,7 @@ which stays for v1.0.
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,825 B | 61,288 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,848 B | 61,345 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -3678,7 +3678,7 @@ Required test inputs and still-missing real-file proof are listed in
 skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
 It does not establish any of the pending real-file, reference-render or hardware claims.
 
-Margo is a small WebGPU engine: core plus the stage facade is 24,825 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,225 B of its 22,226 B cap (2026-11-11: Scott-approved bug-sweep fix KB6016c, core's GGX D denominator written |n x h|^2 + a2 nh^2 so float32 does not cancel it on smooth surfaces, took core from 22,207 B to 22,225 B and core + stage from 24,808 B to 24,825 B; 2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 24,848 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 22,225 B of its 22,226 B cap (2026-11-11: Scott-approved stage option `createStage({ background })`, which sets `engine.scene.background` once at creation, took core + stage from 24,825 B to 24,848 B and left core at 22,225 B; 2026-11-11: Scott-approved bug-sweep fix KB6016c, core's GGX D denominator written |n x h|^2 + a2 nh^2 so float32 does not cancel it on smooth surfaces, took core from 22,207 B to 22,225 B and core + stage from 24,808 B to 24,825 B; 2026-11-11: Scott-approved bug-sweep fix KB5875a, height-correlated Smith in core's direct light, a shorter expression, took core from 22,211 B to 22,207 B and core + stage from 24,812 B to 24,808 B; 2026-11-11: Scott-approved bug-sweep fix KB6434a, an out-of-memory uncaptured error reports once and rebuilds the device instead of failing every later frame, took core from 22,145 B to 22,211 B and core + stage from 24,743 B to 24,812 B; 2026-11-11: Scott-approved bug-sweep fix KB0378, `uploadRows` reads its dirty-row words 16 bits at a time so no JIT tier boxes a full word, took core from 22,125 B to 22,145 B and core + stage from 24,726 B to 24,743 B; 2026-11-11: Scott-approved core fix, evicted clear-colour buffers are destroyed after submitted work, took core from 22,083 B to 22,125 B and core + stage from 24,686 B to 24,726 B; 2026-11-10: Scott's approved core scale changes (adapter buffer limits, the 11,184,810-vertex Geometry cap and the device's backbuffer limit) took core from 22,031 B to 22,083 B and core + stage from 24,630 B to 24,726 B; 2026-11-10: Scott's approved core bug fixes (camera validate-before-publish, outward-rounded bounds, restore budget) took core from 21,828 B to 22,031 B and core + stage from 24,432 B to 24,630 B; 2026-11-10: bundling the shared helpers measures core at 21,828 B and core + stage at 24,432 B; 2026-11-09: core uploads the unit light direction so no shader normalizes that uniform-only value, core 21,553 B to 21,584 B and core + stage 23,924 B to 23,950 B; 2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,837 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -17743,7 +17743,7 @@ Give the container a height, for example `<div id="scene" style="height:400px"><
 
 ```ts
 import {createStage} from 'margoengine';
-const app = await createStage('#scene');
+const app = await createStage('#scene', {background: '#202024'});
 const orb = app.sphere({color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1]});
 app.onTick(delta => {orb.rotation.z += delta;});
 window.addEventListener('pagehide', () => app.dispose(), {once: true});
@@ -17751,7 +17751,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});
 
 Use a selector, an HTMLElement container or an existing canvas. The wrapper appends its own accessible canvas to containers. `app.dispose()` stops rendering, aborts active imports, removes controls and removes an owned canvas. Existing canvases and their styles remain available after disposal. Call disposal when your page or component unmounts. `onTick` returns an unsubscribe function.
 
-`createStage(target, options)` accepts core camera/backend/capacity options and `controls`, `autoStart`, `label` and `onError`. Controls and rendering start by default. Use `autoStart: false` for manual rendering through `app.engine`. Camera validation and initial rendering finish before creation resolves.
+`createStage(target, options)` accepts core camera/backend/capacity options and `controls`, `autoStart`, `label`, `onError` and `background`. Controls and rendering start by default. Use `autoStart: false` for manual rendering through `app.engine`. Camera validation and initial rendering finish before creation resolves.
 
 | API | Behavior |
 | --- | --- |
@@ -17767,7 +17767,7 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 ### Options and defaults
 
 `createStage(target, options)` takes every [core engine option](../core/README.md) (`backend`, `camera`, `capacity`,
-`fallback`, `features`, `exactSize`, `signal`, `startupWarning`, `startupTimeout`, `powerPreference`) and four of its own:
+`fallback`, `features`, `exactSize`, `signal`, `startupWarning`, `startupTimeout`, `powerPreference`) and five of its own:
 
 [README continues: https://margoengine.com/llms/packages/stage.md]
 
@@ -17957,7 +17957,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,825 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,848 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
