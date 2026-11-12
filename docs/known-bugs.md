@@ -3687,8 +3687,18 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   - **Cost:** a pass break and a full-target copy before each linear surface (the native glass cost); its instances
     do not blend over each other and it never joins an instanced batch. The option takes effect from the frame after a
     model first draws it (the capture joins the frame graph between frames).
-  - **Still open (KB3148d):** an OIT pass does not take a linear material: its `renderState` keeps it on the sorted path
-    (blended in linear light, not order-independent), and the OIT passes would average encoded colours if it did.
+  - **Fixed 2026-11-12 for `OIT` (KB3148d):** the weighted pass takes a linear material (glTF Pro routes a
+    `renderState` holding only `blendSpace: 'linear'` to a hook with `linearLayers`), marks its pixels (revealage `.g`,
+    or an `r8unorm` target with `blending`) and redraws them after the composite from the native glass snapshot:
+    encode(decode(average) * (1 - revealage) + decode(scene) * revealage). Measured on the RTX A6000, native WebGPU and
+    the WebGL2 layer, 1x and 4x, plain and `blending`, materials and glTF: 137 and 165 (display 94 and 141). Regression:
+    `packages/oit/test/gpu/linear-check.mjs`, `packages/oit/test/oit.test.js` (KB3148d tests).
+- **Open (KB3148e): `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` do not take `blendSpace: 'linear'` layers**
+  (`packages/oit/src/exact.ts`, `moments.ts`, `peel.ts`, `precise.ts`). Repro: `ExactOIT.attach(engine).add(mesh)` with
+  `Material.blendSpace = 'linear'`; the mesh draws on the sorted path (linear light, not order-independent). Cause:
+  these passes implement no `linearLayers` hook; each blends its layers in encoded values in its own resolve, which
+  would need the per-layer decode and the scene snapshot `OIT` now uses. Pinned by `packages/oit/test/oit.test.js`
+  ("passes without linear layers").
   - Regression: `packages/materials/test/native-glass-browser.mjs` (`linearBlend`: materials and glTF, set before the
     first frame and after it), `packages/materials/test/render-state.test.js`.
 

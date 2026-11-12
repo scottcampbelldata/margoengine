@@ -84,7 +84,53 @@ Limits:
 - Only this pass takes them. `ExactOIT` and `MomentOIT` leave these surfaces on the sorted path.
 - `blending: 'none'`, other blends and any further render state (`depthWrite`, `depthTest`, stencil, polygon offset)
   stay on the sorted path.
-- Cost: 16 more bytes per pixel, 64 more under 4x MSAA, and one more full-screen draw.
+- Cost: four targets, 25 bytes per pixel in all (the plain pass: 12), four times that under 4x MSAA, and one more
+  full-screen draw. The fourth target is the `r8unorm` mark of [linear-light layers](#linear-light-layers-blendspace-linear).
+
+## Linear-light layers (`blendSpace: 'linear'`)
+
+A material with `blendSpace: 'linear'` (materials `Material.blendSpace`, glTF Pro `renderState: {blendSpace: 'linear'}`)
+goes into the pass like any other transparent material, so it stays order-independent and mixes in linear light on a
+display-encoded canvas. Both `OIT` and `OIT` with `blending` take it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const oit = OIT.attach(engine);
+const glass = new Material({color: '#ff0000', opacity: 0.5, transparent: true, blendSpace: 'linear'});
+oit.add(createMesh(engine, boxGeometry(1, 1, 1), glass));
+oit.add(createMesh(engine, boxGeometry(2, 2, 2), glass));
+```
+
+How: a linear layer accumulates like any other and also clears a mark (the revealage target's second channel, or an
+`r8unorm` target with `blending`). When one drew, the pass copies the colour drawn so far (the native glass snapshot)
+and, after the usual composite, redraws only the marked pixels with blending off:
+`encode(decode(average) * (1 - revealage) + decode(scene) * revealage)`, the weighted average of McGuire and Bavoil (JCGT
+2013) composited with the over operator (Porter and Duff 1984) on linear values, sRGB transfer per IEC 61966-2-1 (why
+linear: Gritz and d'Eon, "The Importance of Being Linear", GPU Gems 3, 2007). With `blending`, the dimming of tints
+applies to the decoded scene as well, and added light is summed after the encode. A pixel half covered at a 4x edge
+mixes the two results by its mark.
+
+Measured on the RTX A6000, native WebGPU and the WebGL2 layer, 1x and 4x MSAA, plain and `blending`, materials meshes
+and glTF (`packages/oit/test/gpu/linear-check.mjs`): 50 % red (linear 0.5) over black reads 137 of 255 for one layer and
+165 for two, the sorted linear values; `'display'` reads 94 and 141 as before.
+
+Limits:
+
+- A pixel that any linear layer covers composites all its layers in linear light, display ones included: the pass keeps
+  one average per pixel. The average itself is taken on encoded colours and decoded once, which is exact for one layer
+  and for layers of one colour, and adds to the weighted blend's own approximation when layers of different colours meet.
+- Takes effect from the frame after a model first draws the option: until the native glass capture joins the frame
+  graph, the layer composites as a display layer. On an HDR target (Bloom, tonemapping) every layer is linear already
+  and no mark, copy or draw is added.
+- Cost only when a linear layer drew: one full-target copy (4x: a resolve too) and one more full-screen draw. Pixels
+  without a linear layer are untouched by that draw, so their values are those of the plain composite.
+- `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` do not take linear layers yet: such a material stays on the
+  sorted path there, blended in linear light but not order-independent (docs/known-bugs.md, KB3148e).
 
 ## Exact layers (`ExactOIT`)
 
@@ -346,7 +392,8 @@ not a pass: `alphaHash()` from `margoengine/materials/alpha-hash` (materials REA
 - BLEND primitives leave the beauty pass. In OIT's pass (frame graph order 8 by default: after the scene, edges and
   section caps, before TAA, SSAO and the post composites) they draw with their normal lit shader into two targets,
   depth tested against the opaque scene and not writing depth: accumulation (`rgba16float`, additive:
-  premultiplied colour × w, alpha × w) and revealage (`r16float`, multiplied by 1 − alpha).
+  premultiplied colour × w, alpha × w) and revealage (`rg16float`, multiplied by 1 − alpha; the second channel marks
+  [linear-light layers](#linear-light-layers-blendspace-linear)).
 - Weight: `w = clamp(10 / (depth / depthScale)^6, 0.01, 1000)`, `depth` the view-space depth (perspective and
   orthographic alike), `depthScale` by default the camera's distance to its target each frame. A layer 10 % nearer
   than another weighs 1.9× as much.
@@ -407,7 +454,7 @@ CPU at 45-100 %):
   OIT like other primitives.
 - Transparent surfaces write no depth, as before: SSAO and DOF see the opaque scene only, and TAA has no motion vectors
   for them, until [`TransparentDepth`](#depth-and-motion-for-glass-transparentdepth) adds them.
-- Cost: two 1x targets (10 bytes per pixel) plus 4x copies (40 bytes per pixel) under MSAA, and one full-screen
+- Cost: two 1x targets (12 bytes per pixel) plus 4x copies (48 bytes per pixel) under MSAA, and one full-screen
   composite whenever something transparent is visible: about twice the GPU time of sorted blending in the table above.
 
 

@@ -314,6 +314,19 @@ const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.rende
   /** KB3148b: a plain blended material that asked for linear-light blending (`renderState.blendSpace: 'linear'`). */
   linearBlends = (m: PBRMaterial) =>
     m.settings[0] === 2 && !m.tint && m.renderState?.blend === undefined && m.renderState?.blendSpace === 'linear',
+  linearAlone = new WeakMap<PBRRenderState, boolean>(),
+  /** KB3148d: a linear-blend material whose render state holds nothing else, which a hook with `linearLayers` takes. */
+  linearLayer = (m: PBRMaterial): boolean => {
+    if (!linearBlends(m)) return false;
+    const s = m.renderState!;
+    let alone = linearAlone.get(s);
+    if (alone === undefined)
+      linearAlone.set(
+        s,
+        (alone = Object.entries(s).every(([name, value]) => name === 'blendSpace' || value === undefined)),
+      );
+    return alone;
+  },
   /** A loaded material's tint draw reads the surface; a shading hook's material has its own tint. */
   surfaceTint = (m: PBRMaterial) => !!m.attenuation && !m.shading;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
@@ -3261,12 +3274,15 @@ export class PBRModel implements EnginePlugin {
       this.releaseNativeGlass = acquireNativeGlass(this.engine, () => this.glassActive());
     models.revision = graph.revision;
   }
-  /** Whether a primitive draws as native glass or as a linear-light blend (both read the capture's snapshot). */
+  /**
+   * Whether a primitive draws as native glass or as a linear-light blend (both read the capture's snapshot); a linear
+   * layer a transparency hook takes reads it in the hook's composite (KB3148d).
+   */
   private glassActive(): boolean {
     return this.primitives.some(
       (p) =>
-        !this.takesTransparent(p.material) &&
-        ((!this.transmission && transmits(p.material)) || linearBlends(p.material)),
+        linearBlends(p.material) ||
+        (!this.takesTransparent(p.material) && !this.transmission && transmits(p.material)),
     );
   }
   /**
@@ -3456,7 +3472,9 @@ export class PBRModel implements EnginePlugin {
     const hook = this.transparency;
     return (
       !!hook &&
-      (separable(m) || (!!hook.blends && !(m.tint && this.transmission && !hook.depthWrite) && blendKind(m) > 0))
+      (separable(m) ||
+        (!!hook.linearLayers && linearLayer(m)) ||
+        (!!hook.blends && !(m.tint && this.transmission && !hook.depthWrite) && blendKind(m) > 0))
     );
   }
   /**
@@ -3881,6 +3899,9 @@ export class PBRModel implements EnginePlugin {
       run = carry && !external ? carry : undefined,
       // The state already set on the pass: a run's pass is the run's alone, so its draws skip what is already bound.
       bound = run ? run.bindings : scratch.bound;
+    // KB3148d: a transparency hook taking linear layers on a display target gets the scene snapshot once per draw.
+    let linearScene =
+      through && !transmission && !!(oit as PBRTransparency | undefined)?.linearLayers && !linearHdr(c.format) && !external;
     let frame = drawFrame(
       run,
       mode,
@@ -3962,6 +3983,19 @@ export class PBRModel implements EnginePlugin {
         node.check();
         if (!nodeVisible(this.engine, node) || (inst && !inst.count)) continue;
         if (!r.batch && !r.mergedInto && outsideView(camera.planes, p)) continue;
+        if (linearScene && linearBlends(m)) {
+          linearScene = false;
+          const glass = nativeGlass(c),
+            copy = glass?.copy;
+          if (copy) {
+            const view = glass.entries[0].resource as GPUTextureView;
+            (oit as PBRTransparency).linearLayers!(() => (copy.call(glass, c), view));
+          } else {
+            // The capture joins once this frame ends; until then the layer composites as a display layer.
+            this.wantGlass();
+            (oit as PBRTransparency).linearLayers!();
+          }
+        }
         const wireframe = wireframeIndices(r),
           topology = p.topology ?? (wireframe ? 'line-list' : undefined),
           index = wireframe?.index ?? r.index,
@@ -5135,6 +5169,8 @@ export class PBRModel implements EnginePlugin {
     const transmit = !compact && !!m.tint,
       blend = m.settings[0] === 2 || transmit,
       kind = through && !transmission && this.transparency!.blends ? blendKind(m) : 0,
+      // KB3148d: a linear layer in a hook's pass marks its pixels for the hook's linear-light composite.
+      linearMark = through && !transmission && !linearHdr(c.format) && !!this.transparency!.linearLayers && linearBlends(m),
       tinted =
         !native &&
         transmit &&
@@ -5168,7 +5204,7 @@ export class PBRModel implements EnginePlugin {
       (inst ? ':i' + face + ':' + objectId(inst.layout) + (white ? 'w' : '') : '') +
       (topology ? ':' + topology : '') +
       (laterUV ? ':uv' : '') +
-      (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind : '') +
+      (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind + (linearMark ? 'l' : '') : '') +
       (tinted && (shading?.texturedTint || surfaceTint(m)) ? ':t' : '');
     let pipeline = draws.pipelines.get(key);
     // A draw that may join an instanced batch derives without building its own pipeline or calling the lighting
@@ -5198,6 +5234,7 @@ export class PBRModel implements EnginePlugin {
             margoFaceTest: face,
             margoAlphaTest: mask,
             ...(through && !transmission && this.transparency!.blends ? { margoKind: kind } : {}),
+            ...(linearMark ? { margoLinear: 1 } : {}),
           },
           targets:
             through || capture

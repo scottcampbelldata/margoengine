@@ -216,7 +216,7 @@ test('depth peeling resizes between views and recreates private resources after 
   engine.dispose();
 });
 
-test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r16float, then one composite over the scene (MSAA 4x)', async () => {
+test('BLEND primitives leave the beauty pass and accumulate into rgba16float + rg16float, then one composite over the scene (MSAA 4x)', async () => {
   const { engine, model, view, frame, id } = await scene(4),
     oit = OIT.attach(engine);
   assert.throws(() => new OIT().add(model), /attach/);
@@ -235,7 +235,8 @@ test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r
   );
   for (const [i, clear] of [
     [0, [0, 0, 0, 0]],
-    [1, [1, 0, 0, 0]],
+    // Revealage in r, the linear-layer mark in g (KB3148d).
+    [1, [1, 1, 1, 1]],
   ]) {
     const a = accumulate.colorAttachments[i];
     assert.deepEqual(a.clearValue, clear);
@@ -253,9 +254,9 @@ test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r
     textures.map((t) => [t.format, t.sampleCount, t.size]),
     [
       ['rgba16float', 1, [1280, 720]],
-      ['r16float', 1, [1280, 720]],
+      ['rg16float', 1, [1280, 720]],
       ['rgba16float', 4, [1280, 720]],
-      ['r16float', 4, [1280, 720]],
+      ['rg16float', 4, [1280, 720]],
     ],
   );
   assert.equal(
@@ -538,15 +539,17 @@ test('MomentOIT refuses a depth range it cannot warp', () => {
     assert.throws(() => new MomentOIT({ depthRange }), RangeError);
 });
 
-test('OIT blending: transmission joins the pass as a tint draw and a lit draw, three targets, and the composite dims then lights', async () => {
+test('OIT blending: transmission joins the pass as a tint draw and a lit draw, four targets, and the composite dims then lights', async () => {
   const { engine, model, frame } = await scene(4),
     oit = OIT.attach(engine, { blending: true });
   oit.add(model);
   const log = frame(0),
     list = passes(log);
   assert.equal(list.length, 3, 'the opaque pass, then accumulate and composite: no pass for the glass alone');
-  assert.equal(list[1].colorAttachments.length, 3);
+  // Accumulation, revealage and tints, added light, and the r8unorm linear-layer mark (KB3148d).
+  assert.equal(list[1].colorAttachments.length, 4);
   assert.deepEqual(list[1].colorAttachments[1].clearValue, [1, 1, 1, 1]);
+  assert.deepEqual(list[1].colorAttachments[3].clearValue, [1, 1, 1, 1]);
   assert.equal(draws(log), 5, 'opaque, two BLEND primitives, and the glass twice');
   const entries = of(log, 'renderPipeline').map((e) => e[2].fragment.entryPoint);
   assert.ok(entries.includes('margoTint'));
@@ -683,4 +686,80 @@ test('addEffect refuses what is no effect, and a pass not attached', () => {
   assert.throws(() => addEffect(new OIT(), fakeEffect()), /attach/);
   assert.throws(() => addEffect(new OIT(), {}), /VFX, Splats or PointsPlugin/);
   assert.throws(() => addEffect(new OIT(), null), TypeError);
+});
+
+// KB3148d: what one labelled pass recorded, from its begin to its end.
+const inPass = (log, label) => {
+  const start = log.findIndex((e) => e[0] === 'beginRenderPass' && e[1].label === label);
+  if (start < 0) return [];
+  const end = log.findIndex((e, i) => i > start && e[0] === 'pass.end');
+  return log.slice(start + 1, end);
+};
+test("KB3148d: a blendSpace 'linear' material joins the OIT pass, marked, and its pixels composite in linear light from the snapshot", async () => {
+  for (const blending of [false, true])
+    for (const samples of [1, 4]) {
+      const { engine, model, frame } = await scene(samples),
+        oit = OIT.attach(engine, { blending });
+      // The red BLEND primitive asks for linear-light blending; the clearcoat one keeps the display default.
+      model.primitives[1].material.renderState = { blendSpace: 'linear' };
+      oit.add(model);
+      const first = frame(0),
+        accumulated = inPass(first, 'oit:accumulate').filter((e) => e[0] === 'pass.drawIndexed').length;
+      // Both BLEND primitives, the linear one included (with blending, the glass's tint and lit draws too).
+      assert.equal(accumulated, blending ? 4 : 2, `${blending} ${samples}x: the linear primitive accumulates`);
+      const marked = of(first, 'renderPipeline').filter((e) => e[2].fragment?.constants?.margoLinear === 1);
+      assert.equal(marked.length, 1, 'one pipeline marks linear layers');
+      assert.equal(marked[0][2].fragment.entryPoint, 'transparent');
+      // The scene's transmission primitive already holds the native glass capture, so the snapshot is there at once.
+      await null;
+      const next = frame(1),
+        list = of(next, 'beginRenderPass').map((e) => e[1].label);
+      assert.equal(
+        list[list.indexOf('oit:composite') - 1],
+        'native-glass:copy',
+        'the snapshot is taken after the layers, right before the composite',
+      );
+      const composite = inPass(next, 'oit:composite'),
+        drawn = composite.filter((e) => e[0] === 'pass.draw').length;
+      assert.equal(drawn, blending ? 3 : 2, 'the display composite, then the linear-light one');
+      const code = [...of(first, 'module'), ...of(next, 'module')]
+        .map((e) => e[2].code)
+        .find((c) => c.includes('var sceneMap'));
+      assert.ok(code?.includes('encode(decode(d.rgb)*dim+decode(avg)*(1-r))'), 'linear-light mix of average and scene');
+      assert.ok(code.includes('if(mark>=1.0){discard;}'), 'pixels without a linear layer keep the display composite');
+      // Steady: no new pipelines, groups or textures in the next frame.
+      await null;
+      const steady = frame(2);
+      for (const name of ['renderPipeline', 'group', 'texture'])
+        assert.equal(of(steady, name).filter((e) => !e[2]?.label?.startsWith('native-glass:')).length, 0, name);
+      oit.dispose();
+      engine.dispose();
+    }
+});
+
+test('KB3148d: passes without linear layers leave a linear material on the sorted path, and the display path has no mark draw', async () => {
+  for (const Pass of [ExactOIT, MomentOIT]) {
+    const { engine, model, frame } = await scene(1),
+      oit = Pass.attach(engine);
+    model.primitives[1].material.renderState = { blendSpace: 'linear' };
+    oit.add(model);
+    const log = frame(0);
+    assert.ok(
+      !of(log, 'renderPipeline').some((e) => e[2].fragment?.constants?.margoLinear !== undefined),
+      `${Pass.name}: no linear mark`,
+    );
+    oit.dispose();
+    engine.dispose();
+  }
+  const { engine, model, frame } = await scene(4),
+    oit = OIT.attach(engine);
+  oit.add(model);
+  frame(0);
+  await null;
+  const log = frame(1);
+  assert.equal(inPass(log, 'oit:composite').filter((e) => e[0] === 'pass.draw').length, 1);
+  const labels = of(log, 'beginRenderPass').map((e) => e[1].label);
+  assert.notEqual(labels[labels.indexOf('oit:composite') - 1], 'native-glass:copy', 'no snapshot without a linear layer');
+  oit.dispose();
+  engine.dispose();
 });

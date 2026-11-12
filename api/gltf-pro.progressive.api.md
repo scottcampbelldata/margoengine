@@ -1161,6 +1161,7 @@ interface PBRTransparency {
     bindings(): GPUBindGroupEntry[];
     readonly blends?: boolean;
     readonly depthWrite?: boolean;
+    linearLayers?(scene?: () => GPUTextureView): void;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
 }

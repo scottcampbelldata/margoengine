@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><style>canvas{width:8px;height:8px}</style></head><body><script type="module">
+// Browser side of linear-check.mjs (KB3148d): a 50% red surface (linear 0.5) over black, one or two layers, through OIT
+// (plain or `blending`), blendSpace display or linear, set before the first frame or after it (late), as a materials
+// mesh or a glTF primitive. Counts the OIT pass's begin() calls: a layer left on the sorted path never opens it.
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {extendedMaterials} from '/packages/gltf-pro/dist/extended.js';
+import {UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {OIT} from '/packages/oit/dist/index.js';
+import {instancedGLTF} from '/tests/support/instanced-gltf.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const errors=[];
+window.linearOIT=async()=>{
+ const quad=(z)=>({positions:[-1,-1,z,1,-1,z,1,1,z,-1,1,z],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+ const rows=[];
+ const cases=[[1,'display'],[1,'linear'],[1,'linear',true],[2,'linear'],[2,'display'],[2,'linear',true],[1,'linear',false,true],[2,'linear',true,true]];
+ for(const blending of [false,true]) for(const samples of [1,4]) for(const [layers,space,late,gltf] of cases){
+  const canvas=document.body.appendChild(document.createElement('canvas'));
+  const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
+  engine.gpu.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+  try{
+   engine.scene.background='#000000';engine.lighting.radiance.fill(0);
+   const oit=OIT.attach(engine,{blending});
+   let taken=0;const begin=oit.begin.bind(oit);oit.begin=()=>{taken++;return begin();};
+   let set;
+   if(gltf){
+    const input=instancedGLTF(Array.from({length:layers},(_,i)=>({t:[0,0,-i*0.1]})),{instanced:false,material:{
+     alphaMode:'BLEND',pbrMetallicRoughness:{baseColorFactor:[0.5,0,0,0.5],metallicFactor:0,roughnessFactor:1},extensions:{KHR_materials_unlit:{}},
+    }});
+    input.doc.extensionsUsed=['KHR_materials_unlit'];
+    const model=parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
+    oit.add(model);
+    set=(v)=>{for(const p of model.primitives)p.material.renderState={blendSpace:v};};
+   }else{
+    const material=new UnlitMaterial({color:[0.5,0,0],opacity:0.5,transparent:true});
+    for(let i=0;i<layers;i++)oit.add(createMesh(engine,quad(-i*0.1),material));
+    set=(v)=>{material.blendSpace=v;};
+   }
+   if(!late)set(space);
+   const frame=async()=>{engine.render({culling:false,samples});await engine.gpu.queue.onSubmittedWorkDone();};
+   await waitForPipelines(frame);
+   let before;
+   if(late){before=canvas.toDataURL('image/png');set(space);}
+   await waitForPipelines(frame);taken=0;await frame();
+   rows.push({blending,samples,layers,space,late:!!late,gltf:!!gltf,taken,png:canvas.toDataURL('image/png'),before});
+   oit.dispose();
+  }finally{engine.dispose();canvas.remove();}
+ }
+ return {rows,errors};
+};
+window.ready=true;
+</script></body></html>

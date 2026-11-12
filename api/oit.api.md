@@ -17,6 +17,7 @@ export class OIT extends TransparentPass {
     declarations(group: number): string;
     surface(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    linearLayers(scene?: () => GPUTextureView): void;
     begin(): GPURenderPassEncoder;
     protected render(c: Context): void;
     protected release(): void;

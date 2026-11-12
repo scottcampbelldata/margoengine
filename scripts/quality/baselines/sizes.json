@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15154001,
+  "total": 15153542,
   "history": [
     {
       "date": "2026-10-24",
@@ -8645,6 +8645,12 @@
       "commit": "739f28fcd8",
       "reason": "KB3148b: the usdz worker bundles gltf-pro's draw path, which gains the opt-in linear-light blend (linearBlends, wantGlass, DrawFrame.glass): +75 B gzip measured; a lazy split of 75 B would cost a request",
       "grew": 1
+    },
+    {
+      "date": "2026-11-12",
+      "commit": "65deccf3b2",
+      "reason": "KB3148d: OIT linear-light composite for blendSpace linear layers (sRGB decode and encode shader, pipeline, snapshot bind group), measured 4376 B against a 3808 budget; a lazy import() split measured 4466 B, so it stays inline",
+      "grew": 1
     }
   ],
   "items": {
@@ -8933,16 +8939,16 @@
     "@margoengine/ecs/serialize": 4260,
     "@margoengine/environment": 32706,
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
-    "@margoengine/environment/blend": 4999,
+    "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 5882,
     "@margoengine/environment/exr-codecs": 1729,
-    "@margoengine/environment/exr-tiled": 9063,
+    "@margoengine/environment/exr-tiled": 8898,
     "@margoengine/environment/exr-write": 2084,
     "@margoengine/environment/fog-volumes": 1638,
-    "@margoengine/environment/gi": 19260,
+    "@margoengine/environment/gi": 18746,
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/prefiltered": 3949,
-    "@margoengine/environment/probes": 19114,
+    "@margoengine/environment/probes": 18602,
     "@margoengine/environment/reflector": 11438,
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/environment/refractor": 11397,
@@ -9310,7 +9316,7 @@
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/netcode/webtransport": 1819,
-    "@margoengine/oit": 3808,
+    "@margoengine/oit": 4632,
     "@margoengine/oit/depth": 2004,
     "@margoengine/oit/exact": 4820,
     "@margoengine/oit/meshes": 747,

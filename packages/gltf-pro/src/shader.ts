@@ -254,6 +254,14 @@ export interface PBRTransparency {
    * tint draw. For a hook used through `PBRModel.drawTransparent` after the colour has drawn.
    */
   readonly depthWrite?: boolean;
+  /**
+   * Present: BLEND materials whose `renderState` holds nothing but `blendSpace: 'linear'` draw here too, with the
+   * pipeline constant `margoLinear` true on a display-encoded target (declarations then hold `override margoLinear:bool`).
+   * A draw holding such a surface calls it once with `scene`, which copies the colour drawn so far into the native glass
+   * capture's snapshot and returns that view, for a composite in linear light; `scene` is absent until the capture runs
+   * (from the frame after a model first draws the option). KB3148d.
+   */
+  linearLayers?(scene?: () => GPUTextureView): void;
   /** Colour targets of the transparent pass, in `MargoTransparent` location order. */
   readonly targets: readonly GPUColorTargetState[];
   /** This frame's transparent pass: the scene depth read-only and these targets; begun on the first draw, ended by the owner. */

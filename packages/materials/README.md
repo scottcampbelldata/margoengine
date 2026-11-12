@@ -319,8 +319,9 @@ paint.dispose();
   255. `'linear'` mixes in linear light and reads 137, the physically right value, at the cost of a pass break and a
   full-target copy before each such mesh (the native glass snapshot); its instances do not blend over one another. It
   takes effect from the frame after a mesh first draws with it. On an HDR target (Bloom, tonemapping) every blend is
-  linear already. A model added to an OIT pass keeps such a mesh on the sorted path, blended in linear
-  light but not order-independent (docs/known-bugs.md, KB3148d).
+  linear already. Added to an `OIT` pass (`@margoengine/oit`) such a mesh stays order-independent and its pixels
+  composite in linear light there (KB3148d); `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` keep it on the sorted
+  path for now (KB3148e).
 
 ```ts
 import {Engine} from 'margoengine/core';

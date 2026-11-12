@@ -20,7 +20,8 @@ export interface OITOptions {
   depthScale?: number;
   /**
    * Also takes additive and multiply materials and native transmission (a transmission hook keeps its own), so tints and
-   * glows blend in any order. Costs one more `rgba16float` target and a second composite draw. Default false.
+   * glows blend in any order. Costs one more `rgba16float` target, an `r8unorm` mark for `blendSpace: 'linear'` layers
+   * and a second composite draw. Default false.
    */
   blending?: boolean;
 }
@@ -29,26 +30,30 @@ export interface OITOptions {
 const BINDING = 120;
 // Weight: alpha * clamp(10 / (depth / scale)^6, 0.01, 1000). The power sets how strongly a nearer layer wins (exact for
 // two 50% layers 12% apart in depth); the clamp keeps 64 LDR layers inside rgba16float. Unclamped from 0.46 to 3.2 x scale.
+// `margoLinear` (KB3148d): a `blendSpace: 'linear'` layer. It clears reveal.g (non-blending) or the `linear` target
+// (blending), so the composite knows which pixels to mix in linear light.
 const surface = (group: number) => /* wgsl */ `
+override margoLinear:bool=false;
 struct MargoTransparent {@location(0) accum:vec4f, @location(1) reveal:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
   let a=clamp(color.a,0.0,1.0); let d=max(depth*margoOIT.x,1e-4);
   let w=a*clamp(10.0/pow(d,6.0),0.01,1000.0); var o:MargoTransparent;
-  o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(a); return o;
+  o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(a,select(0.0,1.0,margoLinear),0,0); return o;
 }
 `;
 // `blending`: what each kind of surface leaves. Light adds in `added`, the background multiplies by `reveal.rgb`, and
 // `reveal.a` keeps the coverage of normal layers alone, which scales their average colour.
 const surfaceBlended = (group: number) => /* wgsl */ `
 override margoKind:u32=0u;
-struct MargoTransparent {@location(0) accum:vec4f, @location(1) reveal:vec4f, @location(2) added:vec4f}
+override margoLinear:bool=false;
+struct MargoTransparent {@location(0) accum:vec4f, @location(1) reveal:vec4f, @location(2) added:vec4f, @location(3) linear:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 fn margoTransparentTint(share:vec4f)->MargoTransparent {
-  var o:MargoTransparent; o.reveal=vec4f(share.rgb,1.0); return o;
+  var o:MargoTransparent; o.reveal=vec4f(share.rgb,1.0); o.linear=vec4f(0); return o;
 }
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
-  let a=clamp(color.a,0.0,1.0); var o:MargoTransparent; o.reveal=vec4f(1.0);
+  let a=clamp(color.a,0.0,1.0); var o:MargoTransparent; o.reveal=vec4f(1.0); o.linear=vec4f(select(0.0,1.0,margoLinear));
   if(margoKind==0u){
     let d=max(depth*margoOIT.x,1e-4);
     let w=a*clamp(10.0/pow(d,6.0),0.01,1000.0); o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(1.0-a);
@@ -81,6 +86,27 @@ const compositeBlended = /* wgsl */ `
   return vec4f(a.rgb/max(a.a,1e-5)*(1-r)+l.rgb,1-r+l.a);
 }
 `;
+// KB3148d: pixels a linear layer touched, drawn after the composites above with blending off. `scene` is the colour
+// before them (the native glass snapshot); `mark` is 1 where no linear layer drew, so a partly covered edge mixes the
+// two results. In linear light: encode(decode(average) * coverage + decode(scene) * revealage); the weighted average
+// itself stays the one the display composite uses (McGuire and Bavoil 2013), decoded once per pixel.
+const linearComposite = (blended: boolean) => /* wgsl */ `
+@group(0) @binding(0) var accumMap:texture_2d<f32>;
+@group(0) @binding(1) var revealMap:texture_2d<f32>;
+@group(0) @binding(2) var sceneMap:texture_2d<f32>;
+${blended ? '@group(0) @binding(3) var addedMap:texture_2d<f32>; @group(0) @binding(4) var markMap:texture_2d<f32>;' : ''}
+fn decode(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
+fn encode(c:vec3f)->vec3f {let x=max(c,vec3f(0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
+@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);}
+@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
+  let q=vec2i(p.xy); let v=textureLoad(revealMap,q,0);
+  ${blended ? 'let mark=textureLoad(markMap,q,0).r; let r=v.a; let dim=v.rgb; let l=textureLoad(addedMap,q,0);' : 'let mark=v.g; let r=v.r; let dim=vec3f(r); let l=vec4f(0);'}
+  if(mark>=1.0){discard;}
+  let a=textureLoad(accumMap,q,0); let avg=a.rgb/max(a.a,1e-5); let d=textureLoad(sceneMap,q,0);
+  let shown=d.rgb*dim+avg*(1-r)+l.rgb; let light=encode(decode(d.rgb)*dim+decode(avg)*(1-r))+l.rgb;
+  return vec4f(mix(light,shown,mark),d.a*r+1-r+l.a);
+}
+`;
 const add: GPUBlendState = {
   color: { srcFactor: 'one', dstFactor: 'one' },
   alpha: { srcFactor: 'one', dstFactor: 'one' },
@@ -89,6 +115,10 @@ const dim: GPUBlendState = {
   color: { srcFactor: 'zero', dstFactor: 'src' },
   alpha: { srcFactor: 'zero', dstFactor: 'src' },
 };
+const reveal: GPUBlendState = {
+  color: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
+  alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
+};
 const over: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
@@ -96,9 +126,10 @@ const over: GPUBlendState = {
 
 /**
  * Order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf-pro) or a transparent
- * materials mesh into an accumulation (rgba16float, additive) and a revealage (r16float, multiplicative) target, depth
+ * materials mesh into an accumulation (rgba16float, additive) and a revealage (rg16float, multiplicative) target, depth
  * tested against the opaque scene, then composites them over it, so overlapping transparent parts no longer pop as the
- * camera moves. Models not added keep gltf-pro's sorted blending. WebGPU only.
+ * camera moves. Materials with `blendSpace: 'linear'` go in too: on a display-encoded target the pixels they touch
+ * composite in linear light from the native glass snapshot (from the frame after one first draws; README "Linear-light layers"). Models not added keep gltf-pro's sorted blending. WebGPU only.
  * @throws RangeError from the constructor when `order` is not > 0 or `depthScale` not a positive number.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` from `add` before
  * `attach`.
@@ -120,6 +151,10 @@ export class OIT extends TransparentPass {
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly blendedPipelines = new Map<string, GPURenderPipeline[]>();
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup>();
+  private readonly linearPipelines = new Map<string, GPURenderPipeline>();
+  /** This frame's scene snapshot source, set when a `blendSpace: 'linear'` layer drew (KB3148d). */
+  private scene?: () => GPUTextureView;
+  private linearGroup?: { view: GPUTextureView; pipeline: GPURenderPipeline; group: GPUBindGroup };
 
   static attach(engine: EngineKernel, options?: OITOptions): OIT {
     const value = new OIT(options);
@@ -137,16 +172,11 @@ export class OIT extends TransparentPass {
           { format: 'rgba16float', blend: add },
           { format: 'rgba16float', blend: dim },
           { format: 'rgba16float', blend: add },
+          { format: 'r8unorm', blend: reveal },
         ]
       : [
           { format: 'rgba16float', blend: add },
-          {
-            format: 'r16float',
-            blend: {
-              color: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
-              alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
-            },
-          },
+          { format: 'rg16float', blend: reveal },
         ];
   }
   override setup(engine: Engine): void {
@@ -165,6 +195,10 @@ export class OIT extends TransparentPass {
   bindings(): GPUBindGroupEntry[] {
     return [{ binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } }];
   }
+  /** @internal gltf-pro transparency hook: a `blendSpace: 'linear'` layer drew this frame (KB3148d). */
+  linearLayers(scene?: () => GPUTextureView): void {
+    if (scene) this.scene = scene;
+  }
   /** @internal gltf-pro transparency hook: the accumulation pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
@@ -177,7 +211,7 @@ export class OIT extends TransparentPass {
       colorAttachments: this.targets.map((_, k) => ({
         view: msaa ? v[k + count] : v[k],
         resolveTarget: msaa ? v[k] : undefined,
-        clearValue: k !== 1 ? [0, 0, 0, 0] : this.blends ? [1, 1, 1, 1] : [1, 0, 0, 0],
+        clearValue: k === 1 || k === 3 ? [1, 1, 1, 1] : [0, 0, 0, 0],
         loadOp: 'clear',
         storeOp: msaa ? 'discard' : 'store',
       })),
@@ -216,12 +250,17 @@ export class OIT extends TransparentPass {
     this.values[0] = 1 / (scale || 1);
     // A second view in the same frame gets its own copy of the uniform.
     this.binding = writeUniform(device, this.uniform!, this.values, c.view ?? c);
+    this.scene = undefined;
+    let scene: GPUTextureView | undefined;
     try {
       if (!this.drawModels(c)) return;
+      // The colour before the composite, for the pixels a linear layer touched (copied only when one drew).
+      scene = (this.scene as (() => GPUTextureView) | undefined)?.();
     } finally {
       this.binding = undefined;
+      this.scene = undefined;
     }
-    if (this.blends) return this.compositeBlended(c, samples);
+    if (this.blends) return this.compositeBlended(c, samples, scene);
     const key = c.format + samples;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -257,9 +296,45 @@ export class OIT extends TransparentPass {
     out.setPipeline(pipeline);
     out.setBindGroup(0, group);
     out.draw(3);
+    if (scene) this.drawLinear(out, c, samples, scene);
     out.end();
   }
-  private compositeBlended(c: Context, samples: number): void {
+  /** KB3148d: the linear-light composite of the pixels a `blendSpace: 'linear'` layer touched, blending off. */
+  private drawLinear(out: GPURenderPassEncoder, c: Context, samples: number, scene: GPUTextureView): void {
+    const device = c.device,
+      key = c.format + samples;
+    let pipeline = this.linearPipelines.get(key);
+    if (!pipeline) {
+      const module = device.createShaderModule({ code: linearComposite(this.blends) });
+      this.linearPipelines.set(
+        key,
+        (pipeline = device.createRenderPipeline({
+          label: 'oit:composite-linear',
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
+          multisample: { count: samples },
+        })),
+      );
+    }
+    let linear = this.linearGroup;
+    if (linear?.view !== scene || linear.pipeline !== pipeline) {
+      const v = this.views,
+        resources = this.blends ? [v[0], v[1], scene, v[2], v[3]] : [v[0], v[1], scene];
+      this.linearGroup = linear = {
+        view: scene,
+        pipeline,
+        group: device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: resources.map((resource, binding) => ({ binding, resource })),
+        }),
+      };
+    }
+    out.setPipeline(pipeline);
+    out.setBindGroup(0, linear.group);
+    out.draw(3);
+  }
+  private compositeBlended(c: Context, samples: number, scene?: GPUTextureView): void {
     const device = c.device,
       key = c.format + samples;
     let pair = this.blendedPipelines.get(key);
@@ -305,6 +380,7 @@ export class OIT extends TransparentPass {
       out.setPipeline(pipeline);
       out.draw(3);
     }
+    if (scene) this.drawLinear(out, c, samples, scene);
     out.end();
   }
   protected release(): void {
@@ -313,11 +389,13 @@ export class OIT extends TransparentPass {
     this.views = [];
     this.size = '';
     this.groups.clear();
+    this.linearGroup = undefined;
   }
   protected freeDevice(): void {
     this.release();
     this.pipelines.clear();
     this.blendedPipelines.clear();
+    this.linearPipelines.clear();
     retire(this.device!, this.uniform);
     this.uniform = undefined;
   }
