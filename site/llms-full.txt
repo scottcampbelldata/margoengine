@@ -18385,7 +18385,7 @@ engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2,
 new Color('#ff8800').toArray(mesh.material.data); // linear RGB, recolors in place
 ```
 
-Each type is its own module: `import {Vector3} from '@margoengine/math/vector3'` (or from the root, which tree-shakes the same) ships about 1.3 kB min+gzip. The whole package is about 10.4 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
+Each type is its own module: `import {Vector3} from '@margoengine/math/vector3'` (or from the root, which tree-shakes the same) ships about 1.4 kB min+gzip. The whole package is about 20.6 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
 
 Array helpers: the other Margo packages work on plain arrays (`number[]`, `Float32Array`, `Float64Array`) rather than these classes, and share one copy of those helpers from here, each bundled into the package that uses it. `@margoengine/math/mat4`: `multiplyMatrices(a, b, out)`, `invertMatrix(m, out)` (cofactors), `invertMatrixStable(m, out, workspace?)` (pivoted, rejects non-finite input and Float32 overflow; `out` may be `m`) and `composeMatrix(t, q, s, out)`, column-major like `camera.matrix`, float64 arithmetic; the inverses return null (`out` untouched) when they fail. `@margoengine/math/quat`: `eulerToQuaternion(x, y, z)` (XYZ, like `Mesh.setRotation`), `multiplyQuaternions(a, b)`, `axisAngleToQuaternion(axis, angle)`, `conjugateQuaternion(q)`, `normalizeQuaternion(q)` and `rotateByQuaternion(v, q)`, returning new arrays, and `rotationToQuaternion(m, out?, sx?, sy?, sz?)`: the rotation of a column-major 3x3 or 4x4 (columns divided by the given scales; a negative `sx` undoes a mirror), the one conversion every package uses.
 
@@ -19315,7 +19315,7 @@ Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cach
 
 Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
-every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 3.0 kB
+every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 4.6 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
 
 ```ts
@@ -19919,28 +19919,28 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 | Entry | Enables | min+gzip, entry alone |
 | --- | --- | --- |
-| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 7.1 kB |
+| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 7.3 kB |
 | `/preetham` | Preetham day model (the default `model`) | 0.7 kB |
 | `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory), `groundAlbedo` | 3.0 kB |
 | `/clouds` | `clouds` | 2.2 kB |
 | `/night` | stylized `night` (stars, phased moon) | 2.4 kB |
-| `/fog` | `fog` | 2.0 kB |
+| `/fog` | `fog` | 2.3 kB |
 | `/reflection` | `reflectionTexture` | 1.1 kB |
-| `/lighting` | `lighting` (engine sun/moon light, ambient) | 3.8 kB |
+| `/lighting` | `lighting` (engine sun/moon light, ambient) | 3.9 kB |
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
-| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, sleet, lightning, thunder timing | 5.9 kB |
-| `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
+| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, sleet, lightning, thunder timing | 6.0 kB |
+| `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.5 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
-| `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
-| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone and an HDR environment bake | 10.8 kB |
-| `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
+| `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.9 kB |
+| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone and an HDR environment bake | 11.1 kB |
+| `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 7.0 kB |
 | `/presets` | `EARTH`, `MARS` and `marsAtmosphere` for the Hillaire entries (not a `Sky` feature) | 1.6 kB |
-| `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.5 kB |
-| `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.3 kB |
+| `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.6 kB |
+| `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.4 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
-so sums overstate a combined bundle: the root `Sky` is 17.7 kB with all of them, against 22.4 kB
-summed. `addSky(stage)` (base, night) sums to about 9.5 kB and Night Citadel (base, night, fog, reflection) to about 12.6 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+so sums overstate a combined bundle: the root `Sky` is 18.1 kB with all of them, against 23.0 kB
+summed. `addSky(stage)` (base, night) sums to about 9.7 kB and Night Citadel (base, night, fog, reflection) to about 13.1 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model
@@ -21925,8 +21925,8 @@ sky.config.moonPhase = 0.2; // read every frame
 
 `@margoengine/scenery/sky` and the root export `SkyMoon` and the `SkyMoonConfig` type (an alias of Sky's
 `SkyNightOptions`). `SkyMoon.attach(engine, config)` is `engine.use(new SkyMoon(config))`, and `new SkyMoon(config)` is `new Sky({hours: 0, timeScale: 0, night: config}, {night})` from
-`@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (about 6.6 kB min+gzip
-summed over this entry, Sky's base and Sky's night, against 10.2 kB for the full Sky;
+`@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (about 10.0 kB min+gzip
+summed over this entry, Sky's base and Sky's night, against 18.1 kB for the full Sky;
 [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so it is not an `instanceof` the root `Sky`, and options that need
 other features (fog, clouds, a day model) throw; build a `Sky` with those features instead. `config` (also
 `sky.options.night`) is read every frame, so change it in place for live controls. Remove it with
