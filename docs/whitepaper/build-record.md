@@ -4969,3 +4969,32 @@ Every row, with what came out, the cause and its state, is in [amd-gpu-hunt.md](
   targets of at least 256 px, and every tile size from 32 to 512 gives the whole image's bytes on both backends. Row
   19 stays with the dev PC (the path tracer is banned on this machine); the dedicated hunts stay open, so the list 5
   row stays in progress.
+
+## List 5 on the Beelink: batch I1, packages work together, part 1 (2026-11-10 to 2026-11-11)
+
+Run on the Beelink (AMD Radeon 680M, Windows 11; Chromium with WebGPU on Dawn D3D12 and the WebGL2 layer on ANGLE
+D3D11), one GPU slot, the mini-pc heat profile. Sciviz stays out until its batches 175, 176 and 178 are done.
+
+- **J5, packaging (`fb8ac941d`, CPU only):** `examples/all-entries/entries.ts`, generated from the exports maps, imports
+  every public entry of every package in one type program run by check:examples-types; each contract group is bundled
+  in both import orders with byte-identical output; core plus one package reaches only what its manifest names; core
+  by two paths plus the umbrella share one Engine class. No package fix and no core change was needed.
+  [integration-packaging.md](../integration-packaging.md).
+- **J1, plugin lifetime and device loss:** by manager ruling, J1's own runner was folded into `check:owners` instead
+  of kept as a second runner. Fixtures now gate 33 packages, the 24 the prompt names except html and inspector (DOM
+  the CPU model lacks; pending, docs/limits.md) plus eleven more (audio, controls, environment, gltf-pro, labels,
+  points, post, sky, text, ui, video). New harness cases: `cycles` (GPU objects alive must not grow from the second
+  disposal to the third), leaked `onFrame` callbacks and `engine.views` left changed; each has a deliberate-defect
+  test. `warmUp` uses up a fixed per-device first-use set (materials' 1x1 default textures) before measuring, so
+  `OIT.addMesh` joins; a deliberate leak in `addMesh` still fails all 13 of its cases. Every fixture package passes on
+  both backends here. post's 31 entries needed 208 s in one WebGL2 leaf against the leaf's 180 s limit, and culling's 30
+  ran past it too, so both run one leaf per entry (`leafPerEntry`); the limit stays. [integration-fixtures.md](../integration-fixtures.md).
+- **Bugs found and fixed in the owning package, each with a regression test:** a plugin attached to a second scene
+  stayed there on dispose and removed a same-name plugin of the active scene instead, in 31 dispose sites of 11
+  packages; hygiene now finds the whole class (`e8242290c`). `addMesh` made its copy in the active scene, not the
+  scene of the mesh it follows (`a55ee75d9`). Main break fixed forward: lighting2d's GPU check lost the device more
+  often than core's new restore cap allows (`686df9f96`, names `21ef41b32`).
+- **Old fixes the lifetime check catches when reverted** (locally, never pushed; `ac0679fdd`): taa `25fa87f74` (3 of
+  11 cases fail), stats `f7947b63d` (15 of 55), quality `c7b7273aa` (8 of 22).
+- **Open:** html and Inspector pending a browser-only entry (docs/limits.md); the physics and sciviz scene-owner
+  sites stay in docs/known-bugs.md (physics on hold, sciviz held out of list 5).

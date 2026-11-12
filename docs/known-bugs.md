@@ -479,6 +479,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   ended, the covered region copied (or resolved) to a texture, and a new pass begun, or the whole composite moved to
   an extra target: a new copy and an extra render pass per frame, which Scott's ruling (2026-11-10) does not allow.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0171/report.md` with the raw WebGPU and WebGL2 page `screen-blend.html`. Reproduces on 2026-11-11 on this PC's AMD RDNA2 iGPU (19 of 1024 pixels off, including source 151 over destination 16: 157 instead of 158) and not on the RTX A6000.
+- **Gate:** on the Beelink this case is recorded and not counted; pixel's GPU step runs on the dev PC or Mac (Scott, 2026-11-12).
 
 ### Fixed 2026-11-11: the transitions GLSL oracle and the WGSL port disagreed at a texel edge (list 5 R6 row 21)
 
