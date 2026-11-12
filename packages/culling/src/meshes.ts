@@ -315,6 +315,7 @@ export class CulledMeshes implements EnginePlugin {
         h = Math.max(height, c.view ? pyramid.height : 0);
       checked(() => pyramid.resize(w, h));
     }
+    // A slot made while occlusion was off has no lists yet (slots made with it on get theirs in their own check).
     for (const batch of batches) {
       const slot = this.slots.get(batch.geometry)!;
       if (!slot.occluders) checked(() => this.occluderLists(d, slot));
@@ -490,9 +491,16 @@ export class CulledMeshes implements EnginePlugin {
           s.uniform = make(s.data.byteLength, GPUBufferUsage.UNIFORM);
           s.drawn = make(n * 96, S | GPUBufferUsage.VERTEX);
           s.args = make(20, S | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
-          make(n * 4, S);
+          const visible = make(n * 4, S);
           make(n * 4, S);
           make(Math.ceil(n / 256) * 4, S);
+          if (this.occlusion) {
+            // One confirmation covers the occluder lists too, so the slot occludes from its first culled frame (a
+            // check of their own held every batch's occlusion off a frame later). With no last frame, every instance
+            // is an occluder candidate: it is real geometry drawn with this frame's camera, so the pyramid stays exact.
+            this.occluderLists(d, s);
+            d.queue.writeBuffer(visible, 0, new Uint32Array(n).fill(1));
+          }
         });
       slot.instance = undefined;
       slot.ready = !check;

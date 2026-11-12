@@ -161,7 +161,8 @@ core's (`test/gpu/meshes-occlusion-check.mjs`).
 
 - A frame falls back to frustum culling when core's shader is changed in a way that moves or discards surfaces (section
   planes), as for `CulledInstances`. Batches a package has `claimed` are culled but do not occlude.
-- The first frame has no occluders; a hidden crowd starts to drop from the second.
+- A geometry's first culled frame has no last frame, so every instance of it is an occluder candidate (it is real
+  geometry drawn with this frame's camera, so the test stays exact); from the second frame only last frame's kept ones are.
 - It costs a depth pass and a pyramid, so it pays in dense or enclosed scenes. Only core's meshes occlude.
 - WebGL2 compatibility layer: frustum and screen size only, the same image with more drawn. The full Hi-Z route was
   measured there and costs more than it saves (WebGL2 has no indirect draw, so every draw record is read back each
