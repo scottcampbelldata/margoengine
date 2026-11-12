@@ -1,4 +1,5 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
+import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
 // One entry per export (like packages/creative) so `@margoengine/math/vector3` ships only Vector3.
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -42,3 +43,4 @@ execFileSync(
 await packageDeclarations(root);
 
 await declarePackageCore(root);
+await stripPackageShaderComments(root);

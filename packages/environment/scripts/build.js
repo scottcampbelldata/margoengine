@@ -1,4 +1,5 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
+import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -71,6 +72,7 @@ execFileSync(
 await packageDeclarations(root);
 
 await declarePackageCore(root);
+await stripPackageShaderComments(root);
 await mkdir(resolve(root, 'dist/vendor/exr-codecs'), { recursive: true });
 for (const name of ['exrview.js', 'exrview.wasm', 'LICENSE.txt', 'ThirdPartyNotices.txt'])
   await copyFile(resolve(root, 'vendor/exr-codecs', name), resolve(root, 'dist/vendor/exr-codecs', name));

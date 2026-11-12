@@ -1,4 +1,4 @@
-// Quality gate (`npm run quality`, part of `npm run verify` and CI): five ratchets over packages/, each against a
+// Quality gate (`npm run quality`, part of `npm run verify` and CI): six ratchets over packages/, each against a
 // checked-in baseline in scripts/quality/baselines/<gate>.json. A gate passes on what the baseline records and fails on
 // anything new or worse, with the fix in the message. See docs/conventions.md, "Quality gate".
 //   sizes        gzip budget per package entry and worker; static imports of another package's heavy entry (leaks)
@@ -6,7 +6,8 @@
 //   tests        every package tested in verify; every public entry imported by a test
 //   api          TSDoc on public exports; throws follow docs/conventions.md (via npm run hygiene)
 //   clean-room   no three.js / Babylon / other engines in packages/**; no unlisted third-party dependency
-// Needs `npm run build:packages` and current api/ reports (sizes and api read dist/).
+//   shader-comments  comment text inside the shader strings of any package dist (scripts/shader-comments.mjs)
+// Needs `npm run build:packages` and current api/ reports (sizes, api and shader-comments read dist/).
 // Options: --gate=a,b (run some), --update (write shrunk baselines), --update --reason="..." (accept growth, logged),
 // --summary (print the biggest offenders), --details (write test-results/quality.json with every item and block).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -17,6 +18,7 @@ import { cleanRoomGate } from './quality/clean-room.js';
 import { duplicatesGate } from './quality/duplicates.js';
 import { packageList, repoFiles } from './quality/packages.js';
 import { compare, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
+import { shaderCommentsGate } from './quality/shader-comments.js';
 import { sizesGate } from './quality/sizes.js';
 import { testsGate } from './quality/tests-floor.js';
 
@@ -52,6 +54,11 @@ const GATES = {
     run: cleanRoomGate,
     about: 'three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies',
     fix: 'remove the mention or move the comparison to docs/ or benchmarks/; drop the dependency or write our own',
+  },
+  'shader-comments': {
+    run: shaderCommentsGate,
+    about: 'comments left inside shader strings of a package dist; each literal the build strip leaves whole counts one',
+    fix: 'rebuild (npm run build:packages strips them); a literal left whole has a comment running into an interpolation or the end of the string, so move that comment into the JavaScript beside the string',
   },
 };
 

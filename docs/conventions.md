@@ -171,7 +171,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 
 ## Quality gate
 
-`npm run quality` (`scripts/quality-gate.mjs`, part of `npm run verify` and CI, about 6.5 s after a build) runs five
+`npm run quality` (`scripts/quality-gate.mjs`, part of `npm run verify` and CI, about 25 s after a build) runs six
 ratchets over `packages/`. Each has a baseline of today's known violations in `scripts/quality/baselines/<gate>.json`:
 a gate passes on what its baseline records and fails on anything new or worse, naming the fix.
 
@@ -182,6 +182,7 @@ a gate passes on what its baseline records and fails on anything new or worse, n
 | `tests` | a package without a verify test; an entry no test imports | a new package or entry without a test that imports it |
 | `api` | from `npm run hygiene`: undocumented public export; `throw new Error(`; a throw message that names no fix (Errors, above) | a new one of each. `tests/api-conventions.test.js` keeps attach / dispose / `Symbol.dispose` at 0 with no baseline |
 | `clean-room` | mentions of three.js, Babylon or another graphics library anywhere in `packages/**`; third-party `dependencies` / `peerDependencies` | a new mention (put comparisons in docs/ or benchmarks/) or a new third-party dependency |
+| `shader-comments` | per package: comments still inside the WGSL or GLSL strings of its built `dist` (.js and .d.ts), each literal the build strip has to leave whole counting one (see Shader comments, below) | any comment ships: rebuild, or move a comment that runs into an interpolation or the end of its string out into the JavaScript |
 
 Baselines only shrink. When you fix a violation the gate fails until you lock it in:
 `npm run quality -- --gate=<gate> --update`. Growing a baseline (a new entry's budget, an accepted dependency) needs
@@ -190,6 +191,24 @@ only suggest shrinking. `--update` leaves the size budgets of a package whose di
 matches the checked-out sources, as after a rebase onto other lanes' work) as recorded, and says how many it kept;
 rebuild that package to update them. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
 `test-results/quality.json`.
+
+### Shader comments
+
+Write WGSL and GLSL comments in the source as usual: every package build strips them from the strings it ships
+(`scripts/shader-comments.mjs`, run beside `declarePackageCore` by every build script; KB-WGSL1). The strip follows the
+WGSL comment grammar (W3C WGSL, section 3.3 Comments and 3.2 Line Breaks; block comments nest) and GLSL ES 3.00.6
+section 3.4 (block comments do not nest; GLSL text with a backslash is left whole for line continuation). A comment
+leaves its line breaks, or one separating space, so every token keeps its text, order and line number; compilation
+messages and the inspector's error placement still point at the right line. Rules worth knowing:
+
+- Only string and untagged template literals that classify as WGSL or GLSL are touched. Each piece between
+  interpolations is stripped on its own, so a comment that runs into `${...}` or to the end of its string leaves the
+  whole literal as written, and the `shader-comments` gate fails: move that comment into the JavaScript beside it.
+- A comment that code finds its place by (`code.split('//INDICES')`, `edit('// One lobe', ...)`) stays: any comment
+  starting with the comment text of another string in the package's `src/` is an anchor.
+- Every rewrite is checked token for token before it is written, and `tests/shader-comments.test.js` checks every
+  shader in `packages/*/src` and proves that broken strips are caught. Text-patching code should still search code, not
+  comments.
 
 ## API lock
 

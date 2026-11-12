@@ -14,6 +14,7 @@ import { writeServerEntries } from './react-server-entries.js';
 import { importMap, isInstallKit } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
 import { declarePackageCore } from './core-requirements.mjs';
+import { stripPackageShaderComments } from './shader-comments.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
 import { clearStamp, packageStamps, writeStamp } from './package-stamps.mjs';
 import { buildCoreKernel, deflateKernel } from './build-core-kernel.mjs';
@@ -189,6 +190,8 @@ await buildInDependencyOrder(
       clearStamp(process.cwd(), name);
       await buildPackage(name);
       await declarePackageCore(resolve(`packages/${name}`));
+      // A package with its own build script strips its shader comments there (scripts/shader-comments.mjs).
+      if (!manifests.get(name).scripts?.build) await stripPackageShaderComments(resolve(`packages/${name}`));
       writeStamp(process.cwd(), name, stamps.get(name));
     }),
 );

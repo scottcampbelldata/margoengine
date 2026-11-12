@@ -6675,6 +6675,20 @@ shadows fixes. Splitting would not remove them: the fixes sit in code every shad
 chunk would still count here and add a request at start-up. The web template's install and first frame are unchanged;
 core + stage stays below 25,000 B.
 
+## Shader comments in package builds
+
+Package dists ship no WGSL or GLSL comment text (KB-WGSL1). Every package build strips the comments from the shader
+strings it emits (`scripts/shader-comments.mjs`; conventions.md, "Shader comments"), keeping every token's text, order
+and line; the sources keep their comments. The quality gate `shader-comments` fails when a comment ships. Two kinds of
+comment stay on purpose: anchors that code searches for by text (`//INDICES` in compute's quantized kernels,
+`/*lod:direct*/` in lod's imposter shader, five in voxel-pathtracer, one in scatter). Columns after a
+removed block comment on the same line move; line numbers never do. Core and stage ship no shader comments, so core +
+stage is unchanged. Rolled out in batches; min+gzip per entry before and after (entry-sizes.json's method):
+
+| Batch | Entry: before to after (B) |
+| --- | --- |
+| 1 | tonemap 12,708 to 12,634; lod 14,613 to 13,821; compute/fft 5,973 to 5,914, /signal 7,436 to 7,375, /random 8,325 to 8,134, /stream 1,112 to 1,096, /nn 18,947 to 18,767, /autotune 3,557 to 3,542, /nn-extra 20,942 to 20,762; cameras/panini 3,183 to 3,094, /wide-cube 3,844 to 3,777; taa 14,927 to 14,803, /upscale-velocity 19,145 to 19,039 |
+
 ## Batch 120 scaffold profile routing
 
 The five create-margo starters install one engine profile each: web 40 engine packages, game 70, viz 42, React and Next 42 in the packed rehearsal. React, React DOM, Next and development tools remain explicit app dependencies as appropriate; Rapier's 3D solver comes with `@margoengine/physics`, and the game starter imports it from `@margoengine/game/physics` so its root ships no Wasm. All five production builds draw a first frame; Next runs its own production server. Profile entry sizes and core + stage remain unchanged. scripts/template-install-check.mjs and template-browser-check.mjs reproduce this route from packed engine and CLI tarballs with no workspace engine symlink. The starting-path review is docs/guides/kit-migration.md. Timing is deferred to the speed phase; template README examples remain owed.

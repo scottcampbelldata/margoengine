@@ -1,4 +1,5 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
+import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
 import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -92,3 +93,4 @@ await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(dist, 'LI
 await packageRuntime(root);
 
 await declarePackageCore(root);
+await stripPackageShaderComments(root);

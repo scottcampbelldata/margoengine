@@ -5,8 +5,11 @@ import { Tonemap } from '../dist/index.js';
 import { PostStack } from '../../post/dist/index.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 
+// KB-WGSL1: the output shader was f5a49365 until the build stripped shader comments; 61e18503 is that text without its
+// one comment (the P3 gamut note), every token and line the same (the dist equals scripts/shader-comments.mjs applied to
+// the old dist, file for file).
 const defaultShader = '672546811be6922e47f3faa5531e004859899ab5f333c9869f73295de3c49159',
-  defaultOutputShader = 'f5a493659603156fc4d55c92af83d5b67016cf1c71be1750348ebb717bd3c344';
+  defaultOutputShader = '61e185033d477154c99826208d4c1f3573580fb804580cf0d9fd2fe41578ed6e';
 const hash = (code) => createHash('sha256').update(code).digest('hex');
 
 function lut(size = 33, explicit = true) {

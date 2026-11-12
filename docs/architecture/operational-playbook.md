@@ -2609,7 +2609,8 @@ This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they d
 | --- | --- | --- |
 | Core and stage size | build and `npm run measure:size` | Combined minified ES2022 gzip must be strictly below 25,000 bytes. |
 | Kernel payload | `scripts/build-modern.js` | Raw Wasm below 30 KiB, valid module, lossless raw-deflate round trip. |
-| Quality ratchets | `npm run quality` | New or worse size, duplication, test, API, or clean-room item fails. |
+| Quality ratchets | `npm run quality` | New or worse size, duplication, test, API, clean-room or shader-comments item fails. |
+| Shipped shader text | `scripts/shader-comments.mjs` in every package build; `tests/shader-comments.test.js`; quality `shader-comments` | Builds strip WGSL/GLSL comments from shipped shader strings by the spec grammar (WGSL 3.3, nested blocks; GLSL ES 3.00.6 3.4), keeping every token's text, order and line, checked token for token at build; the test proves it over every shader in `packages/*/src` and catches broken strips; the gate fails when any comment ships (KB-WGSL1). Evidence: CPU token equality on the whole source corpus; GPU suites of each stripped package, native and MARGO_COMPAT=1. |
 | Formatting and lint | `scripts/hygiene.js --verify` plus normal lint/typecheck commands | Fast source checks; quality ratchets enforce selected non-regression classes. |
 | Errors page | `npm run hygiene` and `tests/errors-page.test.js` (both run `scripts/errors/check.mjs`) | Every coded throw in core, stage, compute, sciviz, ui, mcp, biomes and cache links to an entry on margoengine.com/errors that lists its literal message, and `site/errors.html` matches `scripts/errors/entries.js`. In hygiene since KB-ERR1, because a lane's fast gate never ran the root test. |
 | API and parity | `npm run api:check`, `npm run check:parity` | Generated API and parity contracts remain current. |

@@ -1,4 +1,5 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
+import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
 import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -60,3 +61,4 @@ await packageDeclarations(root);
 await packageRuntime(root);
 
 await declarePackageCore(root);
+await stripPackageShaderComments(root);

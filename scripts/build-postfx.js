@@ -1,4 +1,5 @@
 import { declarePackageCore } from './core-requirements.mjs';
+import { stripPackageShaderComments } from './shader-comments.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -42,3 +43,4 @@ execFileSync(
 await packageDeclarations(root);
 
 await declarePackageCore(root);
+await stripPackageShaderComments(root);
