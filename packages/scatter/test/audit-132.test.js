@@ -39,3 +39,42 @@ for (const [label, make] of [
       h.cleanup();
     }
   });
+
+// Batch 132b: ScatterRoute (the WebGL2 layer's route) built each cascade count's shadow lists, prefix and counts into
+// the route-wide owned list, so changing the cascade count left the old set alive until the scatter was released.
+test('ScatterRoute frees the previous shadow lists when the cascade count changes', async () => {
+  // The route is a lazy chunk with a content hash in its name.
+  const { readdirSync } = await import('node:fs'),
+    chunk = readdirSync(new URL('../dist/', import.meta.url)).find((f) => /^compat-.*\.js$/.test(f)),
+    { ScatterRoute } = await import(`../dist/${chunk}`);
+  const h = optionalGPU(),
+    d = h.engine.gpu,
+    buffer = (size) => d.createBuffer({ size, usage: 128 }),
+    rings = [buffer(64), buffer(64), buffer(64)],
+    route = new ScatterRoute({
+      device: d,
+      cull: new Scatter(box(), { count: 2 }).cullCode(),
+      count: 2,
+      capacity: 2,
+      uniform: buffer(352),
+      rings,
+      commands: buffer(60),
+      exclusions: buffer(16),
+      vertices: [buffer(24), buffer(24), buffer(24)],
+      indices: [buffer(12), buffer(12), buffer(12)],
+      indexCounts: [3, 3, 3],
+      values: new Float32Array(80),
+      shadowCode: '',
+      shadowListCode: '',
+      shadowDepth: () => ({}),
+    }),
+    live = () => h.resources.filter((r) => !r.destroyed).length,
+    matrices = new Float32Array(64);
+  route.prepareShadow(h.context.encoder, matrices, 2, 1);
+  const two = live();
+  route.prepareShadow(h.context.encoder, matrices, 3, 1);
+  route.prepareShadow(h.context.encoder, matrices, 2, 1);
+  assert.equal(live(), two);
+  route.destroy();
+  h.cleanup();
+});

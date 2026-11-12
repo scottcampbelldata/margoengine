@@ -123,6 +123,8 @@ const entries = (list: (GPUBuffer | GPUBindingResource)[]): GPUBindGroupEntry[] 
 /** Scatter's GPU state on the layer: the kernels, the counts and the shadow draws. */
 export class ScatterRoute {
   private readonly owned: { destroy(): void }[] = [];
+  /** The current cascade count's lists, prefix, counts and uniforms: freed when the count changes. */
+  private shadowOwned: { destroy(): void }[] = [];
   private readonly device: GPUDevice;
   private readonly candidates: GPUBuffer;
   private readonly slots: PrefixCount;
@@ -172,9 +174,9 @@ export class ScatterRoute {
       this.kernel(totalsShader(0, RINGS), [this.lanes, this.slots.prefix, host.commands, this.counts], 1),
     );
   }
-  private make(size: number, usage: number): GPUBuffer {
+  private make(size: number, usage: number, owned = this.owned): GPUBuffer {
     const made = this.device.createBuffer({ size, usage });
-    this.owned.push(made);
+    owned.push(made);
     return made;
   }
   private kernel(code: string, list: (GPUBuffer | GPUBindingResource)[], x: number, y = 1): Kernel {
@@ -225,11 +227,14 @@ export class ScatterRoute {
       threads = Math.max(...sizes),
       stride = sizes[0] + sizes[1] + sizes[2],
       lanes = cascades * RINGS;
-    const prefix = new PrefixCount(this.device, threads * lanes, this.owned),
-      lists = this.make(cascades * stride * 4, GPUBufferUsage.STORAGE),
-      commands = this.make(lanes * 20, GPUBufferUsage.STORAGE),
-      uniform = this.make(288, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
-      size = this.make(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
+    // The previous count's set goes: it was last used by an earlier frame's submitted work, which WebGPU completes first.
+    for (const b of this.shadowOwned) b.destroy();
+    const own: { destroy(): void }[] = (this.shadowOwned = []);
+    const prefix = new PrefixCount(this.device, threads * lanes, own),
+      lists = this.make(cascades * stride * 4, GPUBufferUsage.STORAGE, own),
+      commands = this.make(lanes * 20, GPUBufferUsage.STORAGE, own),
+      uniform = this.make(288, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, own),
+      size = this.make(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, own),
       values = new Float32Array(72);
     this.device.queue.writeBuffer(size, 0, new Uint32Array([threads, 0, 0, 0]));
     new Uint32Array(values.buffer, 256, 4).set([0, sizes[0], sizes[0] + sizes[1], stride]);
@@ -326,7 +331,8 @@ export class ScatterRoute {
     }
   }
   destroy(): void {
-    for (const b of this.owned) b.destroy();
+    for (const b of [...this.owned, ...this.shadowOwned]) b.destroy();
     this.owned.length = 0;
+    this.shadowOwned = [];
   }
 }
