@@ -189,8 +189,6 @@ export interface GlobalValue extends Span {
     readonly decl: ValueDecl;
 }
 
-export const HALF_ROUND_GLSL = "vec4 _margoHalf(vec4 v) {\n  vec4 a = abs(v);\n  uvec4 e = floatBitsToUint(max(a, vec4(6.103515625e-5))) & 0x7f800000u;\n  vec4 r = roundEven(a * uintBitsToFloat(0x84000000u - e)) * uintBitsToFloat(e - 0x05000000u);\n  r = uintBitsToFloat(floatBitsToUint(r) | (floatBitsToUint(v) & 0x80000000u));\n  return mix(v, r, lessThan(a, vec4(65520.0)));\n}\n";
-
 export const INVERSE_TRIG_IMPLAUSIBLE = 0.01;
 
 export const INVERSE_TRIG_PROBE: readonly (readonly [number, number, number])[];
@@ -644,8 +642,6 @@ function encodeName(name: string): string;
 export function inverseTrigError(results: ArrayLike<number>): number;
 
 export function parseWGSL(source: string): ModuleAst;
-
-export function roundHalfExports(source: string, targets: readonly (GPUColorTargetState | null | undefined)[], outputs: readonly GLSLLocation[]): string;
 
 export function translateStage(stage: TranslateStage, kind: 'vertex' | 'fragment', options?: Pick<TranslateOptions, 'clipControl' | 'points'>): GLSLStage;
 

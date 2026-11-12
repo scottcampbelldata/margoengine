@@ -18,8 +18,6 @@ export type {
   GLSLVarying,
 } from './glsl/emit.js';
 export { encodeName as glslName, floatLiteral as glslFloat } from './glsl/emit.js';
-/** @internal The render pipelines' binary16 export rounding (device/half-export.ts), exported for its tests. */
-export { HALF_ROUND_GLSL, roundHalfExports } from './device/half-export.js';
 export { INVERSE_TRIG_IMPLAUSIBLE, INVERSE_TRIG_PROBE, INVERSE_TRIG_TOLERANCE, inverseTrigError } from './device/inverse-trig.js';
 export { ATAN_UNIT, HELPERS as GLSL_HELPERS } from './glsl/helpers.js';
 

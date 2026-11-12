@@ -113,7 +113,6 @@ class CompatAdapter {
     readonly capabilities: WebGL2Capabilities;
     readonly cpuWorkBudget: number;
     readonly tierFormats?: TierFormats | undefined;
-    readonly halfExportRounding: boolean;
     readonly drawClears: boolean;
     readonly accurateInverseTrig: boolean;
     readonly features: ReadonlySet<string>;
@@ -128,7 +127,6 @@ class CompatAdapter {
     constructor(gl: WebGL2RenderingContext, capabilities: WebGL2Capabilities,
     cpuWorkBudget?: number,
     tierFormats?: TierFormats | undefined,
-    halfExportRounding?: boolean,
     drawClears?: boolean,
     accurateInverseTrig?: boolean);
     requestDevice(descriptor?: GPUDeviceDescriptor): Promise<CompatDevice>;

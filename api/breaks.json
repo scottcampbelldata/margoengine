@@ -1069,5 +1069,77 @@
     "reason": "KB1405: the native WebGL2 sciviz driver is retired. It drew only surfaces, bars, histograms and heatmaps and refused axes, points, lines and volumes; createFallbackFigure from @margoengine/sciviz/fallback draws every figure on the complete WebGL2 layer, matching native WebGPU (packages/sciviz/tests/fallback-browser.mjs). The whole entry and its @internal root seam (FallbackBackend, FallbackDraw, drawGL, SciRenderer fallback option) are removed.",
     "date": "2026-11-11",
     "approved": "Scott 2026-11-11"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/device",
+    "symbol": "CompatAdapter.halfExportRounding",
+    "change": "removed",
+    "was": "6e4baa0b",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/device",
+    "symbol": "CompatAdapter.constructor",
+    "change": "signature",
+    "was": "a16d1c64",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/glsl",
+    "symbol": "HALF_ROUND_GLSL",
+    "change": "removed",
+    "was": "f5136b89",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/glsl",
+    "symbol": "roundHalfExports",
+    "change": "removed",
+    "was": "28194ec6",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/xr",
+    "symbol": "CompatAdapter.halfExportRounding",
+    "change": "removed",
+    "was": "6e4baa0b",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/xr",
+    "symbol": "CompatAdapter.constructor",
+    "change": "signature",
+    "was": "a16d1c64",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/tiers",
+    "symbol": "CompatAdapter.halfExportRounding",
+    "change": "removed",
+    "was": "6e4baa0b",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
+  },
+  {
+    "entry": "@margoengine/webgl2-compat/tiers",
+    "symbol": "CompatAdapter.constructor",
+    "change": "signature",
+    "was": "a16d1c64",
+    "reason": "List 5 R6 job 1: the unused binary16 export rounding is removed. 6e89b747c stopped every pipeline from applying it (native WebGPU on the Radeon 680M truncates colour exports the same way as the driver under ANGLE, so the layer stores what native stores; docs/known-bugs.md row 28 entry). HALF_ROUND_GLSL and roundHalfExports were @internal exports of the glsl entry kept only for their own unit test, and the CompatAdapter constructor parameter halfExportRounding was always false. The parameters after it (drawClears, accurateInverseTrig) move up one place; the layer makes its adapters itself, so no caller outside the package constructs one.",
+    "date": "2026-11-12",
+    "approved": "Scott 2026-11-12"
   }
 ]

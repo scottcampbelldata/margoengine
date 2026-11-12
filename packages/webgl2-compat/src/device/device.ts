@@ -197,7 +197,6 @@ export class CompatGPU {
       caps,
       budget,
       formats,
-      false,
       clearsLost(gl),
       inverseTrigInaccurate(gl),
     );
@@ -224,12 +223,6 @@ export class CompatAdapter {
     readonly cpuWorkBudget = CPU_WORK_BUDGET,
     /** @internal Lower-tier target selection, loaded only for a lower-tier adapter. */
     readonly tierFormats?: TierFormats,
-    /**
-     * @internal Always false. The layer once rounded colour exports to the nearest binary16 where the driver truncates
-     * (3adffdee0), but native WebGPU on that GPU (Radeon 680M) truncates the same way, so the layer now stores what the
-     * driver stores; the parameter keeps the constructor's argument order.
-     */
-    readonly halfExportRounding = false,
     /**
      * @internal True when this GPU drops a clear of a texture level or layer whose last write was a clear
      * (device/fresh-clears.ts): colour textures of more than one level or layer are then cleared by draws.

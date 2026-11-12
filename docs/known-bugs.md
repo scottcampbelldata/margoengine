@@ -693,8 +693,9 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
 - **Not a fix:** `3adffdee0` rounded every such export to the nearest binary16 in the shader. fog-all then passed, but
   the layer no longer stored what native stores on the same GPU: `dof` `compat-check.mjs` "a one-sample capture blurs
   the same" read max 1 for 0, and `features-browser.mjs` `halfExport` had the layer store 0x3800 for 0.49999997 where
-  native stores 0x37ff. No pipeline applies that rounding now (the dof check and `halfExport`, now layer equals native exactly, are
-  its regressions); fog-all is red under `MARGO_COMPAT=1` on this machine again, as before `3adffdee0`.
+  native stores 0x37ff. The rounding code (`HALF_ROUND_GLSL`, `roundHalfExports`, the adapter's `halfExportRounding`)
+  was removed on 2026-11-12 (API break approved by Scott); the dof check and `halfExport`, now layer equals native
+  exactly, are its regressions. fog-all is red under `MARGO_COMPAT=1` on this machine again, as before `3adffdee0`.
 
 ### Fixed 2026-11-11: `gpu-lock run` refused browser checks, so they ran outside the GPU slot cap (KB-GL1)
 
