@@ -67,6 +67,7 @@ import {
   worktreeIdentity,
 } from './support/gpu-admission.mjs';
 import { GpuActivity, gpuIdleWindow, monitorGpuLease, terminateGpuTree } from './support/gpu-activity.mjs';
+import { ownerPresent, ownerState, quiesceOwner } from './support/gpu-mutex-beat.mjs';
 
 /**
  * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
@@ -136,11 +137,13 @@ const freshMs = () => Number(process.env.MARGO_GPU_FRESH_MS ?? 5_000);
 // Unlike renaming a directory, this cannot replace an empty mutex just made by an older client.
 const mutexToken = `${process.pid}-${Math.random().toString(36).slice(2)}`;
 const mutexOwnerDir = `${lockDir}-mutex-${mutexToken}`;
+// Shared with the heartbeat worker: whether mutexOwnerDir exists, so the worker never touches it while it is removed.
+const mutexOwnerState = ownerState();
 let mutexHeartbeat;
 function readyMutexHeartbeat() {
   mutexHeartbeat ??= new Promise((done, fail) => {
     const worker = new Worker(new URL('./support/gpu-mutex-beat.mjs', import.meta.url), {
-      workerData: mutexOwnerDir,
+      workerData: { path: mutexOwnerDir, state: mutexOwnerState },
       // This built-in-only worker needs no caller flags (eval-only and process-only flags are invalid here).
       execArgv: [],
     });
@@ -171,9 +174,11 @@ function readyMutexHeartbeat() {
 function tryMutex() {
   mkdirSync(mutexOwnerDir);
   writeFileSync(join(mutexOwnerDir, 'owner.json'), JSON.stringify({ pid: process.pid, token: mutexToken }));
+  ownerPresent(mutexOwnerState);
   try {
     symlinkSync(mutexOwnerDir, mutexDir, process.platform === 'win32' ? 'junction' : 'dir');
   } catch (error) {
+    quiesceOwner(mutexOwnerState);
     rmSync(mutexOwnerDir, { recursive: true });
     if (error.code === 'EEXIST' || error.code === 'ENOENT') return null;
     throw error;
@@ -183,6 +188,7 @@ function tryMutex() {
       throw Object.assign(new Error('gpu-lock: mutex ownership changed during its critical section'), {
         code: 'ERR_GPU_MUTEX_OWNER_LOST',
       });
+    quiesceOwner(mutexOwnerState);
     retireMutex(mutexDir);
     rmSync(mutexOwnerDir, { recursive: true });
   };

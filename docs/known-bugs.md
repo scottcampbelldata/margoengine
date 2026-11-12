@@ -462,6 +462,37 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   setting it already overrides for the same reason. The root dev servers keep the root config. Regression:
   tests/dev-server-watch.test.js ("a suite dev server scans only its start page").
 
+### Fixed 2026-11-11: the gpu-lock mutex heartbeat could end gpu-lock on Windows (KB-L6b-mb)
+
+- **Bug:** the worker that keeps the mutex owner folder fresh for older clients touched it every second whatever the
+  main thread was doing. When the touch landed while the main thread removed the folder, Windows answered EPERM (delete
+  pending), the worker rethrew it, and the worker's error ended the whole `gpu-lock` process. Measured with a touch loop
+  against 3,000 create and remove cycles: 59 EPERM and 2,571 ENOENT in about 9,800 touches. At one touch a second the
+  window is small (0 errors in 60 s of cycles), but every acquire and release opens it.
+- **Fix:** `scripts/support/gpu-mutex-beat.mjs` shares one Int32 with the main thread. The main thread marks the folder
+  present once it and its owner.json exist and, before removing it, waits out a touch in progress (one utimes call); the
+  worker touches only a present folder. It no longer tolerates ENOENT either: a failure it meets now is a real one and
+  still surfaces.
+- **Regression:** tests/gpu-mutex-beat.test.js (the handshake, a real failure still surfacing, and the real worker
+  through 3,000 cycles at a 0 ms interval; with the handshake skipped the same loop fails at once).
+- **Sources:** Microsoft, "DeleteFileW function" remarks (a file marked for deletion stays until its last handle
+  closes, and opens of it fail meanwhile), https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-deletefilew;
+  Node.js, "Atomics and SharedArrayBuffer across worker_threads", https://nodejs.org/api/worker_threads.html.
+
+### Open: one `gpu-lock run` outlived its finished command by 14 minutes (KB-L6b-gl, seen once)
+
+- **Repro:** not reproduced. Seen once on 2026-11-11: `MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --max=45 -- npm
+  run test:gpu:outside` (packages/shadows) printed its last line at 19:25:26 (the check passed; the browser teardown
+  note said the kernel had not finished with Chromium 2 s after it was ended), its holder entry was gone by 19:38, it
+  had no child process at 19:39, and the wrapper had not exited until it was killed then. The native run just before it
+  ended normally. No timeout, idle reclaim or browser-host survivor line was written.
+- **Ruled out:** the wrapper's own waits (it awaits the command's close event, then releases synchronously and calls
+  `process.exit`); a lingering grandchild holding inherited output (6 private-lock runs, each ended 42 to 85 ms after
+  its command); the heartbeat process (detached, ignores output, exits on the tick after release); the mutex heartbeat
+  race above (it ends the process with a stack, which the log does not hold).
+- **Next:** if it happens again, record the wrapper's process tree and thread state before ending it (a dump of the
+  node process names the wait), then fix the cause it shows.
+
 ### Fixed 2026-11-11: a gate step limit counted time queued for a GPU slot (bug sweep L6b)
 
 Fixed 2026-11-11 (bug sweep L6b): a gate step's time limit counted time queued for a GPU slot. `timeout 1500 npm run check:readme-run` ran out while every slot was busy and never ran a README. gpu-lock now leaves a marker (its pid) in `MARGO_GPU_WAIT_MARKERS` while a request waits, and `node scripts/gate-step.mjs --limit=<s> [--wait-max=<s>] -- <command>` counts only time when no request of the step waits. The wait keeps its own limit (`--wait-max`, handed to every request as `MARGO_GPU_WAIT_MAX_MIN`), and the whole step still ends at limit plus wait-max plus a minute. A marker left by a killed waiter does not stop the clock. Regression: tests/gate-step.test.js.
