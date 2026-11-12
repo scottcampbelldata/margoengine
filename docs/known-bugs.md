@@ -209,8 +209,15 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   test suites ran beside it: "lights: the real EnvironmentTest" failed with `page.evaluate: Execution context was
   destroyed`. Run alone, and the full check run again on the same build and on origin/main 519906bcf6, it passed.
 - **Cause:** not found. The page was replaced or its renderer exited after about 40 earlier checks on one page, under
-  heavy memory load; nothing in the failing check navigates. Next: record the renderer's exit reason and memory when
-  the context goes, so a repeat names the cause.
+  heavy memory load; nothing in the failing check navigates.
+- **Instrumented 2026-11-11 (KB0043):** `packages/gltf-pro/scripts/page-loss.mjs` watches the page for a renderer
+  exit (Chromium's `Target.targetCrashed` status and code), `crash`, `close` and a main-frame navigation, and samples
+  the renderer's JS heap, documents and nodes after every check; a failed check prints one `page-loss {...}` line with
+  them, and a passing run ends with a `memory {...}` line holding the first and last samples (regression:
+  `packages/gltf-pro/tests/page-loss.test.js`). Tried to reproduce on 2026-11-11 on the dev PC: `MARGO_COMPAT=1`
+  twice, once beside two Draco encodes that each held 2.5 to 3.8 GB, and natively once; all 23 checks passed each
+  time. Ruled out: a check that navigates (none does, and the watch now records any main-frame navigation). Still
+  open: a repeat will name whether the renderer exited, with its status, or the page was closed or replaced.
 
 ### Path tracer analytic furnace read low twice on the WebGL2 layer under a concurrent GPU load page (2026-11-10, open, not reproduced)
 

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { nameFilter, selectChecks } from './name-filter.mjs';
+import { watchPageLoss } from './page-loss.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 import { cubeDocument } from '../tests/support/cube-png.js';
 import { externalAssetRoot, requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
@@ -17,6 +18,8 @@ const browser = await openBrowser({ startPath: '/tests/modern-extension.html', p
   { page, hardware } = browser,
   errors = [],
   size = 256;
+// KB0043: the page once went away mid-run on the WebGL2 layer; a failed check prints what happened to it and its memory.
+const loss = await watchPageLoss(page);
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
@@ -1204,10 +1207,17 @@ try {
   assert.equal(hardware.webgpu?.fallback, false, 'Physical WebGPU adapter required');
   // --compat (or MARGO_COMPAT=1) runs on the WebGL2 layer (openBrowser); the first other argument filters by name.
   for (const name of selectChecks(checks, nameFilter())) {
-    await checks[name]();
+    try {
+      await checks[name]();
+    } catch (error) {
+      console.error(loss.report(name, error));
+      throw error;
+    }
+    await loss.sample(name);
     console.log('ok -', name);
   }
   assert.deepEqual(errors, []);
+  console.log(`memory ${JSON.stringify({ first: loss.samples[0], last: loss.samples.at(-1) })}`);
 } finally {
   await browser.close();
 }
