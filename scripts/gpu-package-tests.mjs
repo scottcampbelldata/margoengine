@@ -542,12 +542,42 @@ export function splitSteps(test) {
  */
 export const lockOrder = (steps) => [...steps.filter((s) => !s.exclusive), ...steps.filter((s) => s.exclusive)];
 
-/** The steps a profile runs, in plan order: excluded tests stay in the list with their stated reason. */
+/**
+ * The repo-relative files a planned step runs with node: a root suite's package.json script, else the step's own
+ * command (following its `cd`); none for a step with no command.
+ */
+export function stepFiles(step) {
+  const script = step.name && json('package.json').scripts[step.name];
+  return script ? scriptFiles('.', script) : scriptFiles(step.cwd ?? '.', step.command ?? '');
+}
+
+/**
+ * Why `profile` leaves a step out: its package is excluded, or it runs a file of an excluded package from another
+ * package's script (webgl2-compat's test:gpu runs the path tracer's browser check with --compat), which the package's
+ * own exclusion must cover too. Null when the step runs.
+ */
+function stepExcluded(profile, step) {
+  for (const file of stepFiles(step)) {
+    const dir = /^packages\/([^/]+)\//.exec(file)?.[1],
+      reason = dir && dir !== step.dir && excludedReason(profile, dir, '');
+    if (reason) return `${reason} (runs ${file})`;
+  }
+  return null;
+}
+
+/**
+ * The steps a profile runs, in plan order: excluded tests stay in the list with their stated reason. A step that
+ * runs a file of an excluded package is excluded as well (on a split profile only that step, else the whole test).
+ */
 export function planSteps(tests, profile) {
   return tests.flatMap((test) => {
     const reason = excludedReason(profile, test.dir ?? test.label.split(' ')[0], test.script ?? test.name);
     if (reason) return [{ ...test, id: testId(test), part: [1, 1], excluded: reason }];
-    return profile.split ? splitSteps(test) : [{ ...test, id: testId(test), part: [1, 1] }];
+    const steps = profile.split ? splitSteps(test) : [{ ...test, id: testId(test), part: [1, 1] }];
+    return steps.map((step) => {
+      const banned = stepExcluded(profile, step);
+      return banned ? { ...step, excluded: banned } : step;
+    });
   });
 }
 

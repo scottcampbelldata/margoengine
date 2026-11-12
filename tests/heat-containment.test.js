@@ -17,7 +17,9 @@ import {
   report,
   runPlan,
   splitSteps,
+  stepFiles,
   summaryLines,
+  testId,
 } from '../scripts/gpu-package-tests.mjs';
 import { coolDown, fileTemperature, hottestZone, thermalSource, toCelsius } from '../scripts/support/heat.mjs';
 import {
@@ -295,6 +297,44 @@ test('a profile that excludes a package reports it as EXCLUDED BY PROFILE with i
   assert.match(summary, /excluded by profile: \d+ step\(s\)/);
   assert.equal(exitCode(results), 0, 'an exclusion is stated, not a failure');
   assert.equal(report(results, profile).json.profile, 'thermal-limited');
+});
+
+// A package a profile excludes stays out when another package's script runs its test file: webgl2-compat's test:gpu
+// runs packages/voxel-pathtracer/tests/browser-check.mjs --compat as its step 13, and the mini-pc exclusion matched only
+// voxel-pathtracer's own scripts, so check:gpu-packages ran the path tracer on the machine it froze. Planned commands
+// only: nothing here runs a GPU test.
+test("a profile exclusion holds for any step that runs an excluded package's file, not only that package's scripts", () => {
+  const banned = (step) => stepFiles(step).filter((file) => file.startsWith('packages/voxel-pathtracer/'));
+  for (const name of ['mini-pc', 'thermal-limited']) {
+    const profile = machineProfile({ MARGO_MACHINE_PROFILE: name }),
+      all = planSteps(plan(), profile);
+    assert.deepEqual(
+      all.filter((s) => !s.excluded && banned(s).length).map((s) => s.label),
+      [],
+      `profile ${name} plans a step that runs the path tracer`,
+    );
+    const compat = all.filter((s) => s.id.startsWith('webgl2-compat/test:gpu#'));
+    assert.ok(compat.length > 13, `${name}: webgl2-compat test:gpu still runs as short steps`);
+    assert.deepEqual(
+      compat.filter((s) => s.excluded).map((s) => s.id),
+      ['webgl2-compat/test:gpu#13'],
+      `${name}: only the path tracer step of webgl2-compat test:gpu is left out`,
+    );
+    const step = compat.find((s) => s.excluded);
+    assert.match(step.command, /node packages\/voxel-pathtracer\/tests\/browser-check\.mjs --compat/);
+    assert.match(
+      step.excluded,
+      new RegExp(`^excluded by profile ${name}: .+ \\(runs packages/voxel-pathtracer/tests/browser-check\\.mjs\\)$`),
+    );
+  }
+  // Without short steps the whole script runs at once, so the whole script is left out, with the same reason.
+  const whole = { ...machineProfile({ MARGO_MACHINE_PROFILE: 'mini-pc' }), split: false },
+    compatGpu = plan().filter((t) => testId(t) === 'webgl2-compat/test:gpu'),
+    [one] = planSteps(compatGpu, whole);
+  assert.match(one.excluded, /^excluded by profile mini-pc: the path tracer froze this machine once/);
+  // A profile that excludes nothing still runs it.
+  const [kept] = planSteps(compatGpu, { ...whole, exclude: {} });
+  assert.equal(kept.excluded, undefined);
 });
 
 test('the laptop profile loads, has a heat watch and excludes nothing', () => {
