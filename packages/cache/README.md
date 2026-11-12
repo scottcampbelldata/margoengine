@@ -4,7 +4,7 @@ Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cach
 
 Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
-every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 3.0 kB
+every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 4.6 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
 
 ```ts

@@ -28,28 +28,28 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 | Entry | Enables | min+gzip, entry alone |
 | --- | --- | --- |
-| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 7.1 kB |
+| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 7.3 kB |
 | `/preetham` | Preetham day model (the default `model`) | 0.7 kB |
 | `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory), `groundAlbedo` | 3.0 kB |
 | `/clouds` | `clouds` | 2.2 kB |
 | `/night` | stylized `night` (stars, phased moon) | 2.4 kB |
-| `/fog` | `fog` | 2.0 kB |
+| `/fog` | `fog` | 2.3 kB |
 | `/reflection` | `reflectionTexture` | 1.1 kB |
-| `/lighting` | `lighting` (engine sun/moon light, ambient) | 3.8 kB |
+| `/lighting` | `lighting` (engine sun/moon light, ambient) | 3.9 kB |
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
-| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, sleet, lightning, thunder timing | 5.9 kB |
-| `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
+| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, sleet, lightning, thunder timing | 6.0 kB |
+| `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.5 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
-| `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
-| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone and an HDR environment bake | 10.8 kB |
-| `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
+| `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.9 kB |
+| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone and an HDR environment bake | 11.1 kB |
+| `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 7.0 kB |
 | `/presets` | `EARTH`, `MARS` and `marsAtmosphere` for the Hillaire entries (not a `Sky` feature) | 1.6 kB |
-| `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.5 kB |
-| `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.3 kB |
+| `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.6 kB |
+| `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.4 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
-so sums overstate a combined bundle: the root `Sky` is 17.7 kB with all of them, against 22.4 kB
-summed. `addSky(stage)` (base, night) sums to about 9.5 kB and Night Citadel (base, night, fog, reflection) to about 12.6 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+so sums overstate a combined bundle: the root `Sky` is 18.1 kB with all of them, against 23.0 kB
+summed. `addSky(stage)` (base, night) sums to about 9.7 kB and Night Citadel (base, night, fog, reflection) to about 13.1 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model

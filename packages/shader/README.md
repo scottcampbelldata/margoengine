@@ -731,7 +731,7 @@ createMesh(stage.engine, planeGeometry(2, 2), new NodeMaterial({shading: 'basic'
 
 `node packages/shader/test/compute-texture-check.mjs` (real GPU, under the GPU lock): eight generations of Conway's life on a 32 x 32 pair equal a CPU run, a material follows the pair as it swaps, all 16 formats write and read back through a second pass, a blur sampling in compute gives exact thirds, and in-place r32float counts to 3.
 
-## Raw shaders (`@margoengine/shader/raw`, 13.2 kB min+gzip)
+## Raw shaders (`@margoengine/shader/raw`, 14.3 kB min+gzip)
 
 Your own WGSL vertex and fragment
 entry points, any named attributes per vertex or per instance, live uniforms, textures and storage buffers, drawn into the

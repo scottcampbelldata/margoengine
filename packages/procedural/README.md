@@ -159,7 +159,7 @@ no asset downloads. Pack them into your scene's 80-byte vertex stream, then
 upload and release CPU arrays. The gameplay sandbox
 uses these exports with `ScatterInstances` and `PlacementLayout` from scatter.
 
-## Noise (`@margoengine/procedural/noise`, 2.1 kB min+gzip)
+## Noise (`@margoengine/procedural/noise`, 2.3 kB min+gzip)
 
 ```ts
 import {Noise, fbm, ridged, domainWarp} from 'margoengine/procedural/noise';
@@ -199,7 +199,7 @@ the two old packages installed, otherwise it reports HISTORICAL.
 `@margoengine/shader/noise` are WGSL twins of `simplex2`, `simplex`, `perlin` and the three combinators; the same seed gives
 the same field on the GPU within f32 rounding. Coordinates are limited to |v| <= 1e7.
 
-## L-systems (`@margoengine/procedural/lsystem`, 2.2 kB min+gzip)
+## L-systems (`@margoengine/procedural/lsystem`, 2.3 kB min+gzip)
 
 ```ts
 import {createStage} from 'margoengine';
@@ -699,7 +699,7 @@ with identical output; tiny grids select the direct stencil when cheaper. Counts
 include intermediate and centre reads, exclude initialization, copies, allocation
 and compilation. No elapsed-time, SIMD gain or rival-speed claim is made.
 
-Caves entry: 1421 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 24848 B gzip, strictly below 25000 B.
+Caves entry: 1433 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 24848 B gzip, strictly below 25000 B.
 
 ## Texture baker and WebGL2 tiers
 

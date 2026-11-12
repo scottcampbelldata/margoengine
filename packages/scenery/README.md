@@ -27,8 +27,8 @@ sky.config.moonPhase = 0.2; // read every frame
 
 `@margoengine/scenery/sky` and the root export `SkyMoon` and the `SkyMoonConfig` type (an alias of Sky's
 `SkyNightOptions`). `SkyMoon.attach(engine, config)` is `engine.use(new SkyMoon(config))`, and `new SkyMoon(config)` is `new Sky({hours: 0, timeScale: 0, night: config}, {night})` from
-`@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (about 6.6 kB min+gzip
-summed over this entry, Sky's base and Sky's night, against 10.2 kB for the full Sky;
+`@margoengine/sky/base` with plugin name `sky-moon`: it loads only the stylized-night feature (about 10.0 kB min+gzip
+summed over this entry, Sky's base and Sky's night, against 18.1 kB for the full Sky;
 [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so it is not an `instanceof` the root `Sky`, and options that need
 other features (fog, clouds, a day model) throw; build a `Sky` with those features instead. `config` (also
 `sky.options.night`) is read every frame, so change it in place for live controls. Remove it with
