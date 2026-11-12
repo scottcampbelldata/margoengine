@@ -346,6 +346,11 @@ export interface PBRMaterial extends GLTFMaterial {
         };
     };
     pickMask?: PBRMaterial['castMask'];
+    castAnimation?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
     vertexAlpha?: boolean;
     extendedFrame?: boolean;
 }
@@ -405,6 +410,11 @@ export class PBRModel implements EnginePlugin {
             readonly view: GPUTextureView;
             readonly sampler: GPUSampler;
         } | undefined;
+        animation?: {
+            readonly buffer: GPUBuffer;
+            readonly view: GPUTextureView;
+            readonly sampler: GPUSampler;
+        } | undefined;
         vertexAlpha?: boolean | undefined;
         displacement?: import("./shared/caster.js").CasterDisplacement | undefined;
         clip?: GPUBufferBinding | undefined;
@@ -455,6 +465,11 @@ export class PBRModel implements EnginePlugin {
         texCoord: 0 | 1;
         alphaTransform?: Float32Array<ArrayBufferLike> | undefined;
         opacity?: {
+            readonly buffer: GPUBuffer;
+            readonly view: GPUTextureView;
+            readonly sampler: GPUSampler;
+        } | undefined;
+        animation?: {
             readonly buffer: GPUBuffer;
             readonly view: GPUTextureView;
             readonly sampler: GPUSampler;
@@ -1257,6 +1272,7 @@ interface ShadowCasterRecord {
     instances?: PBRInstances;
     displacement?: PBRMaterial['displacement'];
     opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
+    animation?: PBRMaterial['castAnimation'];
     vertexAlpha?: boolean;
     clip?: GPUBufferBinding;
     clipHardware?: boolean;

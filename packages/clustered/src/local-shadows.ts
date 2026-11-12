@@ -14,6 +14,8 @@ import {
   displacementGroup,
   opacityDepth,
   opacityEntries,
+  animatedDepth,
+  animationEntries,
   solidVertexDepth,
   drawCaster,
   staleCaster,
@@ -108,6 +110,11 @@ export interface LocalShadowPrimitive {
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Requires 80-byte vertices.
    */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Moving UVs of the cut-out (VRMC_materials_mtoon 1.0 UV animation, PBR vertices; shared/caster.js `animationCode`):
+   * the alpha map is read at the animated UV in place of `alphaTransform`'s, as the colour pass reads it.
+   */
+  animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
 }
@@ -148,6 +155,7 @@ interface Draw {
   epoch: number;
   displacement?: LocalShadowPrimitive['displacement'];
   opacity?: LocalShadowPrimitive['opacity'];
+  animation?: LocalShadowPrimitive['animation'];
   displaced?: GPUBindGroup;
 }
 const emptyPrimitives: readonly LocalShadowPrimitive[] = [];
@@ -554,6 +562,8 @@ export class LocalShadowMaps {
     if (displacement && p.stride !== 80) throw new RangeError('Displaced local shadow casters need PBR vertices');
     const opacity = p.opacity;
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped local shadow casters need PBR vertices');
+    const animation = p.animation;
+    if (animation && p.stride !== 80) throw new RangeError('UV-animated local shadow casters need PBR vertices');
     if (
       transform !== undefined &&
       (!(transform instanceof Float32Array) ||
@@ -582,7 +592,8 @@ export class LocalShadowMaps {
         (lines ? 4 : 0) +
         (displacement ? 8 : 0) +
         (opacity ? 16 : 0) +
-        (solid ? 32 : 0));
+        (solid ? 32 : 0) +
+        (animation ? 64 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const depth = depthShader(p.stride === 80, !!transform),
@@ -594,7 +605,8 @@ export class LocalShadowMaps {
             )
           : code,
         cut = solid ? solidVertexDepth(placed) : placed,
-        module = this.device!.createShaderModule({ code: opacity ? opacityDepth(cut, 0) : cut });
+        lit = opacity ? opacityDepth(cut, 0) : cut,
+        module = this.device!.createShaderModule({ code: animation ? animatedDepth(lit, 0) : lit });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
@@ -614,6 +626,7 @@ export class LocalShadowMaps {
         epoch: this.epoch,
         displacement,
         opacity,
+        animation,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
@@ -634,6 +647,7 @@ export class LocalShadowMaps {
               { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
               { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
               ...(opacity ? opacityEntries(opacity) : []),
+              ...(animation ? animationEntries(animation) : []),
             ],
           }),
         };

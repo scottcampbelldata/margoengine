@@ -73,6 +73,7 @@ export interface ContactSource {
 interface CasterCutout {
   alphaTransform?: Float32Array;
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   vertexAlpha?: boolean;
   displacement?: CasterDisplacement;
   clip?: GPUBufferBinding;

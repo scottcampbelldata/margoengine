@@ -198,6 +198,11 @@ interface PickingPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    animation?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
     vertexAlpha?: boolean;
     displacement?: import('./shared/caster.js').CasterDisplacement;
     clip?: GPUBufferBinding;

@@ -25,7 +25,7 @@ import {
   lockResolve,
   present,
 } from './shader.js';
-import { displacementGroup, opacityEntries, type CasterCutout } from '../../shared/caster.js';
+import { animationEntries, displacementGroup, opacityEntries, type CasterCutout } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -194,6 +194,7 @@ interface Draw {
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
   opacity?: VelocityPrimitive['opacity'];
+  animation?: VelocityPrimitive['animation'];
   displacement?: VelocityPrimitive['displacement'];
   displaced?: GPUBindGroup;
   /**
@@ -882,14 +883,14 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       throw new TypeError(
         'Invalid TAA alpha transform; set it to a Float32Array of 8 finite numbers on a primitive with stride 80.',
       );
-    const { opacity, surfaceClip: clip } = p,
+    const { opacity, animation, surfaceClip: clip } = p,
       displacement = p.displacement,
       graph = displacement?.velocity,
       // A move that reads the graph's uniforms runs again on last frame's.
       before =
         displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
-    if ((opacity || displacement || clip) && p.stride !== 80)
-      throw new TypeError('Invalid TAA opacity map, displacement or clip; use it on a primitive with stride 80.');
+    if ((opacity || animation || displacement || clip) && p.stride !== 80)
+      throw new TypeError('Invalid TAA opacity map, UV animation, displacement or clip; use it on a primitive with stride 80.');
     const pbr = p.stride === 80,
       solid = pbr && p.vertexAlpha === false,
       key =
@@ -904,6 +905,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         (displacement?.key ?? !!displacement) +
         ':' +
         !!clip +
+        ':' +
+        !!animation +
         ':' +
         c.descriptor.depthStencil!.format +
         ':' +
@@ -920,6 +923,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           !!clip,
           graph,
           before && { move: before.move!, binding: before.program!.next },
+          !!animation,
         ),
       });
       pipeline = c.device.createRenderPipeline({
@@ -968,6 +972,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       r.alpha !== p.alphaTexture ||
       r.sampler !== p.alphaSampler ||
       r.opacity !== opacity ||
+      r.animation !== animation ||
       r.displacement !== displacement ||
       r.clip !== clip?.buffer
     ) {
@@ -994,6 +999,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
         opacity,
+        animation,
         displacement,
         displaced: undefined,
         clip: clip?.buffer,
@@ -1060,6 +1066,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
                 { binding: 2, resource: p.alphaTexture ?? white! },
                 { binding: 3, resource: p.alphaSampler ?? this.whiteSampler! },
                 ...(opacity ? opacityEntries(opacity, 5) : []),
+                ...(animation ? animationEntries(animation, 9) : []),
                 ...(clip ? [{ binding: 8, resource: clip }] : []),
               ]
             : []),

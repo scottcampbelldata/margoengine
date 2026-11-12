@@ -19,7 +19,10 @@ export const cases = [
   // Real elevation of Mount Rainier (Terrarium tile 10/165/360), a `drawShadow` source. Terrain draws a clipmap of its heights
   // and Cycles the tile's own grid, so edges can differ by one cell, 1 unit, some 2 pixels here.
   { name: 'rainier-shadows', scene: 'rainier', kind: 'shadows', minShadow: 2000, iou: 0.75, difference: 0.05, options: { resolution: 4096, bounds: { min: [-135, 0, -135], max: [135, 45, 135] }, filter: 'hard', casterMargin: 10, bias: 0.0002, normalBias: 0.05 } },
-  { name: 'rainier-virtual', scene: 'rainier', kind: 'virtual', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 400, filter: 'hard', casterMargin: 100, bias: 0.1, normalBias: 0.1 } },
+  // No extra normal offset: since 9ae0388ee5 every receiver moves a quarter of its page's texel along its normal and
+  // `normalBias` adds to that. The 0.1 written here when it was the whole offset moved receivers twice as far, and the
+  // overlap fell from 0.80 to 0.733 (KB-L6b-rv).
+  { name: 'rainier-virtual', scene: 'rainier', kind: 'virtual', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 400, filter: 'hard', casterMargin: 100, bias: 0.1 } },
   { name: 'rainier-control', scene: 'rainier', kind: 'virtual', minShadow: 2000, below: 0.75, control: 'nocast', options: { distance: 400, filter: 'hard', casterMargin: 100, bias: 0.2, normalBias: 0.2 } },
   // A real image as a light pattern against a real sheet of that image across the sun. Both read the same texels, so what
   // parts them is how a bilinear tap at one sample per pixel meets Cycles' 64 samples: the edges of the half-light regions

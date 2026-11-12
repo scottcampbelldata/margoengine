@@ -500,6 +500,15 @@ how many words or texels one invocation stores) and the reason it is not on a fa
 buffers by `"group:binding"` and changes them in place. Neither is needed to use compute through the device; both are
 there for tools and tests.
 
+Driver workaround (2026-11-11, KB5289b): ANGLE's Direct3D 11 back end gives a GLSL function with a sampler parameter
+the wrong texture when an argument of a call to it calls the same function again, directly or inside another function:
+the outer call samples the inner call's texture (Chrome 157, RTX A6000; a renamed copy of the function reads right).
+The layer's sampling helpers (textureSampleLevel with a mip filter, textureLoad, textureSampleBaseClampToEdge and
+textureGather) are such functions, so `textureSampleLevel(a, s, moved(uv), 0.0)` where `moved` samples `b` read `b`
+twice. A helper call with sampling nested in its arguments now calls a copy of the helper named for that depth; a
+shader with no nesting is translated as before. Regression: the `nestedSampling` case of test/features.html (five
+nesting forms, native against the layer) and test/glsl.test.js (no helper inside its own arguments).
+
 Driver workaround (2026-11-10, lane I): Chrome on ANGLE's Metal back end drops the first draw through a framebuffer
 after the WebGL2 context's canvas was shown with `transferToImageBitmap` when that framebuffer's texture was uploaded to
 since its last draw, with no GL error. Scatter-tier dispatches refresh a buffer's word texture (R32UI, 4,096 x 8,192 words; a buffer past 128 MiB gets as many

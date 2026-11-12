@@ -99,6 +99,25 @@ constant 0 is. MASK colour pipelines in gltf-pro (`exactAlphaShader`) and the `v
 the cutoff keeps all 77,822 grid pixels (40,257 cut before), 64 of 64 picks (56 before) and the same 7,974 shadow
 texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still interpolates in the plain path.
 
+### Section 5 evidence: moving cut-outs in casters and picking (2026-11-11)
+
+A MASK material whose UVs move (MToon UV animation) is cut in its casters and in picking at the same animated UV as
+its colour pass: shared/caster.js `animatedDepth` carries the raw UVs to the fragment and evaluates the MToon motion
+(per-texel time from the mask's blue channel, rotation about 0.5, scroll, then the base map's affine rows) from an
+80-byte uniform at bindings 7 to 9. Cascades, virtual shadows, clustered local and cube maps, staging contact shadows and
+selection picking use it, and TAA object velocity reads the same function at bindings 9 to 11; such casters redraw
+every frame. Evidence: `packages/rigging/tests/mtoon-uv-shadow.browser.mjs` on the RTX A6000,
+WebGPU and WebGL2 compat: the shadow half and the picked half swap after half a texture of scroll, and stay put
+without the fix. Missing: other GPU vendors.
+
+On the WebGL2 layer the cascade caster first cast the whole quad: its alpha sample takes `margoAnimatedUV(...)` as its
+coordinate, and that function samples the mask, so the layer's GLSL called its sampling helper inside its own
+arguments. ANGLE's Direct3D 11 back end then reads the inner call's texture for the outer call (a raw WebGL2 shader
+shows it; a renamed copy of the function reads right). The layer's translator (`packages/webgl2-compat/src/glsl/emit.ts`,
+`nesting`) now gives each nesting depth its own copy of a sampling helper. Evidence: the `nestedSampling` case of
+`packages/webgl2-compat/test/features.html` (five forms, layer against native, fails without the change) and
+`packages/webgl2-compat/test/glsl.test.js`. Missing: ANGLE on other vendors (the change is the same text on all).
+
 ### Section 5 evidence: mip chains at odd sizes and for blended colour (2026-11-11)
 
 `packages/shared/mipmaps.js` (gltf-pro, gltf, materials, lines, points, rigging, sprites and ui mips) builds every level

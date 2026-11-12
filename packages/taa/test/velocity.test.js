@@ -47,6 +47,12 @@ test('object velocity cuts with the opacity map and leaves vertex alpha out on r
   assert.match(cut, /o\.alpha=1\.0-\(1\.0\);/);
 });
 
+test('object velocity cuts a moving cut-out (MToon UV animation) at the animated UV', () => {
+  assert.doesNotMatch(objectVelocity(true, true, true), /margoAnimatedUV/);
+  const moving = objectVelocity(true, true, true, false, false, true, undefined, undefined, true);
+  assert.match(moving, /@binding\(9\) var<uniform> margoAnimation/, '5 to 7 are the opacity map, 8 the planes');
+  assert.match(moving, /textureSample\(alphaMap,alphaSampler,margoAnimatedUV\(i\.uv\)\)\.a\*margoOpacityAt/);
+});
 test('taa.velocity: the velocity texture, the jitter part of every vector, and the resolved frame', () => {
   const r = rig();
   assert.equal(r.taa.velocity, undefined, 'nothing before the first resolved frame');

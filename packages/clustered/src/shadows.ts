@@ -33,6 +33,8 @@ import {
   displacementGroup,
   opacityDepth,
   opacityEntries,
+  animatedDepth,
+  animationEntries,
   solidVertexDepth,
 } from '../../shared/caster.js';
 import { worldRadius } from '../../shared/sphere.js';
@@ -88,6 +90,11 @@ export interface LocalShadowPrimitive {
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
    */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Moving UVs of the cut-out (VRMC_materials_mtoon 1.0 UV animation, PBR vertices; shared/caster.js `animationCode`):
+   * the alpha map is read at the animated UV in place of `alphaTransform`'s, as the colour pass reads it.
+   */
+  animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /**
@@ -152,6 +159,7 @@ interface Draw {
   key: string;
   displacement?: LocalShadowPrimitive['displacement'];
   opacity?: LocalShadowPrimitive['opacity'];
+  animation?: LocalShadowPrimitive['animation'];
   displaced?: GPUBindGroup;
   /** World bounding sphere (x, y, z, radius); a NaN radius is unknown: drawn into every map. */
   sphere: Float32Array;
@@ -447,7 +455,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private alphaSampler?: GPUSampler;
   private cameraLayout?: GPUBindGroupLayout;
   private drawLayout?: GPUBindGroupLayout;
-  private opacityLayout?: GPUBindGroupLayout;
+  private cutLayouts = new Map<number, GPUBindGroupLayout>();
   private displaceLayout?: GPUBindGroupLayout;
   private cameraGroup?: GPUBindGroup;
   private layerViews: GPUTextureView[] = [];
@@ -940,7 +948,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         if (p.alphaTransform) for (let k = 0; k < 8; k++) if (d.values[20 + k] !== p.alphaTransform[k]) moved = true;
         // ponytail: displaced casters redraw every frame (live scale and bias live in a GPU buffer); compare their
         // values on the CPU if many static displaced casters make that costly.
-        if (p.displacement || p.opacity) moved = true;
+        if (p.displacement || p.opacity || p.animation) moved = true;
         // A new caster has no old bounds (count -1 until first seen); its new bounds below are enough.
         if (moved && d.count !== -1) touched.push(Float32Array.from(d.sphere));
         if (moved) {
@@ -1191,8 +1199,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     const identity = p.primitive ?? p.index,
       displacement = p.displacement,
       opacity = p.opacity,
-      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 || displacement?.cuts ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}${p.stride === 80 && p.vertexAlpha === false ? 'a' : ''}${displacement?.key ?? ''}`;
+      animation = p.animation,
+      key = `${animation ? 'v' : ''}${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 || displacement?.cuts ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}${p.stride === 80 && p.vertexAlpha === false ? 'a' : ''}${displacement?.key ?? ''}`;
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
+    if (animation && p.stride !== 80) throw new RangeError('UV-animated shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     let records = this.draws.get(p.node);
     if (!records) this.draws.set(p.node, (records = new Map()));
@@ -1206,7 +1216,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       d.sampler !== p.alphaSampler ||
       d.key !== key ||
       d.displacement !== displacement ||
-      d.opacity !== opacity
+      d.opacity !== opacity ||
+      d.animation !== animation
     ) {
       d?.uniform.destroy();
       const uniform = this.device!.createBuffer({
@@ -1215,12 +1226,13 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       });
       try {
         const group = this.device!.createBindGroup({
-          layout: opacity ? this.opacityDrawLayout() : this.drawLayout!,
+          layout: this.cutLayout(!!opacity, !!animation),
           entries: [
             { binding: 0, resource: { buffer: uniform } },
             { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
             { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
             ...(opacity ? opacityEntries(opacity) : []),
+            ...(animation ? animationEntries(animation) : []),
           ],
         });
         d = {
@@ -1239,6 +1251,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           key,
           displacement,
           opacity,
+          animation,
           displaced: displacementGroup(this.device!, () => this.displacementLayout(displacement), displacement, true),
           sphere: new Float32Array([0, 0, 0, Number.NaN]),
           stale: true,
@@ -1254,20 +1267,33 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     }
     return d;
   }
-  /** Group 1 of an opacity-mapped caster (shared/caster.js `opacityDepth`): the draw's bindings and the map's. */
-  private opacityDrawLayout(): GPUBindGroupLayout {
+  /**
+   * Group 1 of a caster: the draw's bindings, plus an opacity map's (shared/caster.js `opacityDepth`, 4 to 6) and a UV
+   * animation's (`animatedDepth`, 7 to 9) when it has them.
+   */
+  private cutLayout(opacity: boolean, animation: boolean): GPUBindGroupLayout {
+    if (!opacity && !animation) return this.drawLayout!;
+    const key = (opacity ? 1 : 0) + (animation ? 2 : 0);
+    let layout = this.cutLayouts.get(key);
+    if (layout) return layout;
     const V = GPUShaderStage.VERTEX,
-      F = GPUShaderStage.FRAGMENT;
-    return (this.opacityLayout ??= this.device!.createBindGroupLayout({
+      F = GPUShaderStage.FRAGMENT,
+      map = (first: number): GPUBindGroupLayoutEntry[] => [
+        { binding: first, visibility: F, buffer: { type: 'uniform' } },
+        { binding: first + 1, visibility: F, texture: { sampleType: 'float' } },
+        { binding: first + 2, visibility: F, sampler: { type: 'filtering' } },
+      ];
+    layout = this.device!.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: V | F, buffer: { type: 'uniform' } },
         { binding: 1, visibility: F, texture: { sampleType: 'float' } },
         { binding: 2, visibility: F, sampler: { type: 'filtering' } },
-        { binding: 4, visibility: F, buffer: { type: 'uniform' } },
-        { binding: 5, visibility: F, texture: { sampleType: 'float' } },
-        { binding: 6, visibility: F, sampler: { type: 'filtering' } },
+        ...(opacity ? map(4) : []),
+        ...(animation ? map(7) : []),
       ],
-    }));
+    });
+    this.cutLayouts.set(key, layout);
+    return layout;
   }
   /** Group 2 of a displaced caster (shared/displacement.js `displacedDepth`): its uniform, map and sampler. */
   private displacementLayout(displacement: LocalShadowPrimitive['displacement']): GPUBindGroupLayout {
@@ -1284,19 +1310,21 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private pipeline(key: string, displacement: LocalShadowPrimitive['displacement']): GPURenderPipeline {
     let pipeline = this.pipelines.get(key);
     if (pipeline) return pipeline;
-    const pbr = key.startsWith('80'),
+    const pbr = key.replace(/^v/, '').startsWith('80'),
       displaced = key.includes('d'),
       plain = depth(pbr, key.includes('t')),
       opacity = key.includes('o'),
+      animation = key.startsWith('v'),
       code = displaced ? displacedDepth(plain, 2, displacement) : plain,
       instanced = key.includes('i') ? instancedDepth(code) : code,
       placed = key.includes('a') ? solidVertexDepth(instanced) : instanced,
-      module = this.device!.createShaderModule({ code: opacity ? opacityDepth(placed, 1) : placed });
+      lit = opacity ? opacityDepth(placed, 1) : placed,
+      module = this.device!.createShaderModule({ code: animation ? animatedDepth(lit, 1) : lit });
     pipeline = this.device!.createRenderPipeline({
       layout: this.device!.createPipelineLayout({
         bindGroupLayouts: [
           this.cameraLayout!,
-          opacity ? this.opacityDrawLayout() : this.drawLayout!,
+          this.cutLayout(opacity, animation),
           ...(displaced ? [this.displacementLayout(displacement)] : []),
         ],
       }),
@@ -1324,10 +1352,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.alphaSampler =
       this.cameraLayout =
       this.drawLayout =
-      this.opacityLayout =
       this.displaceLayout =
       this.cameraGroup =
         undefined;
+    this.cutLayouts.clear();
     this.layerViews = [];
     this.entries = [];
     this.pipelines.clear();

@@ -6,6 +6,12 @@ export interface CasterCutout {
   alphaTransform?: Float32Array;
   /** Opacity map of the cut-out (materials `alphaMap`, 80-byte vertices): its green channel multiplies the alpha tested. */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Moving UVs of the cut-out (VRMC_materials_mtoon 1.0 UV animation, 80-byte vertices): an 80-byte uniform (scroll x,
+   * scroll y, rotation, time; the base map's affine rows; the mask's affine rows), the mask view and its sampler. The
+   * alpha map is read at the animated UV in place of `alphaTransform`'s, as the colour pass reads it.
+   */
+  animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices). */
@@ -74,6 +80,15 @@ export function displacementGroup(
   displacement: CasterDisplacement | undefined,
   explicit?: boolean,
 ): GPUBindGroup | undefined;
+/** WGSL of a moving cut-out (MToon UV animation) at bindings `first` to `first` + 2 (default 7), and `margoAnimatedUV`. */
+export function animationCode(group: number, first?: number): string;
+/** A caster depth shader whose cut-out reads its alpha map at the animated UV, bound at 7-9 of `group`. */
+export function animatedDepth(code: string, group: number, first?: number): string;
+/** The bind group entries of a caster's UV `animation`, from binding `first` (default 7). */
+export function animationEntries(
+  animation: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler },
+  first?: number,
+): GPUBindGroupEntry[];
 /** WGSL of an opacity map at bindings `first` to `first` + 2 (default 4) of `group`, and `margoOpacityAt` of both UV sets. */
 export function opacityCode(group: number, first?: number): string;
 /** A caster depth shader whose cut-out also multiplies by an opacity map's green channel, bound at 4-6 of `group`. */
@@ -122,7 +137,7 @@ export function drawCaster(
 /** Whether a caster's cached draw `record` no longer fits primitive `p` drawn with `pipeline` and `displacement`. */
 export function staleCaster<R extends object>(
   record: R | undefined,
-  p: { vertex: GPUBuffer; alphaTexture?: unknown; alphaSampler?: unknown; opacity?: unknown },
+  p: { vertex: GPUBuffer; alphaTexture?: unknown; alphaSampler?: unknown; opacity?: unknown; animation?: unknown },
   pipeline: GPURenderPipeline,
   displacement: unknown,
 ): record is undefined;

@@ -5,6 +5,7 @@ import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {worldTriangles} from '/packages/bvh/dist/index.js';
 import {ProgressiveStill} from '/packages/staging/dist/pathtrace.js';
 import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 let engine,scene,still,triangles;const errors=[];
 const watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const frame=async(delta=0.125)=>{engine.render({delta});await engine.gpu.queue.onSubmittedWorkDone();};
@@ -56,6 +57,11 @@ window.check={
   const {TAA}=await import('/packages/taa/dist/index.js');
   still.dispose();const taa=TAA.attach(engine),rows=[];
   try{
+   // TAA hands the still a linear capture target, whose display pipeline compiles on the first traced frame. Compile it
+   // here, so the sixteen frames below start with every pipeline in place (KB-L6b-ti: on a loaded GPU the first row
+   // spent up to 12 of its frames tracing nothing while that pipeline compiled).
+   const warm=await ProgressiveStill.attach(engine,{scene,idleDelay:0,maxSamples:1,samplesPerFrame:1,denoise:false,seed:37});
+   await warm.ready;await waitForPipelines(frame,{ready:()=>warm.stats.samples>0,timeoutMs:120000});warm.dispose();
    for(const idleDelay of [0.25,0]){
     still=await ProgressiveStill.attach(engine,{scene,idleDelay,maxSamples:4,samplesPerFrame:1,denoise:false,seed:37});
     await still.ready;

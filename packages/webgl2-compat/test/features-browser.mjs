@@ -13,7 +13,8 @@
 // The cases: sRGB views of a unorm texture, 2D views of array layers, cube views of 6- and 12-layer textures and an
 // array view of a cube, copyTextureToBuffer of depth, stencil, packed and snorm formats, occlusion queries, render
 // bundles, textureGather in every address mode and textureGatherCompare, an external texture from a VideoFrame, and
-// two regressions (an upload on the wrong texture unit; depth writes after a multisample resolve), and a depth texture
+// two regressions (an upload on the wrong texture unit; depth writes after a multisample resolve), sampling nested in
+// another sampling call's coordinates (ANGLE D3D11 read the inner texture for both, KB5289b), and a depth texture
 // sampled by the pass it is attached to read-only, and 3D texture slices drawn beside a depth attachment (ANGLE's
 // Direct3D 11 back end drops such draws; the layer draws them in a 2D stand-in).
 import assert from 'node:assert/strict';
@@ -118,6 +119,11 @@ try {
     if (name === 'compressedSrgbView' && !r.missing) {
       assert.notDeepEqual(r.srgb, r.unorm, 'compressedSrgbView: the sRGB view decodes');
       assert.notDeepEqual(r.srgbAfter, r.srgb, 'compressedSrgbView: a later write reaches the sRGB view');
+    }
+    if (name === 'nestedSampling') {
+      // Every form reads texture a (255, 0, 0, 64), never b (white), whatever samples inside its coordinates.
+      for (const form of ['throughFunction', 'direct', 'afterSibling', 'load', 'twoDeep'])
+        assert.deepEqual(r[form].map((v) => Math.round(v * 255)), [255, 0, 0, 64], `nestedSampling ${form}: the outer call reads its own texture`);
     }
     if (name === 'volumeSliceDepth') {
       // Rows top first: the wedge covers one texel of the top row and two of the bottom; slice 1 is only cleared.

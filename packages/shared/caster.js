@@ -127,6 +127,44 @@ export const opacityEntries = (opacity, first = 4) => [
 ];
 
 /**
+ * WGSL of a cut-out whose base UV moves (VRMC_materials_mtoon 1.0 UV animation): the uniform, mask view and sampler at
+ * bindings `first` to `first` + 2 of `group`, and `margoAnimatedUV` of both raw UV sets. The uniform holds the motion
+ * (scroll x, scroll y, rotation in radians per second, time in seconds), the base map's affine rows (set in row 0's w)
+ * and the mask's affine rows (set in row 0's w). The mask's blue channel scales time per texel; a white mask moves all.
+ */
+export const animationCode = (group, first = 7) => `struct MargoAnimation {motion:vec4f,base:array<vec4f,2>,mask:array<vec4f,2>}
+@group(${group}) @binding(${first}) var<uniform> margoAnimation:MargoAnimation;
+@group(${group}) @binding(${first + 1}) var margoAnimationMask:texture_2d<f32>;
+@group(${group}) @binding(${first + 2}) var margoAnimationSampler:sampler;
+fn margoAnimatedUV(raw:vec4f)->vec2f {let a=margoAnimation; let m=vec3f(select(raw.xy,raw.zw,a.mask[0].w>0.5),1);
+let t=a.motion.w*textureSampleLevel(margoAnimationMask,margoAnimationSampler,vec2f(dot(a.mask[0].xyz,m),dot(a.mask[1].xyz,m)),0.0).b;
+let r=a.motion.z*t; let c=cos(r); let s=sin(r); let q=select(raw.xy,raw.zw,a.base[0].w>0.5)-0.5;
+let p=vec3f(vec2f(c*q.x+s*q.y,-s*q.x+c*q.y)+0.5+a.motion.xy*t,1); return vec2f(dot(a.base[0].xyz,p),dot(a.base[1].xyz,p));}
+`;
+
+/**
+ * A caster shader (80-byte PBR vertices) whose cut-out reads its alpha map at the animated UV of `animationCode`, bound
+ * at `first` to `first` + 2 of `group`, in place of the static affine UV. Apply it after `opacityDepth`.
+ */
+export function animatedDepth(code, group, first = 7) {
+  const out = code
+    .replace(/struct (\w*Out) \{/, 'struct $1 {@location(4) margoRaw:vec4f,')
+    .replace('o.uv=select(', 'o.margoRaw=i.uv;o.uv=select(')
+    .replace('o.uv=o.uv*i.uvt.xy+i.uvt.zw;', '$&o.margoRaw=o.margoRaw*i.uvt.xyxy+i.uvt.zwzw;')
+    .replace(/(textureSample(?:Level)?\(\w+,\w+,)(?:i\.)?uv((?:,0(?:\.0)?)?\)\.a\*)/, '$1margoAnimatedUV(i.margoRaw)$2');
+  if (!out.includes('o.margoRaw=i.uv;') || !out.includes('margoAnimatedUV(i.margoRaw)'))
+    throw new TypeError('UV-animated shadow casters need 80-byte vertices; draw them with a PBR depth shader');
+  return animationCode(group, first) + out;
+}
+
+/** The bind group entries of a caster's UV `animation`, from binding `first` (see `animationCode`). */
+export const animationEntries = (animation, first = 7) => [
+  { binding: first, resource: { buffer: animation.buffer } },
+  { binding: first + 1, resource: animation.view },
+  { binding: first + 2, resource: animation.sampler },
+];
+
+/**
  * A caster shader that leaves vertex alpha out of its cut-out, for a primitive with `vertexAlpha: false` (materials
  * `vertexColors: false`, whose colour pass reads white, or gltf-pro vertices whose colour alpha is all 1). An instance's
  * tint still counts. Apply it after `instancedDepth`. The stage hands on 1 - alpha and the fragment reads 1 minus that:
@@ -178,4 +216,5 @@ export const staleCaster = (record, p, pipeline, displacement) =>
   record.alpha !== p.alphaTexture ||
   record.sampler !== p.alphaSampler ||
   record.displacement !== displacement ||
-  record.opacity !== p.opacity;
+  record.opacity !== p.opacity ||
+  record.animation !== p.animation;

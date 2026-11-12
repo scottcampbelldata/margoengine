@@ -11,6 +11,8 @@ import {
   displacementGroup,
   opacityDepth,
   opacityEntries,
+  animatedDepth,
+  animationEntries,
   solidVertexDepth,
 } from '../../shared/caster.js';
 import { displacedDepth } from '../../shared/displacement.js';
@@ -35,6 +37,12 @@ export interface PickingPrimitive {
   alphaTransform?: Float32Array;
   /** Opacity map of the surface (materials `alphaMap`): its green channel multiplies the alpha `cutoff` tests. */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Moving UVs of the cut-out (VRMC_materials_mtoon 1.0 UV animation; shared/caster.js `animationCode`): an 80-byte
+   * uniform, the mask view and its sampler. The alpha map is read at the animated UV in place of `alphaTransform`'s, so
+   * a click passes through the holes the colour pass shows. gltf-pro fills it from a material's `castAnimation`.
+   */
+  animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the test, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /** Vertex displacement of the surface (materials `displacementMap`): the shape a click lands on. */
@@ -71,6 +79,7 @@ interface Draw {
   texture?: GPUTextureView;
   sampler?: GPUSampler;
   opacity?: PickingPrimitive['opacity'];
+  animation?: PickingPrimitive['animation'];
   displacement?: PickingPrimitive['displacement'];
   displaced?: GPUBindGroup;
   clip?: GPUBuffer;
@@ -311,10 +320,10 @@ export class PickingPrimitives {
     // Each primitive owns its uniform; another view of the same frame writes a frame-arena slice.
     for (let index = 0; index < primitives.length; index++) {
       const p = primitives[index],
-        { opacity, displacement, clip } = p,
+        { opacity, animation, displacement, clip } = p,
         variant =
-          opacity || displacement || clip || p.vertexAlpha === false
-            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, displacement, !!clip)
+          opacity || animation || displacement || clip || p.vertexAlpha === false
+            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, displacement, !!clip, !!animation)
             : pipeline;
       let record = draws[index];
       if (
@@ -323,6 +332,7 @@ export class PickingPrimitives {
         record.texture !== p.alphaTexture ||
         record.sampler !== p.alphaSampler ||
         record.opacity !== opacity ||
+        record.animation !== animation ||
         record.displacement !== displacement ||
         record.clip !== clip?.buffer
       ) {
@@ -341,6 +351,7 @@ export class PickingPrimitives {
             texture: p.alphaTexture,
             sampler: p.alphaSampler,
             opacity,
+            animation,
             displacement,
             displaced: displacementGroup(this.device!, () => variant.getBindGroupLayout(1), displacement),
             clip: clip?.buffer,
@@ -353,6 +364,7 @@ export class PickingPrimitives {
                   { binding: 2, resource: sampler },
                   ...(clip ? [{ binding: 3, resource: clip }] : []),
                   ...(opacity ? opacityEntries(opacity) : []),
+                  ...(animation ? animationEntries(animation) : []),
                 ],
               }),
             ),
@@ -405,13 +417,14 @@ export class PickingPrimitives {
     }
     return candidates;
   }
-  /** The pipeline of `options`; a primitive with an opacity map, no vertex alpha, displacement or planes takes its own shader. */
+  /** The pipeline of `options`; a primitive with an opacity map, moving UVs, no vertex alpha, displacement or planes takes its own shader. */
   private pipeline(
     options: DrawOptions,
     opacity = false,
     solid = false,
     displacement?: PickingPrimitive['displacement'],
     clipped = false,
+    animated = false,
   ): GPURenderPipeline {
     const mask = !!options.mask,
       displaced = !!displacement,
@@ -426,6 +439,7 @@ export class PickingPrimitives {
         solid,
         displacement?.key ?? displaced,
         clipped,
+        animated,
       ].join(':');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -437,6 +451,7 @@ export class PickingPrimitives {
       if (displaced) code = displacedDepth(code, 1, displacement);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
+      if (animated) code = animatedDepth(code, 0);
       if (clipped) code = clippedDepth(code, 3, 'materialClip');
       if (options.surface) code = options.surface.shader(code, 'primitive');
       const module = this.device!.createShaderModule({ code });

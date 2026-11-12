@@ -171,12 +171,48 @@ struct Out { @builtin(position) clip:vec4f, @location(0) world:vec3f, @location(
     return app(engine, (t) => (time.value = t), { camera: data.camera, note: 'materials meshes, one NodeMaterial' });
   },
 
-  async 'p-compute'() {
-    // ComputePass integrates a storage buffer, but no Margo drawable reads one per point: @margoengine/points keeps its
-    // own position buffer, and NodeMaterial / RawMesh have no instance index or storage input.
-    throw new Error(
-      'unsupported: drawing a ComputePass storage buffer as points (points owns its positions; no per-instance storage read in NodeMaterial or RawMesh)',
+  async 'p-compute'(canvas, data, marks) {
+    // A ComputePass integrates the storage buffers every frame; a raw point mesh pulls each point from the same buffer by
+    // its vertex index (shader/raw `storage` takes the storage() node as it is), so nothing is copied between them.
+    const engine = await engineFor(canvas, data.camera, 8, marks),
+      s = performance.now(),
+      [{ ComputePass, storage, vec4 }, { RawShaders, RawShaderMaterial, RawMesh }] = await Promise.all([
+        import('@margoengine/shader'),
+        import('@margoengine/shader/raw'),
+      ]),
+      n = data.n,
+      start = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) start.set([...data.positions.subarray(i * 3, i * 3 + 3), 1], i * 4);
+    const positions = storage(start, 'vec4f'),
+      velocities = storage(n, 'vec4f'),
+      dt = 1 / 60;
+    // v += (-p * 0.5) * dt; p += v * dt, with the new v.
+    ComputePass.attach(engine, n, (i) => {
+      const p = positions.element(i).xyz,
+        v = velocities.element(i).xyz.add(p.mul(-0.5 * dt));
+      return [velocities.store(i, vec4(v, 0)), positions.store(i, vec4(p.add(v.mul(dt)), 1))];
+    });
+    const raw = new RawShaders();
+    engine.use(raw);
+    raw.add(
+      new RawMesh({
+        material: new RawShaderMaterial({
+          vertexShader: `struct Out { @builtin(position) clip:vec4f }
+@vertex fn vertex(@builtin(vertex_index) i:u32)->Out { return Out(camera.viewProjection * vec4f(positions[i].xyz, 1.0)); }
+@fragment fn fragment()->@location(0) vec4f { return margoEncode(vec4f(1.0)); }`,
+          storage: { positions },
+        }),
+        vertexCount: n,
+        topology: 'point-list',
+      }),
     );
+    done(marks, s);
+    engine.render();
+    await raw.ready();
+    return app(engine, () => {}, {
+      camera: data.camera,
+      note: 'shader ComputePass (2 storage buffers) + one raw point-list mesh pulling positions by vertex index',
+    });
   },
 
   async 'p-render-target'(canvas, data, marks) {

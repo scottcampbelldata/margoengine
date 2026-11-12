@@ -330,6 +330,18 @@ function postfix(code: string): boolean {
   return true;
 }
 
+/** Texture built-ins the layer emits as a generated GLSL function that takes the sampler as a parameter. */
+const SAMPLER_HELPERS = new Set([
+  'textureLoad',
+  'textureSample',
+  'textureSampleBias',
+  'textureSampleLevel',
+  'textureSampleGrad',
+  'textureSampleBaseClampToEdge',
+  'textureGather',
+  'textureGatherCompare',
+]);
+
 const SAMPLER_TYPES: Record<string, string> = {
   '2d': 'sampler2D',
   '1d': 'sampler2D',
@@ -389,6 +401,8 @@ export class StageEmitter {
   /** Calls the current statement evaluates into a temporary first (see markHoists). */
   private readonly hoists = new Set<IRExpr>();
   private readonly discards = new Map<IRFunction, boolean>();
+  /** How deeply sampler-taking helpers nest in each function (see `nesting`). */
+  private readonly samplingDepths = new Map<IRFunction, number>();
   private baseInstance = false;
 
   constructor(
@@ -930,6 +944,97 @@ export class StageEmitter {
   }
 
   /** True when a function, or one it calls, may discard (or needs fragment-only built-ins). */
+  /**
+   * How many sampler-taking helper calls (SAMPLER_HELPERS) nest inside `e`, through the functions it calls. ANGLE's
+   * Direct3D 11 back end gets a GLSL function with a sampler parameter wrong when an argument of a call to it calls the
+   * same function again, directly or inside another function: the outer call samples the inner call's texture (Chrome
+   * 157, RTX A6000; a renamed copy of the function reads right). A helper call made with nested sampling therefore uses
+   * a copy named for its depth, so no helper is ever called inside its own arguments.
+   */
+  private nesting(e: IRExpr | null | undefined): number {
+    if (!e) return 0;
+    const most = (list: readonly IRExpr[]) => list.reduce((m, a) => Math.max(m, this.nesting(a)), 0);
+    switch (e.kind) {
+      case 'builtin':
+        return most(e.args) + (SAMPLER_HELPERS.has(e.name) ? 1 : 0);
+      case 'call':
+        return Math.max(most(e.args), this.functionNesting(e.fn));
+      case 'construct':
+        return most(e.args);
+      case 'load':
+      case 'address-of':
+        return this.nesting(e.ref);
+      case 'deref':
+        return this.nesting(e.pointer);
+      case 'convert':
+      case 'bitcast':
+        return this.nesting(e.arg);
+      case 'member':
+      case 'swizzle':
+        return this.nesting(e.object);
+      case 'index':
+        return Math.max(this.nesting(e.object), this.nesting(e.index));
+      case 'unary':
+        return this.nesting(e.operand);
+      case 'binary':
+        return Math.max(this.nesting(e.left), this.nesting(e.right));
+      default:
+        return 0;
+    }
+  }
+
+  /** The deepest `nesting` of any expression in `fn`'s body. */
+  private functionNesting(fn: IRFunction): number {
+    let known = this.samplingDepths.get(fn);
+    if (known !== undefined) return known;
+    this.samplingDepths.set(fn, 0);
+    let deepest = 0;
+    const expr = (e: IRExpr | null | undefined) => {
+      deepest = Math.max(deepest, this.nesting(e));
+    };
+    const list = (body: readonly IRStmt[] | undefined) => body?.forEach(stmt);
+    const stmt = (s: IRStmt | undefined): void => {
+      switch (s?.kind) {
+        case 'block':
+          return list(s.body);
+        case 'decl':
+          return expr(s.local.init);
+        case 'assign':
+          expr(s.lhs);
+          return expr(s.rhs);
+        case 'increment':
+          return expr(s.lhs);
+        case 'call':
+          return expr(s.call);
+        case 'if':
+          expr(s.condition);
+          list(s.then);
+          return list(s.else);
+        case 'switch':
+          expr(s.selector);
+          for (const c of s.clauses) list(c.body);
+          return;
+        case 'loop':
+          list(s.body);
+          list(s.continuing);
+          return expr(s.breakIf);
+        case 'for':
+          stmt(s.init);
+          expr(s.condition);
+          stmt(s.update);
+          return list(s.body);
+        case 'while':
+          expr(s.condition);
+          return list(s.body);
+        case 'return':
+          return expr(s.value);
+      }
+    };
+    list(fn.body);
+    this.samplingDepths.set(fn, (known = deepest));
+    return known;
+  }
+
   private mayDiscard(fn: IRFunction): boolean {
     let known = this.discards.get(fn);
     if (known === undefined) {
@@ -1957,6 +2062,9 @@ export class StageEmitter {
   }
 
   protected texture(name: string, args: readonly IRExpr[], result: Type): string {
+    // A helper called with sampling nested in its arguments is a copy of its own (see `nesting`).
+    const depth = args.reduce((m, a) => Math.max(m, this.nesting(a)), 0),
+      copy = (key: string) => (depth ? `${key}@${depth}` : key);
     let k = 0,
       component: string | undefined;
     if (name === 'textureGather' && args[0].type.kind !== 'texture') component = this.value(args[k++]);
@@ -1996,7 +2104,7 @@ export class StageEmitter {
         const n = tt.dimension === '1d' ? 1 : coordDims;
         const ty = t.glslType,
           rt = this.type(depthResult ? vector(4, { kind: 'scalar', name: 'f32' }) : result);
-        const fn = this.generated(`load:${ty}:${tt.dimension}`, (fname) => {
+        const fn = this.generated(copy(`load:${ty}:${tt.dimension}`), (fname) => {
           const size = arrayed ? 'ivec3' : n === 3 ? 'ivec3' : 'ivec2';
           const c = tt.dimension === '1d' ? 'ivec2(p, 0)' : arrayed ? 'ivec3(p, a)' : 'p';
           const pparams = `${n === 1 ? 'int' : `ivec${n}`} p${arrayed ? ', int a' : ''}`;
@@ -2085,7 +2193,7 @@ export class StageEmitter {
           // Pass already-emitted argument values once. Re-emitting IR can consume a discard hoist twice;
           // expanding coordinates in derivatives duplicates effects. The helper also stays inside lazy operands.
           const blend = this.generated(
-            `mip:${name}:${t.glslType}:${offset ?? ''}`,
+            copy(`mip:${name}:${t.glslType}:${offset ?? ''}`),
             (fname) =>
               `vec4 ${fname}(highp ${t.glslType} t, ${coordType} p${parameterExtra}, vec3 f, int n, ivec4 s) { if (f.x < 0.5) return ${hardware}; ${lod}float last = float(n - 1); float z = clamp(clamp(l, f.y, f.z), 0.0, last); float a = floor(z); return mix(${sample('a')}, ${sample('min(a + 1.0, last)')}, z - a); }`,
           );
@@ -2123,7 +2231,7 @@ export class StageEmitter {
         const t = this.combined(texArg, rest[0], false, undefined, true);
         const c = v(rest[1]);
         const fn = this.generated(
-          `clampedge:${t.glslType}`,
+          copy(`clampedge:${t.glslType}`),
           (fname) =>
             `vec4 ${fname}(highp ${t.glslType} t, vec2 c, ivec4 z) { vec2 h = 0.5 / vec2(z.xy); return textureLod(t, clamp(c, h, 1.0 - h), 0.0); }`,
         );
@@ -2133,7 +2241,7 @@ export class StageEmitter {
         return this.textureStore(args);
       case 'textureGather':
       case 'textureGatherCompare':
-        return this.gather(name === 'textureGatherCompare', component, texArg, rest);
+        return this.gather(name === 'textureGatherCompare', component, texArg, rest, copy);
     }
     throw unsupported(`the texture built-in ${name}()`);
   }
@@ -2143,7 +2251,13 @@ export class StageEmitter {
    * level 0, fetched with the sampler's address modes applied by hand, in WGSL's order (x: u0 v1, y: u1 v1, z: u1 v0,
    * w: u0 v0); the comparison form compares each with the reference by the sampler's compare function.
    */
-  private gather(compare: boolean, component: string | undefined, texArg: IRExpr, rest: readonly IRExpr[]): string {
+  private gather(
+    compare: boolean,
+    component: string | undefined,
+    texArg: IRExpr,
+    rest: readonly IRExpr[],
+    copy: (key: string) => string,
+  ): string {
     const tt = texArg.type as TextureType;
     if (tt.dimension !== '2d' && tt.dimension !== '2d_array')
       throw unsupported(`textureGather on a ${tt.dimension} texture (GLSL ES 3.00 cannot fetch texels of cube maps)`);
@@ -2170,7 +2284,7 @@ export class StageEmitter {
             `float ${fn}(float r, float d, int f) { bool p = f == 1 ? false : f == 2 ? r < d : f == 3 ? r == d : f == 4 ? r <= d : f == 5 ? r > d : f == 6 ? r != d : f == 7 ? r >= d : true; return p ? 1.0 : 0.0; }`,
         )
       : '';
-    const fn = this.generated(`gather:${t.glslType}:${c}:${compare}`, (name) => {
+    const fn = this.generated(copy(`gather:${t.glslType}:${c}:${compare}`), (name) => {
       const at = (x: string, y: string) =>
         `texelFetch(t, ${arrayed ? `ivec3(${x}, ${y}, a)` : `ivec2(${x}, ${y})`}, 0).${c}`;
       const texel = (x: string, y: string) => (compare ? `${test}(r, ${at(x, y)}, m.w)` : at(x, y));

@@ -1096,6 +1096,11 @@ export interface PBRMaterial extends GLTFMaterial {
   };
   /** The same mask for picking, which a blended material's holes also pass through. Absent draws as ever. */
   pickMask?: PBRMaterial['castMask'];
+  /**
+   * Moving UVs of the shadow cut-out, as the colour pass moves them (`@margoengine/rigging` MToon UV animation): an
+   * 80-byte uniform, the mask view and its sampler (shared/caster.js `animationCode`). Absent casts as ever.
+   */
+  castAnimation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False when the material's colour pass reads white for vertex colours (`@margoengine/materials` `vertexColors`). */
   vertexAlpha?: boolean;
   /** Use the retained UV-transform frame layout for constructed optional materials. */
@@ -1350,6 +1355,7 @@ interface ShadowCasterRecord {
   instances?: PBRInstances;
   displacement?: PBRMaterial['displacement'];
   opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
+  animation?: PBRMaterial['castAnimation'];
   /** False keeps vertex alpha out of the cut-out, as the colour pass does. Set only on a primitive that cuts. */
   vertexAlpha?: boolean;
   clip?: GPUBufferBinding;
@@ -1451,6 +1457,9 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   const opacity = mask?.opacity;
   if (opacity) value.opacity = opacity;
   else delete value.opacity;
+  const animation = value.cutoff > 0 ? m.castAnimation : undefined;
+  if (animation) value.animation = animation;
+  else delete value.animation;
   if ((m.vertexAlpha === false || opaqueDraw(r)) && value.cutoff > 0) value.vertexAlpha = false;
   else delete value.vertexAlpha;
   // Rows 20 to 23 of `physical`: KHR_materials_diffuse_transmission's factor, then its colour. Its textures are not read.
@@ -1476,6 +1485,7 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
     (!!r.edited ||
       !!displacement ||
       !!opacity ||
+      !!animation ||
       !!clip ||
       p.definition.attributes?.JOINTS_0 !== undefined ||
       !!p.definition.targets?.length ||
@@ -3693,6 +3703,8 @@ export class PBRModel implements EnginePlugin {
               ? { alphaTransform: textureCoordinates(m.maps[0]).transform }
               : {}),
           ...(mask?.opacity ? { opacity: mask.opacity } : {}),
+          // A cut-out whose UVs move (MToon UV animation) is picked where the colour pass cuts it, as it casts.
+          ...(cutoff > 0 && m.castAnimation ? { animation: m.castAnimation } : {}),
           ...((m.vertexAlpha === false || opaqueDraw(r)) && cutoff > 0 ? { vertexAlpha: false } : {}),
           ...(m.displacement ? { displacement: m.displacement } : {}),
           ...(m.surfaceClip ? { clip: m.surfaceClip } : {}),

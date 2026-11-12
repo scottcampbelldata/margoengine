@@ -47,6 +47,11 @@ export interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    animation?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
     vertexAlpha?: boolean;
     bounds?: ArrayLike<number>;
 }
@@ -274,6 +279,11 @@ interface LocalShadowPrimitive {
     };
     displacement?: import('./shared/caster.js').CasterDisplacement;
     opacity?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
+    animation?: {
         readonly buffer: GPUBuffer;
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;

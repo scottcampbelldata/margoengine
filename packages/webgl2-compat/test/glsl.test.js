@@ -466,3 +466,61 @@ ${V}
   assert.match(f, /const bool qon = true;/);
   assert.match(f, /const uint qcount = 3u;/);
 });
+
+/** Helper calls (`_gN(`) whose own arguments reach the same helper, directly or through the functions they call. */
+function selfNestedHelpers(source) {
+  const span = (from) => {
+    let depth = 0;
+    for (let i = from; i < source.length; i++) {
+      if (source[i] === '(') depth++;
+      else if (source[i] === ')' && --depth === 0) return source.slice(from + 1, i);
+    }
+    return '';
+  };
+  const bodies = new Map();
+  for (const m of source.matchAll(/^\S[^\n(]* (\w+)\([^)]*\) \{/gm)) {
+    let depth = 0,
+      i = m.index + m[0].length - 1;
+    const start = i;
+    for (; i < source.length; i++) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) break;
+    }
+    bodies.set(m[1], (bodies.get(m[1]) ?? '') + source.slice(start, i));
+  }
+  const reach = (text, seen = new Set()) => {
+    for (const [, name] of text.matchAll(/\b(_g\d+|q\w+)\(/g))
+      if (!seen.has(name)) {
+        seen.add(name);
+        reach(bodies.get(name) ?? '', seen);
+      }
+    return seen;
+  };
+  const nested = [];
+  for (const m of source.matchAll(/\b(_g\d+)\(/g)) {
+    const args = span(m.index + m[1].length);
+    if (reach(args).has(m[1])) nested.push(`${m[1]}(${args.slice(0, 60)}`);
+  }
+  return nested;
+}
+
+test('a sampling helper is never called inside its own arguments (ANGLE D3D11 reads the inner texture, KB5289b)', () => {
+  const head = `${V}\n@group(0) @binding(0) var a:texture_2d<f32>; @group(0) @binding(1) var b:texture_2d<f32>; @group(0) @binding(2) var s:sampler;
+    fn moved(p:vec2f)->vec2f {return p+0.0*textureSampleLevel(b,s,p,0.0).zw;}`;
+  for (const body of [
+    'textureSampleLevel(a,s,moved(vec2f(0.5)),0.0)',
+    'textureSampleLevel(a,s,vec2f(0.5)+0.0*textureSampleLevel(b,s,vec2f(0.5),0.0).zw,0.0)',
+    'textureSampleLevel(a,s,vec2f(0.5)+0.0*textureSampleLevel(b,s,moved(vec2f(0.5)),0.0).zw,0.0)',
+    'textureLoad(a,vec2i(textureLoad(b,vec2i(0),0).xy*0.0),0)+textureSampleBaseClampToEdge(a,s,moved(vec2f(0.5)))',
+    'textureGather(0,a,s,moved(vec2f(0.5)))',
+  ]) {
+    const source = `${head}\n@fragment fn f()->@location(0) vec4f {return ${body};}`;
+    const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+    assert.match(f.source, /_g\d+\(/, body);
+    assert.deepEqual(selfNestedHelpers(f.source), [], `${body}\n${f.source}`);
+  }
+  // Without nesting, one helper serves every call.
+  const flat = `${head}\n@fragment fn f()->@location(0) vec4f {return textureSampleLevel(a,s,vec2f(0.5),0.0)+textureSampleLevel(b,s,vec2f(0.25),0.0);}`;
+  const helpers = new Set(translateWGSL({ vertex: { source: flat }, fragment: { source: flat } }).fragment.source.match(/\b_g\d+(?=\(highp)/g));
+  assert.equal(helpers.size, 1);
+});

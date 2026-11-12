@@ -164,6 +164,40 @@ test('static redraws an opacity-mapped caster, whose UV rows change on the GPU a
     contact.dispose();
   }
 });
+test('a cut-out whose UVs move (MToon UV animation) cuts at the animated UV and redraws every static frame', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    modules = [],
+    entries = [],
+    create = s.engine.gpu.createShaderModule.bind(s.engine.gpu),
+    group = s.engine.gpu.createBindGroup.bind(s.engine.gpu),
+    full = 4;
+  s.engine.gpu.createShaderModule = (descriptor) => {
+    modules.push(descriptor.code);
+    return create(descriptor);
+  };
+  s.engine.gpu.createBindGroup = (descriptor) => {
+    entries.push(descriptor.entries.map((e) => e.binding));
+    return group(descriptor);
+  };
+  try {
+    contact.add(s.model);
+    assert.equal(s.frame().length, full);
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.animation = { buffer: s.vertex, view: {}, sampler: {} };
+    assert.equal(s.frame().length, full);
+    assert.equal(s.frame().length, full, 'every frame while its cut-out moves (time changes on the GPU alone)');
+    const code = modules.find((c) => c.includes('margoAnimatedUV'));
+    assert.match(code, /textureSample(?:Level)?\(\w+,\w+,margoAnimatedUV\(i\.margoRaw\)/);
+    assert.ok(entries.some((list) => [7, 8, 9].every((b) => list.includes(b))), 'bindings 7 to 9');
+    delete primitive.animation;
+    s.frame();
+    assert.deepEqual(s.frame(), ['plane']);
+  } finally {
+    contact.dispose();
+  }
+});
 test('static re-renders only on transform, source, visibility or option changes', () => {
   const s = scene(),
     contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),

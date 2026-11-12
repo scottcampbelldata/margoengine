@@ -1085,6 +1085,43 @@ struct V { @builtin(position) p: vec4f, @location(0) @interpolate(flat) i: u32 }
     for (const d of draws) d.buffer.destroy();
     return slices;
   },
+  /**
+   * Sampling nested in the coordinates of another sampling call, directly or through a function, reads each texture.
+   * ANGLE's Direct3D 11 back end gives the outer call of a GLSL function with a sampler parameter the inner call's
+   * texture when its arguments call it again, so the layer calls a copy per nesting depth (KB5289b: a moving MToon
+   * cut-out cast a solid shadow on the WebGL2 layer). Texture a is (255, 0, 0, 64), texture b white.
+   */
+  async nestedSampling(device) {
+    const make = (rgba) => {
+      const texture = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: U.TEXTURE_BINDING | U.COPY_DST });
+      device.queue.writeTexture({ texture }, new Uint8Array(rgba), { bytesPerRow: 4 }, [1, 1]);
+      return texture;
+    };
+    const a = make([255, 0, 0, 64]),
+      b = make([255, 255, 255, 255]),
+      sampler = device.createSampler({ minFilter: 'nearest', magFilter: 'nearest' });
+    const bodies = {
+      throughFunction: 'textureSampleLevel(a,s,moved(vec2f(0.5)),0.0)',
+      direct: 'textureSampleLevel(a,s,vec2f(0.5)+0.0*textureSampleLevel(b,s,vec2f(0.5),0.0).zw,0.0)',
+      afterSibling: 'textureSampleLevel(b,s,vec2f(0.5),0.0)*0.0+textureSampleLevel(a,s,moved(vec2f(0.5)),0.0)',
+      load: 'textureLoad(a,vec2i(textureLoad(b,vec2i(0),0).xy*0.0),0)',
+      twoDeep: 'textureSampleLevel(a,s,vec2f(0.5)+0.0*textureSampleLevel(b,s,moved(vec2f(0.5)),0.0).zw,0.0)',
+    };
+    const results = {};
+    for (const [name, body] of Object.entries(bodies))
+      results[name] = await shade(device, { w: 1, h: 1,
+        code: `@group(0) @binding(0) var a:texture_2d<f32>; @group(0) @binding(1) var b:texture_2d<f32>;${name === 'load' ? '' : ' @group(0) @binding(2) var s:sampler;'}
+          ${name === 'load' ? '' : 'fn moved(p:vec2f)->vec2f {return p+0.0*textureSampleLevel(b,s,p,0.0).zw;}'}
+          @fragment fn f()->@location(0) vec4f {return ${body};}`,
+        entries: [
+          { binding: 0, resource: a.createView() },
+          { binding: 1, resource: b.createView() },
+          ...(name === 'load' ? [] : [{ binding: 2, resource: sampler }]),
+        ],
+      });
+    for (const t of [a, b]) t.destroy();
+    return results;
+  },
 };
 
 async function run(device, name, options) {

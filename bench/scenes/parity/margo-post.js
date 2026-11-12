@@ -347,10 +347,26 @@ export const builders = {
     );
   },
 
-  async 'p-color-grading'() {
-    throw new Error(
-      'unsupported: hue rotation (creative PostProcessing has contrast, saturation, gain and lift and tonemap has contrast, but no grading stage rotates hue)',
-    );
+  async 'p-color-grading'(canvas, data, marks) {
+    const { brightness, contrast, saturation, hue } = data.effect;
+    return yard(canvas, data, marks, async (engine) => {
+      const [{ NodePass, inputColor, uniform, vec3, vec4 }, utils] = await Promise.all([
+        import('@margoengine/shader'),
+        import('@margoengine/shader/utils'),
+      ]);
+      // One LDR NodePass after the display transform: add brightness, scale contrast about mid grey, then saturation
+      // (Rec. 709 luminance) and hue (rotation about the grey axis), each a live uniform.
+      const c = inputColor()
+          .rgb.add(uniform(brightness).xxx)
+          .sub(vec3(0.5))
+          .mul(uniform(contrast).xxx)
+          .add(vec3(0.5)),
+        graded = utils.hue(utils.saturation(c, uniform(saturation)), uniform(hue));
+      await stack(engine, [await post.tonemap(), new NodePass(vec4(graded, inputColor().a), { name: 'parity:grading' })]);
+      return {
+        note: `PostStack [Tonemap, NodePass grading {brightness ${brightness}, contrast ${contrast}, saturation ${saturation}, hue ${hue} rad}] (shader/utils saturation and hue).`,
+      };
+    });
   },
 
   async 'p-screen-effects'(canvas, data, marks) {

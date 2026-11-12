@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { opacityCode, solidVertexDepth } from '../../shared/caster.js';
+import { animationCode, opacityCode, solidVertexDepth } from '../../shared/caster.js';
 import { displacementCode } from '../../shared/displacement.js';
 import { sectionShader } from '../../shared/section.js';
 
@@ -28,8 +28,10 @@ export function objectVelocity(
   clipped = false,
   graph?: (code: string, group: number) => string,
   before?: { move: readonly string[]; binding: number },
+  animated = false,
 ): string {
-  let code = `${opacity ? opacityCode(0, 5) : ''}
+  // A moving cut-out (MToon UV animation) reads its alpha map at the animated UV, bound at 9 to 11.
+  let code = `${opacity ? opacityCode(0, 5) : ''}${animated ? animationCode(0, 9) : ''}
 struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f,viewport:vec4f}
 struct ObjectFrame {model:mat4x4f,previousModel:mat4x4f,settings:vec4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1:vec4f' : ''}}
 @group(0) @binding(0) var<uniform> f:ObjectFrame;
@@ -42,7 +44,7 @@ struct Out {@builtin(position) clip:vec4f,@location(4) current:vec4f,@location(0
   o.current=o.clip;o.previous=camera.previous*f.previousModel*old;if(!valid){o.previous.w=-1;}
   ${pbr ? 'o.uv=i.uv;o.alpha=i.color.a;' : ''}return o;}
 ${motion}
-@fragment fn fragment(i:Out)->Motion {${pbr ? 'var uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);' + (transformed ? 'uv=vec2f(dot(f.alphaUV0.xy,uv)+f.alphaUV0.z,dot(f.alphaUV1.xy,uv)+f.alphaUV1.z);' : '') + `let alpha=textureSample(alphaMap,alphaSampler,uv).a*${opacity ? 'margoOpacityAt(i.uv)*' : ''}i.alpha*f.alpha.x;if(alpha<f.alpha.y){discard;}` : ''}
+@fragment fn fragment(i:Out)->Motion {${pbr ? 'var uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);' + (transformed ? 'uv=vec2f(dot(f.alphaUV0.xy,uv)+f.alphaUV0.z,dot(f.alphaUV1.xy,uv)+f.alphaUV1.z);' : '') + `let alpha=textureSample(alphaMap,alphaSampler,${animated ? 'margoAnimatedUV(i.uv)' : 'uv'}).a*${opacity ? 'margoOpacityAt(i.uv)*' : ''}i.alpha*f.alpha.x;if(alpha<f.alpha.y){discard;}` : ''}
   // Both positions use the same perspective interpolation. Fragment position includes raster subpixel snapping,
   // which otherwise appears as false velocity even when the surface has only projection jitter.
   let current=(i.current.xy/i.current.w*vec2f(0.5,-0.5)+0.5)*camera.viewport.xy+camera.viewport.zw;

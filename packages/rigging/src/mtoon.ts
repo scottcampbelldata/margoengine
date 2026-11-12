@@ -42,6 +42,10 @@ interface State {
   legacy?: LegacyMToon;
   values: Float32Array;
   resource?: Resource;
+  /** The moving shadow cut-out of a MASK material with UV animation (see `moveCastCutouts`). */
+  castBuffer?: GPUBuffer;
+  castValues?: Float32Array<ArrayBuffer>;
+  castAnimation?: NonNullable<PBRMaterial['castAnimation']>;
   body: PBRMaterialShading;
   outline: PBRMaterialShading;
 }
@@ -54,6 +58,8 @@ interface Part {
   authored: { base: number[]; emission: number[]; maps: PBRMaterial['maps'] };
 }
 let serial = 0;
+/** Scratch rows of `MToon.transform` for the moving shadow cut-out. */
+const castRows = new Float32Array(12);
 /** Unity's first transparent queue: MToon blend queues (2500 + 0..9 with depth writes, 3000 - 9..0 without) and plain BLEND (3000). */
 const BLEND_QUEUE = 2500;
 /**
@@ -339,6 +345,56 @@ export class MToon implements EnginePlugin {
   onPreUpdate(delta: number): void {
     this.time += delta;
     this.applyExpressions();
+    this.moveCastCutouts();
+  }
+  /**
+   * Shadow cut-outs follow the UV animation (KB5289b). Each cut-out (MASK) material whose UVs move hands its casters
+   * (gltf-pro `castAnimation`, read by shadows and clustered through shared/caster.js `animatedDepth`) an 80-byte uniform,
+   * written once per frame: scroll x, scroll y, rotation and time, the base map's affine rows and the mask's, and the
+   * mask view, so a shadow texel cuts where the colour pass cuts. Static or uncut materials hand nothing.
+   */
+  private moveCastCutouts(): void {
+    const device = this.device;
+    if (!device || this.disposed) return;
+    let evaluated: ReturnType<NonNullable<MToonOptions['expressions']>['evaluate']> | undefined,
+      asked = false;
+    for (const state of this.states) {
+      const d = state.definition,
+        part = this.parts.find((p) => p.state === state);
+      if (
+        !part ||
+        part.body.settings[0] !== 1 ||
+        (d.uvAnimationScrollXSpeedFactor === 0 &&
+          d.uvAnimationScrollYSpeedFactor === 0 &&
+          d.uvAnimationRotationSpeedFactor === 0)
+      )
+        continue;
+      const resource = (state.resource ??= this.resources(state, device));
+      if (!asked) {
+        evaluated = this.options.expressions?.evaluate();
+        asked = true;
+      }
+      const moves = evaluated?.transforms.find((t) => t.material === state.index)?.parts ?? [],
+        out = (state.castValues ??= new Float32Array(32)),
+        rows = castRows;
+      out[0] = d.uvAnimationScrollXSpeedFactor;
+      out[1] = d.uvAnimationScrollYSpeedFactor;
+      out[2] = d.uvAnimationRotationSpeedFactor;
+      out[3] = this.time;
+      // The base map's rows as the colour pass applies them after mtAnimate (its KHR_texture_transform, expressions
+      // already in body.maps), then the mask's as mtTransform(…, 5u) reads them.
+      this.transform(rows, 0, part.body.maps[0] as MToonTextureInfo | undefined, []);
+      out.set(rows.subarray(0, 8), 4);
+      this.transform(rows, 0, d.uvAnimationMaskTexture, moves);
+      out.set(rows.subarray(0, 8), 12);
+      const buffer = (state.castBuffer ??= device.createBuffer({ size: 80, usage: 72 }));
+      device.queue.writeBuffer(buffer, 0, out, 0, 20);
+      const mask = resource.maps[5];
+      if (mask.readView) mask.view = mask.readView() ?? mask.fallback!;
+      if (state.castAnimation?.view !== mask.view || state.castAnimation.buffer !== buffer)
+        state.castAnimation = { buffer, view: mask.view, sampler: mask.sampler };
+      for (const p of this.parts) if (p.state === state) p.body.castAnimation = state.castAnimation;
+    }
   }
   private draw(call: MaterialDrawCall): void {
     const old = this.context,
@@ -698,7 +754,10 @@ export class MToon implements EnginePlugin {
     this.device = engine.gpu ?? undefined;
   }
   private release(): void {
+    for (const p of this.parts) delete p.body.castAnimation;
     for (const state of this.states) {
+      if (state.castBuffer) retire(this.device!, state.castBuffer);
+      state.castBuffer = state.castAnimation = undefined;
       if (state.resource) {
         retire(this.device!, state.resource.buffer);
         for (const m of state.resource.maps) retire(this.device!, m.texture);

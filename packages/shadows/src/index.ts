@@ -47,6 +47,8 @@ import {
   drawCaster,
   opacityDepth,
   opacityEntries,
+  animatedDepth,
+  animationEntries,
   solidVertexDepth,
   staleCaster,
 } from '../../shared/caster.js';
@@ -241,6 +243,11 @@ export interface ShadowPrimitive {
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
    */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Moving UVs of the cut-out (VRMC_materials_mtoon 1.0 UV animation, PBR vertices; shared/caster.js `animationCode`):
+   * the alpha map is read at the animated UV in place of `alphaTransform`'s, as the colour pass reads it.
+   */
+  animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
@@ -308,6 +315,7 @@ interface Draw {
   displacement?: ShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
   opacity?: ShadowPrimitive['opacity'];
+  animation?: ShadowPrimitive['animation'];
 }
 /** Core-mesh casters sharing one geometry, drawn as one instanced draw per cascade (see Shadows.batchable). */
 interface Batch {
@@ -1658,6 +1666,7 @@ export class Shadows implements EnginePlugin {
       !p.displacement &&
       !p.clip &&
       !p.opacity &&
+      !p.animation &&
       !p.alphaTexture &&
       p.alphaTransform === undefined &&
       p.topology !== 'line-list' &&
@@ -1750,11 +1759,14 @@ export class Shadows implements EnginePlugin {
       throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
     const opacity = p.opacity;
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
+    const animation = p.animation;
+    if (animation && p.stride !== 80) throw new RangeError('UV-animated shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
       key =
         (displacement?.key ?? '') +
         (p.stride +
+          (animation ? 1024 : 0) +
           (transform ? 1 : 0) +
           (inst ? 2 : 0) +
           (lines ? 4 : 0) +
@@ -1776,6 +1788,7 @@ export class Shadows implements EnginePlugin {
       if (inst) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
+      if (animation) code = animatedDepth(code, 0);
       if (section) code = clippedDepth(code, 3, material ? 'materialClip' : 'section', hardware);
       const module = this.device!.createShaderModule({ code });
       pipeline = tinted
@@ -1811,6 +1824,7 @@ export class Shadows implements EnginePlugin {
                 { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
                 ...(section ? [{ binding: 3, resource: section }] : []),
                 ...(opacity ? opacityEntries(opacity) : []),
+                ...(animation ? animationEntries(animation) : []),
               ],
             }),
           );
@@ -1831,6 +1845,7 @@ export class Shadows implements EnginePlugin {
         section: section?.buffer,
         displacement,
         opacity,
+        animation,
         displaced: displacementGroup(this.device!, () => made.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);

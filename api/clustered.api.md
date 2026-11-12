@@ -208,6 +208,11 @@ export interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    animation?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
     vertexAlpha?: boolean;
 }
 

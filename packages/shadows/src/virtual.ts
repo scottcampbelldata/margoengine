@@ -27,6 +27,8 @@ import {
   drawCaster,
   opacityDepth,
   opacityEntries,
+  animatedDepth,
+  animationEntries,
   solidVertexDepth,
   staleCaster,
 } from '../../shared/caster.js';
@@ -138,6 +140,7 @@ interface Draw {
   displacement?: ShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
   opacity?: ShadowPrimitive['opacity'];
+  animation?: ShadowPrimitive['animation'];
   /** Stays cached while it stays put: not a `static` registration, whose changes only `shadowVersion` reports. */
   watched: boolean;
   /** What the cached pages hold of it (world matrix, alpha, cutoff, UV set, count, then the alpha transform). */
@@ -745,6 +748,7 @@ export class VirtualShadows implements EnginePlugin {
         displacement: p.displacement,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), p.displacement),
         opacity: p.opacity,
+        animation: p.animation,
         watched: false,
         seen: new Float32Array(28),
         castSerial: -1,
@@ -769,10 +773,12 @@ export class VirtualShadows implements EnginePlugin {
     const inst = p.instances,
       displacement = p.displacement,
       transform = p.alphaTransform,
-      opacity = p.opacity;
+      opacity = p.opacity,
+      animation = p.animation;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
+    if (animation && p.stride !== 80) throw new RangeError('UV-animated shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
       key =
@@ -784,7 +790,8 @@ export class VirtualShadows implements EnginePlugin {
           (section ? 8 : 0) +
           (displacement ? 16 : 0) +
           (opacity ? 32 : 0) +
-          (solid ? 64 : 0));
+          (solid ? 64 : 0) +
+          (animation ? 128 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
@@ -792,6 +799,7 @@ export class VirtualShadows implements EnginePlugin {
       if (inst) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
+      if (animation) code = animatedDepth(code, 0);
       if (section) {
         code = code
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
@@ -822,6 +830,7 @@ export class VirtualShadows implements EnginePlugin {
           { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
           ...(section ? [{ binding: 3, resource: section }] : []),
           ...(p.opacity ? opacityEntries(p.opacity) : []),
+          ...(p.animation ? animationEntries(p.animation) : []),
         ],
       });
     }
