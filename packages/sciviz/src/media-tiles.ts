@@ -114,6 +114,14 @@ class TileClear implements EnginePlugin {
   }
 }
 const active = new WeakSet<object>();
+/**
+ * Smallest edge of a tile's render target, clamped to the device limit. The tile draws into the target's top-left
+ * corner (viewport and scissor), and only that corner is read back. The Radeon 680M draws the same lines with
+ * colours 1 apart in small targets (WebGPU on D3D12: both edges 128 px or less; the WebGL2 layer on ANGLE D3D11
+ * too), so 64 px tiles differed from the whole image in 1,982 of 307,200 values. With every target at least 256 px,
+ * each tile takes the whole image's path on both backends.
+ */
+const MIN_TILE_TARGET = 256;
 
 /**
  * Renders actual off-axis tiles, never an enlarged source bitmap. Captures a fixed camera; the caller keeps layer
@@ -198,7 +206,13 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
           budget = options.maxBytes ?? 256 * 1024 * 1024;
         if (stride * h > budget || stride * h > device.limits.maxBufferSize)
           throw rangeError('Tile readback exceeds maxBytes or the device buffer limit; reduce tileSize', 'sciviz');
-        const texture = device.createTexture({ size: [w, h], format: 'rgba8unorm', usage: 0x10 | 0x01 });
+        const targetWidth = Math.max(w, Math.min(MIN_TILE_TARGET, device.limits.maxTextureDimension2D)),
+          targetHeight = Math.max(h, Math.min(MIN_TILE_TARGET, device.limits.maxTextureDimension2D));
+        const texture = device.createTexture({
+          size: [targetWidth, targetHeight],
+          format: 'rgba8unorm',
+          usage: 0x10 | 0x01,
+        });
         let buffer: GPUBuffer | undefined;
         try {
           buffer = device.createBuffer({ size: stride * h, usage: 0x01 | 0x08 });
@@ -222,8 +236,13 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
                 views: [
                   {
                     camera,
-                    viewport: [0, 0, 1, 1],
-                    scissor: [sx / w, sy / h, Math.max(0, ex - sx) / w, Math.max(0, ey - sy) / h],
+                    viewport: [0, 0, w / targetWidth, h / targetHeight],
+                    scissor: [
+                      sx / targetWidth,
+                      sy / targetHeight,
+                      Math.max(0, ex - sx) / targetWidth,
+                      Math.max(0, ey - sy) / targetHeight,
+                    ],
                     target: { color: texture },
                     id: plugin.name,
                     clear: { color: false },

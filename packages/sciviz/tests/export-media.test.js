@@ -29,10 +29,13 @@ test('physical dimensions round once, with correct inches, millimetres, pixels a
     assert.throws(() => mediaDimensions(640, 480, options), RangeError);
 });
 
-function captureFixture() {
+function captureFixture(maxTextureDimension2D = 4) {
   const created = [],
     removed = [],
-    projections = [];
+    projections = [],
+    textures = [],
+    views = [],
+    copies = [];
   const canvas = {
     width: 8,
     height: 4,
@@ -52,11 +55,11 @@ function captureFixture() {
     return value;
   };
   const gpu = {
-    limits: { maxTextureDimension2D: 4, maxBufferSize: 1e6 },
-    createTexture: () => own(),
+    limits: { maxTextureDimension2D, maxBufferSize: 1e6 },
+    createTexture: ({ size }) => (textures.push(size), own()),
     createBuffer: ({ size }) =>
       own({ mapAsync: async () => {}, getMappedRange: () => new ArrayBuffer(size), unmap() {} }),
-    createCommandEncoder: () => ({ copyTextureToBuffer() {}, finish() {} }),
+    createCommandEncoder: () => ({ copyTextureToBuffer: (...args) => copies.push(args[2]), finish() {} }),
     queue: { submit() {} },
   };
   // As core: plugins join the active scene, removePlugin(name) acts on the active scene, sceneOf finds the owner.
@@ -90,6 +93,7 @@ function captureFixture() {
       owner(active).removePlugin(name);
     },
     render({ views }) {
+      views.push({ viewport: views[0].viewport, scissor: views[0].scissor });
       views[0].camera.update(1, true);
       projections.push(views[0].camera.matrix.slice());
     },
@@ -103,8 +107,46 @@ function captureFixture() {
     vectorAxes: () => [],
     layers: [],
   };
-  return { figure, created, removed, projections };
+  return { figure, created, removed, projections, textures, views, copies };
 }
+
+// Lane N R6 row 18: the Radeon 680M drew 64 px tiles 1 apart from the whole image in 1,982 of 307,200 values, as it
+// draws lines differently into render targets of 128 px or less. Every tile target is now at least 256 px (within
+// the device limit), with the tile drawn into its top-left corner and only that corner read back.
+test('tile targets are at least 256 px, drawn and read back in their top-left corner', async () => {
+  const { figure, textures, views, copies } = captureFixture(8192);
+  const tiles = await Array.fromAsync(renderMediaTiles(figure, { overlays: false, tileSize: 4 }));
+  assert.deepEqual(
+    tiles.map((t) => [t.x, t.y, t.width, t.height, t.pixels.length]),
+    [
+      [0, 0, 4, 4, 64],
+      [4, 0, 4, 4, 64],
+    ],
+  );
+  assert.deepEqual(textures, [
+    [256, 256],
+    [256, 256],
+  ]);
+  for (const view of views) {
+    assert.deepEqual(view.viewport, [0, 0, 4 / 256, 4 / 256]);
+    assert.deepEqual(view.scissor, [0, 0, 4 / 256, 4 / 256]);
+  }
+  assert.deepEqual(copies, [
+    [4, 4],
+    [4, 4],
+  ]);
+  // A tile larger than the minimum keeps its own size, and a device limit below 256 caps the minimum.
+  const big = captureFixture(8192);
+  big.figure.engine.canvas.clientWidth = big.figure.engine.canvas.width = 300;
+  await Array.fromAsync(renderMediaTiles(big.figure, { overlays: false, tileSize: 300 }));
+  assert.deepEqual(big.textures, [[300, 256]]);
+  const small = captureFixture(4);
+  await Array.fromAsync(renderMediaTiles(small.figure, { overlays: false, tileSize: 4 }));
+  assert.deepEqual(small.textures, [
+    [4, 4],
+    [4, 4],
+  ]);
+});
 
 test('tile capture uses actual cropped perspective projection and releases each resource and pass', async () => {
   const { figure, created, removed, projections } = captureFixture();
