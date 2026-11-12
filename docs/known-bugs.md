@@ -788,7 +788,7 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
 - **Also on the Radeon 680M** (Beelink, Chromium through Playwright, `b187ac2d4`, 2026-11-11): instanced 304 B, shadowed
   880 B, basic 328 B, post 1,476 B, dynamic 376 B, the same figures, so it is not one GPU's (list 5 R6 row 15).
 
-### Open: sciviz tiled export differs from the whole image by one level on the Radeon 680M (list 5 R6 row 18)
+### Fixed 2026-11-11: sciviz tiled export differed from the whole image by one level on the Radeon 680M (list 5 R6 row 18)
 
 - **What:** `npm run test:browser:export-media -w packages/sciviz` (`tests/export-media-browser.mjs`) on the Beelink
   (Radeon 680M, WebGPU on D3D12), 2026-11-10 and again on `b187ac2d4`: "Tile seams differ: max 1, changed 0". The
@@ -798,13 +798,19 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   307,200 channel values differ, every one by exactly 1, spread over the line interiors (rows 7 to 230, not at tile
   edges). 64 px and 128 px tiles differ at exactly the same values; 160 px tiles match the whole image exactly; two
   whole-image exports match each other.
-- **Cause (not proven):** each tile draws with the whole-image projection cropped by `cropProjection`
-  (`packages/sciviz/src/media-tiles.ts`); with 64 and 128 px tiles the x scale is 5 or 2.5, with 160 px tiles 2, a
-  power of two that f32 keeps exact. A colour interpolated across a line from rounded clip positions then lands on the
-  other side of a rounding step on this GPU. WebGPU keeps a viewport inside its target, so tiles cannot reuse the
-  whole-image projection through a viewport offset. Not loosened: the check still asks for 0.
-- **Next:** confirm by drawing the 64 px tiles with power-of-two crop scales (tiles of width / 2^k), or interpolate the
-  line colour in a form that does not depend on the clip-space scale.
+- **Cause:** not the crop projection. Every tile size of 128 px or less (32, 40, 48, 64, 80, 96, 100, 128) gave the very
+  same bytes, and 160, 256 and 512 px tiles matched the whole image. Per tile, only tiles with both edges 128 px or
+  less differed (64 x 240 and 160 x 80 matched; 120 x 40 and 62 x 111 did not), and the same tile drawn into a larger
+  texture, viewport and scissor kept to the tile, matched exactly: the driver draws lines into small render targets
+  with colours 1 apart (WebGPU on D3D12). The WebGL2 layer (ANGLE D3D11) does the same for its small targets (up to
+  8,926 values differ).
+- **Fix:** `renderMediaTiles` (`packages/sciviz/src/media-tiles.ts`) gives every tile a render target of at least
+  256 px (within `maxTextureDimension2D`), draws the tile into its top-left corner and reads back only that corner.
+  Tile sizes 32 to 512 now give the whole image's bytes (0 of 307,200) on both backends, and the whole export is
+  unchanged. The exact 0 of the check stays.
+- **Regression:** `packages/sciviz/tests/export-media.test.js` "tile targets are at least 256 px, drawn and read back
+  in their top-left corner" (fails without the fix: 4 x 4 targets) and `tests/export-media-browser.mjs` (max 0,
+  changed 0 on the 680M, both backends).
 
 ### Fixed 2026-11-10: culling readbacks said nothing was drawn on the WebGL2 layer (list 5 R6)
 

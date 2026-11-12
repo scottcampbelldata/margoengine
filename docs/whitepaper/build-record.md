@@ -4962,3 +4962,10 @@ Every row, with what came out, the cause and its state, is in [amd-gpu-hunt.md](
   loads gltf-pro with its first model (129,989 B to 56,264 B before the first frame; budget unchanged). Open: row 17
   (the grass scene saturates, reported), row 18 export-media (known-bugs), row 19 (needs the path tracer, banned here),
   and the dedicated hunts 26, 28, 29, 31, 33 and 34. The list 5 row stays in progress.
+- **Rows 17 and 18 (2026-11-11, session 7):** row 17 by the manager's ruling: the grass check's meadow drops from
+  3,000 to 1,000 clumps, below its footprint (about 71,800 pixels), so 16 blades cover 5.28 times 1 blade (48,097 vs
+  9,105) on both backends; the 3x stays, and a local break (every blade decoded as blade 0) fails it. Row 18
+  export-media: the 680M draws lines into render targets of 128 px or less with colours 1 apart; tiles now draw into
+  targets of at least 256 px, and every tile size from 32 to 512 gives the whole image's bytes on both backends. Row
+  19 stays with the dev PC (the path tracer is banned on this machine); the dedicated hunts stay open, so the list 5
+  row stays in progress.
