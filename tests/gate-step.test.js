@@ -30,6 +30,7 @@ test('the step limit still ends a step that runs too long, with its children', a
   const result = await runStep(node('setTimeout(()=>{},60000)'), { limitMs: 800, waitMaxMs: 60_000 });
   assert.equal(result.code, 124);
   assert.match(result.reason, /past its own limit of 0\.8 s/);
+  // wall-clock: a hang guard, the step must end long before the 60 s command would; it asserts the kill, not a speed
   assert.ok(Date.now() - started < 20_000, 'ended long before the command would have');
 });
 
