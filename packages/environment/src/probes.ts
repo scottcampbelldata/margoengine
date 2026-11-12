@@ -1648,13 +1648,26 @@ export class LightProbes extends ShaderEffect {
     if (this.jobWaiters.length) {
       const waiters = this.jobWaiters;
       this.jobWaiters = [];
-      device.queue.onSubmittedWorkDone().then(
-        () => {
-          for (const waiter of waiters) waiter.resolve();
-        },
-        (error: unknown) => {
+      // The waiters leave jobWaiters here, out of reach of dispose() and release(): settle them by the state now.
+      const settle = (done: () => void) => {
+        if (this.disposed) {
+          const error = new MargoError('disposed', `${this.name} was disposed before the refresh finished`);
           for (const waiter of waiters) waiter.reject(error);
-        },
+        } else if (this.gpu !== device) {
+          // The device was restored before the GPU finished: the radiance went with it, so the probe captures again.
+          this.refreshWaiters[j].push(...waiters);
+          if (!this.refreshQueue.includes(j)) this.refreshQueue.push(j);
+        } else done();
+      };
+      device.queue.onSubmittedWorkDone().then(
+        () =>
+          settle(() => {
+            for (const waiter of waiters) waiter.resolve();
+          }),
+        (error: unknown) =>
+          settle(() => {
+            for (const waiter of waiters) waiter.reject(error);
+          }),
       );
     }
   }

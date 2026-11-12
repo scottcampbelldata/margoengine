@@ -581,3 +581,44 @@ test('disposing during a readback rejects it as disposed, not with the aborted m
   await assert.rejects(copy, (error) => error.code === 'disposed');
   d.createBuffer = createBuffer;
 });
+
+
+test('a refresh whose prefilter was submitted rejects on dispose and restarts on a device restore before the GPU finishes', async () => {
+  // Regression: finishJob() handed the waiters to onSubmittedWorkDone(), out of reach of dispose() and release(), so
+  // the promise resolved after dispose() (the doc says it rejects) and after a device restore that lost the radiance.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const h = harness({});
+  const disposed = h.probes.refresh(0);
+  for (let i = 0; i < 6; i++) h.render(); // the sixth face submits the prefilter; the GPU has not finished
+  h.probes.dispose();
+  await assert.rejects(disposed, (error) => error.name === 'MargoError' && error.code === 'disposed');
+
+  const r = harness({});
+  let done = false;
+  const restarted = r.probes.refresh(0).then(() => {
+    done = true;
+  });
+  for (let i = 0; i < 6; i++) r.render();
+  const fresh = mockGPU();
+  fresh.encoder.finish = () => ({});
+  Object.assign(fresh.device, {
+    createCommandEncoder: () => fresh.encoder,
+    queue: Object.assign(fresh.device.queue, { onSubmittedWorkDone: async () => undefined }),
+  });
+  r.engine.gpu = fresh.device;
+  fresh.record(() => r.probes.onDeviceRestored(r.engine));
+  await settle();
+  assert.equal(done, false, 'the radiance it waited for went with the old device');
+  const frame = context(fresh, { shader: coreShader }),
+    run = passes(r.probes),
+    logs = Array.from({ length: 6 }, (_, i) =>
+      fresh.record(() => {
+        frame.begin(i);
+        run(frame.c);
+      }),
+    );
+  assert.deepEqual(logs.map(computePasses), [0, 0, 0, 0, 0, 1], 'captured again whole on the new device');
+  await restarted;
+  assert.ok(activation(logs[5], 0), 'lit again after the recapture');
+  r.probes.dispose();
+});
