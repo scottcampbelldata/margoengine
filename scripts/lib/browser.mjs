@@ -280,6 +280,12 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
     wsEndpoint: ready.wsEndpoint,
     process: child,
     async end(children) {
+      // A host that has already exited cannot be written to: say so, instead of a bare `write EPIPE` (KB-NA1b).
+      if (gone || child.exitCode !== null || child.signalCode !== null || child.stdin.destroyed || !child.stdin.writable)
+        throw Object.assign(
+          new Error(`browser host ${child.pid} had already exited before the end request (${child.signalCode ?? child.exitCode ?? 'stdin closed'})`),
+          { code: 'HOST_GONE' },
+        );
       child.stdin.write(`${JSON.stringify({ end: true, children })}\n`);
       const answer = await next();
       if (!answer?.terminated) throw new Error(`browser host ${child.pid} did not acknowledge the end: ${JSON.stringify(answer)}`);

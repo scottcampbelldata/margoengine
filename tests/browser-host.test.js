@@ -227,3 +227,24 @@ test('startHost: a launch that fails in the host rejects with its message, and a
   await assert.rejects(host.end([]), { code: 'HOST_GONE' });
   host.release();
 });
+
+test('startHost: end() on a host that already exited fails with a coded HOST_GONE, not a bare write EPIPE (KB-NA1b)', { timeout: 30_000 }, async () => {
+  const host = await startHost({ name: 'gone before end' }, { hostPath: fixture });
+  const exit = new Promise((resolve) => host.process.once('exit', resolve));
+  host.process.kill('SIGKILL');
+  await exit;
+  await assert.rejects(host.end([]), (error) => {
+    assert.equal(error.code, 'HOST_GONE');
+    assert.match(error.message, new RegExp(`browser host ${host.process.pid} .*exited before the end request`));
+    return true;
+  });
+  host.release();
+});
+
+test('startHost: end() on a host whose stdin is closed fails with HOST_GONE (KB-NA1b)', { timeout: 30_000 }, async () => {
+  const host = await startHost({ name: 'stdin closed' }, { hostPath: fixture });
+  host.process.stdin.destroy();
+  await assert.rejects(host.end([]), { code: 'HOST_GONE' });
+  host.process.kill('SIGKILL');
+  host.release();
+});
