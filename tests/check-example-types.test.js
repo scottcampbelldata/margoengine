@@ -127,10 +127,10 @@ test('check:merge runs the example projects a change can reach, all of them for 
   assert.ok(ids(['packages/sciviz/src/index.ts']).includes('examples'));
   // Cameras now has 14 affected workspaces and correctly crosses the existing 12-package safety threshold.
   assert.deepEqual(ids(['packages/cameras/src/index.ts']), ['all']);
-  assert.deepEqual(
-    ids(['packages/dof/src/index.ts']).filter((id) => id === 'examples'),
-    [],
-  );
+  // Every workspace package is now imported by some example (the all-entries project and test-pages/product-viewer.ts
+  // import dof), so no real package is left to pin the "imports nothing in examples/ runs none" case; the synthetic
+  // exampleScopes cases below pin it, and dof pins the reach.
+  assert.ok(ids(['packages/dof/src/index.ts']).includes('examples'));
   // The check's own files, and anything that runs everything, run every project.
   assert.deepEqual(ids(['scripts/check-example-types.mjs']), ['all']);
   assert.deepEqual(ids(['packages/core/src/engine.ts']), ['all']);
