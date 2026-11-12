@@ -202,7 +202,7 @@ engine.start();
 
 `parseAnimatedMargo(engine, bytes, {signal})` reads local bytes, and `margoToGLTF(bytes)` gives the glTF 2.0 document over the file's own bytes without a GPU. The static `loadMargo` refuses an animated file and names this entry. Real Blender 5.2.3 output played this way stays within 1.1e-6 m of Blender's own deformed vertices at every frame of three clips (CPU, by glTF rules) and within 1e-4 m on the GPU (claim LIM-389).
 
-The exporter refuses, by object name: other modifiers on an animated mesh (apply them first), envelopes, Preserve Volume or a mask group on the Armature modifier, a vertex without deform-bone weight, more than eight influences, absolute, muted or vertex-group-masked shape keys, and instanced animated meshes. Object-level animation is not exported (bones only); the export is at the scene's current frame for everything else.
+The exporter refuses, by object name: other modifiers on an animated mesh (apply them first), envelopes, Preserve Volume or a mask group on the Armature modifier, a vertex without deform-bone weight, more than eight influences, absolute, muted or vertex-group-masked shape keys, and instanced animated meshes. Object-level animation is not exported here (bones only); the export is at the scene's current frame for everything else. The export option Object actions and hierarchy (`object_animation=True`, read by `@margoengine/blender/objects`) exports object actions too, and a collection instance there hangs under its instancer, so animating the instancer or its parents moves it (docs/limits.md).
 
 ## Components: colliders, bodies, lights and scripts from custom properties
 

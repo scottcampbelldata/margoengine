@@ -121,6 +121,36 @@ if (process.env.MARGO_BLENDER) {
     ],
     { stdio: "inherit" },
   );
+  // Object actions: a collection instance follows its animated instancer and pivot (KB5247a); a fresh export's own
+  // Blender truth must match the committed one, which packages/blender/tests/objects.test.js checks the file against.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_instance_actions.py",
+      "--",
+      "test-results/blender/instances",
+    ],
+    { stdio: "inherit" },
+  );
+  {
+    const { decodeMargoObjects } = await import("../packages/blender/dist/objects.js");
+    const { objectWorlds } = await import("../packages/blender/tests/object-truth.js");
+    const asset = decodeMargoObjects(await readFile("test-results/blender/instances/instances.margo"));
+    const truth = JSON.parse(await readFile("test-results/blender/instances/instances-truth.json", "utf8"));
+    let worst = 0;
+    for (const clip of asset.document.animations)
+      for (const [frame, worlds] of truth.clips[clip.name].entries()) {
+        const actual = objectWorlds(asset, clip, frame / 24);
+        for (const [name, matrix] of Object.entries(worlds))
+          matrix.forEach((value, i) => (worst = Math.max(worst, Math.abs(value - actual.get(name)[i]))));
+      }
+    assert.ok(worst < 3e-6, `fresh instance export differs from Blender by ${worst}`);
+  }
   // Lights and cameras: a fresh Blender export carries the committed fixture's tags and Blender's same numbers.
   execFileSync(
     process.env.MARGO_BLENDER,

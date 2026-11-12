@@ -5,6 +5,11 @@ from mathutils import Matrix
 def hierarchy(context, node_of):
     """Keep exported object ancestors (including hidden empties) and return roots plus sampling owners."""
     objects = node_of.objects
+    # A generated instance hangs under the object that instances it, so that object's action and its ancestors' move
+    # it (KB5247a); the instancer needs a node even when it draws nothing itself.
+    for _, instancer, _ in node_of.instances:
+        if instancer.as_pointer() not in objects:
+            node_of(instancer, None, Matrix.Identity(4))
     # An exported child still needs its hidden/non-mesh ancestors to keep its pivot and animation.
     for obj, _ in list(objects.values()):
         parent = obj.parent
@@ -46,7 +51,13 @@ def hierarchy(context, node_of):
         else:
             roots.append(node["id"])
         owners.append(("object", obj, node["id"], local))
-    # Generated geometry instances retain their evaluated placement. They are distinct nodes, not object owners.
+    # Generated instances keep their placement relative to their instancer, as evaluated at export: what is inside
+    # the instanced collection cannot be animated (the exporter refuses it), so that placement does not change.
+    for node, instancer, placed in node_of.instances:
+        t, r, s = node_of.trs(instancer, None, world(instancer).inverted() @ placed)
+        node.update(translation=t, rotation=r, scale=s)
+        objects[instancer.as_pointer()][1].setdefault("children", []).append(node["id"])
+    # Generated instances are distinct nodes, not object owners.
     children = {child for node in node_of.nodes for child in node.get("children", [])}
     roots += [node["id"] for node in node_of.nodes if node["id"] not in children and node["id"] not in roots]
     return roots, owners

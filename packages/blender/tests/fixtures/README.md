@@ -13,6 +13,11 @@
 - `bake.margo`: exported for this project by Blender 5.2.3 LTS from `tools/blender-addon/tests/blender_bake.py`: a
   procedural Principled material and a Diffuse BSDF baked to 32 x 32 images at export, beside a direct Principled
   plane (Apache-2.0, as this repository). Regenerate the same way and copy the file here.
+- `instances.margo` and `instances-truth.json`: exported for this project by Blender 5.3.0 Beta (official build from
+  blender.org, run as a black box) from `tools/blender-addon/tests/blender_instance_actions.py`: a collection instance
+  under an animated instancer whose parent pivot is animated too; the JSON holds Blender's own evaluated worlds of the
+  instance and the instancer per clip and frame (KB5247a; Apache-2.0, as this repository). Regenerate the same way and
+  copy both files here.
 - `scene.margo` and `scene-truth.json`: exported for this project by Blender 5.2.3 LTS from
   `tools/blender-addon/tests/blender_scene.py`: a floor and a cube lit by a sun, a spot and a point light, with a
   perspective scene camera and an orthographic one; the JSON holds Blender's own light directions and camera

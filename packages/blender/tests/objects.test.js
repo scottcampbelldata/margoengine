@@ -33,3 +33,26 @@ test('object actions keep parents, hidden empty pivots, constraints, parent inve
   assert.ok(compared >= 1728);
   assert.ok(worst < 3e-6, `largest world matrix error from Blender ${worst}`);
 });
+
+// KB5247a: a collection instance follows its animated instancer and the instancer's animated pivot. Before, its node
+// kept the placement of the frame shown at export, as a root, so neither action moved it.
+test('a collection instance follows its instancer and pivot through object actions', async () => {
+  const asset = decodeMargoObjects(await readFile(new URL('./fixtures/instances.margo', import.meta.url))),
+    expected = JSON.parse(await readFile(new URL('./fixtures/instances-truth.json', import.meta.url), 'utf8'));
+  assert.deepEqual(asset.document.animations.map((a) => a.name).sort(), Object.keys(expected.clips).sort());
+  let worst = 0,
+    compared = 0;
+  for (const clip of asset.document.animations)
+    for (const [frame, worlds] of expected.clips[clip.name].entries()) {
+      const actual = objectWorlds(asset, clip, frame / 24);
+      for (const [name, matrix] of Object.entries(worlds)) {
+        assert.ok(actual.get(name), name);
+        matrix.forEach((value, i) => {
+          worst = Math.max(worst, Math.abs(value - actual.get(name)[i]));
+          compared++;
+        });
+      }
+    }
+  assert.equal(compared, 2 * 9 * 2 * 16);
+  assert.ok(worst < 3e-6, `largest world matrix error from Blender ${worst}`);
+});

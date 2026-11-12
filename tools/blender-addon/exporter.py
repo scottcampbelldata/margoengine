@@ -391,6 +391,8 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
 
         def __init__(self):
             self.nodes, self.meshes, self.convert, self.objects = nodes, {}, convert, {}
+            # Generated instances with the object that instances them and their converted world (KB5247a).
+            self.instances = []
 
         def trs(self, obj, bone, world):
             translation, rotation, scale = world.decompose()
@@ -400,7 +402,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
                 raise ValueError(f"{label}: shear/singular transforms must be applied before export")
             return list(translation), [rotation.x, rotation.y, rotation.z, rotation.w], list(scale)
 
-        def __call__(self, obj, bone, world, mesh=None, instance=""):
+        def __call__(self, obj, bone, world, mesh=None, instance="", instancer=None):
             if object_animation and bone is None and not instance:
                 world = Matrix.Identity(4)  # The hierarchy pass validates local TRS; a valid world may have shear.
             translation, rotation, scale = self.trs(obj, bone, world)
@@ -413,6 +415,8 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
             nodes.append(node)
             if bone is None and not instance:
                 self.objects[obj.as_pointer()] = (obj, node)
+            elif instance and instancer is not None:
+                self.instances.append((node, instancer, world))
             if bone is None and lightmap_records and obj.as_pointer() in lightmap_records:
                 lighting = lightmap_records[obj.as_pointer()]
                 maximum = max(1.0, float(lighting[..., :3].max()))
@@ -559,7 +563,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
                 cached[data_key] = mesh_index
             finally:
                 obj.to_mesh_clear()
-        node_of(obj.original, None, convert(instance.matrix_world), mesh=mesh_index, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+        node_of(obj.original, None, convert(instance.matrix_world), mesh=mesh_index, instance=tuple(instance.persistent_id) if instance.is_instance else "", instancer=instance.parent.original if instance.is_instance and instance.parent else None)
     if lights_cameras:
         for instance in depsgraph.object_instances:
             obj = instance.object
@@ -575,7 +579,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
             # axes change (basis @ M); the mesh conversion basis @ M @ basis^-1 would turn its local axes too.
             world = basis @ instance.matrix_world
             world.translation *= unit_scale
-            node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+            node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "", instancer=instance.parent.original if instance.is_instance and instance.parent else None)
             node["extras"]["margo"]["properties"] = {**own, **tags}
     extra = GeometryData(unit_scale)
     if curves:
@@ -592,7 +596,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
                 world = Matrix.Scale(unit_scale, 4) @ basis @ instance.matrix_world
             else:
                 world = convert(instance.matrix_world)
-            node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+            node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "", instancer=instance.parent.original if instance.is_instance and instance.parent else None)
             node.update(added)
     if (extra.curves or extra.points or extra.volumes) and (moving or object_animation):
         raise ValueError("Curves, point clouds and volumes cannot be exported with skins, shape keys or actions yet; "
