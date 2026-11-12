@@ -1,5 +1,21 @@
 # Known bugs and unverified features
 
+### Open 2026-11-12: margoengine.com does not serve the pages the packages and docs link to (lane D1)
+
+- **Repro:** `curl -sIL https://margoengine.com/errors` answers 404, and so do `/llms.txt`, `/llms-full.txt`,
+  `/llms/docs/csp.md` and `/bench/`; `/catalog/` redirects to the home page. The demo pages (`/night-citadel/`,
+  `/demos/...`) answer 200.
+- **Who links there:** every coded error message with a help link (`packages/shared/errors.js` appends
+  `see https://margoengine.com/errors#<anchor>`; `packages/shared/gpu.js` too), the `margoengine-mcp --help` text,
+  `site/llms.txt` and docs pages such as docs/ai-tools.md and docs/benchmarking.md.
+- **Cause:** the live site is a landing page plus the demos; the output of `npm run build:site` (which writes
+  `errors.html`, `llms.txt`, `llms-full.txt`, `llms/`, `catalog/` and `bench/`) is not what is deployed. No code path is
+  wrong; the deployment lags the repository.
+- **Done here:** the README, docs/start-here.md, docs/README.md and docs/ai-tools.md now point at the repository copies
+  (`site/llms.txt`, `site/llms-full.txt`, docs/conventions.md#errors, `npm run catalog`).
+- **Needs Scott:** deploy the `npm run build:site` output to margoengine.com, or move the help-link base in
+  `packages/shared/errors.js` to a page that is live.
+
 ### Open 2026-11-12: sciviz bricks weight-model bound depends on the GPU's sin (AMD GPU hunt R7 row 42)
 
 - **Repro:** on the Beelink (Radeon 680M), `node packages/sciviz/tests/bricks-browser.mjs` (sciviz `test:browser`

@@ -3,8 +3,9 @@
 Margo has one benchmark tool: `npm run bench`. It measures bytes, startup, rendering, objects, kernel maths, glTF,
 loaders, assemblies, voxels, physics, memory and React. Every run passes the same quiet-machine gate and repeats each case. It
 records the machine it ran on and writes a versioned JSON result with a readable report. It can compare that run with
-an earlier run or commit and fails when something got slower. The same scenes run in the browser at
-[margoengine.com/bench/](https://margoengine.com/bench/), so anyone can measure their own machine with the code we use.
+an earlier run or commit and fails when something got slower. The same scenes run in a browser page,
+[the browser runner](#the-browser-runner), so anyone can measure their own machine with the code we use. Its public
+address, margoengine.com/bench/, is not live yet: the site build that holds it is not deployed.
 
 - [Running it](#running-it)
 - [Suites](#suites)

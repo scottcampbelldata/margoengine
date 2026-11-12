@@ -279,7 +279,7 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Browser | Status |
 | --- | --- |
-| Chrome and Edge (desktop) | Tested. The automated browser suites run in Chromium on real GPUs: an NVIDIA RTX A6000 and an Intel Arc 140V on Windows 11, and an AMD Radeon 680M that ran every package GPU suite on WebGPU and on the WebGL2 layer. Chrome on an Apple M6 Mac mini (Metal) runs some checks by script. |
+| Chrome and Edge (desktop) | Tested. The automated browser suites run in Chromium on real GPUs: an NVIDIA RTX A6000 and an Intel Arc 140V on Windows 11, and an AMD Radeon 680M that ran every package GPU suite on WebGPU and on the WebGL2 layer. Every package's tests also ran on an Apple M6 Mac mini (Metal) in Chrome and Playwright WebKit, with the findings in [docs/known-bugs.md](docs/known-bugs.md). |
 | Firefox | Partly tested. Playwright Firefox 157 on Windows runs the core, stage and WebGL2 layer GPU suites, on WebGPU and on the layer. Open Firefox bugs are in [docs/known-bugs.md](docs/known-bugs.md). |
 | Safari on macOS | Checked by hand: Safari 27.2 on an Apple M6 draws five real models as Edge does. No suite runs in Safari itself. |
 | Safari on iPhone | Demos run, checked by hand only. |

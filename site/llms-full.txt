@@ -285,7 +285,7 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Browser | Status |
 | --- | --- |
-| Chrome and Edge (desktop) | Tested. The automated browser suites run in Chromium on real GPUs: an NVIDIA RTX A6000 and an Intel Arc 140V on Windows 11, and an AMD Radeon 680M that ran every package GPU suite on WebGPU and on the WebGL2 layer. Chrome on an Apple M6 Mac mini (Metal) runs some checks by script. |
+| Chrome and Edge (desktop) | Tested. The automated browser suites run in Chromium on real GPUs: an NVIDIA RTX A6000 and an Intel Arc 140V on Windows 11, and an AMD Radeon 680M that ran every package GPU suite on WebGPU and on the WebGL2 layer. Every package's tests also ran on an Apple M6 Mac mini (Metal) in Chrome and Playwright WebKit, with the findings in [docs/known-bugs.md](docs/known-bugs.md). |
 | Firefox | Partly tested. Playwright Firefox 157 on Windows runs the core, stage and WebGL2 layer GPU suites, on WebGPU and on the layer. Open Firefox bugs are in [docs/known-bugs.md](docs/known-bugs.md). |
 | Safari on macOS | Checked by hand: Safari 27.2 on an Apple M6 draws five real models as Edge does. No suite runs in Safari itself. |
 | Safari on iPhone | Demos run, checked by hand only. |
@@ -10273,6 +10273,22 @@ The same holds for glTF models with BLEND parts (KB1824, 2026-11-11): Khronos Gl
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
+
+### Open 2026-11-12: margoengine.com does not serve the pages the packages and docs link to (lane D1)
+
+- **Repro:** `curl -sIL https://margoengine.com/errors` answers 404, and so do `/llms.txt`, `/llms-full.txt`,
+  `/llms/docs/csp.md` and `/bench/`; `/catalog/` redirects to the home page. The demo pages (`/night-citadel/`,
+  `/demos/...`) answer 200.
+- **Who links there:** every coded error message with a help link (`packages/shared/errors.js` appends
+  `see https://margoengine.com/errors#<anchor>`; `packages/shared/gpu.js` too), the `margoengine-mcp --help` text,
+  `site/llms.txt` and docs pages such as docs/ai-tools.md and docs/benchmarking.md.
+- **Cause:** the live site is a landing page plus the demos; the output of `npm run build:site` (which writes
+  `errors.html`, `llms.txt`, `llms-full.txt`, `llms/`, `catalog/` and `bench/`) is not what is deployed. No code path is
+  wrong; the deployment lags the repository.
+- **Done here:** the README, docs/start-here.md, docs/README.md and docs/ai-tools.md now point at the repository copies
+  (`site/llms.txt`, `site/llms-full.txt`, docs/conventions.md#errors, `npm run catalog`).
+- **Needs Scott:** deploy the `npm run build:site` output to margoengine.com, or move the help-link base in
+  `packages/shared/errors.js` to a page that is live.
 
 ### Open 2026-11-12: sciviz bricks weight-model bound depends on the GPU's sin (AMD GPU hunt R7 row 42)
 

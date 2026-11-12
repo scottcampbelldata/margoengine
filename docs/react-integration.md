@@ -42,7 +42,9 @@ import * as Margo from '@margoengine/react';
 </Margo.Canvas>
 ```
 
-Making a bare `<mesh>` work with no import takes a custom reconciler. That was not added.
+Making a bare `<mesh>` work with no import takes a custom reconciler. That was not added. Since 2026-11-07 a file
+that sets `jsxImportSource` to `@margoengine/react` gets bare tags without one: React's own runtime swaps a known
+tag for its component (see [Lowercase tags and extend](../packages/react/README.md#lowercase-tags-and-extend) in the package README).
 
 ## What stays put
 
