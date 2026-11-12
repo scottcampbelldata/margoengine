@@ -235,6 +235,17 @@ the d-pad move through all rows, scrolling and building as they go. Set `count` 
 call `refresh()` when their data changes. A focused row that scrolls out of the built range gives up the focus.
 The screen reader mirror reads it as a listbox of the built rows, each telling its place in the whole list.
 
+## Forms, text fields, images, keyboard, languages and a layout editor
+
+Six more entries are separate imports, so a screen that does not use them does not load them.
+
+- `@margoengine/ui/input` has `TextInput` (single line, or a password that draws one bullet per grapheme) and `TextArea` (several lines). Options: `value`, `placeholder`, `type` (`'text'` or `'password'`), `readOnly`, `maxLength`, `autocomplete` (default `'off'`), `spellcheck`, `required`, `invalid`, `onChange` and `onSubmit`. The canvas paints the text and caret, while a real DOM control that `attachTextInputs(ui, target)` mounts gives you the browser's selection, undo, mobile keyboards and IME. Call `attachTextInputs` after the `UiRenderer`; it returns a function that detaches it.
+- `@margoengine/ui/forms` has `Select`, `Checkbox` (a `Toggle` drawn as a checkbox), `RadioGroup`, `Tabs` and `ColorPicker`. `Select`, `RadioGroup` and `Tabs` take `options`, a list of `{label, value, disabled}` with unique string values, plus `value` and `onChange`; `Tabs` options also carry the `panel` widget that shows while its tab is chosen. `ColorPicker` has HSV, RGB and alpha sliders and a hex field, takes `value` as `#rrggbb` or `#rrggbbaa` (default `#ffffff`) and calls `onChange`. `attachFormsMirror(ui, target)` adds the radio, tab and select ARIA states to the accessibility mirror; attach it after the `UiRenderer`.
+- `@margoengine/ui/image` has `ImageTexture` (decode a URL with cancellation, or copy a decoded image, video frame or canvas) and the `Image` widget. `Image` options: `texture`, `source` (a pixel rectangle), `fit` (`contain` by default, `cover` crops, `fill` stretches), `slice` and `borderScale` for nine-slice borders, and `tint`.
+- `@margoengine/ui/keyboard` has `VirtualKeyboard`, a panel for headsets and touch screens that types into the focused `TextInput` of the same `Ui`. Options: `target`, `rows` (a QWERTY layout with numbers, punctuation and editing keys by default) and `keyWidth`, the minimum width of a normal key (44 UI pixels by default).
+- `@margoengine/ui/i18n` has `Localization`: message tables per locale with `{name}` substitutions and plural forms, a fallback chain, text direction taken from the locale's script (or set with `directions`), and `missing: 'error'` to throw on a missing key instead of showing the key. `bind` ties a translation to a widget, so a locale change reflows the layout on the next frame.
+- `@margoengine/ui/editor` has `LayoutDocument` (a markup layout with undo and redo, validated before each edit commits, saved as a project string) and `LayoutEditor`, a browser editor over it (options `ui`, `canvas`, `actions` and `signal`). Action handlers named in the markup come only from the options you pass, never from the saved project.
+
 ## Theming
 
 `themes.dark` is the default (`themeForPreferences()` picks high contrast, light or dark from the user's settings).

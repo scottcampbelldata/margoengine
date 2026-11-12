@@ -193,6 +193,15 @@ enter.onclick=async()=>{
 
 Without the browser's layer support `XRLayers.attach` and each layer throw a coded error that names the feature to ask for.
 
+## Smooth movement, skinned hands, AR extras and performance
+
+Four more entries are separate imports, so a page that does not use them does not load them. Each attaches to a running session and stops when the session ends or its `AbortSignal` aborts.
+
+- `@margoengine/xr/locomotion` adds `SmoothLocomotion.attach(xr, options)`: thumbstick walking and smooth turning next to the teleport and snap turn of `Locomotion`, with a vignette that fades in while you move (`vignette: false` turns it off; `comfort` reads its strength). Options and defaults: `speed` 2 (metres per second), `turnSpeed` `Math.PI / 2` (radians per second), `moveHand` `'left'`, `turnHand` `'right'`, `direction` `'head'`, `deadZone` 0.15, `axes` `[2, 3]`, `fieldOfView` `Math.PI / 2`, `feather` 0.2 and `fade` 0.15. Set `enabled = false` to pause it.
+- `@margoengine/xr/hands` adds `SkinnedHands.create(xr, {left, right}, options)`, which drives your own skinned glTF hand models from the 25 tracked joints (`HAND_JOINT_NAMES` lists them). It keeps each asset's inverse binds and weights and loads `@margoengine/animation` when you call it. `jointNames` maps WebXR joint names to your node names when they differ from the generic-hand profile names. Pass at least one model, and not the same model for both hands.
+- `@margoengine/xr/ar-extra` adds `DOMOverlay` (with `domOverlaySessionOptions(root)` for the session request), `ImageTracking` (with `imageTrackingSessionOptions(images)`), `MeshDetection` for the room's triangle meshes, which can draw them as Margo meshes through its `show` option, and `PersistentAnchors`, whose handles belong to the browser and the origin until you delete them. Each needs its WebXR feature in the session and rejects with an `unsupported` error naming what is missing.
+- `@margoengine/xr/performance` adds `performanceSessionOptions({framebufferScale, cameraAccess})` for the session request and `XRPerformance.attach(xr, {fixedFoveation, signal})` for a live foveation setting (0 to 1) that is restored when the session ends or the signal aborts. Camera images are a borrowed WebGL texture, valid only inside their XR frame; native WebGPU raw camera access rejects with the capability reason.
+
 ## Interaction toolkit
 
 `Interaction.attach(xr, { grabbables, sockets, panels })` from `@margoengine/xr/interaction` handles the usual hand and controller interactions. Squeeze (or pinch, on a tracked hand) near an object or with the ray on it to pick it up; it follows the grip as you hold it. Let go over a socket that fits and it snaps in; otherwise `onRelease` gets its speed for a throw. Point the ray at a panel and press the trigger (or pinch) for `down` and `up`, with `u` and `v` from the panel's top left. The arrays stay live: push or remove items at any time.
