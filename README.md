@@ -3,13 +3,12 @@
 A small WebGPU engine for the web, with a Rust/Wasm core.
 
 [![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/margoengine.svg)](https://www.npmjs.com/package/margoengine)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 ![A textured crate and a ball with shadows on a checkered floor, rendered by Margo Engine](docs/images/quickstart.webp)
 
 **[Build something in 5 minutes: a textured, lit scene with shadows and picking](#build-something-in-5-minutes)** ·
-[Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
+[Start here: guides by goal](docs/start-here.md) · [Demos](#demos) ·
 [Coming from three.js](docs/from-threejs.md)
 
 The core and the stage together are 24,848 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
