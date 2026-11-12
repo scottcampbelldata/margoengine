@@ -759,7 +759,18 @@ export async function acquire({
   const take = (file) => {
     unmark();
     const holderPipe = startHeartbeat(file, token, Date.now() + maxMinutes * MIN);
+    // The heartbeat ends a holder that overruns with taskkill /F (exit code 1) and writes only gpu-lock-timeouts.log, so
+    // a suite that called acquire() itself once ended after 916 s with no word of why (AMD GPU hunt row 34). Its own
+    // output names the limit first. A holder stuck in a synchronous loop cannot print this; the log line still stands.
+    const notice = setTimeout(() => {
+      const grace = Number(process.env.MARGO_GPU_GRACE_MS ?? 15_000) / 1000;
+      log(
+        `gpu-lock: ${owner} reached its ${maxMinutes} min hold limit; the lock's heartbeat ends this process tree in ${grace} s (gpu-lock-timeouts.log). Work that needs longer asks for a larger max`,
+      );
+    }, maxMinutes * MIN);
+    notice.unref();
     const release = () => {
+      clearTimeout(notice);
       if (read(file)?.token === token) rmSync(file, { force: true });
       holderPipe.destroy();
       if (existsSync(lockDir)) {

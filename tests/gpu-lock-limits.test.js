@@ -228,6 +228,40 @@ test('a dead holder whose pid a stranger now has: its entry is dropped and the s
   }
 });
 
+// Regression (AMD GPU hunt row 34): biomes flythrough-check called acquire({ max: 15 }), ran past it, and the heartbeat
+// ended it with taskkill /F: exit code 1 after 916 s and not a line of output saying why. The holder names the limit.
+test('a holder that called acquire() itself and runs past its limit says so on its own output before it is ended', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
+    lock = join(folder, 'gpu.lock');
+  let child;
+  try {
+    const slow =
+      "const m = await import('./scripts/gpu-lock.mjs'); await m.acquire({ owner: 'slow-suite', max: 0.01, command: 'long await' }); setTimeout(() => {}, 120000);";
+    child = spawn(process.execPath, ['--input-type=module', '-e', slow], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: { ...process.env, MARGO_GPU_LOCK: lock, MARGO_GPU_LOCK_NESTED: '', ...FAST },
+    });
+    let stderr = '';
+    child.stderr.on('data', (d) => (stderr += d));
+    const closed = new Promise((done) => child.on('close', (code) => done(code)));
+    const code = await bounded(closed, 20_000, 'the overrunning holder is still running');
+    assert.notEqual(code, 0);
+    assert.match(
+      stderr,
+      /gpu-lock: slow-suite reached its 0\.01 min hold limit; the lock's heartbeat ends this process tree in 0\.2 s/,
+    );
+    // The heartbeat writes its line after the kill: wait for it, so the folder is not removed while it writes.
+    const log = join(folder, 'gpu-lock-timeouts.log');
+    await waitUntil(
+      () => existsSync(log) && /TIMEOUT after 0\.01 min: slow-suite/.test(readFileSync(log, 'utf8')),
+      'the heartbeat logs the timeout',
+    );
+  } finally {
+    if (child && child.exitCode === null && child.signalCode === null) killTree(child.pid);
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 // The heartbeat is a process of its own, so its first beat comes after a Node start-up: about 0.2 s here, but seconds
 // on a machine busy with a package build, past this test's 2 s lease (production leases are 2 min). The test waits
 // for the first beat, then checks that a beating holder outlives two leases.
