@@ -6,7 +6,7 @@
 // that went different ways would cross): round its axis, in u; or round its tube, in v, and then u and v are swapped.
 import type { Curve } from '../geometry/curves.js';
 import type { Surface } from '../geometry/surfaces.js';
-import { distance, length, scale, type XYZ } from '../geometry/vec.js';
+import { add, distance, dot, length, scale, sub, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Edge, Face } from './topology.js';
 import { edgeParameters } from './validate.js';
@@ -72,11 +72,14 @@ class Swapped implements Surface {
 }
 
 /**
- * Whether closed loops through these points, on a surface closed both ways, go round it in v (a torus cut through its
- * axis: round its tube). Throws a RangeError for a loop that goes round both ways (a helix's thread across a torus).
+ * Whether a face's u and v are swapped so its loops can go round in u': always on a surface closed in v only (a ruled
+ * band round in v); on one closed both ways, when closed loops through these points go round it in v (a torus cut
+ * through its axis: round its tube). Throws a RangeError for a loop that goes round both ways (a helix's thread across a torus).
  */
 export function roundV(s: Surface, loops: readonly (readonly XYZ[])[], name: string): boolean {
-  if (!s.uPeriod || !s.vPeriod) return false;
+  // Closed in v only (a ruled band round in v): swapped, so the closed way is u', as round a cylinder.
+  if (!s.uPeriod) return !!s.vPeriod;
+  if (!s.vPeriod) return false;
   let around = false;
   for (const samples of loops) {
     if (!samples.length) continue;
@@ -135,6 +138,22 @@ export class FaceUV {
     swapped?: boolean,
   ) {
     this.raw = surfaceEvaluator(face.surface);
+    const corners = face.loops.flatMap((l) => l.coedges.map((c) => c.start.point));
+    if (corners.length)
+      this.#miss =
+        1e-6 *
+        Math.max(
+          ...[0, 1, 2].map((k) => Math.max(...corners.map((q) => q[k])) - Math.min(...corners.map((q) => q[k]))),
+          1e-9,
+        );
+    // The surface's poles in space (the same points with u and v swapped or not).
+    const poles: number[][] = [];
+    for (const side of [1, -1] as const) {
+      const v = this.raw.pole(side),
+        u = this.raw.uPole?.(side);
+      if (v !== undefined) poles.push(this.raw.at(0, v));
+      if (u !== undefined) poles.push(this.raw.at(u, 0));
+    }
     // Each sample's curve and its parameter there and at the next sample along the loop.
     const spansOf: { curve: Curve; t: number; next: number }[][] = [];
     const samplesOf = face.loops.map((loop) => {
@@ -146,7 +165,14 @@ export class FaceUV {
         const curve = curveEvaluator(c.edge.curve);
         for (let k = 0; k < ts.length - 1; k++) {
           samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
-          spans.push({ curve, t: ts[k], next: ts[k + 1] });
+          // An edge over a pole between two samples (a meridian through a sphere's pole) takes the pole as a sample of
+          // its own, so the loop runs along the pole's line there as it does through a pole vertex.
+          const t = poles.length ? this.overPole(curve, ts[k], ts[k + 1], poles) : undefined;
+          if (t === undefined) spans.push({ curve, t: ts[k], next: ts[k + 1] });
+          else {
+            spans.push({ curve, t: ts[k], next: t }, { curve, t, next: ts[k + 1] });
+            samples.push(curve.at(t).slice(0, 3) as XYZ);
+          }
         }
       }
       spansOf.push(spans);
@@ -157,14 +183,6 @@ export class FaceUV {
     this.sense = this.swapped ? !face.sense : face.sense;
     this.flip = !this.sense;
     this.period = this.surface.uPeriod;
-    const corners = face.loops.flatMap((l) => l.coedges.map((c) => c.start.point));
-    if (corners.length)
-      this.#miss =
-        1e-6 *
-        Math.max(
-          ...[0, 1, 2].map((k) => Math.max(...corners.map((q) => q[k])) - Math.min(...corners.map((q) => q[k]))),
-          1e-9,
-        );
     samplesOf.forEach((samples, li) => {
       const { loop: traced, lines } = this.trace(samples),
         spans = spansOf[li];
@@ -218,6 +236,50 @@ export class FaceUV {
       this.box[2] = this.cutInside ? cut : Math.min(...this.loops.map((l) => vRange(l)[0]));
       this.box[3] = this.cutInside ? cut + vPeriod : Math.max(...this.loops.map((l) => vRange(l)[1]));
     }
+  }
+
+  /**
+   * Where a curve passes through one of the poles strictly between parameters t0 and t1 (not at either end, where the
+   * sample itself is at the pole): the parameter there, found as the least distance to the pole by golden section once
+   * the chord passes near it. Undefined when it does not reach a pole (within the distance at which points are at it).
+   */
+  overPole(curve: Curve, t0: number, t1: number, poles: readonly number[][]): number | undefined {
+    const a = curve.at(t0),
+      b = curve.at(t1),
+      chord = sub(b, a),
+      span = length(chord),
+      within = Math.max(this.#miss, 1e-12) * 100;
+    if (!span) return undefined;
+    for (const pole of poles) {
+      if (distance(a, pole) <= within || distance(b, pole) <= within) continue;
+      const along = Math.max(0, Math.min(1, dot(sub(pole, a), chord) / (span * span)));
+      if (distance(pole, add(a, scale(chord, along))) > 0.5 * span) continue;
+      const off = (t: number) => distance(curve.at(t), pole),
+        g = (Math.sqrt(5) - 1) / 2;
+      let lo = t0,
+        hi = t1,
+        x1 = hi - g * (hi - lo),
+        x2 = lo + g * (hi - lo),
+        f1 = off(x1),
+        f2 = off(x2);
+      for (let k = 0; k < 100 && Math.abs(hi - lo) > 1e-14 * Math.max(1, Math.abs(lo)); k++) {
+        if (f1 < f2) {
+          hi = x2;
+          x2 = x1;
+          f2 = f1;
+          x1 = hi - g * (hi - lo);
+          f1 = off(x1);
+        } else {
+          lo = x1;
+          x1 = x2;
+          f1 = f2;
+          x2 = lo + g * (hi - lo);
+          f2 = off(x2);
+        }
+      }
+      if (Math.min(f1, f2) <= within) return f1 < f2 ? x1 : x2;
+    }
+    return undefined;
   }
 
   /**
