@@ -4,28 +4,40 @@ import { openBrowser } from './browser.js';
 import { Sky } from '../packages/sky/dist/index.js';
 import { optionalGPU } from '../tests/support/optional-gpu.js';
 
-// Retain the actual 1x shader as the reference, without copying fog/sky math.
-const fixture = optionalGPU(),
-  sourceDepth = Object.assign(
-    fixture.engine.gpu.createTexture({
-      size: [128, 96],
-      format: 'depth32float',
-      usage: GPUTextureUsage.TEXTURE_BINDING,
-    }),
-    { depthOrArrayLayers: 1 },
-  );
-const sourceSky = new Sky({ fog: { depth: () => sourceDepth } });
-let singleShader;
-try {
-  fixture.engine.use(sourceSky);
-  fixture.frame();
-  singleShader = fixture.pipelines.find((p) => p.fragment?.entryPoint === 'fogFragment').fragment.module.code;
-} finally {
-  sourceSky.dispose();
-  sourceDepth.destroy();
-  fixture.cleanup();
+// Retain the actual 1x shader as the reference, without copying fog/sky math. Since d33be0d67 the sky compiles only the
+// day model in use (KB2224a), so each model has its own reference shader: the Preetham text has no Bruneton lookup and
+// reads no tables (binding 1).
+const singleShaders = {};
+for (const model of ['preetham', 'bruneton']) {
+  const fixture = optionalGPU(),
+    sourceDepth = Object.assign(
+      fixture.engine.gpu.createTexture({
+        size: [128, 96],
+        format: 'depth32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      }),
+      { depthOrArrayLayers: 1 },
+    );
+  const sourceSky = new Sky({ model, fog: { depth: () => sourceDepth } });
+  try {
+    fixture.engine.use(sourceSky);
+    fixture.frame();
+    singleShaders[model] = fixture.pipelines.find((p) => p.fragment?.entryPoint === 'fogFragment').fragment.module.code;
+  } finally {
+    sourceSky.dispose();
+    sourceDepth.destroy();
+    fixture.cleanup();
+  }
+  assert.doesNotMatch(singleShaders[model], /@builtin\(sample_index\)/);
 }
-assert.doesNotMatch(singleShader, /@builtin\(sample_index\)/);
+const dayCalls = { bruneton: 'color=lookup(scattering,', preetham: 'color=preetham(w,s);' };
+for (const [model, other] of [
+  ['bruneton', 'preetham'],
+  ['preetham', 'bruneton'],
+]) {
+  assert.ok(singleShaders[model].includes(dayCalls[model]), `${model} reference shader lacks its day model`);
+  assert.ok(!singleShaders[model].includes(dayCalls[other]), `${model} reference shader also calls ${other}`);
+}
 const browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5198 }),
   errors = [];
 browser.page.on('pageerror', (error) => errors.push(error.message));
@@ -33,7 +45,7 @@ browser.page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 try {
-  const result = await browser.page.evaluate(async (singleShader) => {
+  const result = await browser.page.evaluate(async (singleShaders) => {
     const { Sky } = await import('/packages/sky/dist/index.js'),
       { Camera } = await import('/packages/core/dist/index.js');
     const assert = (condition, message) => {
@@ -96,26 +108,43 @@ try {
       });
       const vertex =
         '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}';
-      const legacyModule = shader(
-        singleShader
-          .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
-          .replace('fogFragment(i:Vertex)', 'fogFragment(i:Vertex,@builtin(sample_index) sample:u32)')
-          .replace('vec2i(i.position.xy),0', 'vec2i(i.position.xy),i32(sample)'),
-      );
       const blend = {
         color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
         alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
       };
-      const legacy = d.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module: legacyModule, entryPoint: 'vertex' },
-        fragment: { module: legacyModule, entryPoint: 'fogFragment', targets: [{ format: 'rgba16float', blend }] },
-        multisample: { count: 4 },
-      });
+      // One reference pipeline per day model, from that model's own 1x shader.
+      const legacyPipelines = {};
+      const legacyFor = (model) => {
+        if (legacyPipelines[model]) return legacyPipelines[model];
+        const module = shader(
+          singleShaders[model]
+            .replace('sceneDepth:texture_depth_2d', 'sceneDepth:texture_depth_multisampled_2d')
+            .replace('fogFragment(i:Vertex)', 'fogFragment(i:Vertex,@builtin(sample_index) sample:u32)')
+            .replace('vec2i(i.position.xy),0', 'vec2i(i.position.xy),i32(sample)'),
+        );
+        return (legacyPipelines[model] = d.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint: 'fogFragment', targets: [{ format: 'rgba16float', blend }] },
+          multisample: { count: 4 },
+        }));
+      };
       // The fog uniform is private to the fog feature since 3bab400; this is its packing for the options above (exp2, no colour).
       const fogValues = buffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       d.queue.writeBuffer(fogValues, 0, new Float32Array([0.008, 45, 0, 0, 0, 0, 0, 0]));
       const render = async (samples, { reference = false, legacyFog = false, singleDepth = false } = {}) => {
+        // A render the device rejects reads back zero-initialized memory, which must fail here by name, never pass or
+        // fail as a pixel difference.
+        d.pushErrorScope('validation');
+        const values = await renderOnce(samples, { reference, legacyFog, singleDepth }),
+          rejected = await d.popErrorScope();
+        assert(
+          !rejected,
+          `${sky.options.model}/${sky.options.hours} render ${JSON.stringify({ samples, reference, legacyFog, singleDepth })} was rejected: ${rejected?.message}`,
+        );
+        return values;
+      };
+      const renderOnce = async (samples, { reference, legacyFog, singleDepth }) => {
         const depthSamples = singleDepth ? 1 : samples,
           color = texture({
             size: [width, 1],
@@ -228,11 +257,14 @@ try {
         passes['sky:fog'].execute(context);
         if (legacyFog) {
           seed();
+          const model = sky.options.model,
+            legacy = legacyFor(model);
           const group = d.createBindGroup({
             layout: legacy.getBindGroupLayout(0),
             entries: [
               { binding: 0, resource: { buffer: sky.uniform } },
-              { binding: 1, resource: sky.tables.view },
+              // Only the Bruneton shader reads the tables; an auto layout has no binding 1 for Preetham.
+              ...(model === 'bruneton' ? [{ binding: 1, resource: sky.tables.view }] : []),
               { binding: 3, resource: borrowedDepth.createView({ aspect: 'depth-only' }) },
               { binding: 4, resource: { buffer: fogValues } },
             ],
@@ -348,7 +380,7 @@ try {
         d.destroy();
       }
     }
-  }, singleShader);
+  }, singleShaders);
   assert.deepEqual(errors, []);
   await writeFile('test-results/sky-fog.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log(JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
