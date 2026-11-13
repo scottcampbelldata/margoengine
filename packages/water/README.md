@@ -78,6 +78,16 @@ Water binds the cascades at group 1 and samples them with the same PCSS filter a
 the scene, only where a glint or foam shows. All glint lights take that one shadow
 map, as the scene's single blended light does.
 
+`whitecaps` (0 to 1, default 0) breaks steep crests into white foam: where the summed slope of a crest's
+components passes a threshold that falls as the amount rises, read a little ahead of the crest where spilling foam
+runs down the face, broken into patches by gradient noise, with long foam streaks down-wind toward 1. With
+`terrain`, foam lines ring the land (ground near the sea in a few taps round each point) and drift with the
+backwash, breaker foam grows, and with `spray` more and larger droplets fly from the breakers. While it is above 0,
+foam also takes the light of the sky above it, so whitecaps read at night. `chop` (0 to 1, default 0) roughens the
+normals: the ripple layers grow and a short wind-sea layer joins them. `water.setWhitecaps(amount)` and
+`water.setChop(amount)` change either from the next frame (a storm slider), and both reject values outside 0 to 1
+with RangeError. At 0 both draw exactly as before.
+
 For beaches and inland dips, supply `terrain: {heightmap: () => texture,
 origin: [-80,-80], size: [160,160]}`. The borrowed heightmap must contain world-space
 Y heights in a sampleable `r32float` texture, 2..512 cells per side. Each cell holds
@@ -170,7 +180,7 @@ so optional sky moonlight produces cool reflections without daytime-white surf.
 The water body uses the scene's ambient floor; a borrowed sky environment carries
 the matching night sky into Fresnel reflections.
 
-Physical WebGPU all-shore run-up/recession, deep isolated-basin retention, curved-crest/normal, zero-amplitude, channel, spray, triangle-order, coastal-seam,
+Physical WebGPU all-shore run-up/recession, deep isolated-basin retention, curved-crest/normal, zero-amplitude, channel, spray, whitecaps and chop, triangle-order, coastal-seam,
 refraction and device-restoration checks: npm run test:gpu --workspace @margoengine/water
 (build core, post and terrain packages first).
 

@@ -195,7 +195,7 @@ test('default reflection lights copy exact uniform bits without creating tempora
   await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
-test('ripple normals use gradient noise on four separately turned lattices', () => {
+test('ripple normals use gradient noise on five separately turned lattices (the fifth is the wind chop)', () => {
   const h = optionalGPU(),
     water = new Water({ segments: 4 });
   h.engine.use(water);
@@ -206,7 +206,7 @@ test('ripple normals use gradient noise on four separately turned lattices', () 
   assert.match(code, /f\*f\*f\*\(10\.0\+f\*\(6\.0\*f-15\.0\)\)/);
   assert.doesNotMatch(code, /6\.0\*f\*\(1\.0-f\)/);
   const turns = [...code.matchAll(/rippleSlope\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
-  assert.equal(turns.length, 4);
+  assert.equal(turns.length, 5);
   const angles = turns.map(([c, s]) => {
     assert.ok(Math.abs(Math.hypot(c, s) - 1) < 1e-4, 'Turns rotate without scaling');
     return Math.atan2(s, c);
@@ -245,8 +245,8 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {return shadowFrame.x;}`,
   assert.match(code, /\+glint\*shade;/);
   assert.match(
     code,
-    /vec3f\(0\.72,0\.77,0\.74\)\*\(frame\.eye\.w\+frame\.radiance\.rgb\*nl\*frame\.sun\.w\*shade\/3\.14159265\)/,
-    'Foam: ambient plus Lambert N.L, shadowed',
+    /vec3f\(0\.72,0\.77,0\.74\)\*\(frame\.eye\.w\+frame\.radiance\.rgb\*nl\*frame\.sun\.w\*shade\/3\.14159265\+skyLight\)/,
+    'Foam: ambient plus Lambert N.L, shadowed (plus the sky light, with whitecaps only)',
   );
   const shadowGroups = () => h.groups.filter((g) => g.entries === current).length;
   assert.equal(shadowGroups(), 1);
@@ -593,4 +593,24 @@ test('ocean horizon retains the central grid and supplies larger sample footprin
   await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new Water({ horizon: 'yes' }), /options/);
+});
+
+test('whitecaps and chop upload 0-1 from the options and their setters and reject other values', () => {
+  const h = optionalGPU(),
+    effect = new Water({ segments: 4, whitecaps: 0.4, chop: 0.7 });
+  h.engine.use(effect);
+  h.frame();
+  const uniform = h.resources.find((r) => r.size === 528),
+    values = new Float32Array(uniform.data);
+  assert.ok(Math.abs(values[130] - 0.4) < 1e-6 && Math.abs(values[131] - 0.7) < 1e-6);
+  effect.setWhitecaps(1).setChop(0);
+  h.frame();
+  assert.deepEqual([values[130], values[131]], [1, 0]);
+  for (const bad of [-0.01, 1.01, NaN, '0.5']) {
+    assert.throws(() => effect.setWhitecaps(bad), RangeError);
+    assert.throws(() => effect.setChop(bad), RangeError);
+    assert.throws(() => new Water({ whitecaps: bad }), RangeError);
+  }
+  assert.equal(new Water().options.whitecaps, undefined);
+  effect.dispose();
 });

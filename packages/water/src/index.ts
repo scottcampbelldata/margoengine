@@ -119,6 +119,14 @@ export interface WaterOptions {
    * lose that light where it is blocked; without it they are lit everywhere.
    */
   shadows?: WaterShadowSource;
+  /**
+   * Breaking whitecaps, 0-1: steep crests break white in patches, with long foam streaks down-wind toward 1 (a gale);
+   * with `terrain`, foam lines ring the land and the breakers, and with `spray` the spray, grow with it; foam takes the
+   * sky's light too. 0 (the default) keeps the gentle crest foam only. Live through `setWhitecaps`.
+   */
+  whitecaps?: number;
+  /** Wind chop on the swell, 0-1: stronger ripples and a short wind-sea layer in the normals. Default 0. Live through `setChop`. */
+  chop?: number;
 }
 // Sources: Gerstner waves (Fournier & Reeves 1986; Tessendorf 2001 sec. 3); Schlick 1994 Fresnel with F0 0.02 =
 // ((1.33 - 1) / (1.33 + 1))^2; sun glint GGX D (Walter et al. 2007) with the Schlick-GGX k = (r + 1)^2 / 8 of Karis
@@ -129,6 +137,16 @@ export interface WaterOptions {
 // Refraction reads the opaque colour where the Snell-bent ray (water 1.33) meets the bed, projected to the screen: along
 // the unbent eye ray a grazing view would read ground tens of metres off, whose light could only leave the water outside
 // Snell's window, so it never reaches the eye (total internal reflection).
+// Whitecaps (frame.grid.z, 0 draws none; whitecap()): a crest breaks where its components' summed slope a*k*sin, read a
+// little ahead of the crest where spilling foam runs down the face, passes a threshold that falls as the amount rises;
+// gradient noise breaks it into patches, soft-edged (denser toward the breaking crest, broken into bubbly foam by two
+// finer octaves), and toward a gale long streaks lie down-wind (Beaufort 8 and up). Thresholds and noise scales are
+// Margo tuning. Foam lines that the backwash carries out from the shore, wider than the shoreline band, follow
+// landNearby(): how much land lies round a point of the coastal grid, ground at or above the sea in 18 taps on three
+// rings of 1.2, 2.4 and 3.6 foam distances, nearer rings weighing more (0 in open water, about 0.5 beside a straight
+// cliff). Wind chop (frame.grid.w): the ripple layers grow and a short wind-sea layer joins them, turned -5 degrees.
+// With whitecaps on, foam also takes the light of the sky above it: a Lambert surface under a sky of radiance L returns
+// about L, here the mean of the zenith and the sky 30 degrees up toward the eye.
 const shader =
   waterFrame +
   oceanWaves +
@@ -229,6 +247,33 @@ fn rippleSlope(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f)->vec2f 
  return along*n.x+across*n.y;
 }
 fn fresnel(cosine:f32)->f32 {return 0.02+0.98*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
+fn landNearby(xz:vec2f)->f32 {
+ let size=vec2f(textureDimensions(coast));var land=0.0;
+ for(var r=1;r<=3;r++){
+  for(var a=0;a<6;a++){
+   let angle=f32(a)*1.0471976+f32(r)*0.52;let p=xz+vec2f(cos(angle),sin(angle))*f32(r)*1.2*frame.settings.z;
+   let uv=(p-frame.coast.xy)/frame.coast.zw;
+   if(all(uv>=vec2f(0))&&all(uv<vec2f(1))&&textureLoad(coast,vec2i(uv*size),0).y>frame.settings.y-0.3){land+=1.0/f32(r);}
+  }
+ }
+ return land/11.0;
+}
+fn whitecap(xz:vec2f,footprint:f32)->f32 {
+ let amount=frame.grid.z;if(amount<=0.0){return 0.0;}
+ var crest=0.0;
+ for(var j=0u;j<u32(frame.settings.w);j++){
+  for(var c=0u;c<3u;c++){let s=swell(frame.waves[j],xz,c,max(footprint*2.0,0.05));crest+=s.amplitude*length(s.gradient)*sin(s.phase-0.4);}
+ }
+ let w=frame.waves[0].wave.xy;let q=vec2f(dot(xz,w),dot(xz,vec2f(-w.y,w.x)));let t=frame.settings.x;
+ let detail=1.0-smoothstep(0.3,1.5,footprint);
+ let patches=noise(q*vec2f(0.32,0.7)+vec2f(-t*0.35,0)).x+noise(q*vec2f(1.3,2.9)+vec2f(-t*0.8,5.1)).x*0.5*detail;
+ let threshold=mix(0.42,0.16,amount);
+ let mask=smoothstep(threshold,threshold+0.12,crest+patches*0.08);
+ let bubbles=noise(q*vec2f(0.75,1.3)+vec2f(-t*0.6,2.3)).x+noise(q*vec2f(2.1,2.7)+vec2f(-t*0.9,7.7)).x*0.5;
+ let caps=mask*mix(0.6,smoothstep(0.0,0.5,bubbles+mask*0.45),detail);
+ let streaks=amount*amount*smoothstep(0.25,0.55,noise(q*vec2f(0.06,1.4)+vec2f(-t*0.5,0)).x)*0.25*detail;
+ return clamp(caps+streaks,0.0,1.0);
+}
 fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
  if(light.direction.w<=0.0){return vec3f(0);}
  let l=light.direction.xyz;let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.001,1.0);
@@ -249,13 +294,13 @@ ${displayShader}
 @fragment fn fragment(i:Output)->Result{
  let pixel=vec2i(i.clip.xy);let waterDistance=linear(i.clip.z);let sceneDepth=textureLoad(depth,pixel,0);
  var gap=50.0;if(sceneDepth>0){gap=max(0.0,linear(sceneDepth)-waterDistance)*abs(frame.eye.y-i.world.y)/max(0.0001,waterDistance);}
- var movement=i.crest;let isCoast=inCoast(i.xz);var refraction=1.0;var dry=false;var river=false;
+ var movement=i.crest;let isCoast=inCoast(i.xz);var refraction=1.0;var dry=false;var river=false;var open=1.0;
  if(frame.flow.w>0.5){
   let sample=coastal(i.xz);let v=sample.water;refraction=coastBlend(i.xz).z;
   // shortcut: uncharted seabed deepens at 0.35 m/m; supply a larger heightmap for distant shoals.
   let outside=max(max(frame.coast.xy-i.xz,i.xz-frame.coast.xy-frame.coast.zw),vec2f(0));let bed=max(0.0,i.world.y-v.y)+length(outside)*0.35;
   gap=mix(gap,min(gap,bed),select(sample.ocean,1.0,isCoast));
-  if(isCoast){dry=select(v.x<0.003,sample.edge<=0.0,STILL);gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;}
+  if(isCoast){dry=select(v.x<0.003,sample.edge<=0.0,STILL);gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;open=1.0-sample.blend.z;}
  }
  let footprint=max(length(dpdx(i.world.xz)),length(dpdy(i.world.xz)));let edge=max(0.015,fwidth(gap)*1.5);
  let normalWidth=length(fwidth(i.normal));
@@ -265,8 +310,14 @@ ${displayShader}
  // Gradient noise is centred on zero with the same 0.21 spread as the former 0..1 value noise.
  if(grainDetail>0){grain=0.5+noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x*grainDetail;}
  let shore=1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08));
- let pattern=mix(0.45,1.0,grain);let fresh=clamp((select(shore,0.0,river)*SHORE_FOAM+movement*0.9)*pattern,0.0,1.0);
+ let pattern=mix(0.45,1.0,grain);let caps=frame.grid.z;
+ let fresh=clamp((select(shore,0.0,river)*SHORE_FOAM+movement*(0.9+0.9*caps))*pattern,0.0,1.0);
  var foam=fresh;if(frame.flow.w<0.5){foam=max(fresh,textureLoad(history,pixel,0).r*exp(-frame.cameraData.z*3.0)*shore);}
+ if(caps>0.0&&!river){
+  var lines=0.0;
+  if(isCoast){let near=landNearby(i.world.xz);lines=smoothstep(0.04,0.3,near+(grain-0.5)*0.25+0.08*sin(frame.settings.x*1.3-near*9.0))*mix(0.55,1.0,grain);}
+  foam=max(foam,max(whitecap(i.world.xz,footprint)*open,lines*caps));
+ }
  var ripple=vec3f(0);
  if(footprint<6.0){
  // Agitation, chop and two micro layers turned 11, -21, 30 and -41 degrees from the wind. Weights keep the former
@@ -275,7 +326,10 @@ ${displayShader}
  let slope=rippleSlope(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0))*0.186*(1.0-smoothstep(0.25,1.0,footprint*0.22))
   +rippleSlope(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23))*0.062*(1.0-smoothstep(0.25,1.0,footprint*0.57))
   +(rippleSlope(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0))*0.0112+rippleSlope(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71))*0.0037*(1.0-smoothstep(0.12,0.5,footprint)))*(1.0-smoothstep(0.2,1.0,footprint));
- ripple=vec3f(-slope.x,0,-slope.y)*(1.0-foam);
+ let chop=frame.grid.w;
+ let windSea=rippleSlope(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4))*0.5*(1.0-smoothstep(0.25,1.0,footprint*0.11));
+ let agitated=slope*(1.0+3.0*chop)+windSea*chop;
+ ripple=vec3f(-agitated.x,0,-agitated.y)*(1.0-foam);
  }
  let n=normalize(i.normal+ripple);let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
  let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-vec3f(0.38,0.10,0.045)*optical);
@@ -293,7 +347,8 @@ ${displayShader}
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
  // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
  // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
- color=mix(color,vec3f(0.72,0.77,0.74)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265),foam*0.95);
+ let skyLight=select(vec3f(0),0.5*(skyColor(vec3f(n.x,1.0,n.z),0.4)+skyColor(vec3f(v.x,0.58,v.z),0.4)),frame.grid.z>0.0);
+ color=mix(color,vec3f(0.72,0.77,0.74)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265+skyLight),foam*0.95);
  if(frame.cameraData.w<0.5){color=toDisplay(color);}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
@@ -334,6 +389,11 @@ const depthCopy = `
 @fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {return textureLoad(sceneDepth,vec2i(p.xy),0);}
 `;
 let instances = 0;
+function unit(value: number, name: string): number {
+  if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+    throw new RangeError(`Invalid water ${name}; use a number from 0 to 1`);
+  return value;
+}
 // How far the horizon grid's last row lies from the camera, in metres: atan(10 km / 10,000 km) is 0.06 degrees.
 const HORIZON_REACH = 10_000_000;
 /** One view's foam history and the bind groups that read it. */
@@ -482,6 +542,7 @@ export class Water implements EnginePlugin {
     this.values.set([0, height, foamDistance, waves.length], 20);
     this.values.set(color, 24);
     this.values.set([0.6, 0.8, 0, 3, 1, 0.9, 0.75, 0], 104);
+    this.setWhitecaps(options.whitecaps ?? 0).setChop(options.chop ?? 0);
     if (
       (options.reflection !== undefined && typeof options.reflection !== 'function') ||
       (options.sceneColor !== undefined && typeof options.sceneColor !== 'function') ||
@@ -669,6 +730,16 @@ export class Water implements EnginePlugin {
    */
   setFog(fog: FogLike | null): this {
     this.fogSource = checkFog(fog);
+    return this;
+  }
+  /** Sets the breaking whitecaps, 0-1 (see `WaterOptions.whitecaps`); read every frame. Throws RangeError outside 0-1. */
+  setWhitecaps(amount: number): this {
+    this.values[130] = unit(amount, 'whitecaps');
+    return this;
+  }
+  /** Sets the wind chop, 0-1 (see `WaterOptions.chop`); read every frame. Throws RangeError outside 0-1. */
+  setChop(amount: number): this {
+    this.values[131] = unit(amount, 'chop');
     return this;
   }
   /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */

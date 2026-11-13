@@ -29,14 +29,14 @@ const simulate =
   let uv=(p.position.xz-frame.coast.xy)/frame.coast.zw;let pixel=clamp(vec2i(uv*vec2f(size)),vec2i(0),size-1);
   let water=textureLoad(coast,pixel,0);if(p.position.y<water.x+water.y){p.position.w=0;}
  }else{
-  let clock=u32(frame.settings.x*60.0);let seed=index*73856093u+clock*19349663u;
+  let clock=u32(frame.settings.x*60.0);let caps=frame.grid.z;let seed=index*73856093u+clock*19349663u;
   for(var i=0u;i<4u;i++){
    let key=seed+i*83492791u;let pixel=vec2i(vec2f(random(key),random(key+1u))*vec2f(size-1));let water=textureLoad(coast,pixel,0);
-   if(water.x>0.01&&water.x<1.8&&water.w>0.08&&random(key+2u)<min(0.9,dt*45.0*water.w)){
+   if(water.x>0.01&&water.x<1.8+4.0*caps&&water.w>0.08&&random(key+2u)<min(0.9,dt*45.0*water.w*(1.0+3.0*caps))){
     let q=textureLoad(flux,pixel,0);let velocity=clamp(vec2f(q.y-q.x,q.w-q.z)/max(0.04,water.x),vec2f(-4),vec2f(4));
     let xz=frame.coast.xy+(vec2f(pixel)+vec2f(random(key+3u),random(key+4u)))/vec2f(size)*frame.coast.zw;
     p.position=vec4f(xz.x,water.x+water.y+0.03,xz.y,0.4+random(key+5u)*0.5);
-    p.velocity=vec4f(velocity.x*0.4+(random(key+6u)-0.5)*0.6,1.3+random(key+7u)*2.2,velocity.y*0.4+(random(key+8u)-0.5)*0.6,random(key+9u));break;
+    p.velocity=vec4f(velocity.x*0.4+(random(key+6u)-0.5)*0.6,(1.3+random(key+7u)*2.2)*(1.0+1.5*caps),velocity.y*0.4+(random(key+8u)-0.5)*0.6,random(key+9u));break;
    }
   }
  }droplets[index]=p;
@@ -52,7 +52,7 @@ struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) 
  let p=droplets[index];if(p.position.w<=0){return Output(vec4f(-2,-2,0,1),vec2f(0),0);}
  let corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));let uv=corners[v];
  let right=normalize(vec3f(frame.camera[0].x,frame.camera[1].x,frame.camera[2].x));let up=normalize(vec3f(frame.camera[0].y,frame.camera[1].y,frame.camera[2].y));
- let size=(0.018+p.velocity.w*0.025)*(1.0+p.position.w*0.2);let world=p.position.xyz+(right*uv.x+up*uv.y)*size;
+ let size=(0.018+p.velocity.w*0.025)*(1.0+p.position.w*0.2)*(1.0+2.5*frame.grid.z);let world=p.position.xyz+(right*uv.x+up*uv.y)*size;
  return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0));
 }
 fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
@@ -60,7 +60,7 @@ fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.camera
  let radius=dot(i.uv,i.uv);if(radius>1){discard;}
  let gap=max(0.0,linear(textureLoad(surface,vec2i(i.clip.xy),0))-linear(i.clip.z));
  let alpha=(1.0-smoothstep(0.25,1.0,radius))*i.alpha*min(1.0,gap*12.0)*0.65;
- let color=vec3f(0.78,0.84,0.85)*(vec3f(0.05)+frame.radiance.rgb*min(1.0,frame.sun.w));
+ let color=vec3f(0.78,0.84,0.85)*(vec3f(0.05+frame.eye.w*frame.grid.z)+frame.radiance.rgb*min(1.0,frame.sun.w));
  return vec4f(color*alpha,alpha);
 }`;
 // Scene fog (Water.setFog), uniform at binding 3: droplets blend over the water like the surface's own colour and are
