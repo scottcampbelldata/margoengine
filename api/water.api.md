@@ -26,6 +26,8 @@ export class Water implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
+    setWhitecaps(amount: number): this;
+    setChop(amount: number): this;
     setWaveHeight(height: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -68,6 +70,8 @@ export interface WaterOptions {
     spray?: boolean;
     horizon?: boolean;
     shadows?: WaterShadowSource;
+    whitecaps?: number;
+    chop?: number;
 }
 
 export interface WaterShadowSource {
