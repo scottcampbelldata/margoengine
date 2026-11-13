@@ -3,7 +3,7 @@
 // point with a radius, a capsule two, a hull its corners. A baked field is read by branch and bound on its Lipschitz
 // bound, as on the CPU. The kernel is kinematics-constraints' CPU hull kernel in f32, with no expanding polytope: an
 // overlap reads zero less the radii, which is all a filter needs. Written clean room from that publication.
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { preciseMathWgsl } from '../../shared/precise-math.js';
 import { CapsuleVolume, ConvexHullVolume, SphereVolume } from '@margoengine/kinematics-constraints';
 import { Robot } from './robot.js';
@@ -691,17 +691,34 @@ export class GPUClearance {
       whole[0] = count;
       device.queue.writeBuffer(this.params, 0, header);
       device.queue.writeBuffer(this.poses, 0, poses.buffer, 0, count * dof * 4);
-      const encoder = device.createCommandEncoder({ label: 'GPUClearance' }),
-        pass = encoder.beginComputePass();
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, group);
-      pass.dispatchWorkgroups(Math.ceil(count / WORKGROUP));
-      pass.end();
-      encoder.copyBufferToBuffer(this.gaps, 0, this.read, 0, count * 4);
-      device.queue.submit([encoder.finish()]);
-      await this.read.mapAsync(GPUMapMode.READ, 0, count * 4);
-      out.set(new Float32Array(this.read.getMappedRange(0, count * 4)), start);
-      this.read.unmap();
+      // A dispatch the device drops (a compat dispatch over its CPU work budget, a validation fault) stores nothing and
+      // says so only through an error scope, so read the scopes before trusting the buffer: never hand back silent zeros.
+      device.pushErrorScope('internal');
+      device.pushErrorScope('validation');
+      let failure: GPUError | null = null;
+      try {
+        const encoder = device.createCommandEncoder({ label: 'GPUClearance' }),
+          pass = encoder.beginComputePass();
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, group);
+        pass.dispatchWorkgroups(Math.ceil(count / WORKGROUP));
+        pass.end();
+        encoder.copyBufferToBuffer(this.gaps, 0, this.read, 0, count * 4);
+        device.queue.submit([encoder.finish()]);
+        await this.read.mapAsync(GPUMapMode.READ, 0, count * 4);
+        out.set(new Float32Array(this.read.getMappedRange(0, count * 4)), start);
+        this.read.unmap();
+      } finally {
+        const invalid = await device.popErrorScope();
+        failure = (await device.popErrorScope()) ?? invalid;
+      }
+      if (failure)
+        throw fault(
+          'failed',
+          `GPUClearance dispatch of ${count} poses failed on the device, so its gaps were not computed: ${failure.message}. ` +
+            `Use a smaller batch (now ${batch}; pass options.batch) or fewer poses per evaluate call`,
+          'failed',
+        );
     }
     for (let i = 0; i < total; i++) if (out[i] >= NOTHING) out[i] = Infinity;
     return out;

@@ -13,9 +13,12 @@ globalThis.GPUBufferUsage ??= { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 
 globalThis.GPUMapMode ??= { READ: 1 };
 
 /** Records what a real device would receive; `reply` fills the read buffer for a dispatch of `count` poses. */
-function fakeDevice({ limit = 1 << 27, groups = 65535, reply = (count) => new Float32Array(count) } = {}) {
+function fakeDevice({ limit = 1 << 27, groups = 65535, reply = (count) => new Float32Array(count), dropped = () => null } = {}) {
+  const scopes = [];
   const device = {
     buffers: [],
+    pushErrorScope: (filter) => scopes.push({ filter, error: null }),
+    popErrorScope: async () => scopes.pop().error,
     written: new Map(),
     dispatches: [],
     code: null,
@@ -59,7 +62,11 @@ function fakeDevice({ limit = 1 << 27, groups = 65535, reply = (count) => new Fl
       writeBuffer(buffer, offset, data, at = 0, size = data.byteLength - at) {
         device.written.set(buffer.label, new Uint8Array(data.slice(at, at + size)));
       },
-      submit() {},
+      // `dropped(dispatch)` is a message for a dispatch the device refuses, reported to its error scope as a device does.
+      submit() {
+        const message = dropped(device.dispatches.length - 1);
+        if (message) scopes.findLast((scope) => scope.filter === 'internal').error ??= { name: 'GPUInternalError', message };
+      },
     },
   };
   return device;
@@ -222,4 +229,25 @@ test('bad arguments are refused, and dispose frees every buffer once', async () 
   clearance.dispose();
   assert.ok(device.buffers.every((buffer) => buffer.destroyed));
   await assert.rejects(clearance.evaluate([0, 0]), /disposed/);
+});
+
+test('a dispatch the device drops rejects with the cause and the fix, never silent zeros', async () => {
+  const device = fakeDevice({
+      dropped: (dispatch) => (dispatch === 1 ? 'A compute dispatch stopped at its work budget of 1000 invocations' : null),
+    }),
+    clearance = new GPUClearance(device, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], { batch: 100 });
+  await assert.rejects(
+    clearance.evaluate(new Float32Array(250 * clearance.dof)),
+    (error) =>
+      error.name === 'MargoError' &&
+      error.code === 'failed' &&
+      /work budget of 1000/.test(error.message) &&
+      /100 poses/.test(error.message) &&
+      /smaller batch/.test(error.message),
+  );
+  assert.equal(device.dispatches.length, 2, 'stops at the failed dispatch');
+  // The scopes are balanced and the next call, whose dispatches all land, answers.
+  const next = fakeDevice(),
+    ok = new GPUClearance(next, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], { batch: 100 });
+  assert.equal((await ok.evaluate(new Float32Array(3 * ok.dof))).length, 3);
 });

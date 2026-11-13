@@ -1,5 +1,5 @@
 {
-  "commit": "9c84b21ca",
+  "commit": "7f7dac81c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -8930,8 +8930,8 @@
         "gzip": 7139
       },
       "./gpu": {
-        "raw": 46969,
-        "gzip": 15597
+        "raw": 47417,
+        "gzip": 15822
       }
     },
     "@margoengine/save": {
