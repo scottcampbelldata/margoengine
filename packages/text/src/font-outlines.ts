@@ -693,7 +693,6 @@ export class FontOutlines {
         c = r.i16() / 16384;
         d = r.i16() / 16384;
       }
-      if ((flags & 0x1800) === 0x1800) fontError('composite offset flags conflict');
       const loops = this.readTrueTypeGlyph(child, [...ancestors, glyph], work).map((loop) =>
         loop.map((p) => ({
           x: a * p.x + c * p.y,
@@ -705,7 +704,10 @@ export class FontOutlines {
       let tx = arg1,
         ty = arg2;
       if (xy) {
-        if (flags & 0x800) {
+        // SCALED_COMPONENT_OFFSET alone scales the offset. Neither flag, or both (invalid), takes the default, which
+        // the OpenType glyf chapter recommends be the unscaled offset. Before batch 132b (2026-11-13) both flags threw
+        // and the whole glyph failed to load.
+        if ((flags & 0x1800) === 0x800) {
           tx = a * arg1 + c * arg2;
           ty = b * arg1 + d * arg2;
         }

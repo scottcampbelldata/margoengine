@@ -122,6 +122,10 @@ test('F8 composite point matching uses raw point indices and scaled offsets', ()
   assert.deepEqual(font.getGlyphContours(0)[1][0], [0.3, 0.2]);
   const scaled = parseFontOutlines(ttf([composite(component(1, 0x80b, 200, 100, [8192])), child]));
   assert.deepEqual(scaled.getGlyphContours(0)[0][0], [0.15, 0.05]);
+  // Batch 132b (lane N, 2026-11-13): SCALED_ and UNSCALED_COMPONENT_OFFSET together are invalid, and the OpenType glyf
+  // chapter says to take the default behaviour (the unscaled offset) then. The glyph threw instead.
+  const both = parseFontOutlines(ttf([composite(component(1, 0x180b, 200, 100, [8192])), child]));
+  assert.deepEqual(both.getGlyphContours(0)[0][0], [0.25, 0.1]);
 });
 test('F9 subdivisions reject nonfinite, fractional and excessive values with codes', () => {
   for (const name of ['steps', 'bevelSegments', 'curveSegments']) {
