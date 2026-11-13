@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15547342,
+  "total": 15551969,
   "history": [
     {
       "date": "2026-10-24",
@@ -8747,6 +8747,12 @@
       "commit": "868585930",
       "reason": "@margoengine/brep grows from 124,621 to 133,182 B gzip (+8,561): cone and frustum, sewing, face offset, shell and draft, sweep along lines and arcs and ruled loft (about 3,900 lines with their checks, refusals and messages that name the fix), plus the pole-loop and spline-mass fixes. These are what the kernel's CAD compare harness measured parity against; a split into a second entry would cost a second bundle of the shared geometry and topology code for the same callers",
       "grew": 1
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "f1ac1ab44",
+      "reason": "Storm Light lane S1i: water whitecaps and wind chop (+335 B), VolumetricClouds flash and the deck marched into the sky's environment map (Sky.environmentLayer, reflection and lighting layered variants), the known bug of 2026-11-13",
+      "grew": 6
     }
   ],
   "items": {
@@ -9747,17 +9753,17 @@
     "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 16664,
     "@margoengine/shadows/vsm": 2046,
-    "@margoengine/sky": 18225,
+    "@margoengine/sky": 18981,
     "@margoengine/sky/aerial": 7124,
     "@margoengine/sky/astro": 9780,
-    "@margoengine/sky/base": 7356,
+    "@margoengine/sky/base": 7630,
     "@margoengine/sky/bruneton": 3258,
     "@margoengine/sky/cloud-shadows": 3448,
     "@margoengine/sky/clouds": 2338,
-    "@margoengine/sky/compat-clouds": 15593,
+    "@margoengine/sky/compat-clouds": 16914,
     "@margoengine/sky/fog": 2295,
     "@margoengine/sky/hillaire": 11147,
-    "@margoengine/sky/lighting": 4064,
+    "@margoengine/sky/lighting": 4389,
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/planet": 4943,
     "@margoengine/sky/preetham": 953,
@@ -9765,7 +9771,7 @@
     "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/shafts": 7139,
     "@margoengine/sky/sun": 2379,
-    "@margoengine/sky/volumetric-clouds": 7571,
+    "@margoengine/sky/volumetric-clouds": 8533,
     "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 33200,
@@ -10047,7 +10053,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/voxel/wind": 3073,
-    "@margoengine/water": 21457,
+    "@margoengine/water": 22446,
     "@margoengine/water/bodies": 4419,
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7858,
