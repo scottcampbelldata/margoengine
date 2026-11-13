@@ -89,6 +89,14 @@ window.check={samples:sceneSamples,
    disposedCleared:sky.environmentLayer===undefined&&same(afterMap,clearMap),
    upper:{clear:upper(clearMap),clouds:upper(cloudMap),flash:upper(flashMap)},
    pillar:{clear:pillarLight(clearFrame),clouds:pillarLight(cloudFrame),flash:pillarLight(flashFrame)}};
+  // Moonlight through the deck (2026-11-13: the moon lit every sample of the cloud alike, so a thick deck was as bright
+  // as a thin veil and its gaps read as flat dark cut-outs): at night under a bright moon, the deck's light per unit
+  // of its opacity in the sky's map falls as the cloud thickens, as the sun's does by day.
+  sky.options.hours=23;sky.options.lighting={moon:{intensity:20},ambient:{day:[0,0,0],night:[0,0,0]}};
+  const perOpacity=async(density)=>{const c=VolumetricClouds.attach(engine,{sky,coverage:0.9,density,depth:()=>post.depthTexture});await frame();await frame();
+   const m=await read(sky.environmentLayer);c.dispose();let light=0,alpha=0;for(let p=0;p<64*16*4;p+=4){light+=m[p]+m[p+1]+m[p+2];alpha+=m[p+3];}return {light,alpha,ratio:light/Math.max(alpha,1e-6)};};
+  out.moonlit={thin:await perOpacity(0.002),thick:await perOpacity(0.1),moon:Array.from(sky.lights[1].direction)};
+  sky.options.hours=10;
   sky.options.lighting=undefined;
   const error=await device.popErrorScope();
   return {...out,error:error?.message??null,errors:errors.splice(0)};

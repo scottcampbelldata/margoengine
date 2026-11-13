@@ -61,6 +61,11 @@ const checks = {
     assert.notEqual(e.pillar.clouds, e.pillar.clear, `the deck left the scene light alone: ${JSON.stringify(e.pillar)}`);
     assert.ok(e.pillar.flash > e.pillar.clouds * 1.05, `flash in the scene light: ${JSON.stringify(e.pillar)}`);
     assert.ok(e.layered, `the clouds gave the sky no layer: ${JSON.stringify(e)}`);
+    // Moonlight through the deck (2026-11-13, before the fix the moon lit every sample alike: one ratio for any
+    // density): under a bright moon the thick deck's light per unit opacity is well below the thin veil's.
+    const m = r.moonlit;
+    assert.ok(m.moon[3] > 1 && m.thin.alpha > 0 && m.thick.alpha > m.thin.alpha, `moonlit decks: ${JSON.stringify(m)}`);
+    assert.ok(m.thick.ratio < m.thin.ratio * 0.7, `the moon does not shade the deck: ${JSON.stringify(m)}`);
     assert.ok(e.composite < 0.002, `map is not sky over deck: ${JSON.stringify(e)}`);
     assert.ok(e.zeroCleared && e.disposedCleared, `layer left behind: ${JSON.stringify(e)}`);
     console.log(

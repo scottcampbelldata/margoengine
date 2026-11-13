@@ -226,6 +226,11 @@ fn cloudShell(d:vec3f,h:f32)->vec2f {
 }
 fn cloudHG(nu:f32,g:f32)->f32 {return (1.0-g*g)/pow(max(1.0+g*g-2.0*g*nu,0.0001),1.5);}
 fn cloudPhaseK(nu:f32,k:f32)->f32 {return mix(cloudHG(nu,0.8*k),cloudHG(nu,-0.3*k),0.3);}
+fn cloudScatter(od:f32,nu:f32)->f32 {
+ var octaves=0.0;var a=1.0;var b=1.0;var g=1.0;
+ for(var o=0;o<3;o++){octaves+=a*cloudPhaseK(nu,g)*exp(-b*od);a*=0.5;b*=0.5;g*=0.5;}
+ return octaves*mix(1.0-exp(-2.0*od-0.3),1.0,0.5+0.5*nu);
+}
 fn cloudSpan(d:vec3f)->vec2f {
  let bottom=clouds.layer.x;let top=clouds.layer.y;let altitude=cloudAltitude(clouds,clouds.eye.xyz);
  var start=0.0;var end=-1.0;
@@ -245,7 +250,7 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32)->vec4f {
  let dt=(end-start)/f32(n);let s=clouds.sun.xyz;let nu=dot(d,s);
  let lit=max(clouds.sunColor.r,max(clouds.sunColor.g,clouds.sunColor.b))>0.0;
  let above=textureLoad(skyLight,vec2i(0,0),0).rgb;let horizon=textureLoad(skyLight,vec2i(1,0),0).rgb;
- let moon=clouds.moonColor.rgb*clouds.moon.w*cloudPhaseK(dot(d,clouds.moon.xyz),1.0)*0.15;
+ let m=clouds.moon.xyz;let nuMoon=dot(d,m);let moonLit=clouds.moon.w>0.0&&max(clouds.moonColor.r,max(clouds.moonColor.g,clouds.moonColor.b))>0.0;
  var t=start+dt*jitter;
  var transmittance=1.0;var light=vec3f(0);var opacity=0.0;
  for(var k=0u;k<n;k++){
@@ -254,12 +259,10 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32)->vec4f {
    let sigma=density*clouds.layer.w;
    var sun=vec3f(0);
    if(lit){
-    let od=cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,s,u32(clouds.wind.w));
-    var octaves=0.0;var a=1.0;var b=1.0;var g=1.0;
-    for(var o=0;o<3;o++){octaves+=a*cloudPhaseK(nu,g)*exp(-b*od);a*=0.5;b*=0.5;g*=0.5;}
-    let powder=mix(1.0-exp(-2.0*od-0.3),1.0,0.5+0.5*nu);
-    sun=clouds.sunColor.rgb*clouds.sun.w*octaves*powder;
+    sun=clouds.sunColor.rgb*clouds.sun.w*cloudScatter(cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,s,u32(clouds.wind.w)),nu);
    }
+   var moon=vec3f(0);
+   if(moonLit){moon=clouds.moonColor.rgb*clouds.moon.w*0.15*cloudScatter(cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,m,u32(clouds.wind.w)),nuMoon);}
    let h=clamp((cloudAltitude(clouds,p)-bottom)/(top-bottom),0.0,1.0);
    var flash=vec3f(0);
    if(clouds.flash.w>0.0){
