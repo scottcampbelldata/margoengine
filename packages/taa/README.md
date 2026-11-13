@@ -182,7 +182,7 @@ upscale.reset(); // after a camera cut
 | `clampGamma` | `1.5` | Colour range history may keep, in standard deviations of the 3x3 neighbourhood |
 | `sharpen` | `0.2` | Output sharpening, 0 to 1 |
 
-Limits: one full-canvas view; multi-view frames throw. A `PostStack` inside it runs at the render size. Plugins that draw
+Limits: one full-canvas view; multi-view frames throw. A scene `background` or a camera layer mask, which core passes as one full-canvas view, upscales like a plain frame. A `PostStack` inside it runs at the render size. Plugins that draw
 after frame-graph order 39, such as `Selection`, draw over the full frame without scene depth. Moving objects are rejected
 through depth and colour, not per-object velocity, so thin fast objects can ghost more than under `TAA`.
 

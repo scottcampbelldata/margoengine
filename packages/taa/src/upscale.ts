@@ -25,6 +25,21 @@ import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type View = NonNullable<Context['view']>;
+
+/**
+ * The view TAAUpscale draws at render size, or undefined for a plain frame. Core passes a frame whose scene has a
+ * `background` or a camera layer mask as one full-canvas view; that is still one full-canvas view, so its rectangles
+ * shrink with the render size. Several views, a partial rectangle or a view into a target throw.
+ */
+function renderSizeView(view: View | undefined, canvas: readonly [number, number], size: readonly [number, number]): View | undefined {
+  if (!view) return undefined;
+  const full = (r: readonly number[] | undefined) =>
+    !r || (r[0] === 0 && r[1] === 0 && r[2] === canvas[0] && r[3] === canvas[1]);
+  if (view.count !== 1 || view.target || !full(view.viewport) || !full(view.scissor))
+    throw new MargoError('unsupported', 'TAAUpscale handles one full-canvas view; use TAA with several views');
+  return { ...view, viewport: [0, 0, size[0], size[1]], scissor: view.scissor && [0, 0, size[0], size[1]] };
+}
 
 /** Options of {@link TAAUpscale}; the object is kept and read every frame. */
 export interface TAAUpscaleOptions {
@@ -171,7 +186,7 @@ export class TAAUpscale implements EnginePlugin {
   private manual = '';
   private originalCamera?: Context['camera'];
   private cameraView?: Context['camera'];
-  private saved?: { width: number; height: number };
+  private saved?: { width: number; height: number; view: View | undefined };
 
   /** Output rectangle used by optional view-aware upscalers. */
   protected outputView?: Context['view'];
@@ -253,13 +268,12 @@ export class TAAUpscale implements EnginePlugin {
 
   protected capture(c: Context): void {
     this.validate();
-    if (c.view)
-      throw new MargoError('unsupported', 'TAAUpscale handles one full-canvas view; use TAA with several views');
     const o = this.options,
       scale = o.scale ?? 0.67,
       width = Math.max(1, Math.round(c.width * scale)),
       height = Math.max(1, Math.round(c.height * scale)),
       temporal = o.temporal ?? true;
+    const view = renderSizeView(c.view, [c.width, c.height], [width, height]);
     this.resize(c, width, height);
     const camera = c.camera === this.cameraView ? this.originalCamera! : c.camera;
     if (this.originalCamera !== camera || !this.cameraView)
@@ -287,7 +301,9 @@ export class TAAUpscale implements EnginePlugin {
     v.set([jx, jy, width, height], 52);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     this.last.set(m);
-    this.saved = { width: c.width, height: c.height };
+    this.saved = { width: c.width, height: c.height, view: c.view };
+    // The render-size view first: the target keeps the view it begins with for its depth copies.
+    c.view = view;
     this.target!.begin(c);
     c.width = width;
     c.height = height;
@@ -390,6 +406,7 @@ export class TAAUpscale implements EnginePlugin {
     target.restore(c);
     c.width = saved.width;
     c.height = saved.height;
+    c.view = saved.view;
     if (c.camera === this.cameraView) c.camera = this.originalCamera!;
     if ((this.options.temporal ?? true) && !this.resolveGroups.length) {
       const extra = this.resolveEntries();
@@ -460,6 +477,7 @@ export class TAAUpscale implements EnginePlugin {
       this.target!.restore(c);
       c.width = this.saved.width;
       c.height = this.saved.height;
+      c.view = this.saved.view;
       this.saved = undefined;
       if (c.camera === this.cameraView) c.camera = this.originalCamera!;
     }

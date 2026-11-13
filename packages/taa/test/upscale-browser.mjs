@@ -122,7 +122,30 @@ try {
       if (x < after.width * 0.72) trail++;
       else body++;
     }
-  const report = { lanczos, single, accumulated, sharpened, trail, body, moved };
+  // A scene background makes core pass every frame as one full-canvas view; the upscale draws it at render size
+  // (it threw "one full-canvas view" on every such frame before).
+  await page.evaluate(() => {
+    window.t.use(null);
+    window.t.engine.scene.background = '#18242e';
+    return window.t.frames(2);
+  });
+  const backgroundReference = await shot();
+  await page.evaluate(() => {
+    window.t.use({ scale: 0.5, sharpen: 0 });
+    return window.t.frames(48);
+  });
+  const background = psnr(await shot(), backgroundReference);
+  // Two views are still refused, by name.
+  const split = await page.evaluate(() => {
+    const camera = window.t.engine.camera;
+    try {
+      window.t.engine.render({ views: [{ camera, viewport: [0, 0, 0.5, 1] }, { camera, viewport: [0.5, 0, 0.5, 1] }] });
+      return 'drawn';
+    } catch (error) {
+      return String(error.message);
+    }
+  });
+  const report = { lanczos, single, accumulated, sharpened, trail, body, moved, background, split };
   console.log(JSON.stringify(report));
   await page.evaluate(() => window.t.engine.dispose());
   assert.deepEqual(errors, []);
@@ -132,6 +155,8 @@ try {
   assert.notEqual(sharpened, accumulated, 'sharpen changes the frame');
   assert.ok(body > 50, `the box is drawn: ${body}`);
   assert.ok(trail < body * 0.15, `no trail behind the box: ${trail} red pixels against ${body}`);
+  assert.ok(background > lanczos, `a scene background upscales like a plain frame: ${background} dB`);
+  assert.match(split, /one full-canvas view/);
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });

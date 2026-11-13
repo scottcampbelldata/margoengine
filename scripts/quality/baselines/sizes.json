@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15187344,
+  "total": 15187643,
   "history": [
     {
       "date": "2026-10-24",
@@ -8717,6 +8717,12 @@
       "commit": "3a7867c74",
       "reason": "KB3240b: the shared direct BRDF weights diffuse by 1 minus the dielectric Fresnel (a few bytes of shader text in materials mips and skin)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "1533ccc08",
+      "reason": "TAAUpscale fix: a scene background or layer mask frame (one full-canvas view) upscales instead of throwing; 7880 -> 7923 B for the view check and its restore, no split would remove them",
+      "grew": 1
     }
   ],
   "items": {
@@ -9782,7 +9788,7 @@
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 15106,
     "@margoengine/taa/sharpen": 1023,
-    "@margoengine/taa/upscale": 7880,
+    "@margoengine/taa/upscale": 8179,
     "@margoengine/taa/upscale-velocity": 19611,
     "@margoengine/terrain": 14424,
     "@margoengine/terrain/blend": 3676,
