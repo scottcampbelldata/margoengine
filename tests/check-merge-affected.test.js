@@ -560,9 +560,9 @@ test('the bundler matrix does not take the GPU lock, and a render in a browser i
 test('verify keeps its checks and adds the preview contract after hygiene, assets and the build', () => {
   assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
   assert.deepEqual(SERIAL, [
+    'node scripts/support/external-test-assets.mjs',
     'node scripts/hygiene.js --verify',
     'node scripts/check-gpu-policy.mjs',
-    'node scripts/support/external-test-assets.mjs',
     'npm run build:packages',
   ]);
   assert.deepEqual(

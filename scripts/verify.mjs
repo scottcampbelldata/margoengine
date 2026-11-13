@@ -29,11 +29,12 @@ export function plantStale(dir = root) {
   }
 }
 
-/** Stage 1: in order. */
+/** Stage 1: in order. The external asset check reads files only, so it runs first: a missing download fails in
+ * seconds with its recovery command instead of after hygiene (over 30 s on the mini PC). */
 export const SERIAL = [
+  'node scripts/support/external-test-assets.mjs',
   'node scripts/hygiene.js --verify',
   'node scripts/check-gpu-policy.mjs',
-  'node scripts/support/external-test-assets.mjs',
   'npm run build:packages',
 ];
 

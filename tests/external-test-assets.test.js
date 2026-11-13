@@ -103,6 +103,9 @@ test('missing, partial, changed and LFS-only external caches fail loudly with th
     assert.match(run.stdout, /verify FAILED at node scripts\/support\/external-test-assets.mjs/);
     assert.match(run.stdout, /fetch-skip-assets.mjs/);
     assert.ok(!run.stdout.includes('=== npm run build:packages'));
+    // Regression: the asset check ran after hygiene, which takes over 30 s on the mini PC, so this run timed out
+    // there before it reached the check. It runs first now and reads files only.
+    assert.ok(!run.stdout.includes('=== node scripts/hygiene.js'), 'the asset check runs before hygiene');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
