@@ -18,6 +18,11 @@ export interface UVLoop {
   readonly points: UV[];
   /** Whole periods the loop goes round in u' (a loop round a cylinder: 1 or -1). */
   readonly wrap: number;
+  /**
+   * A slit: a loop of edges each run both ways, through no pole and not round the period, so it bounds nothing (a seam
+   * from near one pole to near the other, run up and back). The face lies all round it, as round a hole.
+   */
+  readonly slit?: boolean;
 }
 
 /** Samples per edge in (u, v): a line maps to a straight line on the surfaces Booleans take; a curve takes enough points to follow its turn. */
@@ -126,6 +131,10 @@ export class FaceUV {
   #poleVs?: (number | undefined)[];
   /** The surface's poles (where u, or v, has no meaning) and their points, found once. */
   #poles?: { at: { v: number } | { u: number }; point: number[] }[];
+  /** The points of the surface's poles, for `edgeCurve`. */
+  readonly #polePoints: number[][] = [];
+  /** Each edge's curve as `edgeCurve` gives it, and the curve itself (the same where it is not moved), found once. */
+  readonly #curves = new Map<Edge, { curve: Curve; edge: Curve; kinks: number[] }>();
   /**
    * Where a loop runs through a pole or apex (a cone's sector, a sphere's lune): there u has no meaning, so the loop
    * runs along the pole's line at v (its points `at` and `at + 1`) from the u' it arrives with to the u' it leaves with.
@@ -149,22 +158,23 @@ export class FaceUV {
           1e-9,
         );
     // The surface's poles in space (the same points with u and v swapped or not).
-    const poles: number[][] = [];
+    const poles = this.#polePoints;
     for (const side of [1, -1] as const) {
       const v = this.raw.pole(side),
         u = this.raw.uPole?.(side);
       if (v !== undefined) poles.push(this.raw.at(0, v));
       if (u !== undefined) poles.push(this.raw.at(u, 0));
     }
-    // Each sample's curve and its parameter there and at the next sample along the loop.
+    // Each sample's curve and its parameter there and at the next sample along the loop (the curve taken into the pole
+    // where it ends at one, `toPole`).
     const spansOf: { curve: Curve; t: number; next: number }[][] = [];
     const samplesOf = face.loops.map((loop) => {
       const samples: XYZ[] = [],
         spans: { curve: Curve; t: number; next: number }[] = [];
       for (const c of loop.coedges) {
-        const ts = edgeParameters(c.edge, edgeSamples(c.edge));
+        const { curve, kinks } = this.edgeCurves(c.edge),
+          ts = this.graded(curve, withBreaks(edgeParameters(c.edge, edgeSamples(c.edge)), kinks));
         if (!c.forward) ts.reverse();
-        const curve = curveEvaluator(c.edge.curve);
         for (let k = 0; k < ts.length - 1; k++) {
           samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
           // An edge over a pole between two samples (a meridian through a sphere's pole) takes the pole as a sample of
@@ -188,6 +198,14 @@ export class FaceUV {
     samplesOf.forEach((samples, li) => {
       const { loop: traced, lines } = this.trace(samples),
         spans = spansOf[li];
+      // A slit's points run back over themselves: its area is rounding, and its sign said the face was empty.
+      const uses = new Map<Edge, number>();
+      for (const c of face.loops[li].coedges) uses.set(c.edge, (uses.get(c.edge) ?? 0) + (c.forward ? 1 : -1));
+      const slit =
+        !traced.wrap &&
+        !lines.length &&
+        [...uses.values()].every((n) => n === 0) &&
+        samples.every((p) => this.poleOf(p) === undefined);
       for (const { at, before, after } of lines) {
         // In along the curve from the sample before the line, which meets the pole at the next sample's parameter; out
         // along the curve of the last sample at the pole, from its parameter on.
@@ -198,8 +216,18 @@ export class FaceUV {
           to = this.lineEnd(v, from, this.meridian(b.curve, b.t, b.next, traced.points[at + 1]));
         this.poleLines.push({ loop: li, at, v, from, to });
       }
-      this.loops.push(traced);
+      this.loops.push(slit ? { ...traced, slit } : traced);
     });
+    // The face's corners at a pole lie side by side round it: their lines span a turn at most. More, and the loops
+    // overlap there (two edges taken through a pole from either side of it, the face between them narrower than the
+    // pole's reach): no single face, so no integral either.
+    for (const v of new Set(this.poleLines.map((l) => l.v))) {
+      const turn = this.poleLines.filter((l) => l.v === v).reduce((sum, l) => sum + Math.abs(l.to - l.from), 0);
+      if (this.period && turn > this.period * (1 + 1e-9))
+        throw new RangeError(
+          `face ${face.name}: its loops overlap round a pole: a loop over a pole between its vertices is not supported yet`,
+        );
+    }
     const vPeriod = this.surface.vPeriod;
     if (vPeriod && this.loops.length) {
       // The cut is a circle round the tube that no loop crosses, so it lies wholly inside or wholly outside the face.
@@ -282,6 +310,93 @@ export class FaceUV {
       if (Math.min(f1, f2) <= within) return f1 < f2 ? x1 : x2;
     }
     return undefined;
+  }
+
+  /**
+   * An edge's curve as the face's loops follow it: the curve itself, or where it ends or passes within a pole's reach
+   * (`poleReach`) but not at it, the curve taken through the pole. An imported vertex lies a little off a pole (within
+   * its tolerance), and an edge passes a little off one: within that distance of the pole it turns round it, by up to
+   * half a turn in u. The loop counts the point at the pole, its line running from the meridian the edge comes in along
+   * to the one it leaves along; a walk along the edge itself counted the turn as well, or part of it, as finely as it
+   * sampled there (a spline sphere's seam tilted 1e-9 rad came out 25% low). So the curve is moved by the offset from
+   * the pole of its end there, and of its nearest point where it passes one, in full there and less in proportion to the
+   * parameter towards the next such point or end: it reaches each pole along a meridian, with no turn. `kinks` are the
+   * passes' parameters, where it turns at the pole (a walk along it breaks there). Mass integrals take the strip from
+   * its feet out to the edge itself, so the shell still closes along the edge.
+   */
+  edgeCurve(edge: Edge): Curve {
+    return this.edgeCurves(edge).curve;
+  }
+
+  /** `edgeCurve`, the edge's own curve (the same object where it is not moved), and where it passes a pole. */
+  edgeCurves(edge: Edge): { curve: Curve; edge: Curve; kinks: number[] } {
+    const known = this.#curves.get(edge);
+    if (known) return known;
+    const own = curveEvaluator(edge.curve),
+      [t0, t1] = edgeParameters(edge, 1),
+      reach = this.poleReach,
+      poles = this.#polePoints,
+      offset = (c: Curve, t: number): XYZ => {
+        const p = c.at(t);
+        for (const pole of poles) if (distance(p, pole) <= reach) return sub(pole, p);
+        return [0, 0, 0];
+      },
+      zero = (o: XYZ) => o[0] === 0 && o[1] === 0 && o[2] === 0;
+    let curve = own;
+    const kinks: number[] = [];
+    if (poles.length && t1 !== t0) {
+      // Into its ends' poles first: the curve then leaves each along a meridian, and passes it no more just beside it.
+      const a = offset(own, t0),
+        b = offset(own, t1);
+      if (!zero(a) || !zero(b)) curve = moved(own, [t0, t1], [a, b]);
+      // Then each pass within reach of a pole between its ends.
+      const passes = polePasses(curve, t0, t1, poles, reach);
+      if (passes.length) {
+        curve = moved(
+          curve,
+          [t0, ...passes.map((q) => q.t), t1],
+          [[0, 0, 0], ...passes.map((q) => q.offset), [0, 0, 0]],
+        );
+        kinks.push(...passes.map((q) => q.t));
+      }
+    }
+    const out = { curve, edge: own, kinks };
+    this.#curves.set(edge, out);
+    return out;
+  }
+
+  /**
+   * Parameters along a curve (ascending or descending), more between them where it passes a pole of the surface nearer
+   * than they lie apart. Round a pole u' turns as fast as the curve passes it is near: an edge from a vertex 0.8
+   * micrometres off a 4 mm sphere's pole (just past `poleReach`) turns up to half a turn round it within about that, so
+   * its samples a 128th of the edge apart left u' jumping by over a quarter turn between two (refused as a loop over the
+   * pole), or by nearly half, read the wrong way round (a loop round the pole read as one beside it), and a walk's
+   * nodes missed its turn. Cut in halves until each part is no longer than its distance from the pole: u' turns by
+   * under 60 degrees along it, smoothly. A part that reaches a pole (within `poleReach`: into a pole vertex, or over a
+   * pole, where the loop runs along its line) is not cut for it; nor past 48 halvings.
+   */
+  graded(curve: Curve, ts: readonly number[]): number[] {
+    const poles = this.#polePoints,
+      reach = this.poleReach,
+      out = [ts[0]];
+    if (!poles.length) return [...ts];
+    const split = (a: number, pa: number[], b: number, pb: number[], depth: number) => {
+      let near = Infinity;
+      for (const pole of poles) near = Math.min(near, toSegment(pole, pa, pb));
+      if (depth < 48 && near > reach && distance(pa, pb) > near) {
+        const m = (a + b) / 2,
+          pm = curve.at(m);
+        split(a, pa, m, pm, depth + 1);
+        split(m, pm, b, pb, depth + 1);
+      } else out.push(b);
+    };
+    let pa = curve.at(ts[0]);
+    for (let i = 0; i + 1 < ts.length; i++) {
+      const pb = curve.at(ts[i + 1]);
+      split(ts[i], pa, ts[i + 1], pb, 0);
+      pa = pb;
+    }
+    return out;
   }
 
   /**
@@ -395,17 +510,38 @@ export class FaceUV {
   meridian(curve: Curve, t: number, toward: number, hint: UV): number {
     const kind = this.face.surface.kind;
     if (!this.swapped && (kind === 'sphere' || kind === 'cone')) {
-      const d = curve.at(t),
+      // Its tangent on the side towards `toward`: a curve taken through a pole (edgeCurve) turns there.
+      const d = (curve as Moved).toward?.(t, toward) ?? curve.at(t),
         pole = this.surface.at(0, hint[1]),
         reach = (Math.sign(toward - t) * distance(pole, curve.at(toward))) / length([d[3], d[4], d[5]]);
       if (Number.isFinite(reach) && reach)
         return this.near([pole[0] + reach * d[3], pole[1] + reach * d[4], pole[2] + reach * d[5]], hint)[0];
     }
     const h = (toward - t) / 64,
-      near = this.near(curve.at(t + h).slice(0, 3) as XYZ, hint)[0],
-      far = this.near(curve.at(t + 2 * h).slice(0, 3) as XYZ, hint)[0],
+      foot = (q: number[]) => this.exact(q, this.near(q.slice(0, 3) as XYZ, hint))[0],
+      near = foot(curve.at(t + h)),
+      far = foot(curve.at(t + 2 * h)),
       u = 2 * near - far;
     return h && Number.isFinite(u) ? u : hint[0];
+  }
+
+  /** The points of the surface's poles and apexes. */
+  get polePoints(): readonly (readonly number[])[] {
+    return this.#polePoints;
+  }
+
+  /** How near a pole a point is at it (`poleOf`): a ten-thousandth of the face's size. */
+  get poleReach(): number {
+    return Math.max(this.#miss, 1e-12) * 100;
+  }
+
+  /**
+   * Whether `p` lies at a pole or apex to within a billionth of the face's size, where a foot's u' is no more than its
+   * projection's rounding (an edge taken through a pole by `edgeCurve` reaches it exactly).
+   */
+  atPole(p: readonly number[]): boolean {
+    const within = Math.max(this.#miss, 1e-12) * 1e-3;
+    return this.#polePoints.some((pole) => distance(pole, p) <= within);
   }
 
   /** Where `p` is a pole or apex: the v of one where u has no meaning, or the u' of one where v has none. */
@@ -441,6 +577,46 @@ export class FaceUV {
       if (s.vPeriod) v += Math.round((hint[1] - v) / s.vPeriod) * s.vPeriod;
     } else if (s.vPeriod) v = this.vCut + ((((v - this.vCut) % s.vPeriod) + s.vPeriod) % s.vPeriod);
     return [u, v];
+  }
+
+  /**
+   * The foot uv of p to the last digits the surface's evaluation holds. A spline's projection stops once its steps move
+   * the foot under a millionth of a millionth of the surface's size, and near a pole (Su almost nothing) that leaves u'
+   * off by that over the distance to the pole: 1e-10 of a turn 8 micrometres from it on a 4 mm sphere. Mass integrals
+   * weigh u' there by the whole meridian's integral (a seam's rates moved a sphere's volume by 3e-10, a pole's line from
+   * an edge's meridian by 8e-11). Gauss-Newton steps on from it while they shrink (it converges in two), never past an
+   * open parameter's end (a foot held there stays). The surface is left evaluated at the foot.
+   */
+  exact(p: readonly number[], uv: UV): UV {
+    const s = this.surface,
+      inside = (t: number, period: number, [lo, hi]: readonly [number, number]) => period > 0 || (t > lo && t < hi);
+    let u = this.flip ? -uv[0] : uv[0],
+      v = uv[1],
+      d = s.at(u, v),
+      last = Infinity;
+    for (let i = 0; i < 4 && inside(u, s.uPeriod, s.uDomain) && inside(v, s.vPeriod, s.vDomain); i++) {
+      const a = d[3] * d[3] + d[4] * d[4] + d[5] * d[5],
+        b = d[3] * d[6] + d[4] * d[7] + d[5] * d[8],
+        e = d[6] * d[6] + d[7] * d[7] + d[8] * d[8],
+        det = a * e - b * b;
+      if (!(Math.abs(det) > 1e-30 * (a * e + 1e-300))) break;
+      // The Gauss-Newton step towards the foot of p, and its length on the surface.
+      const w0 = p[0] - d[0],
+        w1 = p[1] - d[1],
+        w2 = p[2] - d[2],
+        gu = d[3] * w0 + d[4] * w1 + d[5] * w2,
+        gv = d[6] * w0 + d[7] * w1 + d[8] * w2,
+        du = (gu * e - gv * b) / det,
+        dv = (a * gv - b * gu) / det,
+        step = Math.hypot(du * Math.sqrt(a), dv * Math.sqrt(e));
+      if (!(step < last / 2) || !inside(u + du, s.uPeriod, s.uDomain) || !inside(v + dv, s.vPeriod, s.vDomain)) break;
+      last = step;
+      u += du;
+      v += dv;
+      d = s.at(u, v);
+    }
+    s.at(u, v);
+    return [this.flip ? -u : u, v];
   }
 
   /** The 3D point at (u', v). */
@@ -508,7 +684,7 @@ function crossings(loop: UVLoop, period: number, u: number, v: number): number {
 
 /** Whether (u, v) lies on the left of a loop: inside a counter-clockwise one, outside a clockwise one, on the side a loop round the period turns to. */
 export function leftOf(loop: UVLoop, period: number, u: number, v: number): boolean {
-  const bias = loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : polygonArea(loop.points) < 0 ? 1 : 0;
+  const bias = loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : loop.slit || polygonArea(loop.points) < 0 ? 1 : 0;
   return crossings(loop, period, u, v) + bias === 1;
 }
 
@@ -544,6 +720,113 @@ function inAbove(loops: readonly UVLoop[], period: number, cut: number): boolean
   return !up;
 }
 
+/** A curve moved by `edgeCurve`: `toward(t, u)` is its point at t with its tangent on the side towards u. */
+interface Moved extends Curve {
+  toward(t: number, u: number): number[];
+}
+
+/** A curve moved by offsets given at ascending parameters `knots`, linear between them (and its tangent with them). */
+function moved(base: Curve, knots: readonly number[], offsets: readonly XYZ[]): Moved {
+  const at = (t: number, after = false) => {
+    const d = base.at(t).slice();
+    let k = 0;
+    while (k + 2 < knots.length && (after ? t >= knots[k + 1] : t > knots[k + 1])) k++;
+    const span = knots[k + 1] - knots[k],
+      f = (t - knots[k]) / span,
+      a = offsets[k],
+      b = offsets[k + 1];
+    for (let i = 0; i < 3; i++) {
+      d[i] += a[i] + f * (b[i] - a[i]);
+      d[i + 3] += (b[i] - a[i]) / span;
+    }
+    return d;
+  };
+  return {
+    period: base.period,
+    domain: base.domain,
+    at: (t: number) => at(t),
+    toward: (t: number, u: number) => at(t, u > t),
+    parameter: (q, hint) => base.parameter(q, hint),
+    sample: (from, to, deflection, turn) => base.sample(from, to, deflection, turn),
+  };
+}
+
+/**
+ * Where a curve passes within `reach` of a pole strictly between t0 and t1 (ascending, each pole once a pass; a curve
+ * whose end lies within reach of that pole is taken into it at that end instead): the parameter of its least distance
+ * there and the offset from it to the pole. Found from samples a 128th of the range apart, by golden section between
+ * the neighbours of each sample no farther than they are (and near enough that the curve may come within reach there).
+ */
+function polePasses(
+  curve: Curve,
+  t0: number,
+  t1: number,
+  poles: readonly (readonly number[])[],
+  reach: number,
+): { t: number; offset: XYZ }[] {
+  const n = 128,
+    ts = Array.from({ length: n + 1 }, (_, i) => (i === n ? t1 : t0 + ((t1 - t0) * i) / n)),
+    ps = ts.map((t) => curve.at(t)),
+    out: { t: number; offset: XYZ }[] = [],
+    g = (Math.sqrt(5) - 1) / 2;
+  for (const pole of poles) {
+    const off = (t: number) => distance(curve.at(t), pole),
+      ds = ps.map((p) => distance(p, pole));
+    if (ds[0] <= reach || ds[n] <= reach) continue;
+    for (let i = 0; i <= n; i++) {
+      if ((i > 0 && ds[i - 1] < ds[i]) || (i < n && ds[i + 1] < ds[i])) continue;
+      const gap = Math.max(i > 0 ? distance(ps[i - 1], ps[i]) : 0, i < n ? distance(ps[i + 1], ps[i]) : 0);
+      if (ds[i] - gap > reach) continue;
+      let lo = ts[Math.max(0, i - 1)],
+        hi = ts[Math.min(n, i + 1)],
+        x1 = hi - g * (hi - lo),
+        x2 = lo + g * (hi - lo),
+        f1 = off(x1),
+        f2 = off(x2);
+      for (let k = 0; k < 200 && hi - lo > 1e-15 * Math.max(1, Math.abs(lo)); k++)
+        if (f1 < f2) {
+          hi = x2;
+          x2 = x1;
+          f2 = f1;
+          x1 = hi - g * (hi - lo);
+          f1 = off(x1);
+        } else {
+          lo = x1;
+          x1 = x2;
+          f1 = f2;
+          x2 = lo + g * (hi - lo);
+          f2 = off(x2);
+        }
+      const t = f1 < f2 ? x1 : x2;
+      if (
+        Math.min(f1, f2) <= reach &&
+        Math.min(t - t0, t1 - t) > 1e-9 * (t1 - t0) &&
+        !out.some((q) => Math.abs(q.t - t) <= 1e-9 * (t1 - t0))
+      )
+        out.push({ t, offset: sub(pole, curve.at(t)) as XYZ });
+    }
+  }
+  return out.sort((x, y) => x.t - y.t);
+}
+
+/** Parameters `ts` (ascending or descending) with `breaks` among them added in order (those strictly inside). */
+export function withBreaks(ts: readonly number[], breaks: readonly number[]): number[] {
+  if (!breaks.length || ts.length < 2) return [...ts];
+  const up = ts[ts.length - 1] >= ts[0],
+    lo = Math.min(ts[0], ts[ts.length - 1]),
+    hi = Math.max(ts[0], ts[ts.length - 1]);
+  return [...new Set([...ts, ...breaks.filter((t) => t > lo && t < hi)])].sort((a, b) => (up ? a - b : b - a));
+}
+
+/** The distance from p to the segment from a to b. */
+function toSegment(p: readonly number[], a: readonly number[], b: readonly number[]): number {
+  const ab = sub(b, a),
+    ap = sub(p, a),
+    ll = dot(ab, ab),
+    t = ll ? Math.max(0, Math.min(1, dot(ap, ab) / ll)) : 0;
+  return distance(p, add(a, scale(ab, t)));
+}
+
 /** Signed area of a closed polyline (counter-clockwise positive). */
 function polygonArea(points: readonly UV[]): number {
   let a = 0;
@@ -566,7 +849,7 @@ export function vRange(loop: UVLoop): [number, number] {
 /** The loop moved by whole periods in v so it starts at or above `cut` (it lies below `cut` + period when no part crosses the cut). */
 export function shiftV(loop: UVLoop, cut: number, period: number): UVLoop {
   const k = Math.ceil((cut - vRange(loop)[0]) / period);
-  return k ? { points: loop.points.map(([u, v]) => [u, v + k * period] as UV), wrap: loop.wrap } : loop;
+  return k ? { ...loop, points: loop.points.map(([u, v]) => [u, v + k * period] as UV) } : loop;
 }
 
 /** Middles of the stretches of a periodic coordinate that none of the ranges covers, widest first. */

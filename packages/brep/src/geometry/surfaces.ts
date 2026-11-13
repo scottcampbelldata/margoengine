@@ -413,6 +413,11 @@ class SplinePatch implements Surface {
   private readonly uBreaks: number[];
   private readonly vBreaks: number[];
   private seeds?: { u: number; v: number; p: number[] }[];
+  /** The grid's samples of u and of v. */
+  private uSamples: number[] = [];
+  private vSamples: number[] = [];
+  /** The pole rows (offPole), found once. */
+  private poleRows?: { inU: boolean; at: number; into: 1 | -1; point: number[] }[];
   private cell = 0;
   private rows: [number, number] = [0, 0];
   private readonly size: number;
@@ -470,9 +475,61 @@ class SplinePatch implements Surface {
     if (hint) {
       const r = this.newton(p, hint[0], hint[1]),
         free = !this.singular(hint[0], hint[1]) && !this.singular(r.uv[0], r.uv[1]);
-      return (free && r.along <= this.cell / 4) || r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r, false).uv;
+      return this.offPole(
+        p,
+        (free && r.along <= this.cell / 4) || r.miss <= 1e-6 * this.size ? r : this.nearest(p, r, false),
+      ).uv;
     }
-    return this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, along: Infinity }, true).uv;
+    return this.offPole(
+      p,
+      this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, along: Infinity }, true),
+    ).uv;
+  }
+  /**
+   * A landing on or beside a pole's row that misses the point by more than its own distance from the pole, tried again
+   * from beside the pole. Gauss-Newton from a start on
+   * the row (a hint at the pole, the nearest sample for a point beside it) has no u there, and its first step, divided
+   * by an Su of rounding, sends u anywhere; a v step out past the row is then held on it, and the landing misses by the
+   * point's distance from the pole: within a millionth of the surface's size it was taken, with u wrong (on a sphere's
+   * B-spline, by up to half a turn). So it starts again where the point lies: on the meridians whose tangent at the pole
+   * points nearest its way from the pole, at its distance along them. Kept when it lands nearer.
+   */
+  private offPole(p: readonly number[], best: Landing): Landing {
+    if (!(best.miss > 1e-12 * this.size)) return best;
+    const landed = this.at(best.uv[0], best.uv[1]).slice(0, 3);
+    for (const row of (this.poleRows ??= this.findPoleRows())) {
+      // On the pole, or nearer it than half the miss (a landing a hair off the row, its u as wrong).
+      if (!(distance(landed, row.point) < best.miss / 2)) continue;
+      const w = sub(p, row.point),
+        far = length(w);
+      if (!far) continue;
+      // Along each sample's meridian: its tangent at the pole (Sv on a row of v, Su on one of u), pointed into the surface.
+      const tries: { t: number; speed: number; lean: number }[] = [];
+      for (const t of row.inU ? this.vSamples : this.uSamples) {
+        const d = row.inU ? this.at(row.at, t) : this.at(t, row.at),
+          tangent = row.inU ? d.slice(3, 6) : d.slice(6, 9),
+          speed = length(tangent);
+        if (speed > 0) tries.push({ t, speed, lean: (row.into * dot(tangent, w)) / (speed * far) });
+      }
+      for (const { t, speed } of tries.sort((a, b) => b.lean - a.lean).slice(0, 2)) {
+        const along = row.at + (row.into * far) / speed,
+          r = row.inU ? this.newton(p, along, t) : this.newton(p, t, along);
+        if (r.miss < best.miss) best = { ...r, along: best.along };
+      }
+    }
+    return best;
+  }
+  /** The rows of control points collapsed to a point (poles), with the way into the surface from each. */
+  private findPoleRows(): { inU: boolean; at: number; into: 1 | -1; point: number[] }[] {
+    const rows: { inU: boolean; at: number; into: 1 | -1; point: number[] }[] = [];
+    for (const side of [1, -1] as const) {
+      const v = this.pole(side),
+        u = this.uPole(side),
+        into = side > 0 ? -1 : 1;
+      if (v !== undefined) rows.push({ inU: false, at: v, into, point: this.at(this.uDomain[0], v).slice(0, 3) });
+      if (u !== undefined) rows.push({ inU: true, at: u, into, point: this.at(u, this.vDomain[0]).slice(0, 3) });
+    }
+    return rows;
   }
   /**
    * Up to 4 samples per knot span in each direction (at most 48 a direction, at least one a span, and the ends of an
@@ -495,6 +552,8 @@ class SplinePatch implements Surface {
       us = samples(this.uBreaks, this.uPeriod > 0),
       vs = samples(this.vBreaks, this.vPeriod > 0);
     this.seeds = us.flatMap((su) => vs.map((sv) => ({ u: su, v: sv, p: this.at(su, sv) })));
+    this.uSamples = us;
+    this.vSamples = vs;
     this.rows = [us.length, vs.length];
     let cell = 0;
     for (let i = 0; i < us.length; i++)

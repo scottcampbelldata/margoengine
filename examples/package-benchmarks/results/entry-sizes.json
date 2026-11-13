@@ -1,5 +1,5 @@
 {
-  "commit": "598b9e2c9",
+  "commit": "e379d192d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -422,8 +422,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 384148,
-        "gzip": 134199
+        "raw": 388961,
+        "gzip": 136038
       }
     },
     "@margoengine/bvh": {
@@ -540,8 +540,8 @@
         "gzip": 266
       },
       "dist/workers/cad-runtime.js": {
-        "raw": 229472,
-        "gzip": 81322
+        "raw": 230440,
+        "gzip": 81668
       }
     },
     "@margoengine/cameras": {
@@ -14936,20 +14936,20 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 379087,
-        "gzip": 116285
+        "raw": 379613,
+        "gzip": 116430
       },
       "./adapter": {
         "raw": 1861,
         "gzip": 958
       },
       "./compute": {
-        "raw": 166180,
-        "gzip": 48560
+        "raw": 166710,
+        "gzip": 48710
       },
       "./device": {
-        "raw": 378272,
-        "gzip": 116298
+        "raw": 378798,
+        "gzip": 116442
       },
       "./glsl": {
         "raw": 152059,
@@ -14960,8 +14960,8 @@
         "gzip": 26533
       },
       "./xr": {
-        "raw": 378322,
-        "gzip": 116207
+        "raw": 378848,
+        "gzip": 116356
       },
       "./preview": {
         "raw": 8241,
@@ -14980,8 +14980,8 @@
         "gzip": 3831
       },
       "./tiers": {
-        "raw": 379891,
-        "gzip": 116030
+        "raw": 380417,
+        "gzip": 116183
       }
     },
     "@margoengine/wfc": {
@@ -15386,9 +15386,9 @@
       "brotli": 15920
     },
     "packages/cad/dist/workers/cad-runtime.js": {
-      "raw": 227516,
-      "gzip": 81162,
-      "brotli": 69719
+      "raw": 228484,
+      "gzip": 81509,
+      "brotli": 70106
     },
     "packages/fbx/dist/workers/fbx.js": {
       "raw": 336364,
@@ -15486,13 +15486,13 @@
       "entry": ".",
       "base": {
         "raw": 278674,
-        "gzip": 84441,
+        "gzip": 84438,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime and read-back",
-        "raw": 100412,
-        "gzip": 32293,
+        "raw": 100938,
+        "gzip": 32444,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     },

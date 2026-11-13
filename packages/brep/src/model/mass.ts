@@ -15,7 +15,7 @@
 import type { Curve } from '../geometry/curves.js';
 import type { XYZ } from '../geometry/vec.js';
 import type { Surface } from '../geometry/surfaces.js';
-import { FaceUV, type UV } from './faces.js';
+import { FaceUV, withBreaks, type UV } from './faces.js';
 import { curveEvaluator } from './geometry.js';
 import type { Body, Face } from './topology.js';
 import { edgeParameters } from './validate.js';
@@ -320,11 +320,22 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
       first: XYZ | undefined,
       last: UV | undefined;
     for (const co of loop.coedges) {
-      const curve = curveEvaluator(co.edge.curve),
+      // The walk follows the edge as the loop does (through a pole it ends or passes a hair off), the strip goes out to
+      // the edge itself.
+      const { curve, edge, kinks } = fuv.edgeCurves(co.edge),
         [t0, t1] = edgeParameters(co.edge, 1),
         [a, b] = co.forward ? [t0, t1] : [t1, t0],
-        breaks = curve.sample(a, b, co.edge.curve.kind === 'spline' ? size : Number.POSITIVE_INFINITY, Math.PI / 8),
-        pole = fuv.poleOf(co.start.point) !== undefined;
+        // Cut where it passes through a pole, turning there (FaceUV.edgeCurve), and where it passes one nearer than its
+        // pieces are long (FaceUV.graded): u' turns fast there.
+        breaks = fuv.graded(
+          curve,
+          withBreaks(
+            curve.sample(a, b, co.edge.curve.kind === 'spline' ? size : Number.POSITIVE_INFINITY, Math.PI / 8),
+            kinks,
+          ),
+        ),
+        // At a pole as the loop has it: by the curve's end (taken into a pole within reach of it), not the vertex.
+        pole = fuv.poleOf(curve.at(a).slice(0, 3) as XYZ) !== undefined;
       if (!pole) {
         const p = curve.at(a).slice(0, 3) as XYZ,
           uv = fuv.near(p, hint);
@@ -334,7 +345,7 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
       }
       for (let i = 0; i + 1 < breaks.length; i++) {
         step.fill(0);
-        const piece = pieceNodes(walk, curve, breaks[i], breaks[i + 1], hint);
+        const piece = pieceNodes(walk, curve, edge, breaks[i], breaks[i + 1], hint);
         for (const n of piece.nodes) {
           const gv = G(n.uv[0], n.uv[1]),
             w = across ? n.rates[1] : -n.rates[0];
@@ -346,10 +357,11 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
         for (let k = 0; k < K; k++) out[k] += step[k];
       }
       last = undefined;
-      if (fuv.poleOf(co.end.point) === undefined) hint = last = fuv.near(curve.at(b).slice(0, 3) as XYZ, hint);
+      const end = curve.at(b).slice(0, 3) as XYZ;
+      if (fuv.poleOf(end) === undefined) hint = last = fuv.near(end, hint);
     }
     // Back to the first coedge's start, the short way (a loop round a cylinder ends a period on from where it began).
-    if (first && last && fuv.poleOf(loop.coedges[0].start.point) === undefined) bridge(last, fuv.near(first, last));
+    if (first && last) bridge(last, fuv.near(first, last));
   });
 
   // Where a loop runs through a pole: along its line from the u' it arrives with to the u' it leaves with, the meridians
@@ -581,8 +593,8 @@ function linesBetween(knots: readonly number[], period: number, lo: number, hi: 
 }
 
 /**
- * A Gauss node along an edge: its parameter t and weight, the edge's point and tangent, its foot, the surface there
- * (S(u, v) and its derivatives) and the foot's rates.
+ * A Gauss node along an edge: its parameter t and weight, the edge's own point and tangent, the foot of the curve the
+ * loop follows (FaceUV.edgeCurve), the surface there (S(u, v) and its derivatives) and the foot's rates.
  */
 interface EdgeNode {
   readonly t: number;
@@ -607,7 +619,7 @@ interface Walk {
 
 /**
  * The Gauss nodes of an edge's piece from t0 to t1, `hint` a foot near t0's, and the foot at t1: 16 nodes, with their
- * feet's rates. On a spline face (`lines`) the integrands' derivatives jump where the edge's foot crosses a knot line,
+ * feet's rates, the feet those of `curve` (the edge as the loop follows it) and the points the edge's own (`edge`). On a spline face (`lines`) the integrands' derivatives jump where the edge's foot crosses a knot line,
  * and the foot's rates where it passes the surface's edge and is held there: one Gauss piece across such kinks makes
  * the rates' integral miss the change of u' along the edge (by 2e-4 of the face on a line across 8 knot spans), and the
  * face's integrals then depend on v*. So wherever two consecutive feet (the piece's ends and nodes) lie either side of
@@ -616,15 +628,23 @@ interface Walk {
  * speed changes sixfold or more) is halved, up to 8 times, while that cuts its miss fourfold. Elsewhere the nodes are
  * one piece's.
  */
-function pieceNodes(walk: Walk, curve: Curve, t0: number, t1: number, hint: UV): { nodes: EdgeNode[]; end: UV } {
+function pieceNodes(
+  walk: Walk,
+  curve: Curve,
+  edge: Curve,
+  t0: number,
+  t1: number,
+  hint: UV,
+): { nodes: EdgeNode[]; end: UV } {
   type Foot = { t: number; p: number[]; uv: UV; x?: UV };
   const { fuv, lines, bend, axis, height } = walk,
     s = fuv.surface,
     foot = (t: number, near: UV): Foot => {
       const p = curve.at(t),
-        uv = fuv.near(p.slice(0, 3) as XYZ, near);
-      // Right after the projection, which leaves the surface evaluated there.
-      return { t, p, uv, x: lines && past(s, fuv.flip, uv, p) };
+        uv = lines ? fuv.exact(p, fuv.near(p.slice(0, 3) as XYZ, near)) : fuv.near(p.slice(0, 3) as XYZ, near);
+      // Right after the projection, which leaves the surface evaluated there. At a pole u' has no meaning (its foot's is
+      // the hint's, or any): no knot line is found crossed between it and the next foot, nor a miss halved towards it.
+      return { t, p, uv, x: lines && !fuv.atPole(p) ? past(s, fuv.flip, uv, p) : undefined };
     },
     gauss = (a: number, b: number, from: UV, feet?: Foot[]): EdgeNode[] => {
       const h = b - a,
@@ -638,7 +658,7 @@ function pieceNodes(walk: Walk, curve: Curve, t0: number, t1: number, hint: UV):
         out.push({
           t: f.t,
           w: (h / 2) * GAUSS.w[i],
-          p: f.p,
+          p: edge === curve ? f.p : edge.at(f.t),
           uv: f.uv,
           d,
           rates: rates(s, fuv.flip, f.uv, d, f.p, bend, height),

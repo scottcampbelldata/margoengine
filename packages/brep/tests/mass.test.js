@@ -17,6 +17,7 @@ const {
   revolve,
   sphere,
   torus,
+  surfaceEvaluator,
   validateBody,
 } = model;
 const mm = 0.001,
@@ -616,4 +617,153 @@ test('mass properties: a spline sphere whose seam passes a hair off its poles', 
   loop.use(seam, false);
   const m = massProperties(body);
   close(m.volume, (4 / 3) * Math.PI * r ** 3, 'volume', 1e-9);
+});
+
+/** Tilts from 1e-15 to 1e-1 rad, three a decade. */
+const tilts = [1, 2, 5].flatMap((m) => Array.from({ length: 15 }, (_, i) => m * 10 ** (i - 15))).sort((a, b) => a - b);
+
+test('mass properties: a sphere seamed from a hair off one pole to a hair off the other, at tilts 1e-15 to 1e-1', {
+  timeout: 120000,
+}, () => {
+  // The seam's circle tilted off the poles' meridian, its vertices as far off the poles and as tolerant (as an imported
+  // sphere may have them). A 1e-9 rad tilt left a spline sphere 25% low: the loop counted the vertices at the poles,
+  // the walk along the seam turned a quarter turn round the pole within 4 pm of it where a cut fell there. Seams that
+  // miss the poles by more (1e-2) bounded a slit whose area's sign of rounding read the face as empty: volume 0.
+  const r = 4 * mm;
+  for (const kind of ['spline', 'sphere'])
+    for (const tilt of tilts) {
+      const meridian = {
+          kind: 'circle',
+          frame: frameOf([0, 0, 0], [0, -Math.cos(tilt), Math.sin(tilt)], [0, 0, -1]),
+          radius: r,
+        },
+        c = curveEvaluator(meridian),
+        south = new Vertex('s', c.at(0).slice(0, 3)),
+        north = new Vertex('n', c.at(Math.PI).slice(0, 3)),
+        seam = new Edge('seam', meridian, south, north),
+        body = new Body('seamed', 'solid'),
+        surface =
+          kind === 'spline' ? splineSphere(r) : { kind, frame: frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]), radius: r },
+        loop = body
+          .shell()
+          .add(new Face('f', surface, true))
+          .loop();
+      seam.tolerance = south.tolerance = north.tolerance = 2 * r * tilt + 1e-9;
+      loop.use(seam, true);
+      loop.use(seam, false);
+      const m = massProperties(body);
+      close(m.volume, (4 / 3) * Math.PI * r ** 3, `${kind} ${tilt} volume`, 1e-12);
+      close(m.area, 4 * Math.PI * r * r, `${kind} ${tilt} area`, 1e-12);
+    }
+});
+
+test('mass properties: a ball wedge between half circles through points a hair off the poles, at tilts 1e-15 to 1e-1', {
+  timeout: 300000,
+}, () => {
+  // The wedge's axis tilted off the sphere's, so its edges end a little off the poles and pass a little off them. Each
+  // comes out exact, or the face is refused (a RangeError): never a wrong volume. Before, a spline sphere's wedge came
+  // out wrong by up to 6e-1 at many tilts (feet at the pole with u' anywhere, a pole's line from a meridian the walk did
+  // not follow, a vertex's turn round the pole sampled too coarsely), and the analytic sphere's by up to 4e-1.
+  const r = 4 * mm,
+    refused = [];
+  for (const kind of ['spline', 'sphere'])
+    for (const [alpha, rot] of [
+      [Math.PI / 2, 0.3],
+      [0.5, 2],
+      [Math.PI, 0.1],
+    ])
+      for (const tilt of tilts)
+        for (const forward of [true, false]) {
+          const axis = [0, Math.sin(tilt), Math.cos(tilt)],
+            b1 = [1, 0, 0],
+            b2 = [0, Math.cos(tilt), -Math.sin(tilt)],
+            normal = (angle) => [0, 1, 2].map((k) => Math.cos(angle) * b1[k] + Math.sin(angle) * b2[k]),
+            down = axis.map((x) => -x),
+            [n1, n2] = [normal(rot), normal(rot + alpha)],
+            c1 = { kind: 'circle', frame: frameOf([0, 0, 0], n1, down), radius: r },
+            c2 = { kind: 'circle', frame: frameOf([0, 0, 0], n2, down), radius: r },
+            S = new Vertex('s', curveEvaluator(c1).at(0).slice(0, 3)),
+            N = new Vertex('n', curveEvaluator(c1).at(Math.PI).slice(0, 3)),
+            e1 = new Edge('e1', c1, S, N),
+            e2 = new Edge('e2', c2, S, N),
+            line = new Edge('axis', { kind: 'line', origin: S.point, direction: axis }, S, N),
+            surface =
+              kind === 'spline'
+                ? splineSphere(r)
+                : { kind, frame: frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]), radius: r },
+            plane = (n, s) => ({
+              kind: 'plane',
+              frame: frameOf(
+                [0, 0, 0],
+                n.map((x) => x * s),
+                axis,
+              ),
+            });
+          for (const x of [e1, e2, line, S, N]) x.tolerance = 2 * r * tilt + 1e-9;
+          // The planes' normals out of the wedge: whichever way validates.
+          let body;
+          for (const s1 of [1, -1])
+            for (const s2 of [1, -1]) {
+              if (body) continue;
+              const b = new Body('wedge', 'solid'),
+                shell = b.shell(),
+                lune = shell.add(new Face('lune', surface, true)).loop(),
+                p1 = shell.add(new Face('p1', plane(n1, s1), true)).loop(),
+                p2 = shell.add(new Face('p2', plane(n2, s2), true)).loop();
+              lune.use(e1, forward);
+              lune.use(e2, !forward);
+              p1.use(e1, !forward);
+              p1.use(line, forward);
+              p2.use(e2, forward);
+              p2.use(line, !forward);
+              let problems;
+              try {
+                problems = validateBody(b);
+              } catch {
+                problems = ['refused'];
+              }
+              if (!problems.length) body = b;
+            }
+          const what = `${kind} wedge ${alpha.toFixed(2)} at ${rot} ${forward ? 'out' : 'in'}, tilt ${tilt}`;
+          if (!body) {
+            refused.push(what);
+            continue;
+          }
+          let m;
+          try {
+            m = massProperties(body);
+          } catch (e) {
+            assert.ok(e instanceof RangeError && /not supported yet/.test(e.message), `${what}: ${e}`);
+            refused.push(what);
+            continue;
+          }
+          const angle = forward ? 2 * Math.PI - alpha : alpha;
+          close(m.volume, (2 * angle * r ** 3) / 3, `${what}: volume`, 1e-9);
+        }
+  // Refused only where a vertex lies at the pole's reach (1e-4 of the face's size), its edges passing the pole either
+  // side within it.
+  assert.ok(
+    refused.every((w) => / tilt 0\.0002$/.test(w)),
+    refused.join('; '),
+  );
+  assert.ok(refused.length <= 6, refused.join('; '));
+});
+
+test('mass properties: a spline sphere projects points a hair off its pole onto their own meridian', () => {
+  // From a hint at the pole (or the nearest sample, on it), Gauss-Newton has no u there: its first step, divided by an
+  // Su of rounding, sent u anywhere and a step out past the pole's row held it there, missing the point by its distance
+  // from the pole, within a millionth of the surface's size: taken, with u up to half a turn off.
+  const r = 4 * mm,
+    s = surfaceEvaluator(splineSphere(r)),
+    a = 2 * Math.PI * 0.55;
+  for (const off of [1e-12, 1e-10, 5.9e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5]) {
+    const p = [off * Math.cos(a), off * Math.sin(a), Math.sqrt(r * r - off * off)];
+    for (const hint of [undefined, [0.74, 1], [0.55, 0.999], [0.3, 0.99]]) {
+      const [u, v] = s.parameters(p, hint),
+        q = s.at(u, v);
+      // On the point to the projection's own stop: a millionth of a millionth of the surface's size.
+      assert.ok(Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) <= 1e-14, `${off} from ${hint}: lands at ${u}, ${v}`);
+      assert.ok(Math.abs(u - 0.5525) < 1e-3, `${off} from ${hint}: u ${u}`);
+    }
+  }
 });
