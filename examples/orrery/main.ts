@@ -6,6 +6,7 @@ import { engineRuntime } from '@margoengine/core/extension';
 import { loadGLTF } from '@margoengine/gltf-pro';
 import { Shadows } from '@margoengine/shadows';
 import { Clustered } from '@margoengine/clustered';
+import { AreaLights } from '@margoengine/clustered/area';
 import { LightProbes } from '@margoengine/environment/probes';
 import { OIT } from '@margoengine/oit';
 import { PostStack } from '@margoengine/post/stack';
@@ -101,10 +102,27 @@ async function start() {
   runtime.lighting.radiance.set([1.0, 0.86, 0.68, 0.0]);
   optional(() => Shadows.attach(engine, { distance: 6, lightSize: 0.012 }))?.add(model);
   const lights = optional(() => Clustered.attach(engine));
-  const lampBulb: [number, number, number] = [1.25, 0.43, -0.82];
+  const lampColor: [number, number, number] = [1.0, 0.72, 0.45];
+  // The desk lamp shines through the opal-lined mouth of its shade (29 by 14 cm): an area light, so the smooth dome
+  // shows a soft patch of it, not the pinpoint a point light leaves on glass. Where area lights are refused, a point
+  // light at the bulb stands in.
+  const area = lights && optional(() => AreaLights.attach(engine, { lights, maxLights: 1 }));
+  const mouth = { width: 0.29, height: 0.14 };
+  area?.setLights([
+    {
+      position: [1.25, 0.415, -0.82],
+      direction: [0, -1, 0],
+      up: [0, 0, 1],
+      ...mouth,
+      color: lampColor,
+      intensity: 1.2 / (mouth.width * mouth.height),
+    },
+  ]);
   // The Sun holds a lamp, as old lamp orreries did: the planets show their lit half to it.
   lights?.setLights([
-    { position: lampBulb, range: 4, color: [1.0, 0.72, 0.45], intensity: 1.2 },
+    ...(area
+      ? []
+      : [{ position: [1.25, 0.43, -0.82] as [number, number, number], range: 4, color: lampColor, intensity: 1.2 }]),
     { position: [0, PLANET_Z, 0], range: 0.68, decay: 1, color: [1.0, 0.62, 0.3], intensity: 0.2 },
   ]);
   lights?.add(model);
@@ -319,8 +337,13 @@ async function start() {
     const m = part.planet.matrix;
     const at: [number, number, number] = [m[12], m[13], m[14]];
     // From outside its orbit, a little above, turned toward the side the camera is on now.
+    // The offset below is 1.194 d long; keep it a tenth past the controls' nearest distance, or the transition is
+    // refused (Mercury's own d once fell just inside it).
     const out = Math.hypot(at[0], at[2]) || 1,
-      d = 0.07 + part.layout.radius * 4 + (part.layout.ring?.outer ?? 0) * 2,
+      d = Math.max(
+        0.07 + part.layout.radius * 4 + (part.layout.ring?.outer ?? 0) * 2,
+        (controls.minDistance * 1.1) / Math.hypot(1, 0.5, 0.42),
+      ),
       cam = engine.camera.position,
       side = Math.sign(cam[0] * -at[2] + cam[2] * at[0]) || 1;
     const from: [number, number, number] = [

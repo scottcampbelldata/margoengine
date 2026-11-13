@@ -225,7 +225,6 @@ STEEL = principled('steel', (0.55, 0.56, 0.58), 0.22, 1.0)
 BLUED = principled('blued_steel', (0.035, 0.05, 0.13), 0.18, 1.0)
 NIELLO = principled('niello', (0.012, 0.010, 0.009), 0.45, 0.0)
 GLASS = principled('glass', (0.965, 0.985, 0.978), 0.0, 0.0, transmission=1.0, ior=1.52)
-SUN_GLOW = principled('sun_glow', (1.0, 0.6, 0.2), 0.3, 0.0, emission=(1.0, 0.5, 0.14), emission_strength=7.0)
 BULB = principled('bulb', (1.0, 0.8, 0.55), 0.3, 0.0, emission=(1.0, 0.72, 0.42), emission_strength=40.0)
 SKY = principled('window_sky', (0.0, 0.0, 0.0), 1.0, 0.0, emission=(0.55, 0.68, 0.9), emission_strength=2.4)
 BOOKS = principled('books', (1, 1, 1), 0.55, 0.0)
@@ -470,7 +469,7 @@ def bake_all():
         out = nt.nodes['Material Output']
         emit = nt.nodes.new('ShaderNodeEmission')
         images = {}
-        for channel, colorspace in (('Base Color', 'sRGB'), ('Roughness', 'Non-Color')):
+        for channel, colorspace in (('Base Color', 'sRGB'), ('Roughness', 'Non-Color'), ('Emission Color', 'sRGB')):
             src = bsdf.inputs[channel].links[0].from_socket if bsdf.inputs[channel].links else None
             if src is None:
                 continue
@@ -800,19 +799,38 @@ def build_arms():
                 bake_later(mb, 256)
 
 
+def sun_glass():
+    """The Sun's glass: a lit amber globe whose glow is granulated, slightly brighter and paler in some cells than in
+    others, so it reads as glass with a lamp behind it, not a flat disc. Baked into an emission image."""
+    mat, bsdf = procedural('sun_glow', 0.3)
+    bsdf.inputs['Base Color'].default_value = (1.0, 0.6, 0.2, 1)
+    bsdf.inputs['Emission Strength'].default_value = 8.5
+    lk = mat.node_tree.links.new
+    v = coords(mat, 1.0)
+    cells = node(mat, 'ShaderNodeTexVoronoi', feature='SMOOTH_F1')
+    cells.inputs['Scale'].default_value = 260.0
+    cells.inputs['Smoothness'].default_value = 0.6
+    lk(v, cells.inputs['Vector'])
+    grain = node(mat, 'ShaderNodeTexNoise')
+    grain.inputs['Scale'].default_value = 90.0
+    grain.inputs['Detail'].default_value = 6.0
+    lk(v, grain.inputs['Vector'])
+    mix = node(mat, 'ShaderNodeMix', data_type='FLOAT')
+    mix.inputs['Factor'].default_value = 0.5
+    lk(cells.outputs['Distance'], mix.inputs['A'])
+    lk(grain.outputs['Fac'], mix.inputs['B'])
+    col = ramp(mat, [(0.25, (0.9, 0.34, 0.07)), (0.7, (1.0, 0.56, 0.2))])
+    lk(mix.outputs['Result'], col.inputs['Fac'])
+    lk(col.outputs['Color'], bsdf.inputs['Emission Color'])
+    return mat
+
+
 def build_sun():
     s = L['sun']
-    sun = mesh_object('sun', sphere(s['radius'], 64, 32), SUN_GLOW, ORRERY, (0, 0, s['z']))
-    # A gilt crown of flame rays round the Sun's equator, and a cup under it.
-    rays = []
-    for k in range(16):
-        a = TAU * k / 16
-        length = 0.016 if k % 2 == 0 else 0.011
-        r0 = s['radius'] + 0.001
-        outline = [(r0, -0.0042), (r0 + length * 0.55, -0.0022), (r0 + length, 0.0), (r0 + length * 0.55, 0.0022), (r0, 0.0042)]
-        bm = prism([outline], -0.0007, 0.0007, 0.0002)
-        rays.append(transformed(bm, Matrix.Rotation(a, 4, 'Z')))
-    mesh_object('sun_rays', merge(*rays), GILT, sun)
+    sun = mesh_object('sun', sphere(s['radius'], 64, 32), sun_glass(), ORRERY, (0, 0, s['z']))
+    bake_later(sun, 512)
+    # A plain glowing globe on a gilt cup: no crown of rays, which read as a face (eyes and whiskers) from the
+    # opening view.
     cup = lathe([(0, -s['radius'] - 0.012), (0.004, -s['radius'] - 0.012), (0.012, -s['radius'] - 0.002), (0.0155, -s['radius'] * 0.55),
                  (0.0145, -s['radius'] * 0.5), (0.003, -s['radius'] - 0.008), (0, -s['radius'] - 0.008)], 48)
     mesh_object('sun_cup', cup, GILT, sun)
@@ -836,8 +854,12 @@ def build_dome():
     inner[0] = (0.0, inner[0][1])
     dome = mesh_object('dome', lathe(outer + inner + [(r, z0)], 160), GLASS, ORRERY, smooth=50)
     dome_root = dome
-    finial = lathe([(0, 0), (0.012, 0), (0.014, 0.004), (0.008, 0.008), (0.006, 0.014), (0.0105, 0.024), (0.006, 0.034), (0, 0.036)], 40)
-    mesh_object('dome_finial', transformed(finial, Matrix.Translation((0, 0, wall_top + d['cap'] - 0.001))), BRASS_POLISHED, dome_root)
+    # The finial: a turned knob with a ball top, seated on a wide rosette that hugs the glass, so it reads as fixed to
+    # the jar even where the glass under it is invisible.
+    ball = [(0.011 * math.cos(math.radians(a)), 0.033 + 0.011 * math.sin(math.radians(a))) for a in range(-60, 90, 10)] + [(0, 0.044)]
+    finial = lathe([(0, 0), (0.036, 0), (0.0375, 0.0018), (0.034, 0.0036), (0.022, 0.0052), (0.014, 0.0068), (0.0105, 0.0095),
+                    (0.0075, 0.013), (0.0068, 0.017), (0.0092, 0.019), (0.0092, 0.0215), (0.0062, 0.0235)] + ball, 64)
+    mesh_object('dome_finial', transformed(finial, Matrix.Translation((0, 0, wall_top + d['cap'] - 0.0008))), BRASS, dome_root, smooth=40)
 
 
 # ---------------------------------------------------------------------------------------------------------------------

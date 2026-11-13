@@ -19,7 +19,7 @@ and [main.ts](main.ts) drives it.
 | Reflections and bounce light baked from the study itself: a box probe for the room, one for the mechanism, an irradiance volume | `@margoengine/environment/probes` |
 | The glass dome, two surfaces thick, order independent | `@margoengine/oit` |
 | Window sunlight with soft cascaded shadows, contact shadows | `@margoengine/shadows`, `@margoengine/post/contact-shadows` |
-| The desk lamp, and a lamp inside the Sun that lights the planets' day sides | `@margoengine/clustered` |
+| The desk lamp (an area light the size of its shade's mouth), and a lamp inside the Sun that lights the planets' day sides | `@margoengine/clustered`, `@margoengine/clustered/area` |
 | Depth of field that racks focus to whatever you click | `@margoengine/dof`, `@margoengine/dof/autofocus` |
 | Bloom on the Sun and the highlights, PBR Neutral tone mapping | `@margoengine/post/bloom`, `@margoengine/tonemap` |
 | Temporal anti-aliasing and upscaling of the fine teeth | `@margoengine/taa/upscale` |

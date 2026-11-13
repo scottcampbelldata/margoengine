@@ -110,6 +110,24 @@ try {
   assert.equal(flight.selected, 'mars');
   assert.ok(flight.distance < 0.3, `camera ${flight.distance} m from Mars`);
   await page.waitForFunction(() => window.orrery.dome > 0.4, null, { timeout: 30000 });
+  // Every planet can be flown to: Mercury, the smallest, once asked for a view nearer than the controls allow and threw.
+  const flights = await page.evaluate(async () => {
+    const o = window.orrery,
+      out = {};
+    for (const name of ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']) {
+      try {
+        await o.select(name);
+        const m = o.model.nodes.find((n) => n.name === `planet_${name}`).matrix;
+        const c = o.engine.camera.position;
+        out[name] = Math.hypot(c[0] - m[12], c[1] - m[13], c[2] - m[14]);
+      } catch (error) {
+        out[name] = String(error);
+      }
+    }
+    return out;
+  });
+  for (const [name, distance] of Object.entries(flights))
+    assert.ok(typeof distance === 'number' && distance >= 0.12 && distance < 0.4, `fly to ${name}: ${distance}`);
   await page.click('#xray');
   await page.click('#names');
   await page.click('#reset');
