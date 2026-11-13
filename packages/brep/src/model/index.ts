@@ -22,6 +22,7 @@ export { boolean } from './boolean.js';
 export type { BooleanOperation } from './boolean.js';
 export { chamfer, fillet } from './blend.js';
 export { sew } from './sew.js';
+export { offsetFaces, shell } from './offset.js';
 export type { SewReport } from './sew.js';
 export { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
 export type { SurfaceIntersection } from './intersect.js';
