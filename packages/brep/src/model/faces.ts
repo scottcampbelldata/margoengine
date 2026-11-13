@@ -190,7 +190,15 @@ export class FaceUV {
           vPeriod,
         ),
         wraps = this.loops.some((l) => l.wrap),
-        cut = wraps
+        // A loop whose v runs a whole period is bounded by a seam: an edge round the axis used both ways (a torus swept
+        // part way round, its tube whole). The seam is the cut, on the face's boundary, not inside it.
+        seam = this.loops.find((l) => {
+          const [lo, hi] = vRange(l);
+          return hi - lo >= vPeriod * (1 - 1e-9);
+        }),
+        cut = seam
+          ? vRange(seam)[0]
+          : wraps
           ? options.find(
               (g) =>
                 !inAbove(
@@ -206,7 +214,7 @@ export class FaceUV {
       this.loops.forEach((l, i) => {
         this.loops[i] = shiftV(l, cut, vPeriod);
       });
-      this.cutInside = !wraps && inAbove(this.loops, this.period, cut);
+      this.cutInside = !seam && !wraps && inAbove(this.loops, this.period, cut);
       this.box[2] = this.cutInside ? cut : Math.min(...this.loops.map((l) => vRange(l)[0]));
       this.box[3] = this.cutInside ? cut + vPeriod : Math.max(...this.loops.map((l) => vRange(l)[1]));
     }

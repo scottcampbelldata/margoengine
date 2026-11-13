@@ -23,6 +23,8 @@ export type { BooleanOperation } from './boolean.js';
 export { chamfer, fillet } from './blend.js';
 export { sew } from './sew.js';
 export { draft, offsetFaces, shell } from './offset.js';
+export { sweep } from './sweep.js';
+export type { Path, PathSegment } from './sweep.js';
 export type { SewReport } from './sew.js';
 export { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
 export type { SurfaceIntersection } from './intersect.js';

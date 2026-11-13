@@ -26,7 +26,7 @@ export interface Profile {
 
 const same = (a: XYZ, b: XYZ, tolerance: number) => length(sub(a, b)) <= tolerance;
 /** A profile's own size (its box with its arcs' circles), the same wherever it sits (see `modelSize`). */
-const profileSize = (profile: Profile) =>
+export const profileSize = (profile: Profile) =>
   modelSize(
     [profile.start, ...profile.segments.map((s) => s.to)],
     profile.segments.flatMap((s): [XYZ, number][] =>
@@ -35,7 +35,7 @@ const profileSize = (profile: Profile) =>
   );
 
 /** The angle an arc from `at` turns about `n`: positive counter-clockwise, a whole turn when it ends where it starts. */
-function sweepOf(at: XYZ, s: ProfileSegment, n: XYZ): number {
+export function sweepOf(at: XYZ, s: ProfileSegment, n: XYZ): number {
   const a0 = sub(at, s.center!),
     a1 = sub(s.to, s.center!),
     sweep0 = Math.atan2(dot(cross(a0, a1), n), dot(a0, a1));
@@ -49,7 +49,7 @@ function sweepOf(at: XYZ, s: ProfileSegment, n: XYZ): number {
 }
 
 /** Signed area of a profile about `n` (counter-clockwise positive), arcs included. */
-function signedArea(profile: Profile, n: XYZ): number {
+export function signedArea(profile: Profile, n: XYZ): number {
   let area = 0,
     at = profile.start;
   for (const s of profile.segments) {
@@ -69,7 +69,7 @@ function signedArea(profile: Profile, n: XYZ): number {
  * Throws a RangeError when a profile crosses or touches itself anywhere but where one segment meets the next (arcs
  * are followed as chords of 1/128 turn), or turns straight back on itself.
  */
-function refuseSelfContact(profile: Profile, n: XYZ, tolerance: number) {
+export function refuseSelfContact(profile: Profile, n: XYZ, tolerance: number) {
   // The profile as a cycle of short straight pieces in its plane's (x, y).
   const x = unit(sub(profile.segments[0].to, profile.start)) ?? unit(cross(n, [1, 0, 0])) ?? unit(cross(n, [0, 1, 0]))!,
     y = cross(n, x),
@@ -128,7 +128,7 @@ function refuseSelfContact(profile: Profile, n: XYZ, tolerance: number) {
   }
 }
 
-const fmt = (p: XYZ) => `(${p.map((v) => v.toPrecision(6)).join(', ')})`;
+export const fmt = (p: XYZ) => `(${p.map((v) => v.toPrecision(6)).join(', ')})`;
 
 /** Distance between two segments in the plane (0 when they cross). */
 function segmentGap(
@@ -155,7 +155,7 @@ function segmentGap(
 }
 
 /** The same profile run the other way. */
-function reversed(profile: Profile): Profile {
+export function reversed(profile: Profile): Profile {
   const points = [profile.start, ...profile.segments.map((s) => s.to)],
     segments = profile.segments
       .map((s, k) => ({ ...s, to: points[k], clockwise: s.kind === 'arc' ? !s.clockwise : undefined }))
