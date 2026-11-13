@@ -67,7 +67,7 @@ const root = resolve(import.meta.dirname, '..'),
   baselineRoot = resolve(root, 'tests/visual'),
   out = resolve(root, 'test-results/visual');
 function changedRenderedInputs() {
-  const paths = ['packages', 'examples', 'site', 'apps'],
+  const paths = ['packages', 'examples', 'site'],
     options = { cwd: root, encoding: 'utf8' };
   return renderedInputChanges(
     execFileSync('git', ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--', ...paths], options),

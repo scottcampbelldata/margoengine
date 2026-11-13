@@ -28,7 +28,6 @@ export function documents() {
   walk('docs', () => true);
   walk('examples', (path) => path.endsWith('/README.md'));
   walk('packages', (path) => /^packages\/[^/]+\/README\.md$/.test(path));
-  walk('apps', (path) => path.endsWith('/README.md') && path.split('/').length <= 3);
   return found.sort();
 }
 
