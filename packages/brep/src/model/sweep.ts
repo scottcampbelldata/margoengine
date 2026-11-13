@@ -233,7 +233,17 @@ function refuseSelfCrossing(path: Path, pieces: readonly Piece[], reach: number,
     n = q.length,
     step = reach / 16,
     pts = q.map((p) => samples(p, step)),
-    stepOf = (i: number) => q[i].length / (pts[i].length - 1);
+    stepOf = (i: number) => q[i].length / (pts[i].length - 1),
+    // Each piece's box (from its samples, grown by half a step): pieces whose boxes are twice the reach apart are.
+    boxes = pts.map((list, i) => {
+      const lo = [0, 1, 2].map((k) => Math.min(...list.map((p) => p[k])) - stepOf(i) / 2),
+        hi = [0, 1, 2].map((k) => Math.max(...list.map((p) => p[k])) + stepOf(i) / 2);
+      return { lo, hi };
+    }),
+    boxGap = (i: number, j: number) =>
+      Math.hypot(
+        ...[0, 1, 2].map((k) => Math.max(0, boxes[j].lo[k] - boxes[i].hi[k], boxes[i].lo[k] - boxes[j].hi[k])),
+      );
   for (let i = 0; i < n; i++)
     for (let j = i + 2; j < n; j++) {
       if (closed && i === 0 && j === n - 1) continue;
@@ -242,7 +252,7 @@ function refuseSelfCrossing(path: Path, pieces: readonly Piece[], reach: number,
       // piece's tube away when the other piece's path stays a reach beyond it.
       const apart = (a: Piece, b: Piece) =>
         spanAlong(b, a.to, a.t1)[0] >= reach - tolerance || spanAlong(b, a.from, a.t0)[1] <= -reach + tolerance;
-      if (apart(q[i], q[j]) || apart(q[j], q[i])) continue;
+      if (apart(q[i], q[j]) || apart(q[j], q[i]) || boxGap(i, j) > 2 * reach) continue;
       let least = Infinity;
       for (const a of pts[i]) for (const b of pts[j]) least = Math.min(least, length(sub(a, b)));
       // Sampled points are at most half a step from every point of their piece.
