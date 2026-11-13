@@ -72,9 +72,9 @@ const bloom = new Bloom({ strength: 0.18, threshold: 1.4, radius: 0.85 }),
   stack = PostStack.attach(engine, [bloom, tonemap]);
 TAA.attach(engine, { depth: () => stack.depthTexture });
 
-// The night sky light on everything the lamp does not reach: the overcast deck lit by the moon above it, so the cliffs,
-// the foam and the boat keep their shapes (the deck itself does not light the scene; see the zenith colour below).
-const nightAmbient: Vec3 = [0.05, 0.065, 0.1];
+// The least night sky light on anything: the moonlit deck itself lights the scene and shows in the sea (the volumetric
+// clouds lay it over the sky's reflection map and scene light), so the floor only keeps the darkest gaps from black.
+const nightAmbient: Vec3 = [0.02, 0.026, 0.04];
 // The sky: dusk light fading behind the storm, a moon behind the clouds, the cloud deck closing in with the storm.
 const sky = Sky.attach(
   engine,
@@ -85,9 +85,7 @@ const sky = Sky.attach(
     turbidity: 6,
     exposure: -0.6,
     night: {
-      // The sea reflects, and the sky lights the scene from, the night sky's own colours: the volumetric cloud deck is
-      // in neither (docs/known-bugs.md), so the zenith stands in for the deck's moonlit underside.
-      zenithColor: [0.012, 0.021, 0.048],
+      zenithColor: [0.004, 0.007, 0.016],
       horizonColor: [0.03, 0.04, 0.06],
       hazeDensity: 1.4,
       // The night's moon sits where the lighting moon is (it lights the scene and casts the shadows): a dim disc whose
@@ -119,9 +117,11 @@ const deck = VolumetricClouds.attach(engine, {
   scale: 6000,
   wind: [-14, -9],
   evolution: 6,
-  steps: tier === 'phone' ? 32 : 56,
+  // Steps of at most about 260 m (the 25 km cut of the low slant rays right of the tower in 96): longer ones left the
+  // edges of the rifts there grainy.
+  steps: tier === 'phone' ? 32 : 96,
   lightSteps: 4,
-  maxDistance: 40000,
+  maxDistance: 25000,
   depth: () => stack.depthTexture,
 });
 
@@ -511,7 +511,7 @@ function setStorm(value: number) {
   moonLight = 1.2 * (1 - 0.5 * ramp(0.3, 1, value));
   // Broken enough that the deck shows its masses and the dark rifts between them, the moon glowing through the thin
   // places; a flash lights them from inside.
-  deck.options.coverage = 0.5 + 0.2 * ramp(0, 0.9, value);
+  deck.options.coverage = 0.55 + 0.2 * ramp(0, 0.9, value);
   deck.options.density = 0.012 + 0.016 * value;
   deck.options.wind = [wind[0] * 1.5, wind[1] * 1.5];
   weather.options.intensity = ramp(0.18, 0.9, value);
@@ -606,19 +606,15 @@ stage.use({
     moveBoat(delta, time);
     if (!still && heldFlash === undefined && time - delta < opening.seconds && time >= opening.seconds)
       openingStrike = weather.strike(opening);
-    // A lightning flash lights the cloud deck from inside (a light in the deck above the strike), the cliffs and the
-    // sea (the bolt's light from behind the headland), and the moon's light and the night sky flare with it.
+    // A lightning flash lights the cloud deck from inside (a light in the deck above the strike), and through the deck
+    // the scene's sky light and the sea's reflection; the bolt's light from behind the headland lights the cliffs and
+    // the sea, and the moon's light flares with it.
     const flash = heldFlash ?? weather.flash;
     bolt.position = [strikePosition[0], 420, strikePosition[2]];
     bolt.intensity = flash * 4e6;
     deck.options.flash = { position: [strikePosition[0], 950, strikePosition[2]], intensity: flash * 1.6e6 };
     setLights();
     sky.options.lighting!.moon!.intensity = moonLight + flash * 3;
-    sky.options.lighting!.ambient!.night = [
-      nightAmbient[0] + flash * 0.3,
-      nightAmbient[1] + flash * 0.32,
-      nightAmbient[2] + flash * 0.37,
-    ];
     glow.uniforms.beam.value = beamAngle;
     streak.uniforms.time.value = time;
     fog.options.ambient = [0.004 + flash * 0.06, 0.005 + flash * 0.066, 0.008 + flash * 0.084];

@@ -10364,7 +10364,7 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-13: the volumetric cloud deck is missing from the sky's reflection map and scene light (sky, lane S1g)
+### Fixed 2026-11-13: the volumetric cloud deck is missing from the sky's reflection map and scene light (sky, lane S1g)
 
 - **Repro:** `examples/storm-light` before 2026-11-13 S1g (night zenith `[0.004, 0.007, 0.016]`, night ambient
   `[0.02, 0.026, 0.04]`), 1920x1080, `?tour=0&storm=0.78`. The moonlit `VolumetricClouds` deck fills the sky at a
@@ -10374,11 +10374,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `packages/sky/src/reflection.ts` fills the map from `skyEnvironment` (the day model, `night` and the
   sky's own 2D `clouds`); `VolumetricClouds` reads that map to light itself but never writes into it, so nothing that
   reflects or takes sky light sees the deck.
-- **Workaround:** set the night `zenithColor` and `lighting.ambient.night` near the deck's lit underside, as Storm
-  Light now does.
-- **Needed to close:** let `VolumetricClouds` composite a coarse march of the deck over the 64 x 32 map before the
-  sky's harmonics and mips are built, with a browser test that a lit deck raises the map's upper-hemisphere mean and
-  a mesh's ambient by the deck's coverage times its radiance.
+- **Fix:** `VolumetricClouds` march their deck from the camera into a 64 x 32 map in the sky's layout each frame (four
+  rays a texel, the view's own light, moon and flash) and hand it to the sky as `Sky.environmentLayer`. The sky draws
+  its reflection map clear at order 2, where the clouds take their own light from it, and again with the deck over it
+  at 3.5, before Water reflects it at 4; its `lighting` map takes the deck before the mips and harmonics. Coverage 0
+  and `dispose()` take the layer back. Storm Light drops its stand-ins: the night zenith and night sky light are back
+  to `[0.004, 0.007, 0.016]` and `[0.02, 0.026, 0.04]`, and a flash no longer raises the sky light floor.
+- **Regression:** the `volumetric` case of `packages/sky/test/features-check.mjs` (sky's test:gpu; passes on WebGPU
+  and on the WebGL2 layer): the map is the sky through the deck plus the deck's light, texel for texel; a dense deck
+  changes the upper half and leaves the lower half alone; a flash in the deck brightens the map (upper mean 1.72 to
+  25.3) and a pillar lit only by the sky light (0.254 to 0.358; 0.227 with no clouds); coverage 0 and dispose give
+  the plain map back exactly. Before the fix it fails: the map never changes with the clouds.
+
 ### Open 2026-11-13: offset, shell and draft refuse a half torus made by a Boolean (brep)
 
 - **Repro:** cut a torus in half with `model.boolean` and pass the body to `model.offsetFaces` or `model.shell`

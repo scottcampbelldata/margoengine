@@ -17,8 +17,9 @@ to full gale. Everything moves live in WebGPU.
   the Storm slider raises both. The sea fog stays thin enough that the sea meets the sky in a soft horizon line.
 - **The sky.** `@margoengine/sky`: a stylized night with the moon behind a broken deck of real 3D cloud
   (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. A flash lights the deck from inside
-  (the clouds' `flash`, above the strike), and the bolt's light from behind the headland, the moon and the night sky
-  flare with it for a moment. Every visit opens with one strike behind the headland 1.6 s in. Click the sky to strike
+  (the clouds' `flash`, above the strike), and the bolt's light from behind the headland and the moon flare with it
+  for a moment. The deck is in the sky's reflection map and scene light, so the sea mirrors the moonlit clouds and a
+  flash lights the rock and the sea through them. Every visit opens with one strike behind the headland 1.6 s in. Click the sky to strike
   lightning toward where you clicked.
 - **The light.** Moonlight casts shadows through `@margoengine/shadows`; the cottage windows, the lamp post, the boat's
   mast and cabin are small clustered lights, and two cool fills, from the open sea and from the moonlit deck over the
@@ -62,8 +63,5 @@ node examples/storm-light/blender/compress.mjs
 
 - The cloud deck is lit by the moon, the night sky and the lightning flash, not by the beam: `VolumetricClouds` takes
   the sky's lights and one flash. The beam's glow in the rain haze below the deck stands in for it.
-- The deck is not in the sky's reflection map or its scene light either (docs/known-bugs.md), so the sea would reflect,
-  and the cliffs would be lit by, a near-black night. The page sets the night zenith and the night sky light to the
-  deck's moonlit level instead.
 - The water takes glints from up to two directional lights, so the cabin's glow on the sea is a drawn streak, not a
   reflection the water computes.
