@@ -245,3 +245,9 @@ test('turning the pack off restores one draw per part', async () => {
     engine.dispose();
   }
 });
+
+// 49182025b: PartInstancer took the preview and drew nothing there (its passes are WebGPU only); it refuses it in setup.
+test('PartInstancer refuses the WebGL2 preview in setup', () => {
+  const instancer = new PartInstancer();
+  assert.throws(() => instancer.setup({ backend: 'webgl2', gpu: null, meshes: new Map() }), /PartInstancer needs WebGPU/);
+});

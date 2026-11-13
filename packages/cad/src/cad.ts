@@ -11,6 +11,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { readResponse } from '../../shared/loading.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import type { PBRSourcePrimitive } from '../../shared/pbr-source.js';
 import type { MeshSourceOwner } from '../../shared/mesh-source.js';
@@ -314,6 +315,8 @@ export class PartInstancer implements EnginePlugin {
     return this.removed;
   }
   setup(engine: Engine): void {
+    // The packs draw through WebGPU indirect batches only: refuse the WebGL2 preview instead of drawing nothing.
+    requireWebGPU(engine, 'PartInstancer');
     Object.assign(this.stats, deduplicateParts(engine.meshes.values()));
     this.packs.setup(engine);
   }

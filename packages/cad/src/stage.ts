@@ -2,6 +2,9 @@ import type { LoadedModel, Stage } from '@margoengine/stage';
 import { loadTarget, placeModel } from '../../shared/stage-model.js';
 import { typeError } from '../../shared/errors.js';
 import { cadFormatOf } from './internal/format.js';
+// A static import: the root entry imports this module statically too, so an import() here split nothing
+// (tests/dist-dynamic-imports.test.js); the B-rep kernel itself stays in the worker.
+import { loadCAD } from './cad.js';
 
 export type { LoadedModel } from '@margoengine/stage';
 /** Options for `addCAD`. Format and framing belong to the stage; the rest are forwarded to `loadCAD`. */
@@ -28,7 +31,8 @@ export interface AddCADOptions {
 
 /**
  * Imports an STL, OBJ, STEP, IGES, SAT, XT or JT file with `loadCAD` (the B-rep formats through Margo's own kernel
- * in a worker), adds it to the stage and fits the camera to it. The loader is imported on the first call. Rejects with
+ * in a worker), adds it to the stage and fits the camera to it. The B-rep kernel loads in its worker on the first
+ * B-rep import. Rejects with
  * AbortError, adding nothing, when `signal` aborts or the stage is disposed first.
  * @example const part = await addCAD(stage, '/bracket.step');
  */
@@ -42,8 +46,6 @@ export async function addCAD(
   if (!kind) throw typeError('Specify format', 'install');
   // The stage's disposal aborts the import too. The loader is this package's own module, so it is never missing.
   const abort = signal ? AbortSignal.any([signal, stage.signal]) : stage.signal;
-  abort.throwIfAborted();
-  const { loadCAD } = await import('./cad.js');
   abort.throwIfAborted();
   return placeModel(
     stage,
