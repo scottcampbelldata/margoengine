@@ -6,6 +6,7 @@
 import { EngineKernel, Mesh } from "@margoengine/core";
 
 export class AssemblyIndex {
+    static attach(engine: EngineKernel): AssemblyIndex;
     constructor(engine: EngineKernel);
     refresh(): void;
     tag(handle: MeshHandle, tag: string): void;
@@ -13,5 +14,7 @@ export class AssemblyIndex {
     findChildrenByName(pattern: string, root?: MeshHandle): MeshHandle[];
     findByTag(tag: string, root?: MeshHandle): MeshHandle[];
     setSubtreeVisible(handle: MeshHandle, visible: boolean): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 ```

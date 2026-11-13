@@ -7,7 +7,7 @@ import type { Engine, Mesh } from '@margoengine/core/extension';
  *
  * @example
  * ```ts
- * const index = new AssemblyIndex(engine);
+ * const index = AssemblyIndex.attach(engine);
  * index.tag(lid, 'cover');
  * const bolts = index.findChildrenByName('Bolt*');
  * ```
@@ -16,6 +16,10 @@ export class AssemblyIndex {
   private readonly names = new Map<string, Set<Mesh>>();
   private readonly tags = new Map<string, Set<Mesh>>();
   private readonly engine: Engine;
+  /** Same as `new AssemblyIndex(engine)`: an index of the engine's parts (it adds no plugin). */
+  static attach(engine: EngineKernel): AssemblyIndex {
+    return new AssemblyIndex(engine);
+  }
   constructor(engine: EngineKernel) {
     this.engine = engineRuntime(engine);
     this.refresh();
@@ -92,5 +96,14 @@ export class AssemblyIndex {
         'Assembly root belongs to another engine; pass a mesh created by the engine of this AssemblyIndex.',
       );
     root.visible = visible;
+  }
+  /** Forgets every name and tag; the meshes are untouched. `refresh()` reads the names again. */
+  dispose(): void {
+    this.names.clear();
+    this.tags.clear();
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
   }
 }

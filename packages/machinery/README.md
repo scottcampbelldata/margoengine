@@ -63,7 +63,7 @@ base.name = 'Base plate';
 const lid = engine.createMesh().setGeometry(box()).setPosition([0, 2, 0]);
 lid.name = 'Base lid';
 
-const index = new AssemblyIndex(engine); // call index.refresh() after renaming or adding meshes
+const index = AssemblyIndex.attach(engine); // call index.refresh() after renaming or adding meshes
 index.tag(lid, 'cover');
 const plates = index.findChildrenByName('Base*'); // '*' is the only wildcard
 const covers = index.findByTag('cover');

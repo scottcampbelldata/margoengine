@@ -216,3 +216,23 @@ test('ExplodedView rejects an amount outside 0..1, bad offsets, foreign nodes an
     engine.dispose();
   }
 });
+
+// 1e93374dd: AssemblyIndex was built from the engine without the static attach() every such class has (API reports).
+test('AssemblyIndex.attach indexes the engine like the constructor, and dispose forgets names and tags', async () => {
+  const engine = await scene();
+  try {
+    const bolt = named(engine, 'Bolt M4'),
+      index = AssemblyIndex.attach(engine);
+    assert.ok(index instanceof AssemblyIndex);
+    index.tag(bolt, 'fastener');
+    assert.deepEqual(index.findChildrenByName('Bolt*'), [bolt]);
+    assert.deepEqual(index.findByTag('fastener'), [bolt]);
+    index[Symbol.dispose]();
+    assert.deepEqual(index.findChildrenByName('Bolt*'), []);
+    assert.deepEqual(index.findByTag('fastener'), []);
+    index.refresh();
+    assert.deepEqual(index.findChildrenByName('Bolt*'), [bolt]);
+  } finally {
+    engine.dispose();
+  }
+});
