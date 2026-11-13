@@ -3737,7 +3737,7 @@ examples owed are in the README-owed list.
 - **Not proved (finish-later.md):** the check's point on the pebble's top also loses the light (self-shadowing, the
   0.01 bias below one depth texel's step at the 45-degree view), so that check fails; the check's local shadow-off
   baseline predates main's LTC and textured-light changes and fails its six comparisons until regenerated.
-- **Limits and unmeasured:** Apple Apple silicon Mac (Metal) only; not timed. Contact uses the first view's depth only and trails a
+- **Limits and unmeasured:** Apple silicon Mac (Metal) only; not timed. Contact uses the first view's depth only and trails a
   moving caster by one frame; culling tests every light per cluster; area lights are not clustered and only the first 64
   may cast shadows; IES, projector and contact per-light settings stop at index 1,024 (docs/limits.md LIM-655, LIM-656).
 - **Docs per job:** clustered README prose (examples owed, the README-owed list), operational playbook,

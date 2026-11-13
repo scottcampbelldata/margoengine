@@ -1,7 +1,8 @@
-# Choosing an install
+# Starting from three.js
 
 Choose core or stage alone for the smallest install, a domain profile for an application, or `margoengine` for
-everything. Start with the [kits guide](kits.md). The MCP porting guide is generated from the docs it names.
+everything. Start with the [kits guide](kits.md), then the [API comparisons](../from-threejs.md) and the
+[porting matrix](../threejs-parity.md). The MCP porting guide is generated from those same documents.
 
 For an existing HTML page with `<canvas id="viewport"></canvas>`, install `@margoengine/web` and start with:
 
@@ -36,7 +37,7 @@ manages mounting, default controls, resize and its loop. These are work counts a
 | Point in the path | Finding and action |
 | --- | --- |
 | Selecting an install | Previously every template installed all 98 engine packages. Each now has one profile dependency: web 40 engine packages, game 70, viz 42, React/Next 42 in the packed check. |
-| Mapping an addon import | Standalone profiles and full-install aliases had been conflated. The imports guide now distinguishes installation from bundling and shows the prefix mapping. |
+| Mapping an addon import | Standalone profiles and full-install aliases had been conflated. The imports and from-threejs guides now distinguish installation from bundling and show the prefix mapping. |
 | Starting a scene | WebGPU setup is asynchronous, unlike the documented synchronous WebGL constructor. The stage example includes the required await; the generated app handles startup errors. |
 | Model loading | Loaders stay in a one-line profile subpath so a root-only page emits no Draco/Basis assets. The game starter actually loads its unchanged licensed model. |
 | Matching versions | Every published package and template range is checked together; a combined game/web/viz app proves shared binding identity and one installed core. |
