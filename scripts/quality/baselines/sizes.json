@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15534785,
+  "total": 15547342,
   "history": [
     {
       "date": "2026-10-24",
@@ -8741,6 +8741,12 @@
       "commit": "49182025b",
       "reason": "new package @margoengine/machinery (2026-11-13, from the kernel repository, Scott: no private packages): root 30.8 kB re-exports every tool; spatial 16.2 kB, surface 13.9 kB and telemetry 13.4 kB each embed the 10.9 kB gzip Wasm kernel; dimensions reaches lines and text and react reaches @margoengine/react, which it declares",
       "grew": 18
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "868585930",
+      "reason": "@margoengine/brep grows from 124,621 to 133,182 B gzip (+8,561): cone and frustum, sewing, face offset, shell and draft, sweep along lines and arcs and ruled loft (about 3,900 lines with their checks, refusals and messages that name the fix), plus the pole-loop and spline-mass fixes. These are what the kernel's CAD compare harness measured parity against; a split into a second entry would cost a second bundle of the shared geometry and topology code for the same callers",
+      "grew": 1
     }
   ],
   "items": {
@@ -8844,7 +8850,7 @@
     "@margoengine/blender/nodes": 11505,
     "@margoengine/blender/objects": 5201,
     "@margoengine/blender/pbr-ext": 13434,
-    "@margoengine/brep": 124621,
+    "@margoengine/brep": 137178,
     "@margoengine/bvh": 24403,
     "@margoengine/bvh/alpha": 17382,
     "@margoengine/bvh/alpha-triangles": 1381,

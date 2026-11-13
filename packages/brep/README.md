@@ -44,6 +44,47 @@ for (const check of validateSTEP(model, tessellateSTEP(model)))
   if (!check.ok) console.warn(check.property.label, check.differences, check.note);
 ```
 
+## Modelling (`model`)
+
+The kernel also builds and edits solids, as one namespace, `model`: bodies with persistent face names, primitives (`box`,
+`cylinder`, `cone`, `sphere`, `torus`), `extrude`, `revolve`, `sweep`, `loft`, `boolean`, `fillet`, `chamfer`,
+`offsetFaces`, `shell`, `draft`, `sew`, validity checks (`validateBody`, `checkBody`), exact `massProperties`, and
+`bodiesToSTEP`, `bodiesFromSTEP` and `meshBodies` to write, read and mesh what it makes. Lengths are in metres.
+
+```ts
+import { model } from 'margoengine/brep';
+
+const mm = 0.001;
+// A 40 x 30 x 20 mm block, hollowed to 2 mm walls and open at its top face.
+const block = model.box('block', [40 * mm, 30 * mm, 20 * mm]);
+const cup = model.shell('cup', block, ['block/face:+z'], -2 * mm);
+console.log(model.checkBody(cup).length, 'problems', model.massProperties(cup).volume, 'm3');
+// A frustum: bottom radius, top radius, height.
+console.log(model.massProperties(model.cone('frustum', 10 * mm, 5 * mm, 20 * mm)).volume, 'm3');
+```
+
+- **`cone(name, radius, topRadius, height)`:** a cone or frustum (a top radius of 0 is the apex). `revolve` also takes a
+  profile that touches the axis (an apex, a pole, a disc); a profile that touches the axis at a point with no segment
+  along it would pinch the solid and is refused.
+- **`sew(name, facesOrBodies, tolerance)`:** joins loose faces into a body within a tolerance and returns a report (joined,
+  merged and split edges, dropped faces, open edges with their gap distances, flipped faces, problems); the body is a
+  solid only when it is closed and passes `checkBody`. Closed shells nested in each other are sorted: an odd nesting
+  count is a cavity of the innermost solid shell and is turned inward.
+- **`offsetFaces(name, body, faceNames, distance)`, `shell(name, body, openFaceNames, thickness)` and
+  `draft(name, body, faceNames, neutral, pull, angle)`:** planes, cylinders, cones, spheres and tori are re-solved (new
+  vertices by Gauss-Newton, circles about the old axis, every new edge checked on both faces); a negative `shell`
+  thickness cuts the walls inward, a positive one grows them outward, with no open faces it makes a closed cavity. A
+  cylinder or cone whose axis lies along the pull becomes a cone when drafted. Offsets that change the topology
+  (a face moved past a neighbour, walls thicker than the part) and faces on B-spline surfaces are refused with a
+  `RangeError` that says why.
+- **`sweep(name, profile, path)`:** a closed planar profile along a tangent-continuous `Path` of lines and arcs (a
+  rotation-minimising frame; a closed path makes a ring), with analytic faces only. Refused by name: a corner, an arc
+  tighter than the profile's reach, pieces of the path closer than twice that reach, a profile that is not across the
+  path's start tangent.
+- **`loft(name, sections)`:** a ruled loft through two or more closed planar sections with the same number of segments;
+  faces are planes, cylinders, cones, or bilinear or rational ruled splines, joined with C0 continuity at inner
+  sections. A twist between sections is refused.
+
 ## Other B-rep formats
 
 ACIS SAT, Parasolid XT (also inside JT files) and IGES are converted to STEP entities and then read and meshed by the

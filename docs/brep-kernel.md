@@ -78,7 +78,8 @@ is the current account of what the kernel reads.
 | Shape healing on read (small edges, wire order, tolerances) | to do; failures are listed per face today |
 | IGES reading | stage 6 |
 | STEP writing | to do |
-| Boolean operations, fillets, offsets (modelling) | not planned for the viewer |
+| Boolean operations, fillets and chamfers (modelling) | written (`model`, in the package) |
+| Cone and frustum, sewing, face offset, shell and draft, sweep along lines and arcs, ruled loft (modelling) | written (`model`, in the package); limits in `docs/limits.md` |
 
 Package: `@margoengine/brep` (optional; never core or the stage). Its known defects are in `docs/known-bugs.md`; the JT
 reader's licence terms are in `docs/jt-licensing.md` and its departures from the published texts in `docs/jt-reader.md`.

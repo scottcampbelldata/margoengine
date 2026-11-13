@@ -3839,6 +3839,9 @@ in `packages/cad/test/cad-limits.test.js`).
 | Placed bodies per assembly | Enforced: `maxInstances`, default 1,000,000 ([structure.ts](../packages/brep/src/step/structure.ts)) | Bounds memory for an assembly that places one body many times | A `RangeError` that names `maxInstances` | `maxInstances` on `parseSTEP` |
 | Vertices per tessellated face | Enforced: `maxFaceVertices`, default 50,000 (at least 64; [tessellate.ts](../packages/brep/src/mesh/tessellate.ts)) | Refinement of one face stops before it runs away | The face stops refining at the cap | `maxFaceVertices` on `tessellateSTEP` |
 | Reader warnings | Enforced: at most 100 in `model.warnings` | A broken file does not flood the caller | Later warnings are dropped | None |
+| B-rep modelling: sweep and loft (`model.sweep`, `model.loft`) | Enforced: a sweep takes a closed planar profile across the start tangent of a tangent-continuous path of lines and arcs, with analytic faces only (no helix or spline path); a loft is ruled between closed planar sections with the same number of segments (no loft to a point, no spline sections) | The solid stays exact: its volume and area are the closed forms the tests hold it to, and it passes `checkBody` | A `RangeError` that names the cause: a corner, an arc tighter than the profile reach, path pieces within twice the reach, a twist between sections | Split the path at its corners and `boolean` the pieces, or revolve or extrude the profile |
+| B-rep modelling: offset, shell and draft (`model.offsetFaces`, `model.shell`, `model.draft`) | Enforced: faces on planes, cylinders, cones, spheres and tori with straight or circular edges; an offset that changes the topology (a face moved past a neighbour, walls thicker than the part) is refused, and so are B-spline faces and spline or ellipse edges (a half torus from a Boolean has spline meridian cuts) | A re-solved body is checked on both faces of every new edge; a topology change needs a different construction | A `RangeError` that says why; nothing is returned half done | Build the thicker or thinner shape with `extrude`, `revolve` and `boolean` |
+| B-rep sewing (`model.sew`) | Enforced: a closed edge matches another only when their vertices join; the nearest-open-edge search grows with the square of the open edges | Bounds the search a loose-face set can cost | The `SewReport` lists open edges with their gap distances; a very large loose set is slow | Sew the faces in groups, or raise the tolerance to the gap the report shows |
 | Mesh-only JT parts, IGES entity 114, `.brep` files | Not read: a JT part with only triangle LODs is listed in `warnings`; IGES 114 is refused (`docs/known-bugs.md`); the native format of the earlier importer's kernel is not a supported input | No exact B-rep to mesh, an unverified coefficient order, a format outside the published standards the kernel is written from | The model warns; a `.brep` URL makes `loadCAD` throw a `TypeError` that lists the formats it reads | Export the part as STEP |
 | Load time and memory | Not measured on the engine's machines yet | | | |
 
@@ -10376,6 +10379,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Needed to close:** let `VolumetricClouds` composite a coarse march of the deck over the 64 x 32 map before the
   sky's harmonics and mips are built, with a browser test that a lit deck raises the map's upper-hemisphere mean and
   a mesh's ambient by the deck's coverage times its radiance.
+### Open 2026-11-13: offset, shell and draft refuse a half torus made by a Boolean (brep)
+
+- **Repro:** cut a torus in half with `model.boolean` and pass the body to `model.offsetFaces` or `model.shell`
+  (`packages/brep/src/model/offset.ts`): a `RangeError` says the face or edge is a spline. The refusal is tested in
+  `packages/brep/tests/offset-curved.test.js` (a lofted spline face).
+- **Cause:** the Boolean returns the torus meridian cut as a B-spline edge, and the offset core re-solves only planes,
+  cylinders, cones, spheres and tori with line or circle edges. A spline edge offset is not a circle about the old axis.
+- **Needed to close:** recognise a spline edge that is a circle on a torus (or fit it to a circle about the axis within
+  tolerance and check it on both faces), then test a Boolean half torus against the exact offset torus volume.
+
+### Open 2026-11-13: the validity check flags the body of one fuzz file although its volume is right (brep)
+
+- **Repro:** the kernel's fuzz case `m162.step` (from the CAD fuzz set; not in this repository) through
+  `bodiesFromSTEP` and `checkBody` in `@margoengine/brep`: `checkBody` reports a problem while the mass volume
+  matches the file's own value.
+- **Cause:** not found yet. It is either a check that is too strict for a tolerant edge or a body fault the volume does
+  not show; nobody has looked at which.
+- **Needed to close:** reduce the file to the face the problem names, find which, and add the reduced body as a test.
 
 ### Open 2026-11-13: IGES parametric spline surfaces (entity 114) are refused; their coefficient order is not checked (brep)
 
@@ -19510,28 +19531,24 @@ for (const check of validateSTEP(model, tessellateSTEP(model)))
   if (!check.ok) console.warn(check.property.label, check.differences, check.note);
 ```
 
-## Other B-rep formats
+## Modelling (`model`)
 
-ACIS SAT, Parasolid XT (also inside JT files) and IGES are converted to STEP entities and then read and meshed by the
-same kernel:
+The kernel also builds and edits solids, as one namespace, `model`: bodies with persistent face names, primitives (`box`,
+`cylinder`, `cone`, `sphere`, `torus`), `extrude`, `revolve`, `sweep`, `loft`, `boolean`, `fillet`, `chamfer`,
+`offsetFaces`, `shell`, `draft`, `sew`, validity checks (`validateBody`, `checkBody`), exact `massProperties`, and
+`bodiesToSTEP`, `bodiesFromSTEP` and `meshBodies` to write, read and mesh what it makes. Lengths are in metres.
 
-- **IGES** (`parseIGES`, `igesToSTEP`, `readIGES` for the raw entities, `isIGES` to detect a file): IGES 5.3 fixed
-  ASCII files, written from the published specification (US PRO/IPO-100-1996). The Start, Global, Directory Entry,
-  Parameter Data and Terminate sections; parameter and record delimiters from the Global section, Hollerith strings
-  across lines, D exponents and defaulted fields; units flag and model space scale (the result is in millimetres);
-  transformation matrices (124), chained. Manifold solid B-rep objects (186) with their shells, faces, loops, edge and
-  vertex lists (514, 510, 508, 504, 502) become solids, voids included; trimmed (144) and bounded (143, 141) surfaces,
-  bounded planes (108) and untrimmed surfaces become the faces of one surface model. Curves: circular and conic arcs
-  (100, 104; parabolas and hyperbolas as exact rational quadratics), composite curves (102), linear paths (106),
-  lines (110), parametric splines (112, exact), rational B-splines (126), offset curves (130, fitted), curves on
-  surfaces (142: the model-space curve, else the parameter-space curve mapped through its surface and fitted).
-  Surfaces: planes (108, 190), ruled surfaces (118: exact for matching rails,
-  sampled otherwise), surfaces of revolution (120), tabulated cylinders (122), rational B-spline surfaces (128), offset
-  surfaces (140), cylinders, cones, spheres and tori (192 to 198). Colour numbers and colour definitions (314) colour
-  the faces. Not yet: parametric spline surfaces (114, refused with a MargoError until their coefficient order is
-  verified; `docs/known-bugs.md`), the Compressed and Binary formats, subfigure and solid instances (308/408, 430), CSG
-  solids (150 to 184), and wireframe-only files (nothing to mesh). Faces of trimmed-surface files keep their own edges (they
-  are not sewn into solids).
+```ts
+import { model } from 'margoengine/brep';
+
+const mm = 0.001;
+// A 40 x 30 x 20 mm block, hollowed to 2 mm walls and open at its top face.
+const block = model.box('block', [40 * mm, 30 * mm, 20 * mm]);
+const cup = model.shell('cup', block, ['block/face:+z'], -2 * mm);
+console.log(model.checkBody(cup).length, 'problems', model.massProperties(cup).volume, 'm3');
+// A frustum: bottom radius, top radius, height.
+console.log(model.massProperties(model.cone('frustum', 10 * mm, 5 * mm, 20 * mm)).volume, 'm3');
+```
 
 [README continues: https://margoengine.com/llms/packages/brep.md]
 

@@ -21,6 +21,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Needed to close:** let `VolumetricClouds` composite a coarse march of the deck over the 64 x 32 map before the
   sky's harmonics and mips are built, with a browser test that a lit deck raises the map's upper-hemisphere mean and
   a mesh's ambient by the deck's coverage times its radiance.
+### Open 2026-11-13: offset, shell and draft refuse a half torus made by a Boolean (brep)
+
+- **Repro:** cut a torus in half with `model.boolean` and pass the body to `model.offsetFaces` or `model.shell`
+  (`packages/brep/src/model/offset.ts`): a `RangeError` says the face or edge is a spline. The refusal is tested in
+  `packages/brep/tests/offset-curved.test.js` (a lofted spline face).
+- **Cause:** the Boolean returns the torus meridian cut as a B-spline edge, and the offset core re-solves only planes,
+  cylinders, cones, spheres and tori with line or circle edges. A spline edge offset is not a circle about the old axis.
+- **Needed to close:** recognise a spline edge that is a circle on a torus (or fit it to a circle about the axis within
+  tolerance and check it on both faces), then test a Boolean half torus against the exact offset torus volume.
+
+### Open 2026-11-13: the validity check flags the body of one fuzz file although its volume is right (brep)
+
+- **Repro:** the kernel's fuzz case `m162.step` (from the CAD fuzz set; not in this repository) through
+  `bodiesFromSTEP` and `checkBody` in `@margoengine/brep`: `checkBody` reports a problem while the mass volume
+  matches the file's own value.
+- **Cause:** not found yet. It is either a check that is too strict for a tolerant edge or a body fault the volume does
+  not show; nobody has looked at which.
+- **Needed to close:** reduce the file to the face the problem names, find which, and add the reduced body as a test.
 
 ### Open 2026-11-13: IGES parametric spline surfaces (entity 114) are refused; their coefficient order is not checked (brep)
 

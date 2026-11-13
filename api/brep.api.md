@@ -491,6 +491,20 @@ export namespace model {
 
     export type Name = string;
 
+    export interface Path {
+        readonly name: Name;
+        readonly start: XYZ;
+        readonly segments: readonly PathSegment[];
+    }
+
+    export interface PathSegment {
+        readonly kind: 'line' | 'arc';
+        readonly to: XYZ;
+        readonly center?: XYZ;
+        readonly axis?: XYZ;
+        readonly name?: Name;
+    }
+
     export interface Profile {
         readonly name: Name;
         readonly start: XYZ;
@@ -504,6 +518,31 @@ export namespace model {
         readonly center?: XYZ;
         readonly clockwise?: boolean;
         readonly name?: Name;
+    }
+
+    export interface SewReport {
+        readonly body: Body;
+        readonly closed: boolean;
+        readonly joined: readonly {
+            readonly edges: readonly [Name, Name];
+            readonly gap: number;
+        }[];
+        readonly merged: readonly {
+            readonly vertices: readonly Name[];
+            readonly gap: number;
+        }[];
+        readonly dropped: readonly Name[];
+        readonly split: readonly {
+            readonly edge: Name;
+            readonly into: readonly Name[];
+        }[];
+        readonly open: readonly {
+            readonly edge: Name;
+            readonly nearest?: Name;
+            readonly gap: number;
+        }[];
+        readonly flipped: readonly Name[];
+        readonly problems: readonly ValidityProblem[];
     }
 
     export class Shell {
@@ -592,11 +631,20 @@ export namespace model {
 
     export function checkBody(body: Body): ValidityProblem[];
 
+    export function cone(name: Name, radius: number, topRadius: number, height: number, frame?: Frame, history?: History): Body;
+
     export function curveEvaluator(def: CurveDef): Curve;
 
     export function curveSurfaceCrossings(curve: CurveDef, surface: SurfaceDef, t0: number, t1: number, resolution?: number): number[];
 
     export function cylinder(name: Name, radius: number, height: number, frame?: Frame, history?: History): Body;
+
+    export function draft(name: Name, body: Body, faces: readonly Name[], neutral: {
+        readonly origin: XYZ;
+        readonly normal: XYZ;
+    }, pull: XYZ, angle: number, { history }?: {
+        history?: History;
+    }): Body;
 
     export function extrude(name: Name, profile: Profile, vector: XYZ, { history, bottom, top }?: {
         history?: History;
@@ -612,9 +660,17 @@ export namespace model {
 
     export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3, tolerance?: number): SurfaceIntersection;
 
+    export function loft(name: Name, sections: readonly Profile[], { history }?: {
+        history?: History;
+    }): Body;
+
     export function massProperties(body: Body): MassProperties;
 
     export function meshBodies(bodies: readonly Body[], options?: TessellationOptions): BodyMeshes;
+
+    export function offsetFaces(name: Name, body: Body, faces: readonly Name[], distance: number, { history }?: {
+        history?: History;
+    }): Body;
 
     export function revolve(name: Name, profile: Profile, axis: {
         readonly origin: XYZ;
@@ -623,11 +679,23 @@ export namespace model {
         history?: History;
     }): Body;
 
+    export function sew(name: Name, faces: readonly (Face | Body)[], tolerance: number, { history }?: {
+        history?: History;
+    }): SewReport;
+
+    export function shell(name: Name, body: Body, open: readonly Name[], thickness: number, { history }?: {
+        history?: History;
+    }): Body;
+
     export function signedDistance(s: SurfaceDef, p: XYZ): number;
 
     export function sphere(name: Name, radius: number, frame?: Frame, history?: History): Body;
 
     export function surfaceEvaluator(def: SurfaceDef): Surface;
+
+    export function sweep(name: Name, profile: Profile, path: Path, { history }?: {
+        history?: History;
+    }): Body;
 
     export function torus(name: Name, major: number, minor: number, frame?: Frame, history?: History): Body;
 

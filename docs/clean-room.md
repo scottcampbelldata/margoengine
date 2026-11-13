@@ -1902,6 +1902,7 @@ Batch 132 audit (lane N, 2026-11-10). "Read" means the PDF or specification text
 | BR7 | Parasolid XT transmit files | brep/src/xt | the published XT Format Reference |
 | BR8 | JT container, scene graph, codecs and mesh topology decoder | brep/src/jt | the JT File Format Reference 9.5 and ISO 14306, under Siemens' published licence terms (docs/jt-licensing.md) |
 | BR9 | LZMA, LZMA2 and XZ decoding | brep/src/jt/lzma.ts | Igor Pavlov's LZMA specification; Lasse Collin's .xz file format |
+| BR10 | Modelling: sewing within a tolerance, face offset, shell and draft re-solved by Gauss-Newton, sweep in a rotation-minimising frame, ruled loft | brep/src/model/sew.ts, brep/src/model/offset.ts, brep/src/model/sweep.ts, brep/src/model/loft.ts | Pappus and Guldin for the swept volume; Piegl and Tiller, The NURBS Book (2nd ed.) for ruled and rational surfaces; textbook Gauss-Newton and solid geometry. No source of another CAD kernel is read; the tests hold each result to exact closed forms |
 
 ### cad
 
