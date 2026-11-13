@@ -225,6 +225,9 @@ STEEL = principled('steel', (0.55, 0.56, 0.58), 0.22, 1.0)
 BLUED = principled('blued_steel', (0.035, 0.05, 0.13), 0.18, 1.0)
 NIELLO = principled('niello', (0.012, 0.010, 0.009), 0.45, 0.0)
 GLASS = principled('glass', (0.965, 0.985, 0.978), 0.0, 0.0, transmission=1.0, ior=1.52)
+# The bell jar: a touch of roughness spreads the window's reflection on its shoulder into a soft sheen instead of a
+# bright streak; the glass stays clear, since roughness only blurs what the surface reflects.
+DOME_GLASS = principled('dome_glass', (0.965, 0.985, 0.978), 0.2, 0.0, transmission=1.0, ior=1.52)
 BULB = principled('bulb', (1.0, 0.8, 0.55), 0.3, 0.0, emission=(1.0, 0.72, 0.42), emission_strength=40.0)
 SKY = principled('window_sky', (0.0, 0.0, 0.0), 1.0, 0.0, emission=(0.55, 0.68, 0.9), emission_strength=2.4)
 BOOKS = principled('books', (1, 1, 1), 0.55, 0.0)
@@ -852,7 +855,7 @@ def build_dome():
     inner += [(r - t, wall_top), (r - t, z0)]
     outer[-1] = (0.0, outer[-1][1])
     inner[0] = (0.0, inner[0][1])
-    dome = mesh_object('dome', lathe(outer + inner + [(r, z0)], 160), GLASS, ORRERY, smooth=50)
+    dome = mesh_object('dome', lathe(outer + inner + [(r, z0)], 160), DOME_GLASS, ORRERY, smooth=50)
     dome_root = dome
     # The finial: a turned knob with a ball top, seated on a wide rosette that hugs the glass, so it reads as fixed to
     # the jar even where the glass under it is invisible.

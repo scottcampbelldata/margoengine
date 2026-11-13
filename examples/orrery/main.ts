@@ -146,7 +146,9 @@ async function start() {
   // Post: contact shadows, depth of field that racks to what you click, bloom on the lamp, AgX, then TAA.
   const dof = new DOF({ focalDistance: 1.4, focalLength: 0.085, aperture: 4, maxRadius: 24 });
   const bloom = new Bloom({ strength: 0.4, threshold: 2.2, radius: 0.6 });
-  const tonemap = new Tonemap({ curve: 'neutral', exposure: 0.7 });
+  // Exposure 0.85 with the extra bounces below lifts the shadows enough for the gear train under the frame and the
+  // dial's engraving to read, while the window and the lamp keep the room dim.
+  const tonemap = new Tonemap({ curve: 'neutral', exposure: 0.85 });
   const stack = optional(() =>
     PostStack.attach(engine, [
       new ContactShadows({ distance: 0.04, thickness: 0.02, strength: 0.6 }),
@@ -257,7 +259,9 @@ async function start() {
 
   // ----------------------------------------------------------------------------------------------- probes bake
   engine.render();
-  await probes?.bake();
+  // Three bounces: each capture sees the probe light of the one before, so the brass inside the dome reflects a room
+  // lit by its own bounce light, not the black of a single pass.
+  await probes?.bake({ bounces: 3 });
   // Temporal upscaling, attached after the bake so the probes see an unjittered room: the light tier draws 72 percent
   // of the pixels and rebuilds the full frame from jittered frames.
   const taa = stack && optional(() => TAAUpscale.attach(engine, { scale: tier === 'high' ? 1 : 0.72, sharpen: 0.25 }));
