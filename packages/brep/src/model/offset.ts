@@ -1,10 +1,11 @@
-// Face offset and shell on bodies of planar faces. Offsetting moves chosen faces along their outward normals by a
+// Face offset, shell and draft on bodies of planar faces. Offsetting moves chosen faces along their outward normals by a
 // distance each; their neighbours stay on their own planes and the body is re-solved round them: each vertex is where
 // its faces' planes now meet, each edge the line between its new ends. Where the moved planes no longer meet in the
 // same pattern (an edge would shrink to nothing or turn round, a vertex's planes no longer meet in one point) the
 // topology would have to change, and the operation refuses with a RangeError naming the edge or vertex. A shell is two
 // offsets and a Boolean: inward, the body less a copy offset inward (the open faces offset outward, so the cut opens
 // them); outward, a copy offset outward (the open faces kept) less a copy with only the open faces offset outward.
+// A draft turns faces about the lines where they meet a neutral plane, on the same re-solving core.
 import { cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { boolean } from './boolean.js';
 import { checkBody } from './check.js';
@@ -81,14 +82,23 @@ function meet(planes: readonly Plane[], near: XYZ): { point: XYZ; spread: number
  */
 export function offsetBody(name: Name, body: Body, distances: ReadonlyMap<Name, number>, operation = name): Body {
   if (body.kind !== 'solid') throw new RangeError(`${operation}: offsets take a solid`);
-  const faces = body.faces,
-    names = new Set(faces.map((f) => f.name));
+  const names = new Set(body.faces.map((f) => f.name));
   for (const [n, d] of distances) {
     if (!names.has(n)) throw new RangeError(`${operation}: the body has no face ${n}`);
     if (!Number.isFinite(d)) throw new RangeError(`${operation}: the offset of ${n} must be finite`);
   }
-  const old = new Map(faces.map((f) => [f, planeOf(f, operation)])),
-    moved = new Map(faces.map((f) => [f, { ...old.get(f)!, c: old.get(f)!.c + (distances.get(f.name) ?? 0) }])),
+  return replanes(name, body, (f, p) => ({ ...p, c: p.c + (distances.get(f.name) ?? 0) }), operation);
+}
+
+/**
+ * The body with each face's plane replaced by `planeFor` (given the face and its plane, the normal out of the
+ * material), re-solved round the new planes: the core offsets and drafts share. Throws a RangeError for faces not on
+ * planes, curved edges, and new planes that change the body's topology or leave it invalid.
+ */
+function replanes(name: Name, body: Body, planeFor: (face: Face, plane: Plane) => Plane, operation: string): Body {
+  const faces = body.faces,
+    old = new Map(faces.map((f) => [f, planeOf(f, operation)])),
+    moved = new Map(faces.map((f) => [f, planeFor(f, old.get(f)!)])),
     points = body.vertices.flatMap((v) => [...v.point.map(Math.abs)]),
     size = Math.max(
       ...[0, 1, 2].map((k) => {
@@ -139,15 +149,19 @@ export function offsetBody(name: Name, body: Body, distances: ReadonlyMap<Name, 
   for (const shell of body.shells) {
     const s = out.shell();
     for (const f of shell.faces) {
+      // The new plane through the old frame's origin moved onto it, its natural normal the outward one's way for the
+      // face's sense.
       const p = moved.get(f)!,
         frame = (f.surface as { readonly frame: Frame }).frame,
-        shift = p.c - old.get(f)!.c,
+        shift = p.c - dot(p.n, frame.origin),
         origin: XYZ = [
           frame.origin[0] + shift * p.n[0],
           frame.origin[1] + shift * p.n[1],
           frame.origin[2] + shift * p.n[2],
         ],
-        face = s.add(new Face(f.name, { kind: 'plane', frame: frameOf(origin, frame.z, frame.x) }, f.sense));
+        face = s.add(
+          new Face(f.name, { kind: 'plane', frame: frameOf(origin, scale(p.n, f.sense ? 1 : -1), frame.x) }, f.sense),
+        );
       for (const l of f.loops) {
         const loop = face.loop();
         for (const c of l.coedges) loop.use(newEdge.get(c.edge)!, c.forward);
@@ -209,5 +223,69 @@ export function shell(
       cutter = offsetBody(`${name}/cutter`, body, all(0, t), `shell ${name}`);
     out = boolean(name, 'subtract', outer, cutter, { history });
   }
+  return out;
+}
+
+/**
+ * Drafts the faces of `body` named in `faces` by `angle` radians for a mould pulled along `pull`: each turns about the
+ * line where it meets the neutral plane (through `neutral.origin`, normal `neutral.normal`) until it makes `angle`
+ * with the pull direction, a positive angle leaning its outward normal towards `pull` (the faces close in along it).
+ * The other faces stay on their planes and the body is re-solved round the drafted ones. Throws a RangeError for an
+ * angle not inside (-90, 90) degrees, a face parallel to the neutral plane or square to the pull, one meeting the
+ * neutral plane along a line not square to the pull, and where the new planes would change the body's topology.
+ */
+export function draft(
+  name: Name,
+  body: Body,
+  faces: readonly Name[],
+  neutral: { readonly origin: XYZ; readonly normal: XYZ },
+  pull: XYZ,
+  angle: number,
+  { history }: { history?: History } = {},
+): Body {
+  const operation = `draft ${name}`,
+    p = unit(pull),
+    N = unit(neutral.normal);
+  if (!p || !N) throw new RangeError(`${operation}: the pull direction and the neutral plane's normal must not be zero`);
+  if (!(Math.abs(angle) < Math.PI / 2))
+    throw new RangeError(`${operation}: the draft angle must lie inside (-90, 90) degrees`);
+  if (!faces.length) throw new RangeError(`${operation}: draft needs at least one face`);
+  if (body.kind !== 'solid') throw new RangeError(`${operation}: draft takes a solid`);
+  const chosen = new Set(faces);
+  for (const n of chosen)
+    if (!body.faces.some((f) => f.name === n)) throw new RangeError(`${operation}: the body has no face ${n}`);
+  const out = replanes(
+    name,
+    body,
+    (f, plane) => {
+      if (!chosen.has(f.name)) return plane;
+      // The hinge: where the face's plane meets the neutral plane.
+      const hinge = unit(cross(plane.n, N));
+      if (!hinge) throw new RangeError(`${operation}: face ${f.name} is parallel to the neutral plane`);
+      const m = unit(sub(plane.n, scale(p, dot(plane.n, p))));
+      if (!m) throw new RangeError(`${operation}: face ${f.name} is square to the pull direction`);
+      // A point on the hinge: on both planes, in the span of their normals from the neutral plane's origin.
+      const o = neutral.origin,
+        a = dot(plane.n, plane.n),
+        b = dot(plane.n, N),
+        c = dot(N, N),
+        bp = plane.c - dot(plane.n, o),
+        den = a * c - b * b,
+        x = (bp * c) / den,
+        y = (-bp * b) / den,
+        on: XYZ = [o[0] + x * plane.n[0] + y * N[0], o[1] + x * plane.n[1] + y * N[1], o[2] + x * plane.n[2] + y * N[2]],
+        n = unit([
+          Math.cos(angle) * m[0] + Math.sin(angle) * p[0],
+          Math.cos(angle) * m[1] + Math.sin(angle) * p[1],
+          Math.cos(angle) * m[2] + Math.sin(angle) * p[2],
+        ])!;
+      // The new plane holds the hinge only when its normal is square to it.
+      if (Math.abs(dot(n, hinge)) > 1e-12)
+        throw new RangeError(`${operation}: face ${f.name} meets the neutral plane along a line not square to the pull`);
+      return { n, c: dot(n, on) };
+    },
+    operation,
+  );
+  history?.record({ operation: name, generated: [], modified: faces.map((f) => [f, f] as const), deleted: [] });
   return out;
 }

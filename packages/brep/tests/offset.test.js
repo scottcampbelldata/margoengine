@@ -1,11 +1,11 @@
-// Face offset and shell on bodies of planar faces, against closed forms (boxes and prisms composed of boxes: volume,
+// Face offset, shell and draft on bodies of planar faces, against closed forms (boxes and prisms composed of boxes: volume,
 // area, centroid and the inertia tensor), and the offsets that must be refused: a face moved past a neighbour (the
 // topology would change), walls too thick, faces not on planes, names the body does not have.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model } from '../dist/index.js';
 
-const { box, boolean, checkBody, cylinder, extrude, frameOf, massProperties, offsetFaces, shell, validateBody } = model;
+const { box, boolean, checkBody, cylinder, draft, extrude, frameOf, massProperties, offsetFaces, shell, validateBody } = model;
 const mm = 0.001;
 
 /** Volume, first and second moments (about the origin, mm) of boxes, each [x0, y0, z0, x1, y1, z1] with a sign. */
@@ -173,5 +173,48 @@ test('shell and offset refuse what they cannot make', () => {
   assert.throws(() => offsetFaces('o', cylinder('c', 3 * mm, 5 * mm), ['c/face:+z'], 1 * mm), {
     name: 'RangeError',
     message: /c\/face:side is on a cylinder/,
+  });
+});
+
+test('draft: the sides of a cube against the frustum of a square pyramid; zero is the identity', () => {
+  const sides = ['a/face:-x', 'a/face:+x', 'a/face:-y', 'a/face:+y'],
+    base = { origin: [0, 0, 0], normal: [0, 0, 1] },
+    /** A frustum of a square pyramid, h = 10 between sides b (at z = 0) and t (at z = 10), its sides at angle a. */
+    frustum = (b, t, a) => {
+      const A1 = b * b,
+        A2 = t * t,
+        r = Math.sqrt(A1 * A2);
+      return {
+        volume: (10 / 3) * (A1 + A2 + r),
+        area: A1 + A2 + 4 * ((b + t) / 2) * (10 / Math.cos(a)),
+        z: (10 * (A1 + 2 * r + 3 * A2)) / (4 * (A1 + r + A2)),
+      };
+    },
+    check = (body, { volume, area, z }) => {
+      assert.deepEqual(checkBody(body), []);
+      const m = massProperties(body);
+      assert.ok(Math.abs(m.volume / mm ** 3 - volume) <= 1e-12 * volume, `volume ${m.volume / mm ** 3} vs ${volume}`);
+      assert.ok(Math.abs(m.area / mm ** 2 - area) <= 1e-12 * area, `area ${m.area / mm ** 2} vs ${area}`);
+      assert.ok(Math.abs(m.centroid[2] / mm - z) <= 1e-12 * 10, `centroid ${m.centroid[2] / mm} vs ${z}`);
+      assert.ok(Math.abs(m.centroid[0] / mm - 5) <= 1e-12 * 10 && Math.abs(m.centroid[1] / mm - 5) <= 1e-12 * 10);
+    };
+  // brep-compare O_draft: 5 degrees about the base, pulled up: the top closes in to 10 - 20 tan 5.
+  const a = (5 * Math.PI) / 180,
+    t = Math.tan(a);
+  check(draft('d', cube(), sides, base, [0, 0, 1], a), frustum(10, 10 - 20 * t, a));
+  // Hinged at the top instead: the base opens out to 10 + 20 tan 5.
+  check(draft('d', cube(), sides, { origin: [0, 0, 10 * mm], normal: [0, 0, 1] }, [0, 0, 1], a), frustum(10 + 20 * t, 10, a));
+  // A negative angle flares the sides out along the pull.
+  check(draft('d', cube(), sides, base, [0, 0, 1], -a), frustum(10, 10 + 20 * t, a));
+  // Zero: the cube.
+  check(draft('d', cube(), sides, base, [0, 0, 1], 0), frustum(10, 10, 0));
+  // Refused: a right angle, the top face (parallel to the neutral plane), unknown names, and so steep the top would
+  // turn inside out (the topology would change).
+  assert.throws(() => draft('d', cube(), sides, base, [0, 0, 1], Math.PI / 2), { name: 'RangeError', message: /angle/ });
+  assert.throws(() => draft('d', cube(), [top], base, [0, 0, 1], a), { name: 'RangeError', message: /parallel/ });
+  assert.throws(() => draft('d', cube(), ['a/face:nope'], base, [0, 0, 1], a), { name: 'RangeError', message: /no face/ });
+  assert.throws(() => draft('d', cube(), sides, base, [0, 0, 1], (50 * Math.PI) / 180), {
+    name: 'RangeError',
+    message: /topology/,
   });
 });
