@@ -15,6 +15,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { declaration } from './section-uniform.js';
 import { capsAsSolid } from '@margoengine/cad/closed';
 import { displayShader } from '../../shared/display.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; INDIRECT: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -152,16 +153,16 @@ export class SectionPlanes implements EnginePlugin {
         );
   }
   setup(engine: Engine): void {
-    if (!engine.gpu)
-      throw new MargoError('unsupported', 'SectionPlanes requires WebGPU; use a browser with WebGPU enabled.');
-    if (this.cap && !engine.gpu.features.has('depth32float-stencil8'))
+    // The WebGL2 preview too: its passes draw through WebGPU only.
+    requireWebGPU(engine, 'SectionPlanes');
+    if (this.cap && !engine.gpu!.features.has('depth32float-stencil8'))
       throw new MargoError(
         'unsupported',
         'Solid caps require the depth32float-stencil8 GPU feature; use a device that has it, or set cap: false.',
       );
     this.engine = engine;
     for (let i = 0; i <= this.options.planes.length; i++) {
-      const buffer = engine.gpu.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      const buffer = engine.gpu!.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.buffers.push(buffer);
       this.rows.push(new Float32Array(64));
       this.bindings.push([{ binding: 1, resource: { buffer } }]);

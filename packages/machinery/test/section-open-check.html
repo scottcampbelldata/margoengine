@@ -4,6 +4,7 @@
 // The box must get a cap; the sheet has no inside, so any cap colour on the right half is a stray cap. ?base= loads another
 // machinery build (before/after).
 import {Engine,box,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 const base=new URLSearchParams(location.search).get('base')??'/packages/machinery/dist',{SectionPlanes}=await import(base+'/section.js');
 const canvas=document.getElementById('view'),errors=[];
 window.check={async run(){
@@ -13,7 +14,8 @@ window.check={async run(){
   const sheet=new Geometry([0.3,-0.5,0,1.3,-0.5,0,1.3,0.5,0,0.3,0.5,0],[0,0,1,0,0,1,0,0,1,0,0,1],[0,1,2,0,2,3]);
   engine.createMesh().setGeometry(sheet).setMaterial(grey);
   engine.use(new SectionPlanes({planes:[[0,-1,0,0]],color:'#00ff00',hatch:0}));
-  for(let i=0;i<2;i++){engine.render();await engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>requestAnimationFrame(r));}
+  // Until the cap and section pipelines have compiled and a frame was drawn with all of them (scripts/support/gpu-ready.js).
+  await waitForPipelines(async()=>{engine.render();await engine.gpu.queue.onSubmittedWorkDone();});
   return {errors};
 }};
 window.ready=true;

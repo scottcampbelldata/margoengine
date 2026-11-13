@@ -9,7 +9,7 @@ import {
   type Geometry,
 } from '@margoengine/core/extension';
 import { geometryEdges } from '../../shared/geometry-edges.js';
-import { MargoError } from '@margoengine/math/errors';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { declaration } from './section-uniform.js';
 import { alphaBlend } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
@@ -212,13 +212,10 @@ export class FeatureEdges implements EnginePlugin {
     this.color = new PbrMaterial({ color }).data.slice(0, 4);
   }
   setup(engine: Engine): void {
-    if (!engine.gpu)
-      throw new MargoError(
-        'unsupported',
-        'FeatureEdges requires WebGPU; use a browser with WebGPU, or check engine.gpu before attaching.',
-      );
+    // The WebGL2 preview too: its passes draw through WebGPU only.
+    requireWebGPU(engine, 'FeatureEdges');
     this.engine = engine;
-    const device = engine.gpu,
+    const device = engine.gpu!,
       storage = (binding: number, hasDynamicOffset = false): GPUBindGroupLayoutEntry => ({
         binding,
         visibility: GPUShaderStage.VERTEX,

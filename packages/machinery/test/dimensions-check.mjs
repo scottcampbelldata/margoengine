@@ -48,12 +48,13 @@ try {
       if (mode === 'orthographic' && !e.hasPlugin('cameras')) e.use(projection);
       if (mode === 'perspective' && e.hasPlugin('cameras')) e.removePlugin('cameras');
       projection.zoom = zoom;
-      // Text glyphs rasterize on first use; render until the label's font is ready.
-      for (let i = 0; i < 3; i++) {
-        e.render();
-        await e.gpu.queue.onSubmittedWorkDone();
-        await new Promise((r) => setTimeout(r, 50));
-      }
+      // Text glyphs rasterize on first use, once the label's font has loaded: wait for the document's fonts, then one
+      // frame rasterizes the glyphs and the next draws them.
+      await document.fonts.ready;
+      e.render();
+      await e.gpu.queue.onSubmittedWorkDone();
+      e.render();
+      await e.gpu.queue.onSubmittedWorkDone();
       return { a: pixel([-1, 0.5, 0.5]), b: pixel([1, 0.5, 0.5]), label: dims.label(dims.dimensions[0]), gpuErrors };
     };
   });
