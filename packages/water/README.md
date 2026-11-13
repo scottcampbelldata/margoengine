@@ -130,7 +130,9 @@ Deep ocean keeps the same wave field on both sides of the map boundary. The oute
 four cells (at least 4 m, capped at a quarter of the map) fade sampled seabed color
 into its approximation. Outside the map, the nearest open seabed sample deepens
 at 0.35 m/m; extend the heightmap to represent distant shoals. Optical depth stays
-continuous across the map edge. Refraction samples submerged geometry only;
+continuous across the map edge. Refraction samples submerged geometry only, where the
+ray bent by Snell's law meets it: at a grazing view, ground far along the unbent eye ray stays hidden, since its light
+could leave the water only outside Snell's window;
 clear-depth sky pixels never become seabed color. Shoreline fragments retain
 helper lanes until their screen derivatives are complete, then discard dry cells.
 

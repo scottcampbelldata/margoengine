@@ -126,6 +126,9 @@ export interface WaterOptions {
 // Khronos PBR Neutral then sRGB (IEC 61966-2-1). Absorption (0.38, 0.10, 0.045) /m is Margo art of the order of
 // pure-water absorption (Pope & Fry 1997); seabed, foam and scatter colours, the sky blur, the roughness constants and
 // the ripple layers are Margo tuning.
+// Refraction reads the opaque colour where the Snell-bent ray (water 1.33) meets the bed, projected to the screen: along
+// the unbent eye ray a grazing view would read ground tens of metres off, whose light could only leave the water outside
+// Snell's window, so it never reaches the eye (total internal reflection).
 const shader =
   waterFrame +
   oceanWaves +
@@ -277,7 +280,11 @@ ${displayShader}
  let n=normalize(i.normal+ripple);let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
  let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-vec3f(0.38,0.10,0.045)*optical);
  var bottom=vec3f(0.28,0.25,0.17)*(frame.eye.w+frame.radiance.rgb*frame.sun.w*0.12);
- if(frame.radiance.w>0.5){let limit=vec2i(textureDimensions(opaque))-1;var q=clamp(pixel+vec2i(n.xz*min(6.0,gap*2.0)),vec2i(0),limit);let d=textureLoad(depth,q,0);if(d<=0||d>i.clip.z){q=pixel;}if(textureLoad(depth,q,0)>0){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}}
+ if(frame.radiance.w>0.5){
+  let size=vec2f(textureDimensions(opaque));let bent=refract(-v,n,0.75187970);let seen=frame.camera*vec4f(i.world+bent*(gap/max(0.05,-bent.y)),1);
+  let q=clamp(vec2i((seen.xy/max(0.0001,seen.w)*vec2f(0.5,-0.5)+0.5)*size),vec2i(0),vec2i(size)-1);let d=textureLoad(depth,q,0);
+  if(d>0&&d<=i.clip.z){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}
+ }
  let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);let rough=clamp(0.12+normalWidth*0.6+footprint*0.025,0.12,0.4);
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
  // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
