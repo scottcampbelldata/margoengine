@@ -384,7 +384,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-105 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+106 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 
@@ -486,13 +486,14 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](packages/splines/README.md) | 3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing. |
 
-### Animation and interaction (15)
+### Animation and interaction (16)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/animation`](packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
 | [`@margoengine/animator`](packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints. |
 | [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance. |
+| [`@margoengine/robot-planning`](packages/robot-planning/README.md) | Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch. |
 | [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh. |
 | [`@margoengine/tween`](packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](packages/cinematic/README.md) | Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake. |
@@ -1227,7 +1228,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,663 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,673 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -4298,6 +4299,11 @@ in `packages/cad/test/cad-limits.test.js`).
 | Balance (`@margoengine/ragdoll/balance`, 2026-11-06) | By method: it stands on joint torques alone by default, every one a pair inside the body with the ankle held to what the sole answers; `carry` is an outside force, off unless set. It adds inertia to feet and shins (0.012 of the whole mass times the leg's length squared) brings the character's island to 8 solver passes at the least, and gives a hull foot a flat sole of four corners while it balances. Its torques are forces through the whole step, so a world set above 8 only helps: over 24 roundings at 8, 10 and 16 passes no figure steps late or falls, and no hips drift 0.0020 m. A stance knee takes its torque from the balance with a spring beside it that has no damper and grows with how far the knee is off its bend, full at 0.15 rad, so `motors.setStrength` does not reach it. It stands and steps at the heading it was added at: no turning or walking. Flat ground only, at the height of the feet; no stairs or slopes. `motors.hit` weakens a limb's motor, not the balance torques, which follow the global `strength` only. Measured over 24 hull roundings each at 8 passes: all seven figures settle with no step after the first second, at 0.0006 m/s at most. Worst drift of the hips over five seconds: Knight.glb 0.0009 m, Barbarian 0.0004, Ranger 0.0006, Rogue 0.0010, Mage 0.0003, Seed-san 0.0019, RiggedFigure 0.0005; no foot slides more than 0.0012 m. On 96 other roundings at 8 passes one Seed-san foot slid 0.0020 m and 8 of the 672 figure runs shook a bone over 0.005 m/s; at 10, 16 and 20 passes none did (known-bugs.md, "A standing figure can shake"). Pushes of 1.5 m/s in four directions over 32 roundings on Knight.glb: 125 of 128 pass the push test's reading and none fall; the old assist passed 122 and fell in none, holding about half the weight from outside. The other three are still stepping six seconds after the push and stand still by fourteen. Those 128 pushes at 8 / 10 / 16 passes, failing the reading / falling within four seconds: Knight 3/0, 1/0, 7/0; Rogue 1/0, 4/0, 2/0; Ranger 7/0, 8/0, 8/0; Mage 21/0, 25/0, 13/0; Barbarian 29/9, 36/14, 43/30; RiggedFigure 96/95, 92/88, 96/96; Seed-san 113/108, 121/120, 128/128. Falls in 128 pushes at 8 passes at 0.5 / 1 / 1.5 m/s: Knight, Ranger, Rogue and Mage 0 / 0 / 0, Barbarian 0 / 8 / 9, RiggedFigure 60 / 63 / 95, Seed-san 69 / 93 / 108, so only the first four stay up at 1.5 m/s and RiggedFigure and Seed-san do not reliably take 0.5 (known-bugs.md, "A push throws"). Not measured: speed, including the cost of the added passes. |
 | Uneven bone scales in ragdolls (`@margoengine/ragdoll`, 2026-11-06) | Enforced: zero and mirrored bones are refused. By method: any positive scale is taken. Bodies are rigid and sized in world units when the ragdoll is built, so a scale animated afterwards does not resize them. A bone's own uneven scale costs nothing: a fall with a stretched spine matches the same rig built unstretched to under 1 mm. A bone turned under an uneven scale above it is skewed, so the bones drawn below it stretch as it turns, as in IK, while the bodies keep their joint distance; the pose holds exactly where the bone went limp and drifts from its body as it turns away. A hull fitted to a skewed bone takes the scales of the bone's axes and not the skew. Proved on Seed-san's own scales (`hair_E`, 0.9995, 1, 0.9986); scales as large as 0.1, 3, 40 only on a stand-in rig. |
 | Swept collision (`@margoengine/kinematics-constraints/swept`, 2026-11-06) | By method: colliders hold still during a check, so a moving obstacle needs its own stepping. The path checked is the shortest arc per bone for a chain, and the shortest arc about the hull's origin for a hull; if your animation plays another path, this one is certified, not yours. A contact is any gap at or below `minClearance` plus `tolerance` (1e-4), and a motion that starts there stops at time 0, so keep `minClearance` below the gap the pose was solved with. A gap of `d` and a speed bound of `s` give a step of `d / s`, so a motion that grazes a surface for a long way takes many steps: past the budget of 4,096 poses it ends `exhausted`, which is not clear; raise `maxSteps` or `tolerance`. |
+| Robot swept collision (`@margoengine/robot-planning`, `sweepRobot`, 2026-11-06) | By method: as the swept collision row above, on the straight line in joint space between the two poses; if your animation plays another path, this one is certified, not yours. Self collision is checked only with `selfCollision: true`, on the pairs `Robot.selfCollisionPairs` lists. |
+| Joint-limit solver (`@margoengine/robot-planning/limits`, 2026-11-06) | By method: a local solver, so a start behind an obstacle can stall with a way round it; that is reported as `blocked`, and the planner is the way out. Convergence is proved from starts near an answer, not from anywhere. Ranges are per scalar joint: a ball joint is three of them, so a cone limit is a box of angles. Obstacle gradients are finite differences, so each nearby pair costs one pose per joint per iteration, and at most 48 pairs count per iteration, the closest. |
+| Motion planner (`@margoengine/robot-planning/plan`, 2026-11-06) | By method: sampling planners are probabilistically complete, so `no-path` means the budget ran out, not that no path exists, and a narrow passage can need far more samples. Paths are feasible, not optimal: shortcutting only shortens them. A continuous joint plans on the line of its value, not on a circle, and samples stay one turn each way of the start. Colliders hold still during a plan. `planToPose` picks the first clear pose at the target; if that pose cannot be reached it reports `no-path` without trying another. Nearest neighbours are a plain scan, so a tree's cost grows with the square of its nodes. `Roadmap.grow` and `query` run on the calling thread. |
+| URDF import (`@margoengine/robot-planning/urdf`, 2026-11-06) | By method: a mesh collision shape becomes its convex hull, so a concave link reads fatter than it is. A cylinder is a prism drawn round it, 16 sides by default. Only collision meshes are fetched; visuals are data, for your own loader. `<transmission>`, `<gazebo>`, `<material>` and sensors are not read, and `xacro` is not expanded: pass the generated URDF. A floating joint is six plain joints, three of them rotations in a fixed order, so it has the gimbal lock of Euler angles. A package path not listed in `packages` is a guess at the folder above the document. Mesh units are as the file gives them; only `scale` applies. `/urdf` loads `@margoengine/loaders/xml` at once and the rest of the loaders and `@margoengine/geometry` only when a mesh is met. |
+| Batched GPU clearance (`@margoengine/robot-planning/gpu`, 2026-11-06) | By method: f32, about 1e-6 of a scene of size 1, so it sorts poses and proves nothing; `Roadmap.addPoses` proves each survivor on the CPU. An overlap reads zero or less with no depth. Poses only, not the motion between them: edges still take the CPU swept check. The base, the shapes and the colliders are read once. A `MeshVolume` and a field that is a plain function are refused. One invocation walks every pair of a pose in turn, with no broad phase, so a pose with many shapes and hulls of many points costs in proportion. A field query keeps 48 or 64 cells on its stack and past that answers with the safe lower bound, as `maxCells` does. Run on the RTX A6000 only. |
 | Concave obstacles (`@margoengine/kinematics-constraints/sdf`, 2026-11-06) | By method: `SDFVolume` is only as fine as its grid. A wall thinner than a cell may not be in the field at all, and the default margin of one cell's diagonal reads every obstacle that much fatter; a grid must hold the whole obstacle, because past its edge a reading is the distance to the grid. Both volumes take a rotation, one uniform scale and a move, no shear. A crossing segment reads minus its radius and an overlapping hull reads zero or less on a mesh, which ranks poses and is not a depth. Mesh queries prune with a box round the query, so a long diagonal link visits more of the tree than it needs. `/sdf` is the one entry that loads `@margoengine/bvh/inside`, for the sign of a solid mesh. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
@@ -22977,6 +22983,75 @@ For a motion report, expand **Record a problem**, click **Start recording**, rep
 ## Controller integration
 
 [README continues: https://margoengine.com/llms/packages/kinematics-constraints.md]
+
+=== @margoengine/robot-planning (packages/robot-planning/README.md) ===
+
+# @margoengine/robot-planning
+
+Import `margoengine/robot-planning` from the `margoengine` package, or `@margoengine/robot-planning` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Robot arms on [`@margoengine/kinematics-constraints`](../kinematics-constraints/README.md): a tree of revolute, prismatic, continuous, fixed and mimic joints with capsule and convex hull collision shapes, a swept check of a whole joint-space motion, inverse kinematics that keeps every joint in range and every link clear, sampling planners (RRT-Connect and a reusable roadmap), a URDF reader, and a WebGPU batch that measures the clearance of thousands of poses at once. Obstacles are the volumes of kinematics-constraints: spheres, capsules, convex hulls, and from its `/sdf` entry meshes and baked distance fields. No renderer, physics or Wasm is needed.
+
+Version `1.0.0` is source-only and has not been published to npm. From the repository root:
+
+```sh
+npm ci
+npm run build --workspace @margoengine/robot-planning
+npm run test --workspace @margoengine/robot-planning
+```
+
+The package is Apache-2.0 licensed. `@margoengine/kinematics-constraints` is a required peer; `@margoengine/loaders` (URDF XML and STL meshes) and `@margoengine/geometry` (mesh hulls) are optional peers the `/urdf` entry loads.
+
+## Entries
+
+| Entry | What it holds |
+| --- | --- |
+| `@margoengine/robot-planning` | `Robot` (forward kinematics, motion bounds, clearance, self collision) and `sweepRobot` |
+| `@margoengine/robot-planning/limits` | `JointLimitSolver` and `armRobot`: damped least squares IK with joint ranges as bounds and a velocity damper per obstacle |
+| `@margoengine/robot-planning/plan` | `planPath`, `planPathSync`, `planToPose` and `Roadmap`: RRT-Connect, a probabilistic roadmap and shortcutting, every edge checked with `sweepRobot` |
+| `@margoengine/robot-planning/urdf` | `parseURDF` and `loadURDF`: a URDF description as a `Robot`, meshes reduced to convex hulls |
+| `@margoengine/robot-planning/gpu` | `GPUClearance`: the clearance of many poses at once in a WebGPU compute pass, and `gridData` for the baked fields it uploads |
+
+## A robot and a swept check
+
+```ts
+import { CapsuleVolume } from '@margoengine/kinematics-constraints';
+import { Robot, sweepRobot } from '@margoengine/robot-planning';
+
+const arm = new Robot({
+  joints: [{ lower: -3, upper: 3 }],
+  shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
+});
+const wall = new CapsuleVolume({ start: [0.7, 0.7, -1], end: [0.7, 0.7, 1], radius: 0.01 });
+const hit = sweepRobot(arm, [0], [2], [wall]); // both ends are clear; the motion is not
+console.log(hit.clear, hit.time);
+```
+
+`sweepRobot` is conservative advancement with a per-link motion bound: no step can jump a collider, however thin or fast. A budget that runs out reads `exhausted`, never clear.
+
+## Planning around an obstacle
+
+```ts
+import { ConvexHullVolume } from '@margoengine/kinematics-constraints';
+import { Robot } from '@margoengine/robot-planning';
+import { planPath } from '@margoengine/robot-planning/plan';
+
+const arm = new Robot({
+  joints: [{ lower: -3, upper: 3 }, { lower: -3, upper: 3, origin: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1] }],
+  shapes: [{ joint: 1, end: [1, 0, 0], radius: 0.05 }],
+});
+const wall = new ConvexHullVolume({ points: [1.5, -0.2, -1, 1.5, -0.2, 1, 3, -0.2, -1, 3, -0.2, 1] });
+const plan = await planPath(arm, [0.3, 0], [-0.3, 0], { colliders: [wall], seed: 7 });
+if (plan.status === 'found') console.log(plan.path.length, plan.length);
+```
+
+## GPU clearance
+
+`GPUClearance` runs forward kinematics and GJK per pose in a compute pass and reads back one gap per pose, for filtering candidate poses before the exact CPU checks. Its error against the f64 CPU answer is bounded and checked on a real GPU by `npm run test:gpu -w packages/robot-planning` (from the repository root, after building packages).
+
+## Tests and fixtures
+
+The URDF tests read the Franka Emika Panda description from example-robot-data (Apache-2.0, `tests/fixtures/panda`, see `tests/fixtures/NOTICE.md`). Fixtures are not part of the published package.
 
 === @margoengine/rigging (packages/rigging/README.md) ===
 

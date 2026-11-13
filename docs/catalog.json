@@ -2195,6 +2195,23 @@
     "category": "Animation and interaction"
   },
   {
+    "id": "robot-planning",
+    "title": "Robot-planning",
+    "category": "Animation and interaction",
+    "package": "@margoengine/robot-planning",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "robot planning",
+    "install": "npm install @margoengine/robot-planning@1.0.0",
+    "imports": "import { Robot } from '@margoengine/robot-planning';",
+    "exports": [
+      "Robot",
+      "sweepRobot"
+    ]
+  },
+  {
     "id": "rigging",
     "title": "Rigging",
     "category": "Animation and interaction",

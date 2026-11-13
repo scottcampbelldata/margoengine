@@ -1,0 +1,75 @@
+{
+  "name": "@margoengine/robot-planning",
+  "version": "1.0.0",
+  "description": "Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "robotics",
+    "motion-planning",
+    "urdf"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/robot-planning"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./limits": {
+      "types": "./dist/limits.d.ts",
+      "import": "./dist/limits.js"
+    },
+    "./plan": {
+      "types": "./dist/plan.d.ts",
+      "import": "./dist/plan.js"
+    },
+    "./urdf": {
+      "types": "./dist/urdf.d.ts",
+      "import": "./dist/urdf.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js robot-planning",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/robot-planning/tests/gpu-browser-run.mjs",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/kinematics-constraints": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/geometry": {
+      "optional": true
+    },
+    "@margoengine/loaders": {
+      "optional": true
+    }
+  }
+}

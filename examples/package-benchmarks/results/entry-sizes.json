@@ -5262,8 +5262,8 @@
     },
     "@margoengine/kinematics-constraints": {
       ".": {
-        "raw": 36312,
-        "gzip": 11687
+        "raw": 36257,
+        "gzip": 11677
       },
       "./joint-limits": {
         "raw": 2723,
@@ -5274,12 +5274,12 @@
         "gzip": 1904
       },
       "./swept": {
-        "raw": 25109,
-        "gzip": 9209
+        "raw": 25399,
+        "gzip": 9291
       },
       "./sdf": {
-        "raw": 18842,
-        "gzip": 6973
+        "raw": 18853,
+        "gzip": 6976
       },
       "./multi-goal": {
         "raw": 8535,
@@ -8910,6 +8910,28 @@
       "./structures": {
         "raw": 8238,
         "gzip": 3652
+      }
+    },
+    "@margoengine/robot-planning": {
+      ".": {
+        "raw": 12461,
+        "gzip": 4661
+      },
+      "./limits": {
+        "raw": 19759,
+        "gzip": 7254
+      },
+      "./plan": {
+        "raw": 27700,
+        "gzip": 9757
+      },
+      "./urdf": {
+        "raw": 19506,
+        "gzip": 7139
+      },
+      "./gpu": {
+        "raw": 46969,
+        "gzip": 15597
       }
     },
     "@margoengine/save": {

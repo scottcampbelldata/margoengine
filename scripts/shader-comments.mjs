@@ -293,7 +293,7 @@ export function shaderCommentsLeft(code, filename, anchors = []) {
 
 // KB-WGSL1 lands package by package, each batch with the GPU tests of the packages it strips: the packages stripped so
 // far. It goes (null) once every package is; the shader-comments quality gate records what is left meanwhile.
-const ROLLOUT = new Set(['cameras', 'compute', 'lod', 'taa', 'tonemap']);
+const ROLLOUT = new Set(['cameras', 'compute', 'lod', 'robot-planning', 'taa', 'tonemap']);
 
 /**
  * Applied after emission, beside declarePackageCore, by every package build: strips the shader comments of every .js

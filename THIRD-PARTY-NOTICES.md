@@ -3,14 +3,14 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 107 published packages (105 in `packages/`
+assets the site and examples use. It covers all 108 published packages (106 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-93 of 107 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+94 of 108 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -144,6 +144,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/react-kit` | react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/rigging` | none | none | LICENSE, NOTICE |
 | `@margoengine/road` | none | none | LICENSE, NOTICE |
+| `@margoengine/robot-planning` | none | none | LICENSE, NOTICE |
 | `@margoengine/save` | none | none | LICENSE, NOTICE |
 | `@margoengine/scatter` | none | none | LICENSE, NOTICE |
 | `@margoengine/scene` | none | none | LICENSE, NOTICE |
@@ -259,6 +260,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`packages/fbx/test/fixtures/README.md`](packages/fbx/test/fixtures/README.md) | test fixtures: original FBX scenes exported for this project by Blender 5.3 from the scripts beside them (CC0 1.0) |
 | [`packages/fbx/test/fixtures/real/NOTICE.md`](packages/fbx/test/fixtures/real/NOTICE.md) | test fixtures: Maya and 3ds Max FBX files with OBJ frames from the ufbx test data (MIT or Unlicense, Samuli Raivio); commit and sha256 there |
 | [`packages/gltf-pro/tests/fixtures/bump/NOTICE.md`](packages/gltf-pro/tests/fixtures/bump/NOTICE.md) | test fixture: BumpMaterial.gltf, the EXT_materials_bump interoperability file from luma.gl (CC0-1.0, vis.gl contributors) |
+| [`packages/robot-planning/tests/fixtures/NOTICE.md`](packages/robot-planning/tests/fixtures/NOTICE.md) | test fixtures: Franka Emika Panda description from Gepetto example-robot-data, commit 6249cab1 (Apache-2.0) |
 | [`packages/gltf-pro/tests/fixtures/uv/NOTICE.md`](packages/gltf-pro/tests/fixtures/uv/NOTICE.md) | test fixture: FourUV.glb, exported for this project by Blender 5.3 from fixtures/uv/four-uv.blender.py (Apache-2.0, as this repository) |
 | [`packages/gltf-pro/tests/fixtures/metadata/NOTICE.md`](packages/gltf-pro/tests/fixtures/metadata/NOTICE.md) | test fixtures: XmpMetadataRoundedCube.glb of Khronos glTF-Sample-Assets, commit 8f492390 (CC-BY-4.0, Adam Morris); Box.gltf, Box0.bin and the language edge cases of https://github.com/KhronosGroup/glTF-Metadata-CLI, commit e35dbb00 (CC-BY-4.0, The Khronos Group); boom_box.gltf (CC0-1.0, The Khronos Group) and rocket_ship.gltf (CC-BY-3.0, Poly by Google and aaronfranke) of https://github.com/omigroup/gltf-extensions, commit 4f1fe73b, exported by the Godot Engine |
 | [`packages/gltf-pro/tests/fixtures/scatter/NOTICE.md`](packages/gltf-pro/tests/fixtures/scatter/NOTICE.md) | test fixture: ScatteringSkull.gltf and its external geometry and thickness map, Khronos glTF-Sample-Assets commit 8f492390 (CC0-1.0, Vladimir Petkovic and Adobe Inc.); required hashes in scripts/support/external-test-assets.json |

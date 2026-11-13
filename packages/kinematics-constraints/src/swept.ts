@@ -5,6 +5,7 @@
 // touch for `gap / speed` of the path's time, so the check may step that far and look again. No step can jump a wall,
 // however thin. Written clean room from those publications.
 import { rangeError, typeError } from '../../shared/errors.js';
+import { advance, sweepSettings as settings, type SweptMotion } from '../../shared/swept-advance.js';
 import { ConvexHullVolume, hullPoints } from './hull.js';
 import type { ConstraintVolume, Vec3View } from './types.js';
 import { readVector, validateVector } from './types.js';
@@ -46,84 +47,6 @@ export interface SweepResult {
   shape: number;
   /** Index of the collider at the contact; -1 for none. */
   collider: number;
-}
-
-interface Motion {
-  /** Moving shapes. */
-  count: number;
-  /** The most any point of each shape moves per unit of time. */
-  speed: Float64Array;
-  /** Puts the shapes at time `t`. */
-  place(t: number): void;
-  /** Signed gap of one shape to one collider. */
-  gap(shape: number, volume: ConstraintVolume): number;
-}
-
-function settings(options: SweepOptions | undefined) {
-  const minClearance = options?.minClearance ?? 0,
-    tolerance = options?.tolerance ?? 1e-4,
-    maxSteps = options?.maxSteps ?? 4096;
-  if (!(minClearance >= 0) || !Number.isFinite(minClearance))
-    throw rangeError('Sweep minClearance must be 0 or more', 'kinematics');
-  if (!(tolerance > 0) || !Number.isFinite(tolerance)) throw rangeError('Sweep tolerance must be above 0', 'kinematics');
-  if (!Number.isSafeInteger(maxSteps) || maxSteps < 1)
-    throw rangeError('Sweep maxSteps must be a positive integer', 'kinematics');
-  return { minClearance, tolerance, maxSteps };
-}
-
-function advance(
-  motion: Motion,
-  colliders: readonly ConstraintVolume[],
-  minClearance: number,
-  tolerance: number,
-  maxSteps: number,
-): SweepResult {
-  const { count, speed } = motion,
-    result: SweepResult = {
-      clear: false,
-      exhausted: false,
-      time: 0,
-      clearance: Infinity,
-      steps: 0,
-      shape: -1,
-      collider: -1,
-    };
-  let t = 0;
-  for (;;) {
-    motion.place(t);
-    result.steps++;
-    let step = Infinity;
-    for (let s = 0; s < count; s++) {
-      const moving = speed[s];
-      // A shape that does not move stands where it stood at the start.
-      if (moving === 0 && t > 0) continue;
-      let least = Infinity;
-      for (let c = 0; c < colliders.length; c++) {
-        const gap = motion.gap(s, colliders[c]) - minClearance;
-        if (Number.isNaN(gap)) throw rangeError('A collider gave no finite clearance', 'kinematics');
-        if (gap < result.clearance) result.clearance = gap;
-        if (gap <= tolerance) {
-          result.time = t;
-          result.shape = s;
-          result.collider = c;
-          return result;
-        }
-        if (gap < least) least = gap;
-      }
-      if (moving > 0 && least / moving < step) step = least / moving;
-    }
-    result.time = t;
-    if (t >= 1 || step === Infinity) {
-      result.time = 1;
-      result.clear = true;
-      return result;
-    }
-    if (result.steps >= maxSteps) {
-      result.exhausted = true;
-      return result;
-    }
-    t = Math.min(1, t + step);
-  }
 }
 
 const closest: SegmentDistanceResult = /* @__PURE__ */ (() => ({
@@ -253,7 +176,7 @@ export function sweepChain(
     speed[links + k] = jointSpeed[j];
   });
   const now = new Float64Array(joints * 3);
-  const motion: Motion = {
+  const motion: SweptMotion<ConstraintVolume> = {
     count: speed.length,
     speed,
     place(t) {
@@ -401,7 +324,7 @@ export function sweepHull(
     q = new Float64Array(4),
     distance = new Float64Array(1);
   matrix[15] = 1;
-  const motion: Motion = {
+  const motion: SweptMotion<ConstraintVolume> = {
     count: 1,
     speed,
     place(t) {

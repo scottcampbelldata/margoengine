@@ -66,6 +66,7 @@
     "@margoengine/react-kit",
     "@margoengine/rigging",
     "@margoengine/road",
+    "@margoengine/robot-planning",
     "@margoengine/save",
     "@margoengine/scatter",
     "@margoengine/scene",

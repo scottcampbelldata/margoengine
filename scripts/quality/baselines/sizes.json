@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15548103,
+  "total": 15594045,
   "history": [
     {
       "date": "2026-10-24",
@@ -8753,6 +8753,12 @@
       "commit": "f1ac1ab44",
       "reason": "Storm Light lane S1i: water whitecaps and wind chop (+335 B), VolumetricClouds flash and the deck marched into the sky's environment map (Sky.environmentLayer, reflection and lighting layered variants), the known bug of 2026-11-13",
       "grew": 6
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "1d36e2de9",
+      "reason": "robot planning returns from the kernel repository as @margoengine/robot-planning: five new entries (robot and sweepRobot, limits, plan, urdf, gpu), each importing kinematics-constraints by package name",
+      "grew": 10
     }
   ],
   "items": {
@@ -9603,6 +9609,11 @@
     "@margoengine/road/repair": 861,
     "@margoengine/road/structures": 3908,
     "@margoengine/road/terrain": 1143,
+    "@margoengine/robot-planning": 4917,
+    "@margoengine/robot-planning/gpu": 16065,
+    "@margoengine/robot-planning/limits": 7510,
+    "@margoengine/robot-planning/plan": 10050,
+    "@margoengine/robot-planning/urdf": 7395,
     "@margoengine/save": 7286,
     "@margoengine/save/engine": 8438,
     "@margoengine/save/materials": 461,
@@ -10192,6 +10203,11 @@
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
     "leak @margoengine/rigging/mtoon -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/robot-planning -> @margoengine/kinematics-constraints": 1,
+    "leak @margoengine/robot-planning/gpu -> @margoengine/kinematics-constraints": 1,
+    "leak @margoengine/robot-planning/limits -> @margoengine/kinematics-constraints": 1,
+    "leak @margoengine/robot-planning/plan -> @margoengine/kinematics-constraints": 1,
+    "leak @margoengine/robot-planning/urdf -> @margoengine/kinematics-constraints": 1,
     "leak @margoengine/save/materials -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/save/materials -> @margoengine/materials/serialization": 1,
     "leak @margoengine/scatter/imposter -> @margoengine/gltf-pro/model": 1,

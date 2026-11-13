@@ -3339,6 +3339,26 @@
       "types": "./dist/road/structures.d.ts",
       "import": "./dist/road/structures.js"
     },
+    "./robot-planning": {
+      "types": "./dist/robot-planning.d.ts",
+      "import": "./dist/robot-planning.js"
+    },
+    "./robot-planning/limits": {
+      "types": "./dist/robot-planning/limits.d.ts",
+      "import": "./dist/robot-planning/limits.js"
+    },
+    "./robot-planning/plan": {
+      "types": "./dist/robot-planning/plan.d.ts",
+      "import": "./dist/robot-planning/plan.js"
+    },
+    "./robot-planning/urdf": {
+      "types": "./dist/robot-planning/urdf.d.ts",
+      "import": "./dist/robot-planning/urdf.js"
+    },
+    "./robot-planning/gpu": {
+      "types": "./dist/robot-planning/gpu.d.ts",
+      "import": "./dist/robot-planning/gpu.js"
+    },
     "./save": {
       "types": "./dist/save.d.ts",
       "import": "./dist/save.js"
@@ -5430,6 +5450,7 @@
     "@margoengine/react": "^1.0.0",
     "@margoengine/rigging": "^1.0.0",
     "@margoengine/road": "^1.0.0",
+    "@margoengine/robot-planning": "^1.0.0",
     "@margoengine/save": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
     "@margoengine/scene": "^1.0.0",

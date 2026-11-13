@@ -1,8 +1,8 @@
 // Scott, 2026-11-13: "there should be no private packages at all now". Everything the kernel repository held came back
-// into this repository as public Apache-2.0 packages (brep, cad, machinery). No package manifest is private or
-// unlicensed, no tracked file names that repository's npm scope, and each package that came back imports only node
-// built-ins and the public engine packages it declares. The scope is written in base64 here, so this file does not
-// name it either.
+// into this repository as public Apache-2.0 packages (brep, cad, machinery, robot-planning). No package manifest is
+// private or unlicensed, no tracked file names that repository's npm scope, and each package that came back imports
+// only node built-ins, its own entries and the public engine packages it declares. The scope is written in base64
+// here, so this file does not name it either.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -12,7 +12,7 @@ import test from 'node:test';
 const root = resolve(import.meta.dirname, '..');
 const scope = Buffer.from('QG1hcmdvLWVudGVycHJpc2U=', 'base64').toString('utf8');
 /** The packages that came back from the kernel repository. */
-const RETURNED = ['brep', 'cad', 'machinery'];
+const RETURNED = ['brep', 'cad', 'machinery', 'robot-planning'];
 
 /** Every file under `dir`, recursively. */
 const files = (dir) =>
@@ -78,7 +78,8 @@ for (const pkg of RETURNED) {
   });
 
   test(`@margoengine/${pkg} sources import only node built-ins and the packages it declares`, () => {
-    const declared = new Set(Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies }));
+    // A package's own name is declared by definition: the build keeps it an import, so one entry can load another.
+    const declared = new Set([manifest.name, ...Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies })]);
     for (const file of files(join(dir, 'src')).filter((f) => /\.(ts|tsx|js|mjs)$/.test(f)))
       for (const spec of bareImports(readFileSync(file, 'utf8'))) {
         if (spec.startsWith('node:')) continue;
