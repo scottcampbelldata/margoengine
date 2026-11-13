@@ -51,6 +51,13 @@ export interface ShaftSky {
 
 // Not exported from this entry, but used by the exports above:
 
+interface VolumetricCloudFlash {
+    position: Vec3;
+    intensity: number;
+    color?: Vec3;
+    radius?: number;
+}
+
 interface VolumetricCloudOptions {
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
@@ -67,6 +74,7 @@ interface VolumetricCloudOptions {
     sunIntensity?: number;
     ambient?: readonly [Vec3, Vec3];
     depth?: () => GPUTexture | undefined;
+    flash?: VolumetricCloudFlash;
 }
 
 interface VolumetricCloudSky {
@@ -80,5 +88,6 @@ interface VolumetricCloudSky {
         readonly direction: ArrayLike<number>;
         readonly radiance: ArrayLike<number>;
     }[];
+    environmentLayer?: GPUTexture | undefined;
 }
 ```

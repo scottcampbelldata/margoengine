@@ -49,6 +49,20 @@ const checks = {
     assert.equal(r.flash.off, 0, `a flash of intensity 0 changed ${r.flash.off} pixels`);
     assert.ok(r.flash.lit.changed > r.flash.lit.total * 0.2 && r.flash.gain > 1.2, `flash: ${JSON.stringify(r.flash)}`);
     assert.equal(r.flash.thrown, 3, `invalid flashes accepted: ${3 - r.flash.thrown}`);
+    // The deck in the sky's environment (docs/known-bugs.md, 2026-11-13; before the fix the map and the scene light
+    // never changed with the clouds): the reflection map is the sky through the deck plus the deck's light, texel for
+    // texel (half-float rounding, 1 in 500); the dense deck (coverage 0.9) covers much of the upper half and changes
+    // most of it, the half below the horizon (no cloud from the ground) stays as it was; a flash in the deck brightens
+    // the map and, through the scene's sky light, the pillar; coverage 0 and dispose give the map back exactly.
+    const e = r.environment;
+    assert.ok(e.opacity > 0.3 && e.changed > 64 * 16 * 0.3, `deck in the map: ${JSON.stringify(e)}`);
+    assert.equal(e.lowerChanged, 0, `below the horizon: ${JSON.stringify(e)}`);
+    assert.ok(e.upper.flash > e.upper.clouds * 1.2, `flash in the map: ${JSON.stringify(e.upper)}`);
+    assert.notEqual(e.pillar.clouds, e.pillar.clear, `the deck left the scene light alone: ${JSON.stringify(e.pillar)}`);
+    assert.ok(e.pillar.flash > e.pillar.clouds * 1.05, `flash in the scene light: ${JSON.stringify(e.pillar)}`);
+    assert.ok(e.layered, `the clouds gave the sky no layer: ${JSON.stringify(e)}`);
+    assert.ok(e.composite < 0.002, `map is not sky over deck: ${JSON.stringify(e)}`);
+    assert.ok(e.zeroCleared && e.disposedCleared, `layer left behind: ${JSON.stringify(e)}`);
     console.log(
       `ok volumetric ${samples}x: ground ${r.ground.shown.changed}/${r.ground.shown.total}, inside ${r.inside.shown.changed}, above ${r.above.shown.changed}; frame ${r.ground.ms.toFixed(1)} / ${r.inside.ms.toFixed(1)} / ${r.above.ms.toFixed(1)} ms (diagnostic)`,
     );

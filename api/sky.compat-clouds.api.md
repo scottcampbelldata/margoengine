@@ -40,6 +40,13 @@ export interface StrikeOptions {
     strength?: number;
 }
 
+export interface VolumetricCloudFlash {
+    position: Vec3;
+    intensity: number;
+    color?: Vec3;
+    radius?: number;
+}
+
 export interface VolumetricCloudOptions {
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
@@ -56,6 +63,7 @@ export interface VolumetricCloudOptions {
     sunIntensity?: number;
     ambient?: readonly [Vec3, Vec3];
     depth?: () => GPUTexture | undefined;
+    flash?: VolumetricCloudFlash;
 }
 
 export interface VolumetricCloudSky {
@@ -69,6 +77,7 @@ export interface VolumetricCloudSky {
         readonly direction: ArrayLike<number>;
         readonly radiance: ArrayLike<number>;
     }[];
+    environmentLayer?: GPUTexture | undefined;
 }
 
 export class VolumetricClouds implements EnginePlugin {

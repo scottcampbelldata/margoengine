@@ -175,6 +175,13 @@ reflection map (the `reflection` feature, part of the root `Sky`), reduced on th
 and from the horizon; reading `sky.reflectionTexture` turns that map's refresh on. A sky without the feature, or no sky,
 uses `ambient` and `sunDirection`.
 
+In turn the clouds go into the sky's environment, so what reflects the sky or takes its light sees them. Each frame
+they march their deck from the camera into a 64 × 32 map in the sky's layout (four rays a texel, 32 steps each, with
+the same light, moon and flash as the view) and set it as `sky.environmentLayer`: the sky draws its reflection map
+again with the deck over it (at frame-graph order 3.5, after the clouds took their own light from the clear map and
+before Water reflects it), and its `lighting` map takes the deck before its mips and harmonics, so a moonlit deck lights
+the scene and a lightning flash inside it lights the ground. Coverage 0 or `dispose()` gives the sky back its plain map.
+
 `depth` takes the scene's reversed-Z depth each frame (any effect's scene depth, as the sky's fog does). With it the
 march stops at scene surfaces, so a camera inside the layer sees cloud in front of nearby objects, and a mountain
 in front of the clouds hides them. Without it the clouds draw only over the empty sky.

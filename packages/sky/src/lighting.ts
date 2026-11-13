@@ -3,7 +3,7 @@ import { compute, group } from '../../shared/gpu.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import type { SkyFeatures } from './base.js';
 import { MargoError } from '@margoengine/math/errors';
-import { environment } from './environment.js';
+import { environment, environmentLayer } from './environment.js';
 import { project } from './project.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
@@ -14,6 +14,14 @@ const renderLight = `
 @compute @workgroup_size(8,8) fn renderLight(@builtin(global_invocation_id) id:vec3u){
  if(any(id.xy>=vec2u(64,32))){return;}
  textureStore(lightTarget,vec2i(id.xy),vec4f(skyEnvironment(environmentDirection((vec2f(id.xy)+0.5)/vec2f(64,32)),0.1),1));
+}`;
+// The same with the sky's environment layer (Sky.environmentLayer, the clouds' deck) laid over it, before the mips and
+// the harmonics are taken, so the scene is lit by the clouds as well as the sky.
+const renderLayered = `${environmentLayer}
+@group(0) @binding(3) var lightTarget:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,8) fn renderLight(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=vec2u(64,32))){return;}
+ textureStore(lightTarget,vec2i(id.xy),vec4f(layered(skyEnvironment(environmentDirection((vec2f(id.xy)+0.5)/vec2f(64,32)),0.1),id.xy),1));
 }`;
 const downsample = `
 @group(0) @binding(0) var finer:texture_2d<f32>;
@@ -141,7 +149,8 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         ],
       };
     };
-    let gpu: ReturnType<typeof build> | undefined;
+    let gpu: ReturnType<typeof build> | undefined,
+      layered: { pipeline: GPUComputePipeline; layer?: GPUTexture; group?: GPUBindGroup } | undefined;
     const hooks = new Map<number, { readonly declarations: string; readonly ambient: string }>();
     return {
       pbr(group) {
@@ -162,6 +171,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       recode(next, bindings) {
         code = next;
         entries = bindings;
+        layered = undefined;
         if (!gpu) return;
         // A model switch: only the sky render step reads the sky's code; the map, buffer and bindings stay.
         const render = compute(d, code + environment + renderLight, 'renderLight');
@@ -189,12 +199,21 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         direction[3] = Math.max(l.minimum ?? 0, body.direction[3]);
         if (ambient) radiance[3] = Math.max(floor[0], floor[1], floor[2]);
       },
-      pass(c) {
+      pass(c, layer) {
         const g = (gpu ??= build()),
           encoder = c.encoder.beginComputePass(descriptor);
+        if (layer) {
+          layered ??= { pipeline: compute(d, code + environment + renderLayered, 'renderLight') };
+          if (layered.layer !== layer)
+            layered.group = d.createBindGroup({
+              layout: layered.pipeline.getBindGroupLayout(0),
+              entries: [...entries, { binding: 3, resource: g.top }, { binding: 4, resource: layer.createView() }],
+            });
+          layered.layer = layer;
+        }
         for (let i = 0; i < 5; i++) {
-          encoder.setPipeline(g.pipelines[i]);
-          encoder.setBindGroup(0, g.groups[i]);
+          encoder.setPipeline(i === 0 && layered && layer ? layered.pipeline : g.pipelines[i]);
+          encoder.setBindGroup(0, i === 0 && layered && layer ? layered.group! : g.groups[i]);
           encoder.dispatchWorkgroups(sizes[i * 2], sizes[i * 2 + 1]);
         }
         encoder.end();

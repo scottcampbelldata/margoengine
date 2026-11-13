@@ -9,6 +9,7 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 export class Sky implements EnginePlugin {
     readonly options: SkyOptions;
     readonly name: string;
+    environmentLayer: GPUTexture | undefined;
     readonly sun: Float32Array<ArrayBuffer>;
     readonly moon: Float32Array<ArrayBuffer>;
     get cloudLayer(): {
@@ -77,7 +78,7 @@ export interface SkyFeatures {
     reflection?: {
         create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
             texture: GPUTexture;
-            run(c: SkyPassContext): void;
+            run(c: SkyPassContext, layer?: GPUTexture): void;
             recode(code: string, entries: GPUBindGroupEntry[]): void;
         };
     };
@@ -88,7 +89,7 @@ export interface SkyFeatures {
                 readonly day: Vec3;
                 readonly night: Vec3;
             } | undefined, night: number): void;
-            pass(c: SkyPassContext): void;
+            pass(c: SkyPassContext, layer?: GPUTexture): void;
             recode(code: string, entries: GPUBindGroupEntry[]): void;
             pbr(group: number): {
                 readonly declarations: string;

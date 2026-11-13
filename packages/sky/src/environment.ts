@@ -16,3 +16,11 @@ fn environmentDirection(uv:vec2f)->vec3f {
  let phi=(uv.x-0.5)*6.2831853;let theta=uv.y*3.14159265;return vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));
 }
 `;
+// Sky.environmentLayer at binding 4, a 64 x 32 map in the same layout with premultiplied light and opacity (the
+// VolumetricClouds deck): over the sky, its light plus the sky through what it lets pass.
+export const environmentLayer = /* wgsl */ `
+@group(0) @binding(4) var environmentLayer:texture_2d<f32>;
+fn layered(sky:vec3f,texel:vec2u)->vec3f {
+ let layer=textureLoad(environmentLayer,vec2i(texel),0);return sky*(1.0-layer.a)+layer.rgb;
+}
+`;

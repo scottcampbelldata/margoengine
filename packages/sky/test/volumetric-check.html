@@ -62,6 +62,34 @@ window.check={samples:sceneSamples,
   clouds.dispose();
   const brightness=(f)=>{let s=0;for(let p=0;p<f.length;p+=4)s+=f[p]+f[p+1]+f[p+2];return s;};
   out.flash={off:diff(off,unlit).changed,lit:diff(lit,unlit),gain:brightness(lit)/brightness(unlit),thrown};
+  // The deck in the sky's environment (docs/known-bugs.md, 2026-11-13): the reflection map holds the sky with the deck
+  // laid over it (Sky.environmentLayer), and the scene's sky light (here the only ambient: a zero floor) takes it in.
+  sky.options.lighting={ambient:{day:[0,0,0],night:[0,0,0]}};view(...views.ground);
+  const upper=(m)=>{let s=0;for(let p=0;p<64*16*4;p+=4)s+=m[p]+m[p+1]+m[p+2];return s/(64*16);};
+  const pillarLight=(f)=>{let s=0,n=0;for(let p=0;p<f.length;p+=4)if(centre(p/4)){s+=f[p]+f[p+1]+f[p+2];n++;}return s/n;};
+  await frame();const clearFrame=await frame(),clearMap=await read(sky.reflectionTexture);
+  clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9,depth:()=>post.depthTexture});
+  await frame();const cloudFrame=await frame(),cloudMap=await read(sky.reflectionTexture),deck=sky.environmentLayer?await read(sky.environmentLayer):new Float32Array(64*32*4);
+  // The map is the sky through the deck plus the deck's light, texel for texel, to half-float rounding.
+  let composite=0,lowerChanged=0,changed=0,opacity=0;
+  for(let p=0;p<cloudMap.length;p+=4)for(let c=0;c<3;c++){
+   const want=clearMap[p+c]*(1-deck[p+3])+deck[p+c];composite=Math.max(composite,Math.abs(cloudMap[p+c]-want)/Math.max(want,1e-3));
+  }
+  for(let p=0;p<cloudMap.length;p+=4){
+   const d=Math.max(...[0,1,2].map((c)=>Math.abs(cloudMap[p+c]-clearMap[p+c])/Math.max(clearMap[p+c],1e-4)));
+   if(p<64*16*4){changed+=+(d>0.01);opacity+=deck[p+3];}else lowerChanged+=+(d>0.002);
+  }
+  clouds.options.flash={position:[0,2000,-400],intensity:4e7};await frame();
+  const flashFrame=await frame(),flashMap=await read(sky.reflectionTexture);
+  const layered=sky.environmentLayer!==undefined;
+  clouds.options.coverage=0;await frame();const zeroLayer=sky.environmentLayer,zeroMap=await read(sky.reflectionTexture);
+  clouds.options.coverage=0.9;await frame();clouds.dispose();await frame();
+  const afterMap=await read(sky.reflectionTexture),same=(a,b)=>a.every((v,i)=>v===b[i]);
+  out.environment={composite,changed,opacity:opacity/(64*16),lowerChanged,layered,zeroCleared:zeroLayer===undefined&&same(zeroMap,clearMap),
+   disposedCleared:sky.environmentLayer===undefined&&same(afterMap,clearMap),
+   upper:{clear:upper(clearMap),clouds:upper(cloudMap),flash:upper(flashMap)},
+   pillar:{clear:pillarLight(clearFrame),clouds:pillarLight(cloudFrame),flash:pillarLight(flashFrame)}};
+  sky.options.lighting=undefined;
   const error=await device.popErrorScope();
   return {...out,error:error?.message??null,errors:errors.splice(0)};
  }};

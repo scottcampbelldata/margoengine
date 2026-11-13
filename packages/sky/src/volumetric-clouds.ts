@@ -25,13 +25,16 @@ export const PLANET_RADIUS = 6_360_000;
 /**
  * What lights the clouds: `Sky` from `@margoengine/sky` (or `/base`) fits. Its sun, the sun's colour through its
  * atmosphere (turbidity), its backdrop exposure, its sky light (the `reflection` feature's 64 x 32 map, when the sky has
- * it) and its moon light all carry over, so the clouds match the sky they sit in.
+ * it) and its moon light all carry over, so the clouds match the sky they sit in. In turn the clouds give a sky with an
+ * `environmentLayer` their deck, so what reflects the sky or takes its light sees them too.
  */
 export interface VolumetricCloudSky {
   readonly sun: ArrayLike<number>;
   readonly options: { readonly turbidity?: number; readonly exposure?: number };
   readonly reflectionTexture?: GPUTexture | undefined;
   readonly lights?: readonly { readonly direction: ArrayLike<number>; readonly radiance: ArrayLike<number> }[];
+  /** Set by the clouds to their deck as the sky's map sees it (`Sky.environmentLayer`); a sky without it gets none. */
+  environmentLayer?: GPUTexture | undefined;
 }
 /** {@link VolumetricClouds} settings, read every frame from `clouds.options`. Lengths are metres, speeds metres per second. */
 export interface VolumetricCloudOptions {
@@ -203,13 +206,18 @@ fn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sam
 // "Oz: The Great and Volumetric", a = b = c = 0.5), with the powder darkening of Schneider 2015 away from the sun.
 // Energy-conserving step (Hillaire 2016): the light scattered over the step, with single-scattering albedo 1. Far
 // cloud thins into the haze as the sky's own layer does (half at 28 km).
-const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${hash}${cloudField}${displayShader}
+// The view and the sky map share one march (cloudSpan, cloudMarch): bindings 0 to 4 as below.
+// cloudMarch: the light (before the sky's exposure) and opacity along d from start to end in n steps, the first a
+// fraction jitter of a step in. A lightning flash inside the cloud (VolumetricCloudOptions.flash): inverse-square past
+// its core, through the base shape between it and the sample (three samples); the cloud's multiple scattering carries a
+// flash far through thick cloud, so three octaves of weaker extinction (1, 0.3, 0.08) add up the light, after Wrenninge
+// et al. 2013.
+const march = /* wgsl */ `${hash}${cloudField}
 @group(0) @binding(0) var<uniform> clouds:Clouds;
 @group(0) @binding(1) var shapeNoise:texture_3d<f32>;
 @group(0) @binding(2) var erosionNoise:texture_3d<f32>;
 @group(0) @binding(3) var noiseSampler:sampler;
 @group(0) @binding(4) var skyLight:texture_2d<f32>;
-${depthBinding}
 fn cloudShell(d:vec3f,h:f32)->vec2f {
  let e=clouds.eye.xyz;let R=clouds.eye.w;let b=dot(e,d)+R*d.y;let k=dot(e,e)+2.0*R*(e.y-h)-h*h;let disc=b*b-k;
  if(disc<0.0){return vec2f(-1.0);}
@@ -218,9 +226,7 @@ fn cloudShell(d:vec3f,h:f32)->vec2f {
 }
 fn cloudHG(nu:f32,g:f32)->f32 {return (1.0-g*g)/pow(max(1.0+g*g-2.0*g*nu,0.0001),1.5);}
 fn cloudPhaseK(nu:f32,k:f32)->f32 {return mix(cloudHG(nu,0.8*k),cloudHG(nu,-0.3*k),0.3);}
-@fragment fn fragment(i:Vertex)->@location(0) vec4f {
- let ndc=vec2f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0);let far=clouds.inverse*vec4f(ndc,0.000001,1);
- let d=normalize(far.xyz/far.w-clouds.eye.xyz);
+fn cloudSpan(d:vec3f)->vec2f {
  let bottom=clouds.layer.x;let top=clouds.layer.y;let altitude=cloudAltitude(clouds,clouds.eye.xyz);
  var start=0.0;var end=-1.0;
  if(altitude<bottom){
@@ -232,14 +238,15 @@ fn cloudPhaseK(nu:f32,k:f32)->f32 {return mix(cloudHG(nu,0.8*k),cloudHG(nu,-0.3*
   let high=cloudShell(d,top);
   if(high.x>0.0){start=high.x;let low=cloudShell(d,bottom);end=select(high.y,low.x,low.x>0.0);}
  }
- end=min(end,start+clouds.shape.z);
- ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
- if(end<=start){discard;}
- let n=u32(clouds.shape.w);let dt=(end-start)/f32(n);let s=clouds.sun.xyz;let nu=dot(d,s);
+ return vec2f(start,min(end,start+clouds.shape.z));
+}
+fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32)->vec4f {
+ let bottom=clouds.layer.x;let top=clouds.layer.y;
+ let dt=(end-start)/f32(n);let s=clouds.sun.xyz;let nu=dot(d,s);
  let lit=max(clouds.sunColor.r,max(clouds.sunColor.g,clouds.sunColor.b))>0.0;
  let above=textureLoad(skyLight,vec2i(0,0),0).rgb;let horizon=textureLoad(skyLight,vec2i(1,0),0).rgb;
  let moon=clouds.moonColor.rgb*clouds.moon.w*cloudPhaseK(dot(d,clouds.moon.xyz),1.0)*0.15;
- var t=start+dt*cloudHash3(vec3u(vec2u(i.position.xy),7u)).x;
+ var t=start+dt*jitter;
  var transmittance=1.0;var light=vec3f(0);var opacity=0.0;
  for(var k=0u;k<n;k++){
   let p=clouds.eye.xyz+d*t;let density=cloudDensityAt(clouds,shapeNoise,erosionNoise,noiseSampler,p,true);
@@ -254,9 +261,6 @@ fn cloudPhaseK(nu:f32,k:f32)->f32 {return mix(cloudHG(nu,0.8*k),cloudHG(nu,-0.3*
     sun=clouds.sunColor.rgb*clouds.sun.w*octaves*powder;
    }
    let h=clamp((cloudAltitude(clouds,p)-bottom)/(top-bottom),0.0,1.0);
-   // A lightning flash inside the cloud (VolumetricCloudOptions.flash): inverse-square past its core, through the base
-   // shape between it and the sample (three samples); the cloud's multiple scattering carries a flash far through thick
-   // cloud, so three octaves of weaker extinction (1, 0.3, 0.08) add up the light, after Wrenninge et al. 2013.
    var flash=vec3f(0);
    if(clouds.flash.w>0.0){
     let toward=clouds.flash.xyz-p;let r2=dot(toward,toward);var od=0.0;
@@ -271,10 +275,40 @@ fn cloudPhaseK(nu:f32,k:f32)->f32 {return mix(cloudHG(nu,0.8*k),cloudHG(nu,-0.3*
   }
   t+=dt;
  }
- if(opacity<=0.0){discard;}
- var color=light*clouds.sunColor.w;
- if(clouds.flags.x>0.5){color=toDisplay(color/opacity)*opacity;}
- return vec4f(color,opacity);
+ return vec4f(light,opacity);
+}
+`;
+const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${march}${displayShader}
+${depthBinding}
+@fragment fn fragment(i:Vertex)->@location(0) vec4f {
+ let ndc=vec2f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0);let far=clouds.inverse*vec4f(ndc,0.000001,1);
+ let d=normalize(far.xyz/far.w-clouds.eye.xyz);
+ let span=cloudSpan(d);var end=span.y;
+ ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
+ if(end<=span.x){discard;}
+ let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),cloudHash3(vec3u(vec2u(i.position.xy),7u)).x);
+ if(m.a<=0.0){discard;}
+ var color=m.rgb*clouds.sunColor.w;
+ if(clouds.flags.x>0.5){color=toDisplay(color/m.a)*m.a;}
+ return vec4f(color,m.a);
+}
+`;
+// The deck as the sky's environment sees it (Sky.environmentLayer): each texel of the sky's 64 x 32 map, in its
+// equirectangular layout (environmentDirection in environment.ts), holds the clouds' light at the sky's exposure,
+// premultiplied, and their opacity: the mean of four rays across the texel at stratified starts, 32 steps each.
+const deckShader = /* wgsl */ `${march}
+@group(0) @binding(5) var deck:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=vec2u(64,32))){return;}
+ var sum=vec4f(0);
+ for(var r=0u;r<4u;r++){
+  let uv=(vec2f(id.xy)+vec2f(f32(r&1u),f32(r>>1u))*0.5+0.25)/vec2f(64,32);
+  let phi=(uv.x-0.5)*6.2831853;let theta=uv.y*3.14159265;
+  let d=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));
+  let span=cloudSpan(d);
+  if(span.y>span.x){sum+=cloudMarch(d,span.x,span.y,32u,(f32(r)+0.5)*0.25);}
+ }
+ textureStore(deck,vec2i(id.xy),vec4f(sum.rgb*(0.25*clouds.sunColor.w),sum.a*0.25));
 }
 `;
 // The sky light the clouds receive, from the sky's 64 x 32 reflection map: cosine-weighted over the upper half (light
@@ -394,6 +428,10 @@ export class VolumetricClouds implements EnginePlugin {
   private lightPipeline?: GPUComputePipeline;
   private lightGroup?: GPUBindGroup;
   private lightSource?: GPUTexture;
+  private deck?: GPUTexture;
+  private deckPipeline?: GPUComputePipeline;
+  private deckGroup?: GPUBindGroup;
+  private layered?: VolumetricCloudSky;
   private disposed = false;
   private readonly values = new Float32Array(64);
   private readonly scratch = new Float64Array(52);
@@ -474,6 +512,11 @@ export class VolumetricClouds implements EnginePlugin {
       size: [2, 1],
       format: 'rgba32float',
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    this.deck = d.createTexture({
+      size: [64, 32],
+      format: 'rgba16float',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
   }
   registerPasses(graph: FrameGraph): void {
@@ -563,11 +606,55 @@ export class VolumetricClouds implements EnginePlugin {
     a[3] = a[7] = 1;
     c.device.queue.writeTexture({ texture: this.light! }, a as Float32Array<ArrayBuffer>, { bytesPerRow: 32 }, [2, 1]);
   }
+  /**
+   * The deck in the sky's environment (docs/known-bugs.md, 2026-11-13: the sky's reflection map and scene light showed
+   * only the sky behind it): marched into the sky's 64 x 32 layout once the clouds have taken their own light from the
+   * clear map, and handed to the sky as its `environmentLayer`, which the sky lays over its reflection map in this frame
+   * (before Water reads it) and over the scene light in the next frame's lighting pass.
+   */
+  private environment(c: Context): void {
+    const sky = this.options.sky;
+    if (this.layered !== sky) this.unlayer();
+    if (!sky || !('environmentLayer' in sky)) return;
+    if (!this.deckGroup) {
+      this.deckPipeline ??= c.device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: c.device.createShaderModule({ code: deckShader }), entryPoint: 'main' },
+      });
+      this.deckGroup = c.device.createBindGroup({
+        layout: this.deckPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.uniform! } },
+          { binding: 1, resource: this.volumes!.shape.createView() },
+          { binding: 2, resource: this.volumes!.erosion.createView() },
+          { binding: 3, resource: this.volumes!.sampler },
+          { binding: 4, resource: this.light!.createView() },
+          { binding: 5, resource: this.deck!.createView() },
+        ],
+      });
+    }
+    const pass = c.encoder.beginComputePass();
+    pass.setPipeline(this.deckPipeline!);
+    pass.setBindGroup(0, this.deckGroup);
+    pass.dispatchWorkgroups(8, 4);
+    pass.end();
+    sky.environmentLayer = this.deck;
+    this.layered = sky;
+  }
+  // Takes the deck back from the sky it was given to: nothing drawn, another sky, or released.
+  private unlayer(): void {
+    if (this.layered && this.layered.environmentLayer === this.deck) this.layered.environmentLayer = undefined;
+    this.layered = undefined;
+  }
   private draw(c: Context): void {
     if (!this.uniform) return;
-    if (!this.write(c)) return;
+    if (!this.write(c)) {
+      this.unlayer();
+      return;
+    }
     this.volumes!.fill(c.device, c.encoder);
     this.skyLight(c);
+    this.environment(c);
     const depth = this.options.depth ? sceneDepth(c, this.options.depth, 'VolumetricClouds') : undefined,
       samples = c.descriptor.multisample?.count ?? 1,
       key = `${c.format}:${samples}:${depth?.samples ?? 0}:${c.descriptor.depthStencil?.format}`;
@@ -630,11 +717,13 @@ export class VolumetricClouds implements EnginePlugin {
     pass.end();
   }
   private release(): void {
+    this.unlayer();
     this.uniform?.destroy();
     this.volumes?.dispose();
     this.light?.destroy();
-    this.uniform = this.volumes = this.light = undefined;
-    this.pipeline = this.bind = this.lightPipeline = this.lightGroup = undefined;
+    this.deck?.destroy();
+    this.uniform = this.volumes = this.light = this.deck = undefined;
+    this.pipeline = this.bind = this.lightPipeline = this.lightGroup = this.deckPipeline = this.deckGroup = undefined;
     this.bound = this.lightSource = undefined;
     this.key = '';
   }

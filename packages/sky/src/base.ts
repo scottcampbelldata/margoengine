@@ -209,7 +209,11 @@ export interface SkyFeatures {
       code: string,
       entries: GPUBindGroupEntry[],
       owned: Owned,
-    ): { texture: GPUTexture; run(c: SkyPassContext): void; recode(code: string, entries: GPUBindGroupEntry[]): void };
+    ): {
+      texture: GPUTexture;
+      run(c: SkyPassContext, layer?: GPUTexture): void;
+      recode(code: string, entries: GPUBindGroupEntry[]): void;
+    };
   };
   lighting?: {
     validate(lighting: SkyLightingOptions): void;
@@ -226,7 +230,7 @@ export interface SkyFeatures {
         ambient: { readonly day: Vec3; readonly night: Vec3 } | undefined,
         night: number,
       ): void;
-      pass(c: SkyPassContext): void;
+      pass(c: SkyPassContext, layer?: GPUTexture): void;
       recode(code: string, entries: GPUBindGroupEntry[]): void;
       pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined;
       bindings(): GPUBindGroupEntry[];
@@ -306,6 +310,14 @@ export class Sky implements EnginePlugin {
   private readonly attachment = this.presentation.colorAttachments[0];
   private readonly depthAttachment = this.presentation.depthStencilAttachment;
   readonly name: string = 'sky';
+  /**
+   * A layer over the sky in its environment: `reflectionTexture` (from the frame-graph step at order 3.5 on, before
+   * Water draws at 4) and the scene's sky light (`lighting`, from the next frame). A 64 x 32 `rgba16float` texture in the
+   * map's layout (u turns round +Y from -X, v runs down from the zenith) holding light, premultiplied, at the sky's
+   * exposure, and opacity. `VolumetricClouds` given this sky set it to their deck each frame they draw, and clear it
+   * when they stop; undefined: the sky alone.
+   */
+  environmentLayer: GPUTexture | undefined = undefined;
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private transmission?: GPUTexture;
@@ -501,7 +513,7 @@ export class Sky implements EnginePlugin {
           // The scene's ambient light is the sky of this frame: upload it first, then render and project it.
           if (c.backend === 'webgpu' && this.options.lighting?.ambient) {
             this.prepare(c);
-            this.lit!.pass(c);
+            this.lit!.pass(c, this.environmentLayer);
           }
         },
       });
@@ -519,7 +531,7 @@ export class Sky implements EnginePlugin {
             !c.shader.includes('let margoAmbient=')
           ) {
             this.prepare(c);
-            this.lit!.pass(c);
+            this.lit!.pass(c, this.environmentLayer);
           }
         },
       });
@@ -530,6 +542,17 @@ export class Sky implements EnginePlugin {
         if (c.backend === 'webgpu') this.draw(c);
       },
     });
+    // The reflection map is drawn clear at 2, where VolumetricClouds (3) take their own sky light from it, then again
+    // with the environment layer (their deck) over it, before Water (4) reflects it.
+    if (this.features.reflection)
+      graph.add({
+        name: 'sky:environment-layer',
+        order: 3.5,
+        execute: (c) => {
+          if (c.backend === 'webgpu' && this.environmentLayer && this.reflectionRequested)
+            this.reflection?.run(c, this.environmentLayer);
+        },
+      });
     if (this.features.fog)
       graph.add({
         name: 'sky:fog',
