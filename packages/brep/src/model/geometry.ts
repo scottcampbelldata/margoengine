@@ -305,3 +305,112 @@ export function writeCurve(w: StepWriter, def: CurveDef): string {
       return w.spline(def);
   }
 }
+
+type SplineCurveDef = Extract<CurveDef, { kind: 'spline' }>;
+
+/** A whole circle's control points (in radii along frame x and y) and weights, as four rational quadratic arcs. */
+const RING: readonly (readonly [number, number, number])[] = [
+  [1, 0, 1],
+  [1, 1, Math.SQRT1_2],
+  [0, 1, 1],
+  [-1, 1, Math.SQRT1_2],
+  [-1, 0, 1],
+  [-1, -1, Math.SQRT1_2],
+  [0, -1, 1],
+  [1, -1, Math.SQRT1_2],
+  [1, 0, 1],
+];
+const RING_KNOTS = [0, 0.25, 0.5, 0.75, 1],
+  RING_MULTIPLICITIES = [3, 2, 2, 2, 3];
+
+/**
+ * A curve as a B-spline tracing the same points the same way: a B-spline as it is; a line from parameter t0 to t1 as
+ * one span of degree 1; a whole circle or ellipse from its frame's x, counter-clockwise about its z, as four rational
+ * quadratic arcs (the ellipse an affine image of the circle's, so exact as well).
+ */
+export function splineOf(c: CurveDef, t0 = 0, t1 = 1): SplineCurveDef {
+  switch (c.kind) {
+    case 'spline':
+      return c;
+    case 'line':
+      return {
+        kind: 'spline',
+        degrees: [1],
+        counts: [2],
+        knots: [[t0, t1]],
+        multiplicities: [[2, 2]],
+        points: [t0, t1].map((t) => [0, 1, 2].map((k) => c.origin[k] + t * c.direction[k]) as XYZ),
+      };
+    case 'circle':
+    case 'ellipse': {
+      const a = c.kind === 'circle' ? c.radius : c.a,
+        b = c.kind === 'circle' ? c.radius : c.b,
+        f = c.frame;
+      return {
+        kind: 'spline',
+        closed: true,
+        degrees: [2],
+        counts: [RING.length],
+        knots: [RING_KNOTS],
+        multiplicities: [RING_MULTIPLICITIES],
+        points: RING.map(([x, y]) => [0, 1, 2].map((k) => f.origin[k] + a * x * f.x[k] + b * y * f.y[k]) as XYZ),
+        weights: RING.map(([, , w]) => w),
+      };
+    }
+  }
+}
+
+/**
+ * A B-spline curve C(u) swept along the unit vector d from v0 to v1, S(u, v) = C(u) + v d, as a B-spline surface of
+ * degree 1 in v (ISO 10303-42's surface of linear extrusion, its v measured along d). Closed in u where C is.
+ */
+export function extrudedSurface(c: SplineCurveDef, d: XYZ, v0: number, v1: number): SurfaceDef {
+  const at = (v: number) => c.points.map((p) => [p[0] + v * d[0], p[1] + v * d[1], p[2] + v * d[2]] as XYZ);
+  return {
+    kind: 'spline',
+    uClosed: !!c.closed,
+    vClosed: false,
+    degrees: [c.degrees[0], 1],
+    counts: [c.points.length, 2],
+    knots: [c.knots[0], [v0, v1]],
+    multiplicities: [c.multiplicities[0], [2, 2]],
+    points: [...at(v0), ...at(v1)],
+    ...(c.weights ? { weights: [...c.weights, ...c.weights] } : {}),
+  };
+}
+
+/**
+ * A B-spline curve C(v) turned a whole turn about the axis through o along the unit vector z, counter-clockwise about
+ * z as u grows (ISO 10303-42's surface of revolution, u the turn), exactly: each control point's circle as rational
+ * quadratic arcs, its weight times theirs. Turning every control point by one angle turns the curve by it, so this
+ * holds for a curve out of any plane through the axis too. Closed in u, and in v where C is.
+ */
+export function revolvedSurface(c: SplineCurveDef, o: XYZ, z: XYZ): SurfaceDef {
+  const nv = c.points.length,
+    points: XYZ[] = Array<XYZ>(RING.length * nv),
+    weights: number[] = Array<number>(RING.length * nv);
+  c.points.forEach((p, j) => {
+    const h = (p[0] - o[0]) * z[0] + (p[1] - o[1]) * z[1] + (p[2] - o[2]) * z[2],
+      centre = [0, 1, 2].map((k) => o[k] + h * z[k]),
+      out = [0, 1, 2].map((k) => p[k] - centre[k]),
+      r = Math.hypot(out[0], out[1], out[2]),
+      x = r > 0 ? out.map((t) => t / r) : (frameOf([0, 0, 0], z).x as number[]),
+      y = cross(z, x),
+      w = c.weights?.[j] ?? 1;
+    RING.forEach(([a, b, wr], i) => {
+      points[j * RING.length + i] = [0, 1, 2].map((k) => centre[k] + r * (a * x[k] + b * y[k])) as XYZ;
+      weights[j * RING.length + i] = w * wr;
+    });
+  });
+  return {
+    kind: 'spline',
+    uClosed: true,
+    vClosed: !!c.closed,
+    degrees: [2, c.degrees[0]],
+    counts: [RING.length, nv],
+    knots: [RING_KNOTS, c.knots[0]],
+    multiplicities: [RING_MULTIPLICITIES, c.multiplicities[0]],
+    points,
+    weights,
+  };
+}

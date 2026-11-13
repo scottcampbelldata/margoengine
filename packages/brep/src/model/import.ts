@@ -9,10 +9,19 @@ import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { direction, frame, list, num, point, ref, vector } from '../geometry/read.js';
 import { add, cross, distance, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import type { STEPModel } from '../index.js';
-import { type CurveDef, type Frame, frameOf, type SurfaceDef } from './geometry.js';
+import {
+  type CurveDef,
+  curveEvaluator,
+  extrudedSurface,
+  type Frame,
+  frameOf,
+  revolvedSurface,
+  splineOf,
+  type SurfaceDef,
+} from './geometry.js';
 import { enclosedVolume } from './mass.js';
 import { Body, Edge, Face, type Shell, Vertex } from './topology.js';
-import { measureTolerances, validateBody } from './validate.js';
+import { edgeParameters, measureTolerances, validateBody } from './validate.js';
 
 /** The bodies of `step`, one per STEP body (undefined for a tessellated or faceted-only one, or a failed one). */
 export interface ImportedBodies {
@@ -37,6 +46,15 @@ function shellBox(shell: Shell): number[] {
           box[k + 3] = Math.max(box[k + 3], c.start.point[k]);
         }
   return box;
+}
+
+/** The range of some values widened by a thousandth of its length each way (and a little for a single value). */
+function spread(values: readonly number[]): [number, number] {
+  if (!values.length) return [0, 0];
+  const lo = Math.min(...values),
+    hi = Math.max(...values),
+    pad = 1e-3 * (hi - lo) + 1e-9 * Math.max(1, Math.abs(lo), Math.abs(hi));
+  return [lo - pad, hi + pad];
 }
 
 /** Points where a surface collapses: a sphere's two poles, a cone's apex. */
@@ -229,7 +247,11 @@ class Importer {
     }
   }
 
-  private surface(id: number): SurfaceDef {
+  /**
+   * `reach` gives points of the face's edges, for a surface the file leaves unbounded one way (a curve swept along a
+   * line, or a line turned round an axis): the B-spline the modeler takes it as spans them.
+   */
+  private surface(id: number, reach: () => readonly XYZ[] = () => []): SurfaceDef {
     const entity = this.file.get(id),
       type = entity.parts ? (entity.parts.has('B_SPLINE_SURFACE') ? 'B_SPLINE_SURFACE_WITH_KNOTS' : '') : entity.type,
       args = entity.args,
@@ -254,13 +276,13 @@ class Importer {
       case 'B_SPLINE_SURFACE_WITH_KNOTS':
         return this.spline(id);
       case 'RECTANGULAR_TRIMMED_SURFACE':
-        return this.surface(ref(args[1]) ?? -1);
+        return this.surface(ref(args[1]) ?? -1, reach);
       case 'SURFACE_OF_REVOLUTION':
-        return this.revolution(id, ref(args[1]) ?? -1, ref(args[2]));
+        return this.revolution(id, ref(args[1]) ?? -1, ref(args[2]), reach);
       case 'SURFACE_OF_LINEAR_EXTRUSION':
-        return this.extrusion(id, ref(args[1]) ?? -1, vector(this.file, ref(args[2])));
+        return this.extrusion(id, ref(args[1]) ?? -1, vector(this.file, ref(args[2])), reach);
       case 'OFFSET_SURFACE':
-        return this.offset(id, this.surface(ref(args[1]) ?? -1), num(args[2]) * u);
+        return this.offset(id, this.surface(ref(args[1]) ?? -1, reach), num(args[2]) * u);
       default:
         return this.fail(id, 'surface');
     }
@@ -298,8 +320,17 @@ class Importer {
     };
   }
 
-  /** A line or circle swept round an axis, as the plane, cylinder, cone, sphere or torus it makes. */
-  private revolution(id: number, curveId: number, axisId: number | undefined): SurfaceDef {
+  /**
+   * A curve turned round an axis: a line or circle in a plane through the axis as the plane, cylinder, cone, sphere or
+   * torus it makes; any other curve (a B-spline, an ellipse, a circle out of such a plane, a line skew to the axis) as
+   * the exact rational B-spline surface it sweeps, a line taken as far along it as the face's edges reach.
+   */
+  private revolution(
+    id: number,
+    curveId: number,
+    axisId: number | undefined,
+    reach: () => readonly XYZ[],
+  ): SurfaceDef {
     if (axisId === undefined || !this.file.is(axisId, 'AXIS1_PLACEMENT')) return this.fail(id, 'surface');
     const [, location, dir] = this.file.args(axisId, 'AXIS1_PLACEMENT'),
       o = this.p(ref(location)),
@@ -321,9 +352,16 @@ class Importer {
       if (Math.abs(along) < 1e-12) return { kind: 'plane', frame: frameOf(add(o, scale(z, h)), z) };
       if (r <= tiny) return this.fail(id, 'surface (a line along its own axis)');
       const towards = unit(radial)!;
-      // Coplanar with the axis (else it sweeps a hyperboloid).
-      if (Math.abs(dot(cross(towards, c.direction), z)) > 1e-9)
-        return this.fail(id, 'surface (a line swept round a skew axis)');
+      // Coplanar with the axis (else it sweeps a hyperboloid of one sheet, as a B-spline).
+      if (Math.abs(dot(cross(towards, c.direction), z)) > 1e-9) {
+        // A point turned round the axis keeps its height, so the line's parameter at a point of the face is its height.
+        const h0 = dot(sub(c.origin, o), z),
+          ts = reach().map((p) => (dot(sub(p, o), z) - h0) / along),
+          [t0, t1] = spread(ts);
+        return t1 > t0
+          ? revolvedSurface(splineOf(c, t0, t1), o, z)
+          : this.fail(id, 'surface (a line turned round a skew axis, with no edges to bound it)');
+      }
       const lean = dot(c.direction, towards) / along;
       if (Math.abs(lean) < 1e-12) return { kind: 'cylinder', frame: frameOf(o, z, towards), radius: r };
       // Radius r at height h, growing by `lean` per unit along the axis.
@@ -335,25 +373,37 @@ class Importer {
         radial = rc > tiny ? unit(sub(sub(f.origin, o), scale(z, hc))) : undefined;
       // The circle's plane must hold the axis: its normal square to the axis and to the way out to its centre.
       if (Math.abs(dot(f.z, z)) > 1e-9 || (radial && Math.abs(dot(f.z, radial)) > 1e-9))
-        return this.fail(id, 'surface (a circle swept round an axis outside its plane)');
+        return revolvedSurface(splineOf(c), o, z);
       const centre = add(o, scale(z, hc));
       if (!radial) return { kind: 'sphere', frame: frameOf(centre, z), radius: c.radius };
       return { kind: 'torus', frame: frameOf(centre, z, radial), major: rc, minor: c.radius };
     }
-    return this.fail(id, 'surface (a curve other than a line or circle swept round an axis)');
+    return revolvedSurface(splineOf(c), o, z);
   }
 
-  /** A line or circle swept along a vector, as the plane or cylinder it makes. */
-  private extrusion(id: number, curveId: number, v: XYZ): SurfaceDef {
+  /**
+   * A curve swept along a vector: a line, or a circle along its axis, as the plane or cylinder it makes; any other
+   * curve (a B-spline, an ellipse, a circle at a slant) as the exact B-spline surface it sweeps, as far along the
+   * vector as the face's edges reach.
+   */
+  private extrusion(id: number, curveId: number, v: XYZ, reach: () => readonly XYZ[]): SurfaceDef {
     const c = this.curve(curveId),
-      d = unit(v)!;
+      d = unit(v);
+    if (!d) return this.fail(id, 'surface (a curve swept along no direction)');
     if (c.kind === 'line') {
       const n = unit(cross(c.direction, d));
       return n ? { kind: 'plane', frame: frameOf(c.origin, n, c.direction) } : this.fail(id, 'surface');
     }
     if (c.kind === 'circle' && Math.abs(Math.abs(dot(c.frame.z, d)) - 1) < 1e-9)
       return { kind: 'cylinder', frame: frameOf(c.frame.origin, c.frame.z, c.frame.x), radius: c.radius };
-    return this.fail(id, 'surface (a curve other than a line or a circle along its axis, extruded)');
+    // A point of the face is C(u) + v d, so v = p.d - C(u).d, and C(u).d lies within its control points' (weights > 0).
+    const spline = splineOf(c),
+      along = spline.points.map((q) => dot(q, d)),
+      at = reach().map((p) => dot(p, d));
+    if (!at.length || spline.weights?.some((w) => !(w > 0)))
+      return this.fail(id, 'surface (a curve swept along a vector, with no edges to bound it)');
+    const [v0, v1] = spread([Math.min(...at) - Math.max(...along), Math.max(...at) - Math.min(...along)]);
+    return extrudedSurface(spline, d, v0, v1);
   }
 
   /** An analytic surface moved `d` along its normal, as the analytic surface it is. */
@@ -442,7 +492,7 @@ class Importer {
       geometry = ref(args[2]),
       sameSense = isTrue(args[3]),
       bounds = list(args[1]).map((b) => ref(b) ?? -1),
-      surface = geometry !== undefined ? this.surface(geometry) : this.planeOf(id, bounds);
+      surface = geometry !== undefined ? this.surface(geometry, () => this.reach(bounds)) : this.planeOf(id, bounds);
     // A face its shell turns inside out faces the other way, and its loops run the other way with it.
     const face = new Face(`${this.name}/face:#${id}`, surface, sameSense !== flipped);
     for (const b of bounds) {
@@ -475,6 +525,22 @@ class Importer {
       for (const use of kept) loop.use(use.edge, use.forward);
     }
     return face;
+  }
+
+  /** Points along the edges of a face's edge loops (its vertices and samples between): how far the face reaches. */
+  private reach(bounds: readonly number[]): XYZ[] {
+    const out: XYZ[] = [];
+    for (const b of bounds) {
+      const loopId = ref(this.file.get(b).args[1]) ?? -1;
+      if (this.file.typeName(loopId) !== 'EDGE_LOOP') continue;
+      for (const o of list(this.file.args(loopId, 'EDGE_LOOP')[1])) {
+        const e = this.edge(ref(this.file.args(ref(o) ?? -1, 'ORIENTED_EDGE')[3]) ?? -1),
+          c = curveEvaluator(e.curve);
+        out.push(e.start.point, e.end.point);
+        for (const t of edgeParameters(e, 16)) out.push(c.at(t).slice(0, 3) as XYZ);
+      }
+    }
+    return out;
   }
 
   /** A face with no surface (a faceted B-rep's): the plane of its first poly loop. */
