@@ -4,13 +4,24 @@
 // other become one edge used by both faces, its tolerance the gap it closed; faces are turned over where a neighbour
 // runs a shared edge the same way; and a shell that closes is turned to face out. The result is a solid only when every
 // shell closed and the body passes checkBody; otherwise it is a sheet, and the report says what stayed open and why. The
-// tolerance is a distance in metres, the largest gap the sewing may close; every gap it closes is reported.
-import { distance, dot, nearest, scale, type XYZ } from '../geometry/vec.js';
+// tolerance is a distance in metres, the largest gap the sewing may close; every gap it closes is reported. Closed
+// shells nested in others are sorted by how many shells lie round each (rays from a point of it, crossings counted):
+// one inside an odd number is a cavity of the innermost solid shell round it, turned to face into the cavity.
+import { distance, dot, nearest, scale, unit, type XYZ } from '../geometry/vec.js';
 import { checkBody } from './check.js';
-import { curveEvaluator, type CurveDef } from './geometry.js';
+import { curveSurfaceCrossings } from './distance.js';
+import { FaceUV } from './faces.js';
+import { curveEvaluator, surfaceEvaluator, type CurveDef } from './geometry.js';
 import { enclosedVolume } from './mass.js';
 import { Body, Edge, Face, Vertex, type History, type Name } from './topology.js';
 import { edgeParameters, measureTolerances, type ValidityProblem } from './validate.js';
+
+/** Three directions in general position, for counting how often rays from a point cross a shell. */
+const RAYS = [
+  [0.6234898018587335, 0.5384693101056831, 0.5667004719618033],
+  [-0.3826834323650898, 0.8314696123025452, -0.4029733920661247],
+  [0.7933533402912352, -0.4067366430758002, 0.4524424391035483],
+].map((d) => unit(d)!);
 
 /** What sewing did and what it could not do. */
 export interface SewReport {
@@ -354,34 +365,90 @@ export function sew(
       return face;
     };
   const flipped: Name[] = [];
-  shells.forEach((members, s) => {
-    let faces = members.map((i) => build(i, flip[i]));
-    // A closed shell enclosing negative volume faces in: built again, turned over (its first faces' uses let go).
-    if (closedShells[s] && !oneSided && enclosedVolume(faces) < 0) {
-      const old = new Set(faces);
-      for (const e of edgeOf.values()) {
-        const keep = e.coedges.filter((c) => !old.has(c.loop.face));
-        e.coedges.length = 0;
-        e.coedges.push(...keep);
-      }
-      for (const i of members) flip[i] = !flip[i];
-      faces = members.map((i) => build(i, flip[i]));
+  // A shell turned over: its faces built again the other way (their first build's uses let go).
+  const turnOver = (members: number[], faces: Face[]) => {
+    const old = new Set(faces);
+    for (const e of edgeOf.values()) {
+      const keep = e.coedges.filter((c) => !old.has(c.loop.face));
+      e.coedges.length = 0;
+      e.coedges.push(...keep);
     }
-    for (const i of members) if (flip[i]) flipped.push(loose[i].name);
+    for (const i of members) flip[i] = !flip[i];
+    return members.map((i) => build(i, flip[i]));
+  };
+  const built = shells.map((members, s) => {
+    const faces = members.map((i) => build(i, flip[i]));
+    // A closed shell enclosing negative volume faces in: turned over.
+    return closedShells[s] && !oneSided && enclosedVolume(faces) < 0 ? turnOver(members, faces) : faces;
+  });
+  // Closed shells nested in others: a shell inside an odd number of others is a cavity of the innermost one round it
+  // that is not a cavity itself (a shell inside a cavity is a solid of its own there), turned to face into the cavity.
+  const around = shells.map((): number[] => []),
+    cavity = shells.map(() => false);
+  if (allClosed && shells.length > 1) {
+    const uv = new Map<Face, FaceUV>(),
+      uvOf = (f: Face) => {
+        let x = uv.get(f);
+        if (!x) uv.set(f, (x = new FaceUV(f)));
+        return x;
+      },
+      corners = built.flat().flatMap((f) =>
+        f.loops.length
+          ? f.loops.flatMap((l) => l.coedges.map((c) => c.start.point))
+          : [f.surface.kind === 'spline' ? f.surface.points[0] : f.surface.frame.origin],
+      ),
+      box = boxOf(corners),
+      radii = built.flat().map((f) => {
+        const s = f.surface;
+        return s.kind === 'sphere' || s.kind === 'cylinder' || s.kind === 'cone'
+          ? s.radius
+          : s.kind === 'torus'
+            ? s.major + s.minor
+            : 0;
+      }),
+      reach = 4 * (Math.hypot(box[3] - box[0], box[4] - box[1], box[5] - box[2]) + 2 * Math.max(0, ...radii)) + tolerance,
+      // A point of a shell: a vertex, or a point of a face with no edges (a whole sphere or torus).
+      pointOf = (faces: Face[]): XYZ => {
+        for (const f of faces) for (const l of f.loops) for (const c of l.coedges) return c.start.point;
+        return surfaceEvaluator(faces[0].surface).at(0, 0).slice(0, 3) as XYZ;
+      },
+      // Inside the faces when most of three rays from it cross them an odd number of times.
+      inside = (p: XYZ, faces: Face[]) => {
+        let odd = 0;
+        for (const direction of RAYS) {
+          const line: CurveDef = { kind: 'line', origin: p, direction },
+            c = curveEvaluator(line);
+          let crossings = 0;
+          for (const g of faces)
+            for (const t of curveSurfaceCrossings(line, g.surface, 0, reach))
+              if (uvOf(g).contains(c.at(t).slice(0, 3) as XYZ)) crossings++;
+          if (crossings % 2) odd++;
+        }
+        return odd >= 2;
+      };
+    built.forEach((faces, i) => {
+      const p = pointOf(faces);
+      built.forEach((others, j) => {
+        if (j !== i && inside(p, others)) around[i].push(j);
+      });
+      cavity[i] = around[i].length % 2 === 1;
+    });
+    built.forEach((faces, i) => {
+      if (cavity[i]) built[i] = turnOver(shells[i], faces);
+    });
+  }
+  const bodyShells = built.map((faces, s) => {
+    for (const i of shells[s]) if (flip[i]) flipped.push(loose[i].name);
     const shell = body.shell();
     for (const f of faces) shell.add(f);
+    return shell;
   });
-  // Closed shells nested one in another would need sorting into a solid and its cavities: not decided here.
-  if (body.kind === 'solid' && body.shells.length > 1) {
-    const boxes = body.shells.map((sh) => boxOf(sh.faces.flatMap((f) => f.loops.flatMap((l) => l.coedges.map((c) => c.start.point)))));
-    for (let i = 0; i < boxes.length; i++)
-      for (let j = 0; j < boxes.length; j++)
-        if (i !== j && boxes[i].every((x, k) => (k < 3 ? x >= boxes[j][k] : x <= boxes[j][k])))
-          problems.push({
-            name: body.shells[i].faces[0].name,
-            problem: `its shell lies within the extent of ${body.shells[j].faces[0].name}'s: cavities are not sorted by sewing yet`,
-          });
-  }
+  bodyShells.forEach((shell, i) => {
+    if (!cavity[i]) return;
+    shell.outer = bodyShells[
+      around[i].filter((j) => !cavity[j]).sort((x, y) => around[y].length - around[x].length)[0]
+    ];
+  });
   // Edges and vertices take the gaps they closed as their tolerance (half again, as on import), up to the tolerance.
   measureTolerances(body, tolerance);
 

@@ -261,3 +261,41 @@ test('sew: an edge and a face within the tolerance are dropped; vertices chained
   assert.equal(chained.closed, false);
   assert.ok(chained.problems.some((p) => /spread .* more than the tolerance/.test(p.problem)), JSON.stringify(chained.problems));
 });
+
+test('sew: closed shells nested in others are sorted into cavities and solids inside them', () => {
+  const B = (n, o, s) => model.box(n, [s * mm, s * mm, s * mm], frameOf(o.map((x) => x * mm), [0, 0, 1], [1, 0, 0]));
+  const expectSorted = (r, kinds, volume) => {
+    assert.equal(r.closed, true, JSON.stringify(r.problems));
+    assert.equal(r.body.kind, 'solid');
+    assert.deepEqual(r.problems, []);
+    assert.deepEqual(checkBody(r.body), []);
+    assert.deepEqual(
+      r.body.shells.map((s) => (s.outer ? `cavity of ${r.body.shells.indexOf(s.outer)}` : 'solid')),
+      kinds,
+    );
+    const v = massProperties(r.body).volume;
+    assert.ok(Math.abs(v - volume * mm ** 3) <= 1e-12 * volume * mm ** 3, `volume ${v / mm ** 3} vs ${volume}`);
+  };
+  // A box in a box: the inner one's faces turned to face into the cavity (all six reported flipped).
+  const cavity = sew('s', [B('a', [0, 0, 0], 20), B('b', [5, 5, 5], 10)], 1e-9);
+  expectSorted(cavity, ['solid', 'cavity of 0'], 8000 - 1000);
+  assert.equal(cavity.flipped.length, 6);
+  // A whole sphere (a face with no edges) as the cavity.
+  expectSorted(
+    sew('s', [B('a', [0, 0, 0], 20), model.sphere('b', 5 * mm, frameOf([10 * mm, 10 * mm, 10 * mm], [0, 0, 1]))], 1e-9),
+    ['solid', 'cavity of 0'],
+    8000 - (4 / 3) * Math.PI * 125,
+  );
+  // A solid inside a cavity inside a solid; two cavities side by side; two solids apart.
+  expectSorted(
+    sew('s', [B('a', [0, 0, 0], 30), B('b', [5, 5, 5], 20), B('c', [10, 10, 10], 10)], 1e-9),
+    ['solid', 'cavity of 0', 'solid'],
+    27000 - 8000 + 1000,
+  );
+  expectSorted(
+    sew('s', [B('a', [0, 0, 0], 30), B('b', [2, 2, 2], 10), B('c', [15, 15, 15], 10)], 1e-9),
+    ['solid', 'cavity of 0', 'cavity of 0'],
+    27000 - 2000,
+  );
+  expectSorted(sew('s', [B('a', [0, 0, 0], 10), B('b', [20, 0, 0], 10)], 1e-9), ['solid', 'solid'], 2000);
+});
