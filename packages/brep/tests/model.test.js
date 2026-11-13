@@ -179,7 +179,13 @@ test('modeler: revolve turns a profile of lines and arcs round an axis (ring, fr
     2 * Math.PI ** 2 * 5 * 1e-9,
     4 * Math.PI ** 2 * 5 * 1e-6,
   );
-  assert.throws(() => revolve('x', p([5, 0], [line(5, 3), line(0, 3), line(0, 0), line(5, 0)]), axis), {
+  // A rectangle on the axis closes with two discs (a cylinder); a corner alone on the axis would pinch, and is refused.
+  solid(
+    revolve('y', p([5, 0], [line(5, 3), line(0, 3), line(0, 0), line(5, 0)]), axis),
+    Math.PI * 25 * 3e-9,
+    Math.PI * (2 * 25 + 2 * 5 * 3) * 1e-6,
+  );
+  assert.throws(() => revolve('x', p([5, 0], [line(5, 3), line(0, 3), line(5, 0)]), axis), {
     name: 'RangeError',
     message: /touches the axis/,
   });

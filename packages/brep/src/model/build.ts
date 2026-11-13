@@ -357,11 +357,47 @@ export function torus(
 }
 
 /**
+ * A solid cone or frustum about `frame`'s z axis: radius `radius` at its origin and `topRadius` at `height` up the
+ * axis, either of them 0 for an apex (a vertex where the side's seam ends). Faces side, -z and +z (a disc at each end
+ * that is not an apex). Equal radii make a cylinder. Throws a RangeError for a negative or non-finite size, a height
+ * that is not positive, and two radii of 0.
+ */
+export function cone(
+  name: Name,
+  radius: number,
+  topRadius: number,
+  height: number,
+  frame: Frame = frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]),
+  history?: History,
+): Body {
+  if (
+    !(radius >= 0 && topRadius >= 0 && height > 0 && radius + topRadius > 0) ||
+    !Number.isFinite(radius + topRadius + height)
+  )
+    throw new RangeError('cone radii must not be negative or both zero, and its height must be positive');
+  const at = (r: number, h: number) => add(frame.origin, add(scale(frame.x, r), scale(frame.z, h))),
+    segments: ProfileSegment[] = [];
+  if (radius > 0) segments.push({ kind: 'line', to: at(radius, 0), name: '-z' });
+  segments.push({ kind: 'line', to: at(topRadius, height), name: 'side' });
+  if (topRadius > 0) segments.push({ kind: 'line', to: at(0, height), name: '+z' });
+  segments.push({ kind: 'line', to: at(0, 0), name: 'axis' });
+  return revolve(
+    name,
+    { name: `${name}/profile`, start: at(0, 0), normal: frame.y, segments },
+    { origin: frame.origin, direction: frame.z },
+    { history },
+  );
+}
+
+/**
  * Turns a closed planar profile of lines and arcs once round an axis lying in its plane, into a solid named `name`: a
  * face per segment (a plane, cylinder or cone for a line; a torus, or a sphere for an arc centred on the axis), each
- * closed by its own seam, and a circle at every profile point. The profile must stay off the axis. Throws a
- * RangeError for an open, degenerate or self-touching profile, one that leaves the axis's plane or touches the axis,
- * and an arc crossing it.
+ * closed by its own seam, and a circle at every profile point off the axis. The profile may touch the axis: a segment
+ * along the axis makes no face, a line ending on the axis makes a disc (a plane bounded by its circle alone) or a cone
+ * up to its apex vertex, and an arc centred on the axis makes a sphere up to its pole (a whole sphere, with no edges,
+ * when both its ends are on the axis). Throws a RangeError for an open, degenerate or self-touching profile, one that
+ * leaves the axis's plane or crosses the axis, a point on the axis where the solid would pinch to that point (one
+ * with no segment along the axis next to it), and an arc not centred on the axis that reaches it.
  */
 export function revolve(
   name: Name,
@@ -375,9 +411,31 @@ export function revolve(
   const n0 = unit(profile.normal);
   if (!n0) throw new RangeError('profile normal must not be zero');
   if (Math.abs(dot(n0, z)) > 1e-9) throw new RangeError(`profile ${profile.name} must lie in a plane through the axis`);
-  const rel = sub(profile.start, o),
-    x = unit(sub(rel, scale(z, dot(rel, z))));
-  if (!x) throw new RangeError(`profile ${profile.name} starts on the axis; keep the profile on one side of the axis`);
+  // The side of the axis the profile lies on: towards its point farthest from the axis (arcs' midpoints included,
+  // so a half circle from pole to pole finds its side).
+  let away: XYZ | undefined,
+    reach = 0,
+    at0 = profile.start;
+  for (const s of profile.segments) {
+    const candidates = [s.to];
+    if (s.kind === 'arc') {
+      const a0 = sub(at0, s.center!),
+        t = sweepOf(at0, s, n0) / 2;
+      candidates.push(add(s.center!, add(scale(a0, Math.cos(t)), scale(cross(n0, a0), Math.sin(t)))));
+    }
+    for (const q of candidates) {
+      const rel = sub(q, o),
+        off = sub(rel, scale(z, dot(rel, z))),
+        d = length(off);
+      if (d > reach) {
+        reach = d;
+        away = off;
+      }
+    }
+    at0 = s.to;
+  }
+  const x = away && unit(away);
+  if (!x) throw new RangeError(`profile ${profile.name} lies on the axis; move the profile off the axis`);
   // Counter-clockwise in (distance from the axis, height) about m = x cross z, so the faces face out.
   const m = cross(x, z),
     // The profile's own size, or its distance from the axis where larger (the solid's radius).
@@ -409,24 +467,34 @@ export function revolve(
     if (Math.abs(dot(sub(q, o), m)) > tolerance)
       throw new RangeError(`profile ${profile.name} must lie in a plane through the axis`);
   for (const q of points)
-    if (rho(q) <= tolerance) throw new RangeError(`profile ${profile.name} touches the axis: not supported yet; keep the profile on one side of the axis`);
+    if (rho(q) < -tolerance) throw new RangeError(`profile ${profile.name} crosses the axis at ${fmt(q)}; keep the profile on one side of the axis`);
+  const onAxis = points.map((q) => rho(q) <= tolerance),
+    alongAxis = points.map((_, k) => p.segments[k].kind === 'line' && onAxis[k] && onAxis[(k + 1) % count]);
+  // A point on the axis with no segment along the axis next to it is where two faces would meet in that point alone:
+  // the solid would pinch to it (not a manifold solid).
+  for (let k = 0; k < count; k++)
+    if (onAxis[k] && !alongAxis[k] && !alongAxis[(k + count - 1) % count])
+      throw new RangeError(`profile ${profile.name} touches the axis at ${fmt(points[k])} with no segment along it; add a segment along the axis or move the point off it`);
   const body = new Body(name, 'solid'),
     shell = body.shell(),
     segName = (k: number) => p.segments[k].name ?? `e${k}`,
     vertices = points.map((q, k) => new Vertex(`${name}/vertex:${k}`, q)),
-    circles = points.map(
-      (q, k) =>
-        new Edge(
-          `${name}/edge:round:${k}`,
-          { kind: 'circle', frame: frameOf(level(q), z, x), radius: rho(q) },
-          vertices[k],
-          vertices[k],
-          true,
-        ),
+    circles = points.map((q, k) =>
+      onAxis[k]
+        ? undefined
+        : new Edge(
+            `${name}/edge:round:${k}`,
+            { kind: 'circle', frame: frameOf(level(q), z, x), radius: rho(q) },
+            vertices[k],
+            vertices[k],
+            true,
+          ),
     ),
     around = cross(z, x),
     generated: [Name, Name[]][] = [];
   for (let k = 0; k < count; k++) {
+    // A segment along the axis turns into the axis itself: no face.
+    if (alongAxis[k]) continue;
     const s = p.segments[k],
       from = points[k],
       to = points[(k + 1) % count];
@@ -448,7 +516,10 @@ export function revolve(
           ? { kind: 'cylinder', frame: frameOf(o, z, x), radius: rho(from) }
           : Math.abs(dh) <= tolerance
             ? { kind: 'plane', frame: frameOf(level(from), z, x) }
-            : { kind: 'cone', frame: frameOf(level(from), z, x), radius: rho(from), angle: Math.atan(dr / dh) };
+            : onAxis[k]
+              ? // From the apex: the frame at the other end, where the radius is not zero.
+                { kind: 'cone', frame: frameOf(level(to), z, x), radius: rho(to), angle: Math.atan(dr / dh) }
+              : { kind: 'cone', frame: frameOf(level(from), z, x), radius: rho(from), angle: Math.atan(dr / dh) };
     } else {
       const c = s.center!,
         r = length(sub(from, c)),
@@ -469,7 +540,12 @@ export function revolve(
       start = unit(scale(cross(m, a0), sign))!;
       mid = add(c, spin(a0, sweep / 2));
       midTangent = unit(scale(cross(m, sub(mid, c)), sign))!;
-      if (rho(c) <= tolerance) surface = { kind: 'sphere', frame: frameOf(level(c), z, x), radius: r };
+      if (rho(c) <= tolerance) {
+        // Centred on the axis: it must stay on the profile's side, so it turns at most half way round.
+        if (Math.abs(sweep) > Math.PI * (1 + 1e-9) || rho(mid) < -tolerance)
+          throw new RangeError(`profile ${profile.name}: an arc crosses the axis; keep the profile on one side of the axis`);
+        surface = { kind: 'sphere', frame: frameOf(level(c), z, x), radius: r };
+      }
       else if (rho(c) > r) surface = { kind: 'torus', frame: frameOf(level(c), z, x), major: rho(c), minor: r };
       else throw new RangeError(`profile ${profile.name}: an arc reaches the axis: not supported yet; keep the profile on one side of the axis`);
     }
@@ -480,14 +556,25 @@ export function revolve(
       [u, v] = e.parameters(mid),
       sense = dot(e.normal(u, v), outward) > 0,
       face = shell.add(new Face(`${name}/face:${segName(k)}`, surface, sense)),
-      edge = new Edge(`${name}/edge:${segName(k)}`, seam, vertices[k], vertices[(k + 1) % count], sameSense),
-      loop = face.loop(),
-      forward = dot(cross(cross(start, m), around), start) > 0;
-    loop.use(circles[k], forward);
-    loop.use(edge, true);
-    loop.use(circles[(k + 1) % count], !forward);
-    loop.use(edge, false);
+      forward = dot(cross(cross(start, m), around), start) > 0,
+      first = circles[k],
+      last = circles[(k + 1) % count];
     generated.push([face.name, [`${profile.name}/${segName(k)}`]]);
+    // Both ends on the axis: a whole sphere, which has no edges.
+    if (!first && !last) continue;
+    const loop = face.loop();
+    // A disc: a plane up to the axis, bounded by its circle alone.
+    if (surface.kind === 'plane' && (!first || !last)) {
+      if (first) loop.use(first, forward);
+      else loop.use(last!, !forward);
+      continue;
+    }
+    // Otherwise a seam: an end on the axis is an apex or a pole, where the seam's two uses meet with no circle.
+    const edge = new Edge(`${name}/edge:${segName(k)}`, seam, vertices[k], vertices[(k + 1) % count], sameSense);
+    if (first) loop.use(first, forward);
+    loop.use(edge, true);
+    if (last) loop.use(last, !forward);
+    loop.use(edge, false);
   }
   history?.record({ operation: name, generated, modified: [], deleted: [] });
   return body;
