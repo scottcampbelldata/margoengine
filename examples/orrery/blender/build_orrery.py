@@ -220,6 +220,10 @@ def principled(name, color=(0.8, 0.8, 0.8), rough=0.5, metal=0.0, **extra):
 BRASS = principled('brass', (0.88, 0.64, 0.3), 0.2, 1.0)
 BRASS_POLISHED = principled('brass_polished', (0.92, 0.7, 0.36), 0.1, 1.0)
 BRASS_AGED = principled('brass_aged', (0.72, 0.52, 0.24), 0.28, 1.0)
+# The calendar dial: satin brass, a little darker and rougher than the wheels. Flat and facing the window, a polished
+# ring mirrors the bright sky and outshines the whole mechanism; satin spreads that reflection out so the dial sits
+# with the rest of the brass and its blackened engraving still reads.
+DIAL = principled('dial_brass', (0.6, 0.43, 0.2), 0.58, 1.0)
 GILT = principled('gilt', (1.0, 0.74, 0.32), 0.14, 1.0)
 STEEL = principled('steel', (0.55, 0.56, 0.58), 0.22, 1.0)
 BLUED = principled('blued_steel', (0.035, 0.05, 0.13), 0.18, 1.0)
@@ -274,8 +278,11 @@ def coords(mat, scale=1.0, space='Object'):
     return mp.outputs['Vector']
 
 
-def walnut(name, scale=1.0, coat=1.0, tone=1.0):
-    """Plank wood: long fibres along x, a few darker figure bands wandering across them, fine pores."""
+def walnut(name, scale=1.0, coat=1.0, tone=1.0, fibre=(1.5, 70.0), wander=0.0, fibre_weight=0.7, gloss=(0.5, 0.3)):
+    """Plank wood: long fibres along x, a few darker figure bands wandering across them, fine pores.
+
+    fibre is the fibre noise's stretch (along, across), wander its distortion, fibre_weight how much the fibres set the
+    colour, and gloss the roughness at the dark and light ends of the grain."""
     mat, bsdf = procedural(name, 0.45, coat)
     lk = mat.node_tree.links.new
     tc = node(mat, 'ShaderNodeTexCoord')
@@ -290,7 +297,8 @@ def walnut(name, scale=1.0, coat=1.0, tone=1.0):
     fibres.inputs['Scale'].default_value = 1.0
     fibres.inputs['Detail'].default_value = 10.0
     fibres.inputs['Roughness'].default_value = 0.62
-    lk(stretched(1.5, 70.0), fibres.inputs['Vector'])
+    fibres.inputs['Distortion'].default_value = wander
+    lk(stretched(*fibre), fibres.inputs['Vector'])
     warp = node(mat, 'ShaderNodeTexNoise')
     warp.inputs['Scale'].default_value = 1.0
     warp.inputs['Detail'].default_value = 2.0
@@ -310,10 +318,12 @@ def walnut(name, scale=1.0, coat=1.0, tone=1.0):
     lk(stretched(60.0, 400.0), pores.inputs['Vector'])
     a = node(mat, 'ShaderNodeMath', operation='MULTIPLY_ADD')
     lk(fibres.outputs['Fac'], a.inputs[0])
-    a.inputs[1].default_value = 0.7
-    b = node(mat, 'ShaderNodeMath', operation='MULTIPLY')
+    a.inputs[1].default_value = fibre_weight
+    # Figure bands, plus the fibres' share of the mean when they weigh less, so the wood keeps its overall tone.
+    b = node(mat, 'ShaderNodeMath', operation='MULTIPLY_ADD')
     lk(figure.outputs['Fac'], b.inputs[0])
     b.inputs[1].default_value = 0.16
+    b.inputs[2].default_value = (0.7 - fibre_weight) * 0.5
     lk(b.outputs[0], a.inputs[2])
     c = node(mat, 'ShaderNodeMath', operation='MULTIPLY_ADD')
     lk(pores.outputs['Fac'], c.inputs[0])
@@ -324,7 +334,7 @@ def walnut(name, scale=1.0, coat=1.0, tone=1.0):
                      (0.66, (0.15 * t, 0.078 * t, 0.034 * t)), (0.8, (0.22 * t, 0.12 * t, 0.055 * t))])
     lk(c.outputs[0], col.inputs['Fac'])
     lk(col.outputs['Color'], bsdf.inputs['Base Color'])
-    rr = ramp(mat, [(0.3, (0.5, 0.5, 0.5)), (0.8, (0.3, 0.3, 0.3))])
+    rr = ramp(mat, [(0.3, (gloss[0],) * 3), (0.8, (gloss[1],) * 3)])
     lk(c.outputs[0], rr.inputs['Fac'])
     lk(rr.outputs['Color'], bsdf.inputs['Roughness'])
     return mat
@@ -575,13 +585,18 @@ def build_plinth():
     profile = [(0, 0), (r - 0.012, 0), (r, 0.004), (r, 0.014), (r - 0.006, 0.02), (r - 0.012, 0.024),
                (r - 0.012, 0.05), (r - 0.006, 0.054), (r - 0.004, 0.06), (r - 0.012, 0.066), (r - 0.024, h - 0.002),
                (r - 0.028, h), (0, h)]
-    obj = mesh_object('plinth', lathe(profile, 160), walnut('walnut', 2.0, tone=1.15), ORRERY, smooth=40)
+    # The plinth top fills the view under the dome, seen at a grazing angle. Its glossy grain (roughness 0.3 to 0.5,
+    # following straight fibres) stretched the window and the Sun lamp into long bright parallel streaks there, like
+    # light leaking in; the sun through the dome and the clearcoat were ruled out (no change with either off). A satin
+    # polish (0.52 to 0.6) spreads those reflections into soft sheens, and short, wandering fibres break up the grain.
+    top = walnut('walnut', 2.0, tone=1.15, fibre=(5.0, 40.0), wander=0.8, fibre_weight=0.45, gloss=(0.6, 0.52))
+    obj = mesh_object('plinth', lathe(profile, 160), top, ORRERY, smooth=40)
     bake_later(obj, 2048)
     # Calendar ring inlay: a polished brass annulus flush with the walnut.
     c = L['calendar']
     ring = lathe([(c['inner'] - 0.004, TOP - 0.002), (c['inner'] - 0.004, TOP + 0.0006), (c['outer'] + 0.004, TOP + 0.0006),
                   (c['outer'] + 0.004, TOP - 0.002)], 256)
-    mesh_object('calendar_ring', ring, BRASS, ORRERY, smooth=20)
+    mesh_object('calendar_ring', ring, DIAL, ORRERY, smooth=20)
     engrave_calendar(c)
 
 

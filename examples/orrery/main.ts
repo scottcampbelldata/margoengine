@@ -124,6 +124,9 @@ async function start() {
       ? []
       : [{ position: [1.25, 0.43, -0.82] as [number, number, number], range: 4, color: lampColor, intensity: 1.2 }]),
     { position: [0, PLANET_Z, 0], range: 0.68, decay: 1, color: [1.0, 0.62, 0.3], intensity: 0.2 },
+    // A dim, cool back light inside the dome, behind the mechanism as the opening view sees it: it rims the planets
+    // and the outer arms against the dark bookcase. Its range stops short of the room, and the Sun stays the brightest.
+    { position: [-0.25, 0.5, -0.5], range: 1.3, decay: 1, color: [0.7, 0.78, 1.0], intensity: 1.0 },
   ]);
   lights?.add(model);
 
