@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { group, render } from '../../shared/gpu.js';
 import { applyView } from '../../shared/view-rect.js';
+import { linearHdr } from '../../shared/hdr-format.js';
 import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** Options for `Video`. */
@@ -20,7 +21,12 @@ const sources = new WeakMap<
   HTMLMediaElement,
   { context: AudioContext; node: MediaElementAudioSourceNode; users: number }
 >();
-const shader = `
+// `hdr`: a linear HDR target (every float format, as under post-processing) holds light, not display values, so the
+// frame's sRGB values are decoded there (IEC 61966-2-1 curve, as videoMaterial and HTMLTexture do). Before batch 132b
+// (2026-11-13) they were written as linear light, so a mid-grey 0.5 drew as 0.5 instead of 0.214 and tone mapping
+// washed the video out.
+const shader = (hdr: boolean): string => `
+const hdr=${hdr};
 struct Vertex {@builtin(position) position:vec4f,@location(0) uv:vec2f}
 @group(0) @binding(0) var video:texture_external;
 @group(0) @binding(1) var linear:sampler;
@@ -29,7 +35,11 @@ struct Vertex {@builtin(position) position:vec4f,@location(0) uv:vec2f}
  let p=array<vec2f,6>(vec2f(0,0),vec2f(1,0),vec2f(0,1),vec2f(0,1),vec2f(1,0),vec2f(1,1))[index];
  let screen=rect.xy+p*rect.zw;return Vertex(vec4f(screen.x*2.0-1.0,1.0-screen.y*2.0,0,1),p);
 }
-@fragment fn fragment(i:Vertex)->@location(0) vec4f{return textureSampleBaseClampToEdge(video,linear,i.uv);}
+@fragment fn fragment(i:Vertex)->@location(0) vec4f{
+ let c=textureSampleBaseClampToEdge(video,linear,i.uv);
+ if(hdr){return vec4f(select(pow((max(c.rgb,vec3f(0))+.055)/1.055,vec3f(2.4)),c.rgb/12.92,c.rgb<=vec3f(.04045)),c.a);}
+ return c;
+}
 `;
 let serial = 0;
 /** Caller owns playback, AudioContext and VideoFrame lifetime. No decoded-frame uploads. */
@@ -154,7 +164,9 @@ export class Video implements EnginePlugin {
         if (!texture) return;
         const format = c.format + ':' + c.descriptor.multisample?.count;
         if (this.format !== format) {
-          this.pipeline = render(c.device, shader, c.format, { multisample: c.descriptor.multisample });
+          this.pipeline = render(c.device, shader(linearHdr(c.format)), c.format, {
+            multisample: c.descriptor.multisample,
+          });
           this.format = format;
         }
         const bind = group(c.device, this.pipeline!, [texture, this.sampler!, { buffer: this.uniform! }]);

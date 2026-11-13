@@ -231,3 +231,40 @@ test('failed audio analysis setup retains the media source and removes only its 
     dom.window.close();
   }
 });
+
+// Batch 132b (lane N, 2026-11-13): on a linear HDR target (rgba16float under post-processing) the overlay wrote the
+// frame's sRGB values as linear light. The pipeline for a float target now decodes them; a display target keeps them.
+test('video overlay decodes sRGB on a linear HDR target and keeps display values on a unorm one', () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<video></video>'),
+    old = globalThis.HTMLVideoElement;
+  globalThis.HTMLVideoElement = dom.window.HTMLVideoElement;
+  try {
+    const source = dom.window.document.querySelector('video');
+    Object.defineProperties(source, { videoWidth: { value: 8 }, readyState: { value: 2 } });
+    let format = 'bgra8unorm';
+    Object.defineProperty(h.context, 'format', { get: () => format, set() {}, configurable: true });
+    const descriptors = [],
+      create = h.engine.gpu.createRenderPipeline;
+    h.engine.gpu.createRenderPipeline = (descriptor) => {
+      descriptors.push(descriptor);
+      return create(descriptor);
+    };
+    const video = new Video(source);
+    h.engine.use(video);
+    h.frame();
+    format = 'rgba16float';
+    h.frame();
+    assert.deepEqual(
+      descriptors.map((d) => [d.fragment.targets[0].format, /const hdr=(\w+);/.exec(d.fragment.module.code)?.[1]]),
+      [
+        ['bgra8unorm', 'false'],
+        ['rgba16float', 'true'],
+      ],
+    );
+    video.dispose();
+  } finally {
+    globalThis.HTMLVideoElement = old;
+    dom.window.close();
+  }
+});
