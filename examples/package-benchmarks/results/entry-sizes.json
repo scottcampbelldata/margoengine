@@ -1,5 +1,5 @@
 {
-  "commit": "16ae66376",
+  "commit": "b026fe291",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -9530,12 +9530,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 52129,
-        "gzip": 18111
+        "raw": 55534,
+        "gzip": 18428
       },
       "./base": {
-        "raw": 18985,
-        "gzip": 7338
+        "raw": 19262,
+        "gzip": 7374
       },
       "./preetham": {
         "raw": 1657,
@@ -9558,12 +9558,12 @@
         "gzip": 2250
       },
       "./reflection": {
-        "raw": 1987,
-        "gzip": 1105
+        "raw": 3636,
+        "gzip": 1292
       },
       "./lighting": {
-        "raw": 9470,
-        "gzip": 3936
+        "raw": 11130,
+        "gzip": 4133
       },
       "./weather": {
         "raw": 15798,
@@ -9574,12 +9574,12 @@
         "gzip": 2123
       },
       "./volumetric-clouds": {
-        "raw": 19452,
-        "gzip": 7450
+        "raw": 22662,
+        "gzip": 8277
       },
       "./cloud-shadows": {
-        "raw": 7520,
-        "gzip": 3211
+        "raw": 7569,
+        "gzip": 3230
       },
       "./aerial": {
         "raw": 19849,
@@ -9590,8 +9590,8 @@
         "gzip": 11090
       },
       "./shafts": {
-        "raw": 18073,
-        "gzip": 7000
+        "raw": 18122,
+        "gzip": 7019
       },
       "./astro": {
         "raw": 20615,
@@ -9610,8 +9610,8 @@
         "gzip": 4842
       },
       "./compat-clouds": {
-        "raw": 46535,
-        "gzip": 15178
+        "raw": 49749,
+        "gzip": 16421
       }
     },
     "@margoengine/splats": {
@@ -12990,8 +12990,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 66364,
-        "gzip": 20888
+        "raw": 68901,
+        "gzip": 21792
       },
       "./fft": {
         "raw": 20654,
@@ -15201,9 +15201,9 @@
       "brotli": 6628
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 24939,
-      "gzip": 9811,
-      "brotli": 8770
+      "raw": 25216,
+      "gzip": 9848,
+      "brotli": 8811
     },
     "packages/creative/dist/particles.js": {
       "raw": 45675,
