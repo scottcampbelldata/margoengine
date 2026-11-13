@@ -267,6 +267,9 @@ export function demoSources(demo) {
     return ['examples/boulder.html', 'examples/boulder', 'examples/assets/boulder-robot.glb'];
   let m = /^demos\/(dof|tonemap|animator)\/$/.exec(path);
   if (m) return [`packages/${m[1]}/examples`];
+  // The example folders scripts/build-site.js builds to demos/<name>/.
+  m = /^demos\/(orrery|molten-words|cathedral-light|biomes)\/$/.exec(path);
+  if (m) return [`examples/${m[1]}`];
   m = /^demos\/([a-z0-9-]+)\.html$/.exec(path);
   if (m) return [`examples/${m[1]}.html`];
   m = /^gallery\/([a-z0-9-]+)\.html$/.exec(path);
