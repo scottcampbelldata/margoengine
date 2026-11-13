@@ -149,7 +149,15 @@ try {
   await ready();
   const still = await page.evaluate(() => window.orrery.jd);
   await page.click('#play');
-  await page.waitForTimeout(1500);
+  // 90 animation frames (1.5 s at 60 Hz) after Play: each one would have moved time on if Play ran it.
+  await page.evaluate(
+    () =>
+      new Promise((done) => {
+        let frames = 0;
+        const tick = () => (++frames >= 90 ? done() : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      }),
+  );
   assert.equal(await page.evaluate(() => window.orrery.jd), still, 'time ran under reduced motion');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 

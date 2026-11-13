@@ -79,7 +79,7 @@ test('a srcdoc iframe that takes over its about:blank window still gets its adap
         '<script>navigator.gpu.requestAdapter().then((a) => (window.result = a ? "adapter" : "null"), (e) => (window.result = "error " + e.message))</script>';
       document.body.append(iframe);
       const start = performance.now();
-      while (!iframe.contentWindow.result && performance.now() - start < 30_000) await new Promise((r) => setTimeout(r, 50));
+      while (!iframe.contentWindow.result && performance.now() - start < 30_000) await new Promise((r) => setTimeout(r, 20));
       return iframe.contentWindow.result ?? 'pending after 30 s';
     });
     assert.equal(result, 'adapter');

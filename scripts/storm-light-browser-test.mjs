@@ -33,6 +33,17 @@ page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text());
 });
 const ready = () => page.waitForSelector('#viewport[data-ready="true"]', { timeout: 180000 });
+// Counted animation frames, not milliseconds: the temporal passes settle per frame, and a slow GPU draws fewer per second.
+const frames = (count) =>
+  page.evaluate(
+    (count) =>
+      new Promise((done) => {
+        let n = 0;
+        const tick = () => (++n >= count ? done() : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      }),
+    count,
+  );
 const luma = (image, x0, y0, x1, y1) => {
   let sum = 0,
     n = 0,
@@ -52,7 +63,8 @@ try {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(`${url}?tour=0&beam=0.6&storm=0.78`);
   await ready();
-  await page.waitForTimeout(4000);
+  // 240 frames: 4 s at 60 Hz, what the hero still was given to settle.
+  await frames(240);
   await page.addStyleTag({ content: 'form,h1,#hint{visibility:hidden!important}' });
   const shot = await decodePNG(await page.locator('canvas').screenshot({ path: 'test-results/storm-light.png' }));
   const all = luma(shot, 0, 0, shot.width, shot.height),
@@ -83,7 +95,8 @@ try {
       return { camera: [...engine.camera.position], beam: beam(), rate: weather.options.lightning.rate };
     });
   const first = await pose();
-  await page.waitForTimeout(1500);
+  // 90 frames: each would have moved the camera, the beams or the lightning if reduced motion did not hold them.
+  await frames(90);
   const later = await pose();
   assert.deepEqual(later, first, 'the camera or the beams moved under reduced motion');
   assert.equal(first.rate, 0, 'lightning under reduced motion');
