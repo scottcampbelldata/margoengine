@@ -45,7 +45,7 @@ sample. Two alternating original/diagnostic pairs were measured.
 | Scene and drawing buffer | Original 4× submissions/second | Diagnostic 1× submissions/second |
 | --- | ---: | ---: |
 | Helmet, 1130×800 | 119.7, 119.3 | 119.9, 120.1 |
-| Citadel, 2880×1462 | 20.2, 22.2 | 56.3, 60.0 |
+| Night Citadel (old demo, since removed), 2880×1462 | 20.2, 22.2 | 56.3, 60.0 |
 
 The diagnostic changed only the core pipeline descriptor's `multisample` count
 in the browser's downloaded response. The desktop quality helper, canvas size,

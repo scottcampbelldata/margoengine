@@ -111,7 +111,6 @@ export function checkReferences(text, exists) {
 export function pageSource(page) {
   const folders = {
     '/voxel/': 'examples/voxel-sandbox',
-    '/night-citadel/': 'apps/showcase-night-citadel',
     '/gameplay-sandbox/': 'examples/gameplay-sandbox',
   };
   if (folders[page]) return folders[page];

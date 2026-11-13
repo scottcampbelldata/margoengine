@@ -19,7 +19,7 @@ const night = () => ({
 });
 /** Each scene's options (fresh per run, Sky mutates them), the feature entries it needs, and what each frame changes. */
 export const configs = {
-  'night-citadel': {
+  'night-fog': {
     features: ['night', 'fog'],
     options: (depth) => ({
       hours: 0,

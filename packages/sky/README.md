@@ -49,7 +49,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 18.1 kB with all of them, against 23.0 kB
-summed. `addSky(stage)` (base, night) sums to about 9.7 kB and Night Citadel (base, night, fog, reflection) to about 13.1 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+summed. `addSky(stage)` (base, night) sums to about 9.7 kB and a night scene with fog and reflection (base, night, fog, reflection) to about 13.1 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model
@@ -525,8 +525,8 @@ existing rendering.
 
 Three optional fog fields change the look: `falloff: 'exp'` uses `1 - exp(-optical)` instead of the squared
 default; `height` adds density below y = 0 (optical depth × (1 + height × metres below 0), e.g. 0.065 for a
-sea haze); `color` replaces the sky radiance with a fixed linear colour. Night Citadel uses
-`{start: 0, falloff: 'exp', height: 0.065, color: horizon}`. This is homogeneous distance haze, without height fog,
+sea haze); `color` replaces the sky radiance with a fixed linear colour. The `night-fog` trace configuration
+(`test/configs.js`) uses `{start: 0, falloff: 'exp', height: 0.065, color: horizon}`. This is homogeneous distance haze, without height fog,
 volumetric light shafts or particle-depth fog; large scenes need a suitable
 camera far plane.
 

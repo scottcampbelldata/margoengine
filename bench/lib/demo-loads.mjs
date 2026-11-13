@@ -12,7 +12,6 @@ import { root } from './env.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
 
 export const DEMOS = [
-  '/night-citadel/',
   '/gameplay-sandbox/',
   '/demos/flight-helmet.html',
   '/demos/character-animation.html',

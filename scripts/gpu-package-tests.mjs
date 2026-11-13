@@ -85,8 +85,6 @@ export const ROOT = {
     'the Harrow Head gallery: every page and section draws, no errors, phone layout, JavaScript off, budget, dedication',
   'test:physics2d-kernel-browsers':
     'the own 2D physics kernel in Wasm (simd128) gives the native pinned bits on a WebGPU page and a WebGL2 page',
-  'test:tokyo':
-    'the Tokyo diorama example: production build, tram animation, reduced motion, phone layout, missing asset',
   'test:orrery':
     'the Orrery example: production build, a picture, arms and wheels at the computed angles, fly-in, play, phone, missing model',
   'test:storm-light':
@@ -103,13 +101,12 @@ export const RELEASE_ONLY = {
 };
 /**
  * Browser suites (`test:*`, `modern:test:*`) that no check runs, each with its reason (unrunBrowserSuites fails the
- * plan for any other). modern:test:sky, finalization and test:tokyo had no check and were found passing on 2026-10-31
+ * plan for any other). modern:test:sky, finalization and test:tokyo (since removed) had no check and were found passing on 2026-10-31
  * after their neighbours had rotted; they are in ROOT now.
  */
 export const NOT_IN_CHECKS = {
   'modern:test:hardware':
     'needs a physical NVIDIA or AMD GPU (GPU_VENDOR=nvidia|amd), a visible window and 60 s of recording; the machines that run check:merge may have neither',
-  'modern:test:citadel': 'the Night Citadel page is being removed (Scott, 2026-10-31)',
   'modern:test:blender': 'drives Blender, which Scott has not cleared for the checks (needs his go)',
 };
 /**

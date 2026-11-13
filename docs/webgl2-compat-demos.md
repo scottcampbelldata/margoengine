@@ -76,7 +76,6 @@ Last recorded 2026-11-11 at 15643a259b on nvidia ampere (msedge 157.0.4341.46); 
 | `khronos-TextureTransformTest` | model | runs, same pixels | exact | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
 | `khronos-ToyCar` | model | runs, same pixels | 0.00%, mean 0.000511, max d 1 | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
 | `minimap` | high | runs, same pixels | exact | 0.5 ms / 0.6 ms; 16.7 ms / 16.7 ms |
-| `night-citadel` | high | runs with differences: d > 2 on 0.20% of pixels, mean d 0.0333, max d 235 | exact | 0.5 ms / 9.2 ms; 16.7 ms / 16.7 ms |
 | `scene-targets` | high | runs, same pixels | exact | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
 | `sciviz-head` | high | runs, same pixels | exact | - |
 | `sciviz-points` | high | runs, same pixels | exact | 0.5 ms / 0.8 ms; 16.7 ms / 16.7 ms |
@@ -112,7 +111,6 @@ the RTX A6000, 2026-10-30:
 | --- | --- | --- |
 | `dof` | 0.66% | 0.000%, 1 |
 | `gameplay-sandbox` | 1.16% | 0.006%, 98 (13 pixels with d > 2) |
-| `night-citadel` | 0.20% | 0.000%, 2 |
 | `voxel-ground` | 0.41% | 0.004%, 123 |
 | `voxel-night` | 0.22% | 0.001%, 79 |
 | `voxel-overview` | 1.24% | 0.009%, 125 |

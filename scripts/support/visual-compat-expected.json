@@ -183,12 +183,6 @@
    "status": "same",
    "exact": true
   },
-  "night-citadel": {
-   "status": "differs",
-   "over2": 0.00201,
-   "mean": 0.0333,
-   "exact": true
-  },
   "scene-targets": {
    "status": "same",
    "exact": true

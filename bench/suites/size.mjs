@@ -29,7 +29,6 @@ const DEMOS = {
       rollupOptions: { input: resolve(root, 'examples/voxel-sandbox/src/main.ts'), preserveEntrySignatures: 'strict' },
     },
   },
-  'night-citadel': { root: 'apps/showcase-night-citadel' },
   afterlight: { root: 'examples/gameplay-sandbox' },
   meadow: {
     configFile: false,

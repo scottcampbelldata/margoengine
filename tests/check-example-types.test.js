@@ -120,7 +120,7 @@ test('check:merge runs the example projects a change can reach, all of them for 
   };
   assert.deepEqual(ids(['docs/known-bugs.md']), []);
   assert.deepEqual(ids(['examples/scene-targets.ts']), ['examples']);
-  assert.deepEqual(ids(['examples/tokyo-diorama.js']), ['js']);
+  assert.deepEqual(ids(['examples/khronos-gallery.js']), ['js']);
   assert.deepEqual(ids(['examples/vite/src/main.tsx']), ['vite']);
   // A package an example imports runs that example; one nothing in examples/ imports runs none. The package here needs
   // few enough dependents to stay under the full-run threshold of affected-gpu.mjs, or the plan names no projects.

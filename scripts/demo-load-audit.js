@@ -82,7 +82,6 @@ export function installDemoLoadAudit() {
       window.extensionDemo?.readiness ??
       window.earthDemo?.readiness ??
       window.meadowDemo?.readiness ??
-      window.nightCitadel?.readiness ??
       window.dofDemo?.readiness ??
       window.tonemapDemo?.readiness;
     if (principal?.principalScenePresentedOpportunity > 0) {
@@ -94,8 +93,7 @@ export function installDemoLoadAudit() {
       !load.ready &&
       (document.body?.dataset.ready === 'true' ||
         document.querySelector('#viewport')?.dataset.ready === 'true' ||
-        window.sandbox ||
-        window.nightCitadel?.stats.frames > 0)
+        window.sandbox)
     )
       load.ready = performance.now();
     if (!load.ready || !load.principalScenePresentedOpportunity) requestAnimationFrame(ready);

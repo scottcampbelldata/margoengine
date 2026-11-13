@@ -19,7 +19,7 @@ const texture = () => ({
 });
 /** Options (fresh per run) and the feature entries each needs. */
 export const configs = {
-  'night-citadel': {
+  embers: {
     features: [],
     options: () => ({
       capacity: 2048,

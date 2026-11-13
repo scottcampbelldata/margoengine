@@ -43,7 +43,7 @@ test('each class places the files it is meant for, checked in order', () => {
       'scripts/fuzz/run.js',
       'tests/support/png.js',
       'tests/modern.html',
-      'tests/tokyo_scene_check.py',
+      'tests/scene_check.py',
       'examples/split-screen.ts',
       'examples/package-benchmarks/entry-sizes.mjs',
       'bench/scenes/harness.js',

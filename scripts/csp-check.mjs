@@ -220,7 +220,6 @@ if (want('site')) {
       '/sizes.html',
       '/whitepaper/engine.html',
       '/whitepaper/voxel.html',
-      '/night-citadel/',
       '/gameplay-sandbox/',
       '/voxel/',
       '/gallery/',
@@ -229,11 +228,11 @@ if (want('site')) {
       '/demos/character-animation.html',
       '/demos/robot-expressive.html',
       '/demos/windy-meadow.html',
-      '/demos/tokyo-diorama.html',
       '/demos/earth/',
       '/demos/dof/',
       '/demos/tonemap/',
       '/demos/boulder/',
+      '/demos/orrery/',
     ].map((path) => [
       path,
       settle(

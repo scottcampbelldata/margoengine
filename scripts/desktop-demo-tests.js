@@ -14,7 +14,6 @@ import { percentile } from './lib/percentile.mjs';
 import { desktopTierURL } from './support/desktop-tier.mjs';
 
 const demos = [
-  { name: 'citadel', path: '/night-citadel/', range: ['azimuth', 'azimuth-value'] },
   { name: 'afterlight', path: '/gameplay-sandbox/', range: ['wave', 'wave-value'] },
   { name: 'helmet', path: '/demos/flight-helmet.html' },
   { name: 'character', path: '/demos/character-animation.html' },

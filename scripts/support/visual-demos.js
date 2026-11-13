@@ -19,12 +19,6 @@ export const galleryView = (slug, section) => ({
 });
 
 export const demos = [
-  {
-    id: 'night-citadel',
-    path: 'night-citadel/',
-    ready: '!!window.nightCitadel?.readiness',
-    mask: ['#fps', '#delta', '#refresh-note'],
-  },
   { id: 'gameplay-sandbox', path: 'gameplay-sandbox/', ready: '!!window.sandbox', mask: ['#telemetry *'] },
   // Voxel sandbox deterministic views (seed 1, fixed camera and clock, no HUD; examples/voxel-sandbox/README.md).
   // `profiles`: the baseline profiles that have references for them. On other hardware they are captured but skipped,

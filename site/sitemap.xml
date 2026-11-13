@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://margoengine.com/</loc></url>
   <url><loc>https://margoengine.com/catalog/</loc></url>
-  <url><loc>https://margoengine.com/night-citadel/</loc></url>
+  <url><loc>https://margoengine.com/demos/orrery/</loc></url>
   <url><loc>https://margoengine.com/gameplay-sandbox/</loc></url>
   <url><loc>https://margoengine.com/voxel/</loc></url>
   <url><loc>https://margoengine.com/gallery/</loc></url>
@@ -11,7 +11,6 @@
   <url><loc>https://margoengine.com/demos/character-animation</loc></url>
   <url><loc>https://margoengine.com/demos/windy-meadow</loc></url>
   <url><loc>https://margoengine.com/demos/earth/</loc></url>
-  <url><loc>https://margoengine.com/demos/tokyo-diorama</loc></url>
   <url><loc>https://margoengine.com/demos/split-screen</loc></url>
   <url><loc>https://margoengine.com/demos/minimap</loc></url>
   <url><loc>https://margoengine.com/demos/batched-mesh</loc></url>

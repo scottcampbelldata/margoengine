@@ -213,7 +213,7 @@ test('a .gltf with external files becomes one GLB with the same triangles', { ti
 });
 
 test('a Draco model is passed through untouched with the reason', { timeout: 30_000 }, async () => {
-  const input = read('examples/assets/tokyo-diorama.glb'),
+  const input = read('examples/orrery/orrery.glb'),
     result = await optimizeModel(input, preset('web').model);
   assert.match(result.skipped ?? '', /KHR_draco_mesh_compression/);
   assert.equal(result.glb, input);

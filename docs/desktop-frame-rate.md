@@ -34,7 +34,7 @@ timestamps are quantized, so these short durations are approximate.
 
 | Demo | Previous backing size | New backing size | GPU work, previous | GPU work, new | Reduction |
 | --- | --- | --- | ---: | ---: | ---: |
-| Night Citadel | 2880×1462 | 1440×731 | 1.638 ms | 0.655 ms | 60% |
+| Night Citadel (old demo, since removed) | 2880×1462 | 1440×731 | 1.638 ms | 0.655 ms | 60% |
 | Earth | 2240×1462 | 1120×731 | 0.393 ms | 0.131 ms | 67% |
 | Damaged helmet (old demo, since removed) | 2260×1462 | 1130×731 | 0.786 ms | 0.262 ms | 67% |
 | Windy meadow | 2880×1462 | 1440×731 | 1.245 ms | 0.459 ms | 63% |

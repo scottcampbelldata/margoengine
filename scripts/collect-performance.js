@@ -102,7 +102,7 @@
   function snapshot() {
     const css = canvas?.getBoundingClientRect(),
       info = device?.adapterInfo,
-      stats = window.nightCitadel?.stats ?? window.sandbox?.stats,
+      stats = window.sandbox?.stats,
       timing = window.sandbox?.timing;
     return {
       page: url(location.href),

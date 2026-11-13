@@ -42,7 +42,7 @@ are retained for comparison; current cold-load timings require a fresh run.
 
 | Demo | Subject visible, median | Subject visible, worst | Full scene ready, median | Full scene ready, worst |
 | --- | ---: | ---: | ---: | ---: |
-| Night Citadel | 615 ms | 751 ms | 1,273 ms | 1,379 ms |
+| Night Citadel (old demo, since removed) | 615 ms | 751 ms | 1,273 ms | 1,379 ms |
 | Afterlight / gameplay sandbox | 708 ms | 810 ms | 1,858 ms | 2,058 ms |
 | Damaged helmet (old demo, since removed) | 907 ms | 939 ms | 1,406 ms | 1,500 ms |
 | Character study | 904 ms | 981 ms | 933 ms | 1,011 ms |

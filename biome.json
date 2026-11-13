@@ -7,7 +7,6 @@
       "tests/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "scripts/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "examples/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
-      "apps/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "tools/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "bench/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "!**/dist",
@@ -43,7 +42,6 @@
       "includes": ["scripts/**/*.js"],
       "javascript": {
         "globals": [
-          "nightCitadel",
           "physicalMaps",
           "meadowAudit",
           "gpuAudit",

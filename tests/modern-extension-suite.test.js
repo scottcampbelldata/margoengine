@@ -59,7 +59,8 @@ test('check:gpu-packages runs modern:test:extensions, and this repo has no unrun
   assert.deepEqual(unrunReleaseGates(scripts, file), []);
 });
 
-// The class of bug again: modern:test:sky, finalization and test:tokyo were in no check at all, not even test:release.
+// The class of bug again: modern:test:sky, finalization and test:tokyo (since removed) were in no check at all, not even
+// test:release.
 test('a test:* browser suite must be in a check, a copy of one, a step of the extension suite, or say why not', () => {
   const page = "import { openBrowser } from './browser.js';\nawait openBrowser();\n";
   const read = (file) => (file === 'scripts/plain.js' ? '' : page);
@@ -138,7 +139,7 @@ test('every browser suite of this repo is in a check or in NOT_IN_CHECKS with a 
     assert.ok(scripts[name], `${name} is gone from package.json; remove it from NOT_IN_CHECKS`);
     assert.ok(reason.length > 20, `${name} needs a stated reason`);
   }
-  for (const name of ['modern:test:sky', 'modern:test:finalization', 'test:tokyo']) assert.ok(name in ROOT, name);
+  for (const name of ['modern:test:sky', 'modern:test:finalization', 'test:orrery']) assert.ok(name in ROOT, name);
 });
 
 test('the compute scene-owner regression is a scheduled standalone real-GPU leaf', () => {

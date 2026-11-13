@@ -83,8 +83,7 @@ function browser({
     requestAnimationFrame: request,
     cancelAnimationFrame: cancel,
     matchMedia: () => ({ matches: false }),
-    nightCitadel: { stats: { fps: 60, samples: 4, frames: 70, privateValue: 999 } },
-    sandbox: { timing: new Float32Array([1 / 60, 123]) },
+    sandbox: { stats: { fps: 60, samples: 4, frames: 70, privateValue: 999 }, timing: new Float32Array([1 / 60, 123]) },
   };
   if (inheritedRequest) {
     delete window.requestAnimationFrame;

@@ -11,7 +11,6 @@ import { closeAll } from './support/shutdown.mjs';
 await mkdir('test-results', { recursive: true });
 const auditOnly = process.argv.includes('--audit-only');
 const cases = [
-  { name: 'citadel', path: '/night-citadel/' },
   { name: 'afterlight', path: '/gameplay-sandbox/' },
   { name: 'helmet', path: '/demos/flight-helmet.html' },
 ];
@@ -163,11 +162,7 @@ try {
       else if (demo.name === 'afterlight') assert(await page.locator('#explore').isEnabled());
       else assert(await page.locator('#status').isHidden());
       const style =
-        demo.name === 'citadel'
-          ? 'body > :not(canvas) {visibility:hidden!important}'
-          : demo.name === 'afterlight'
-            ? 'main > :not(canvas) {visibility:hidden!important}'
-            : 'aside {visibility:hidden!important}';
+        demo.name === 'afterlight' ? 'main > :not(canvas) {visibility:hidden!important}' : 'aside {visibility:hidden!important}';
       const image = await page.locator('canvas').first().screenshot({ style }),
         pixels = await decodePNG(image);
       const { data, width, height } = pixels,

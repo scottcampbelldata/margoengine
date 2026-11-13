@@ -616,11 +616,11 @@ test('a one-package change narrows the visual demos, the GPU tests and the WGSL 
   assert.ok(decision.affected.includes('@margoengine/dof'));
   const command = (name) => planned.find((p) => stepName(p.command) === name);
   assert.match(command('visual:check').command, /--only=.*\bdof\b/);
-  assert.doesNotMatch(command('visual:check').command, /night-citadel|khronos/);
+  assert.doesNotMatch(command('visual:check').command, /voxel|khronos/);
   assert.match(command('visual:compat').command, /--only=.*\bdof\b/, 'the WebGL2 layer run narrows the same way');
-  assert.doesNotMatch(command('visual:compat').command, /night-citadel|khronos/);
+  assert.doesNotMatch(command('visual:compat').command, /voxel|khronos/);
   assert.match(command('visual:compat:budget').command, /-- --chunk=8 --only=.*\bdof\b/, 'so does its frame budget');
-  assert.doesNotMatch(command('visual:compat:budget').command, /night-citadel|khronos/);
+  assert.doesNotMatch(command('visual:compat:budget').command, /voxel|khronos/);
   assert.ok(command('check:views').skip === undefined, 'views draw DOF');
   assert.ok(command('check:depth').skip, 'depth does not use dof');
   assert.match(command('check:wgsl').command, /--packages=.*\bdof\b/);
@@ -646,14 +646,15 @@ test('a change to a package the extension suite draws, or to one of its suites, 
   }
 });
 
-// modern:test:sky, finalization and test:tokyo joined check:gpu-packages on 2026-10-31: a change to what they draw selects them.
-test('a change to the sky package, a core-free page they open, or the tokyo example selects its suite', () => {
+// modern:test:sky and finalization joined check:gpu-packages on 2026-10-31 (with test:tokyo, since removed with its demo), and
+// test:orrery with the Orrery: a change to what they draw selects them.
+test('a change to the sky package, a core-free page they open, or the orrery example selects its suite', () => {
   for (const [file, suite] of [
     ['packages/sky/src/index.ts', 'modern:test:sky'],
     ['scripts/modern-sky-fog-tests.js', 'modern:test:sky'],
     ['scripts/modern-finalization-tests.js', 'modern:test:finalization'],
-    ['scripts/tokyo-diorama-browser-test.mjs', 'test:tokyo'],
-    ['examples/tokyo-diorama.js', 'test:tokyo'],
+    ['scripts/orrery-browser-test.mjs', 'test:orrery'],
+    ['examples/orrery/main.ts', 'test:orrery'],
   ]) {
     const { decision, planned } = planFor([file]),
       gpu = planned.find((p) => stepName(p.command) === 'check:gpu-packages');

@@ -272,7 +272,7 @@ const ASSETS = [
   ],
   [
     'examples/assets/ATTRIBUTION.md',
-    'demo models: RobotExpressive (CC0), FlightHelmet (CC0), Tokyo diorama (Apache-2.0); test mesh: MakeHuman base mesh (CC0)',
+    'demo models: RobotExpressive (CC0), FlightHelmet (CC0); test mesh: MakeHuman base mesh (CC0)',
   ],
   [
     'examples/assets/vrm/README.md',
@@ -310,10 +310,6 @@ const ASSETS = [
   [
     'packages/headless/tests/fixtures/pngsuite/NOTICE.md',
     'test fixtures: PngSuite 2017jul19 by Willem van Schaik (free to use, copy, modify and distribute)',
-  ],
-  [
-    'examples/assets/tokyo-diorama-CREDITS.md',
-    'Tokyo diorama: Poly Haven textures (CC0), Noto Sans CJK (OFL 1.1); inspiration credit to Glen Fox, Littlest Tokyo (CC BY 4.0, nothing copied)',
   ],
   ['examples/assets/khronos/README.md', '32 Khronos glTF sample models, each CC0 1.0 or CC BY 4.0 with its credit'],
   [

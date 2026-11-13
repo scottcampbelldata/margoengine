@@ -31,7 +31,7 @@ Apps build on Node.js 22.12 or newer; this repository needs 24.18 or newer. The 
 
 ```sh
 npm ci
-npm run dev                           # Night Citadel showcase; compiles packages first
+npm run dev                           # the Orrery demo; run npm run build:packages first
 npm test                              # compiles packages; runs modern unit checks
 npm run build:packages                # all workspace libraries; precompiled Wasm, no Rust
 npm run typecheck                     # strict checks for every package after build

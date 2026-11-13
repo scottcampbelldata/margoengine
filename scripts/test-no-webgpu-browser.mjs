@@ -83,7 +83,7 @@ try {
   const demos = await pages();
   // Every demo built by scripts/build-site.js; a page that drops out of the list is a test failure, not a skip.
   for (const expected of [
-    'night-citadel/index.html',
+    'demos/orrery/index.html',
     'gameplay-sandbox/index.html',
     'voxel/index.html',
     'gallery/khronos.html',

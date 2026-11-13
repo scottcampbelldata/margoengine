@@ -11,7 +11,6 @@ function sourceOf(path, dev) {
   const url = path.split(/[?#]/)[0];
   if (dev) return url;
   const folders = {
-    'night-citadel/': 'apps/showcase-night-citadel/index.html',
     'gameplay-sandbox/': 'examples/gameplay-sandbox/index.html',
     'voxel/': 'examples/voxel-sandbox/index.html',
     'demos/earth/': 'packages/creative/examples/earth/index.html',

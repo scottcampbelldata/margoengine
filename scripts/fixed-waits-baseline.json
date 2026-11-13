@@ -30,7 +30,6 @@
     "scripts/modern-extension-tests.js": 4,
     "scripts/modern-grass-tests.js": 1,
     "scripts/modern-hardware-gpu-tests.js": 2,
-    "scripts/modern-night-citadel-tests.js": 13,
     "scripts/modern-package-tests.js": 1,
     "scripts/modern-postfx-tests.js": 2,
     "scripts/modern-temporal-tests.js": 1,

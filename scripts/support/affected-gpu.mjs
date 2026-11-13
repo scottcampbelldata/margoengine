@@ -259,7 +259,6 @@ const merge = (...prints) => {
 /** The repo paths a visual-check demo is built from (scripts/build-site.js), or undefined when unknown. */
 export function demoSources(demo) {
   const path = demo.path.split(/[?#]/)[0];
-  if (path === 'night-citadel/') return ['apps/showcase-night-citadel'];
   if (path === 'gameplay-sandbox/') return ['examples/gameplay-sandbox'];
   if (path === 'voxel/') return ['examples/voxel-sandbox'];
   if (path === 'demos/earth/') return ['packages/creative/examples/earth'];

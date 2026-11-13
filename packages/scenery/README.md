@@ -39,9 +39,9 @@ colours, `hazeDensity`, moon direction, angular size, phase, colour and glow, st
 draws behind opaque geometry at reversed-Z depth 0, on canvas and HDR targets, with 1x or 4x sampling. Its
 colours are written as given on both.
 
-The low-level `SkyMoonPass` (`@margoengine/scenery/sky-moon`) and the Night Citadel's `NightAtmosphere` were
+The low-level `SkyMoonPass` (`@margoengine/scenery/sky-moon`) and the old Night Citadel demo's `NightAtmosphere` were
 removed when the three sky implementations were merged into `@margoengine/sky`. Use `Sky` directly for custom
-night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for the citadel's height haze.
+night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for a height haze.
 
 ## Day presets
 

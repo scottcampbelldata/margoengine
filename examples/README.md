@@ -46,7 +46,6 @@ backend can run it.
 | [scene-targets.html](scene-targets.html) | Several render targets with named outputs |
 | [split-screen.html](split-screen.html) | Two players, two views, render layers |
 | [texture-formats.html](texture-formats.html) | TGA, TIFF, KTX and DDS textures |
-| [tokyo-diorama.html](tokyo-diorama.html) | A street corner animated in Blender and played back by the animation package |
 | [weather.html](weather.html) | Weather presets that blend: rain, snow, hail, lightning, wind and wet or snowy ground |
 | [windy-meadow.html](windy-meadow.html) | Grass, wind and a changing sky |
 | [orrery/](orrery/index.html) | A brass orrery under a glass dome: any date puts the planets at their real heliocentric longitudes ([details](orrery/README.md)) |
