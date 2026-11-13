@@ -295,6 +295,27 @@ const cases = {
     run(device, p, [group(device, p, [{ buffer: buffer(device, values) }, { buffer: histogram }, { buffer: totals }, image, marks])], 2);
     return { values: { histogram: u32(await readBuffer(device, histogram)), totals: u32(await readBuffer(device, totals)), marks: [...(await readTexture(device, marks, { bytes: 4 }))] }, tier: tierOf(p) };
   },
+  async scatterSearchReturn(device) {
+    // Hunt H6: a search loop of unknown length that stores its answer and returns (robot-planning's clearance kernel
+    // shape) runs on the scatter tier. On the CPU tier these 65,536 invocations (about 140 million loop iterations)
+    // passed the default work budget, and the dispatch stored nothing.
+    const p = compute(device, `
+      @group(0) @binding(0) var<storage, read_write> out: array<u32>;
+      @group(0) @binding(1) var<uniform> n: vec4u;
+      @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+        var h = id.x * 2654435761u + 1u;
+        for (var i = 0u; i < n.x; i++) {
+          h = h * 1664525u + 1013904223u;
+          if ((h >> 20u) == (id.x & 4095u)) { out[id.x] = i + 1u; return; }
+        }
+        out[id.x] = h;
+      }`);
+    const out = buffer(device, new Uint32Array(65536)), n = buffer(device, Uint32Array.of(3000, 0, 0, 0), B.UNIFORM | B.COPY_DST);
+    run(device, p, [group(device, p, [{ buffer: out }, { buffer: n }])], 1024);
+    const values = u32(await readBuffer(device, out));
+    // The whole result, and how many invocations returned early (about half): a dropped dispatch reads all zeros.
+    return { values: { values, early: values.filter((v) => v <= 3000).length }, tier: tierOf(p) };
+  },
   async cpuLoops(device) {
     // A store inside a loop of unknown length (the clustered light binning shape) and a read-back of an own store.
     const p = compute(device, `

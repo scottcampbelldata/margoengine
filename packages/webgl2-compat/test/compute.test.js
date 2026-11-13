@@ -46,6 +46,42 @@ test('own-texel stores take the fragment tier, other stores the scatter tier, at
   assert.match(readBack.reason, /reads back/);
 });
 
+// Regression (hunt H6): a search loop of unknown length that stores its answer and returns went to the CPU tier, where
+// a long dispatch (robot-planning's self-collision pass from about 1,100 poses) passed the CPU work budget and stored
+// nothing. A store straight before a `return` runs once per call: such kernels take the scatter tier.
+test('a store straight before a return inside a loop of unknown length counts once', () => {
+  const search = tierOf(`@group(0) @binding(0) var<storage, read_write> out: array<f32>;
+    @group(0) @binding(1) var<uniform> n: u32;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+      var least = 1e30;
+      for (var i = 0u; i < n; i++) {
+        least = min(least, f32(i ^ id.x));
+        if (least <= 0.0) { out[id.x] = least; return; }
+      }
+      out[id.x] = least;
+    }`);
+  assert.equal(search.tier, 'scatter', search.reason);
+  assert.equal(search.targets[0].stores, 2);
+  const helper = (call) =>
+    tierOf(`@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+    @group(0) @binding(1) var<uniform> n: u32;
+    fn put(i: u32) { var k = 0u; loop { if (k * k >= i) { out[i] = k; return; } k++; } }
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) { ${call} }`);
+  const once = helper('put(id.x);');
+  assert.equal(once.tier, 'scatter', once.reason);
+  assert.equal(once.targets[0].stores, 1);
+  // The helper's return ends only the helper: called in a loop of unknown length, its store is unbounded.
+  const looped = helper('for (var j = 0u; j < n; j++) { put(id.x + j); }');
+  assert.equal(looped.tier, 'cpu');
+  assert.match(looped.reason, /loop of unknown length/);
+  // A `continue` between the store and the return skips the return: the store repeats.
+  const skipped = tierOf(`@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+    @group(0) @binding(1) var<uniform> n: u32;
+    @compute @workgroup_size(1) fn main() { for (var i = 0u; i < n; i++) { out[i] = i; if (i < 3u) { continue; } return; } }`);
+  assert.equal(skipped.tier, 'cpu');
+  assert.match(skipped.reason, /loop of unknown length/);
+});
+
 test('every compute entry point of the corpus gets a tier (none is refused)', () => {
   const { modules } = readCorpus();
   const tiers = { fragment: 0, scatter: 0, cpu: 0 };

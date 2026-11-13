@@ -21,6 +21,7 @@ const TIERS = {
   scatterStructs: 'scatter',
   scatterTargets: 'scatter',
   cpuAtomics: 'cpu',
+  scatterSearchReturn: 'scatter',
   cpuLoops: 'cpu',
   cpuSample: 'cpu',
   indirect: 'scatter',

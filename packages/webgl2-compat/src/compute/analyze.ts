@@ -5,9 +5,10 @@
 //   id: xy for 1D and 2D textures, xy plus the layer z for arrays, xyz for 3D), no storage buffer is written, and the
 //   shader uses no atomics, workgroup memory or barriers. A full-target draw per written texture and layer runs it.
 // - scatter (A2): stores go anywhere (storage buffer words, texels at any coordinates), but each invocation makes a
-//   bounded number of them (no store inside a loop of unknown length), never reads back what it stored itself, and
-//   uses no atomics, workgroup memory or barriers. An instanced point draw per target runs it: instance k of an
-//   invocation writes its k-th store.
+//   bounded number of them (no store inside a loop of unknown length, except straight before a `return`, which ends
+//   the loop and the function: a search loop that stores its answer and returns), never reads back what it stored
+//   itself, and uses no atomics, workgroup memory or barriers. An instanced point draw per target runs it: instance k
+//   of an invocation writes its k-th store.
 // - cpu (B): everything else (atomics, workgroup memory, barriers, unbounded stores), as JavaScript.
 import { fault } from '../../../shared/errors.js';
 import type { IREntryPoint, IRExpr, IRFunction, IRGlobalVar, IRModule, IRParam, IRStmt } from '../wgsl/ir.js';
@@ -168,6 +169,25 @@ function wordsOf(t: Type): number {
 
 const storeOf = (t: Type): Type => (t.kind === 'ref' || t.kind === 'ptr' ? t.store : t);
 
+/** True when a statement runs through to its end or returns: no loop, `break`, `continue` or `discard` inside. */
+function straight(s: IRStmt): boolean {
+  switch (s.kind) {
+    case 'decl':
+    case 'assign':
+    case 'increment':
+    case 'call':
+    case 'return':
+      return true;
+    case 'block':
+      return s.body.every(straight);
+    case 'if':
+      return s.then.every(straight) && (s.else ?? []).every(straight);
+    case 'switch':
+      return s.clauses.every((c) => c.body.every(straight));
+  }
+  return false;
+}
+
 /** Which part of the global invocation id an expression equals (A1's own-texel test). */
 type Tag = 'x' | 'y' | 'z' | 'xy' | 'xyz' | undefined;
 
@@ -198,6 +218,8 @@ class Analyzer {
   private stored = new Set<IRGlobalVar>();
   /** Store multiplier of the enclosing loops. */
   private times = 1;
+  /** {@link times} where the function being walked was called: what a store just before a `return` counts. */
+  private callTimes = 1;
 
   constructor(
     private readonly module: IRModule,
@@ -261,7 +283,21 @@ class Analyzer {
   // ---------------------------------------------------------------- statements
 
   private statements(list: readonly IRStmt[], w: Walk): void {
-    for (const s of list) this.statement(s, w);
+    // The straight-line statements just before a `return` (`out[i] = x; return;` inside a loop, say) run at most once
+    // per call of the function, whatever loops enclose them in it: their stores count as made where it was called.
+    const end = list.findIndex((s) => s.kind === 'return');
+    let from = end;
+    while (from > 0 && straight(list[from - 1])) from--;
+    for (const [i, s] of list.entries()) {
+      if (end < 0 || i < from || i > end) {
+        this.statement(s, w);
+        continue;
+      }
+      const saved = this.times;
+      this.times = this.callTimes;
+      this.statement(s, w);
+      this.times = saved;
+    }
   }
 
   private statement(s: IRStmt, w: Walk): void {
@@ -539,7 +575,10 @@ class Analyzer {
         }
       }
     });
+    const saved = this.callTimes;
+    this.callTimes = this.times;
     this.statements(fn.body, { tags, handles });
+    this.callTimes = saved;
   }
 
   private builtin(e: Extract<IRExpr, { kind: 'builtin' }>, w: Walk): void {
