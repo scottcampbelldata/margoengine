@@ -398,7 +398,13 @@ export class TilesRenderer implements EnginePlugin {
         const { host, PointCloud } = await (this.points ??= this.loadPoints(engine));
         const anchor = engine.createMesh();
         this.place(anchor, this.contentMatrix(tile, content.rtcCenter, false));
-        const colors = content.colors;
+        // pnts colour precedence: RGBA, RGB, RGB565 (all in `colors`), then CONSTANT_RGBA for every point.
+        const constant = content.constantColor,
+          colors =
+            content.colors ??
+            (constant
+              ? Uint8Array.from({ length: (content.positions.length / 3) * 4 }, (_, i) => constant[i % 4])
+              : undefined);
         const cloud = host.add(
           new PointCloud({
             positions: content.positions,
