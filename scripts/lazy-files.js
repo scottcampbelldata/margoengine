@@ -490,6 +490,15 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'Each `loadGLTFProgressive()` (`@margoengine/gltf-pro/progressive`) where `Worker` exists',
   },
+  // CAD import: one worker per B-rep import, the B-rep kernel bundled in it.
+  {
+    package: '@margoengine/cad',
+    file: 'packages/cad/dist/workers/cad-runtime.js',
+    label: 'workers/cad-runtime.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'Each `loadCAD()` / `parseCADAsync()` of a STEP, IGES, SAT, XT or JT file, or of STL and OBJ (`@margoengine/cad`, also `addCAD(stage, url)` from `@margoengine/cad/stage`) where `Worker` exists',
+  },
   {
     package: '@margoengine/fbx',
     file: 'packages/fbx/dist/workers/fbx.js',

@@ -10,24 +10,39 @@ import { pdfText } from '../scripts/pdf-text.mjs';
 const word = (...codes) => String.fromCharCode(...codes);
 const b64 = (text) => Buffer.from(text, 'base64').toString('utf8');
 const repo = `${word(109, 97, 114, 103, 111)}-${word(99, 97, 100)}-${word(107, 101, 114, 110, 101, 108)}`; // the private repo name
-const pkg = `${word(109, 97, 114, 103, 111, 101, 110, 103, 105, 110, 101)}/${word(98, 114, 101, 112)}`;
 const banned = [
   b64('QG1hcmdvZW5naW5lL21hY2hpbmVyeQ=='), // the removed package's specifier
-  b64('Qi1SZXA='), // the boundary representation abbreviation, hyphenated
-  b64('cGFydC5pZ3M='), // a file of one CAD exchange format
-  b64('U1RFUCBhbmQgSUdFUw=='), // the two CAD exchange formats
-  b64('bG9hZENBRA=='), // the removed loader function
   b64('U2VjdGlvblBsYW5lcw=='), // the removed section class
   b64('bWFyZ29lbmdpbmUvc3RhZ2UvY2Fk'), // the removed stage entry
   b64('T3BlbkNhc2NhZGU='), // the CAD kernel the removed importer used
 ];
 
-test('the repo name, with or without hyphens, and the package path are reported', () => {
+test('the repo name, with or without hyphens, is reported', () => {
   assert.equal(hitsInLine(`see ${repo} for more`).length > 0, true);
   assert.equal(hitsInLine(repo.replaceAll('-', '')).length > 0, true);
-  assert.equal(hitsInLine(`import x from '@${pkg}'`).length > 0, true);
-  assert.equal(hitsInLine(`packages/${word(98, 114, 101, 112)}/src`).length > 0, true);
-  assert.equal(hitsInLine(word(80, 97, 114, 97, 115, 111, 108, 105, 100)).length > 0, true);
+});
+
+// Scott, 2026-11-13: the kernel and the CAD import package are public again (packages/brep, packages/cad), so their
+// names, paths, formats and API pass; the kernel repository's name, the importer's third-party kernel, the package
+// that stays out and the removed stage entry and section class are still reported.
+test('the public kernel and CAD import names pass', () => {
+  const kernel = word(98, 114, 101, 112),
+    short = word(99, 97, 100);
+  for (const text of [
+    `import x from '@margoengine/${kernel}'`,
+    `import x from '@margoengine/${short}/stage'`,
+    `packages/${kernel}/src`,
+    'B-Rep',
+    'part.igs',
+    'STEP and IGES',
+    'Parasolid XT',
+    'AP203, AP214 and AP242',
+    'loadCAD, parseCAD, parseCADAsync, addCAD, PartInstancer, deduplicateParts and CADImporter',
+    'dist/workers/cad-runtime.js and the cad-worker',
+  ])
+    assert.deepEqual(hitsInLine(text), [], text);
+  for (const path of [`packages/${kernel}/src/index.ts`, `packages/${short}/test/pack.test.js`])
+    assert.deepEqual(hitsInPath(path), [], path);
 });
 
 test('every removed CAD name is reported', () => {
@@ -66,12 +81,8 @@ test('ordinary text, IFC files and the kept names pass; binary data is skipped',
 });
 
 test('a removed name in a file or folder name is reported; kept names that merely contain the letters pass', () => {
-  const short = word(99, 97, 100); // the three-letter abbreviation the removed benchmark folder and fixtures used
-  assert.notDeepEqual(hitsInPath(`examples/package-benchmarks/${short}/power.mjs`), []);
-  assert.notDeepEqual(hitsInPath(`packages/blender/tests/fixtures/${short}-triangle.margo`), []);
-  assert.notDeepEqual(hitsInPath(`tests/deep-ingestion-${short}-initialization.test.js`), []);
-  assert.notDeepEqual(hitsInPath(`src/${short.toUpperCase()}CameraControls.ts`), []);
-  assert.notDeepEqual(hitsInPath(`packages/${word(98, 114, 101, 112)}/src/index.ts`), []);
+  assert.notDeepEqual(hitsInPath(`packages/${repo}/src/index.ts`), []);
+  assert.notDeepEqual(hitsInPath(`examples/${banned[0].split('/')[1]}-demo/index.html`), []);
   for (const kept of [
     'tests/modern-facade-isolation.test.js',
     'packages/shadows/src/cascades.ts',
@@ -80,13 +91,11 @@ test('a removed name in a file or folder name is reported; kept names that merel
     'packages/kernel/src/lib.rs',
   ])
     assert.deepEqual(hitsInPath(kept), [], kept);
-  // Text, unlike a path, may still name the camera controls preset.
-  assert.deepEqual(hitsInLine(`${short.toUpperCase()} camera controls`), []);
 });
 
 test('the list file holds hashes only', () => {
   const text = readFileSync(new URL('../scripts/banned-terms.json', import.meta.url), 'utf8').toLowerCase();
-  for (const plain of [repo, pkg, ...banned]) assert.equal(text.includes(plain.toLowerCase()), false);
+  for (const plain of [repo, ...banned]) assert.equal(text.includes(plain.toLowerCase()), false);
 });
 
 /** A one-page PDF that shows `text` through a font with a ToUnicode map, written the way Chromium writes text. */

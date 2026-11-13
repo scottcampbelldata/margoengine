@@ -1889,6 +1889,27 @@ Batch 132 audit (lane N, 2026-11-10). "Read" means the PDF or specification text
 | EX7 | Godot SpriteFrames and TileSet text resources, TileMapLayer.set_cell flips | exporters/src/godot-2d.ts | Godot's public TSCN/TRES format documentation and class reference |
 | EX8 | Unity TextureImporter meta, AnimationClip, Tilemap and TileBase use | exporters/src/unity-2d.ts | Unity's public manual and scripting reference |
 
+### brep
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| BR1 | STEP Part 21 file syntax, entity instances, string escapes | brep/src/step/file.ts | ISO 10303-21 |
+| BR2 | Product structure, units, placements, colours, validation properties | brep/src/step/structure.ts | ISO 10303-41/42/43, the AP203, AP214 and AP242 schemas, CAx-IF recommended practices for validation properties |
+| BR3 | B-spline and NURBS curve and surface evaluation, knot insertion | brep/src/geometry/nurbs.ts, brep/src/geometry/curves.ts, brep/src/geometry/surfaces.ts | Piegl and Tiller, The NURBS Book (2nd ed.) |
+| BR4 | Constrained Delaunay triangulation with exact predicates | brep/src/mesh/cdt.ts | Shewchuk, robust adaptive floating-point predicates (1997); Sloan, constraint recovery (1993) |
+| BR5 | IGES 5.3 sections and entities | brep/src/iges | US PRO/IPO-100-1996 (IGES 5.3) |
+| BR6 | ACIS SAT records | brep/src/sat | Spatial's published SAT format chapter and class restore descriptions |
+| BR7 | Parasolid XT transmit files | brep/src/xt | the published XT Format Reference |
+| BR8 | JT container, scene graph, codecs and mesh topology decoder | brep/src/jt | the JT File Format Reference 9.5 and ISO 14306, under Siemens' published licence terms (docs/jt-licensing.md) |
+| BR9 | LZMA, LZMA2 and XZ decoding | brep/src/jt/lzma.ts | Igor Pavlov's LZMA specification; Lasse Collin's .xz file format |
+
+### cad
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| CA1 | STL (binary and ASCII) and OBJ reading, vertex welding by float32 bits, crease-angle normals | cad/src/cad-parser.ts, cad/src/cad-runtime.worker.ts | the STL and OBJ format descriptions; vertex normals weighted by triangle area times corner angle (textbook) |
+| CA2 | Closed-solid test: every edge shared by exactly two consistently wound triangles | cad/src/closed.ts | manifold mesh definition (textbook) |
+
 ### physics
 
 The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Nothing here comes from the source of Rapier, parry, Box2D, Jolt, Bullet, PhysX or any paper's companion repository; none was opened.

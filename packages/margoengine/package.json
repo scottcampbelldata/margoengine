@@ -415,6 +415,10 @@
       "types": "./dist/blender/nodes.d.ts",
       "import": "./dist/blender/nodes.js"
     },
+    "./brep": {
+      "types": "./dist/brep.d.ts",
+      "import": "./dist/brep.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"
@@ -506,6 +510,22 @@
     "./cache/decoded": {
       "types": "./dist/cache/decoded.d.ts",
       "import": "./dist/cache/decoded.js"
+    },
+    "./cad": {
+      "types": "./dist/cad.d.ts",
+      "import": "./dist/cad.js"
+    },
+    "./cad/cad-async": {
+      "types": "./dist/cad/cad-async.d.ts",
+      "import": "./dist/cad/cad-async.js"
+    },
+    "./cad/stage": {
+      "types": "./dist/cad/stage.d.ts",
+      "import": "./dist/cad/stage.js"
+    },
+    "./cad/closed": {
+      "types": "./dist/cad/closed.d.ts",
+      "import": "./dist/cad/closed.js"
     },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
@@ -5295,8 +5315,10 @@
     "@margoengine/behavior": "^1.0.0",
     "@margoengine/biomes": "^1.0.0",
     "@margoengine/blender": "^1.0.0",
+    "@margoengine/brep": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/cache": "^1.0.0",
+    "@margoengine/cad": "^1.0.0",
     "@margoengine/cameras": "^1.0.0",
     "@margoengine/cinematic": "^1.0.0",
     "@margoengine/clustered": "^1.0.0",

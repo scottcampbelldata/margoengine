@@ -37,6 +37,8 @@
     "packages/usdz",
     "packages/loaders",
     "packages/exporters",
+    "packages/brep",
+    "packages/cad",
     "packages/kinematics-constraints",
     "packages/creative",
     "packages/scenery",

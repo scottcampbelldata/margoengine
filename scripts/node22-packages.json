@@ -80,7 +80,8 @@
       ]
     },
     "@margoengine/inspector": "the remote relay (remote-relay.ts) is a Node server on node:http, node:crypto and node:os; the panels run in the browser",
-    "@margoengine/blender": "compressMargo (@margoengine/blender/ktx2) re-encodes .margo textures in Node; decodeMargo checks files with no GPU"
+    "@margoengine/blender": "compressMargo (@margoengine/blender/ktx2) re-encodes .margo textures in Node; decodeMargo checks files with no GPU",
+    "@margoengine/brep": "STEP, IGES, SAT, XT and JT reading, modelling and tessellation run with no browser API, so tools can mesh CAD files offline"
   },
   "contributorNode": {
     "@margoengine/react": "its unit tests rely on node:test mock.module timing that Node 22 does not give (bug 18), so they run on the contributors' Node 24.18; React 18 SSR itself runs on Node 22 in the end-user proof"
@@ -137,6 +138,7 @@
     "@margoengine/voxel-pathtracer": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/water": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/weather": "renders hail with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
-    "@margoengine/xr": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser"
+    "@margoengine/xr": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
+    "@margoengine/cad": "imports into a live engine and reads B-rep files in a Web Worker; runs in the browser"
   }
 }

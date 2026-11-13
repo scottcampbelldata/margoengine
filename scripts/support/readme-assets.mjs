@@ -54,6 +54,8 @@ export const README_FILES = {
   '/image.tiff': 'examples/assets/texture-formats/checker-lzw.tif',
   '/texture.dds': 'examples/assets/texture-formats/checker-rgba.dds',
   '/studio.exr': 'packages/environment/tests/fixtures/BrightRings.exr',
+  '/assembly.step': 'packages/cad/test/fixtures/bracket-assembly.step',
+  '/bracket.step': 'packages/cad/test/fixtures/bracket-assembly.step',
   '/parts/bracket.3mf': 'packages/loaders/tests/fixtures/gears.3mf',
   '/scans/part.ply': 'packages/loaders/tests/fixtures/torus_colored.ply',
   '/fonts/Inter.ttf': 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.ttf',

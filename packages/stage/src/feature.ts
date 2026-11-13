@@ -1,7 +1,6 @@
 import type { EnginePlugin } from '@margoengine/core';
 import type { Stage } from './index.js';
-import { loadedModel, type LoadedModel, type StageModel } from './model.js';
-import { fault, typeError } from '../../shared/errors.js';
+import { fault } from '../../shared/errors.js';
 
 /** The stage's disposal signal, combined with the caller's `signal` when there is one. */
 export function stageSignal(stage: Stage, signal?: AbortSignal): AbortSignal {
@@ -45,24 +44,5 @@ export async function attachPlugin<T extends EnginePlugin, M>(
   return stage.use(create(await optionalPackage(name, load, stage.signal)));
 }
 
-/** Validates the shared load options of the model loaders (`addGLTF`). */
-export function loadTarget(url: string | URL, fit: unknown): URL {
-  if (typeof fit !== 'boolean')
-    throw typeError(
-      'Invalid fit: expected a boolean; use true to fit the camera or false to keep its view',
-      'arguments',
-    );
-  return new URL(url, globalThis.location?.href);
-}
-
-/** Fits the camera to an imported model and wraps it as a `LoadedModel`; a failure retires the model. */
-export function placeModel(stage: Stage, model: StageModel, fit: boolean, abort: AbortSignal): LoadedModel {
-  try {
-    abort.throwIfAborted();
-    if (fit) stage.fit(model.meshes);
-    return loadedModel(stage.engine, model);
-  } catch (error) {
-    model.dispose();
-    throw error;
-  }
-}
+// Shared with @margoengine/cad's addCAD (packages/shared/stage-model.js).
+export { loadTarget, placeModel } from '../../shared/stage-model.js';

@@ -11,7 +11,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Demos](#demos) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 24,848 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 24,843 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Build something in 5 minutes
@@ -336,7 +336,7 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 24,848 B | 61,345 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 24,843 B | 61,333 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -372,7 +372,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-102 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+104 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 
@@ -397,7 +397,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking, a CPU phase breakdown, leak alerts and field telemetry. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
-### Loading and formats (11)
+### Loading and formats (13)
 
 | Package | What it is |
 | --- | --- |
@@ -408,6 +408,8 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
 | [`@margoengine/exporters`](packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data. |
+| [`@margoengine/cad`](packages/cad/README.md) | CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper. |
+| [`@margoengine/brep`](packages/brep/README.md) | Margo's own CAD kernel: STEP (ISO 10303-21), IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation. |
 | [`@margoengine/blender`](packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
 | [`@margoengine/cache`](packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |

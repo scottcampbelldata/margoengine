@@ -1,5 +1,5 @@
 {
-  "commit": "0e71a9024",
+  "commit": "bf6692e48",
   "dirty": false,
   "browser": "msedge 157.0.4341.46 headless",
   "buildManifest": {
@@ -136,7 +136,7 @@
       ]
     },
     "../../../packages/gltf/dist/index.js": {
-      "file": "assets/dist-C3zhaZZt.js",
+      "file": "assets/dist-BdppTv2c.js",
       "name": "dist",
       "src": "../../../packages/gltf/dist/index.js",
       "isDynamicEntry": true,
@@ -341,7 +341,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-BOA4clVx.js",
+      "file": "assets/index-qFbGWFiK.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -366,26 +366,26 @@
       "encoding": "identity",
       "transferred": 969,
       "raw": 719,
-      "gzip": 411,
+      "gzip": 412,
       "brotli": 261
     },
     {
-      "path": "assets/index-BOA4clVx.js",
+      "path": "assets/index-qFbGWFiK.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27016,
-      "raw": 64849,
-      "gzip": 26634,
-      "brotli": 23494
+      "transferred": 27001,
+      "raw": 64833,
+      "gzip": 26619,
+      "brotli": 23505
     },
     {
-      "path": "assets/preload-helper-CRzLMJPS.js",
+      "path": "assets/geometry-BGTjAxRm.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 1168,
-      "raw": 1534,
-      "gzip": 798,
-      "brotli": 682
+      "transferred": 2420,
+      "raw": 3990,
+      "gzip": 2050,
+      "brotli": 1858
     },
     {
       "path": "assets/version-YYhCZP03.js",
@@ -397,13 +397,13 @@
       "brotli": 526
     },
     {
-      "path": "assets/geometry-BGTjAxRm.js",
+      "path": "assets/preload-helper-CRzLMJPS.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2420,
-      "raw": 3990,
-      "gzip": 2050,
-      "brotli": 1858
+      "transferred": 1168,
+      "raw": 1534,
+      "gzip": 798,
+      "brotli": 682
     },
     {
       "path": "model.glb",
@@ -424,21 +424,21 @@
       "brotli": 113
     },
     {
-      "path": "assets/dist-C3zhaZZt.js",
+      "path": "assets/dist-BdppTv2c.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 7649,
-      "raw": 19292,
-      "gzip": 7277,
-      "brotli": 6516
+      "transferred": 7761,
+      "raw": 19615,
+      "gzip": 7389,
+      "brotli": 6607
     }
   ],
   "total": {
     "requests": 8,
-    "transferred": 42225,
-    "raw": 92913,
-    "gzip": 38336,
-    "brotli": 33809
+    "transferred": 42322,
+    "raw": 93220,
+    "gzip": 38434,
+    "brotli": 33911
   },
   "notFetched": [
     {

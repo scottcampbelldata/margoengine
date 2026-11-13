@@ -1,0 +1,74 @@
+{
+  "name": "@margoengine/cad",
+  "version": "1.0.0",
+  "description": "CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "cad",
+    "step",
+    "iges",
+    "stl",
+    "obj",
+    "jt"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/cad"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js cad",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cad-async": {
+      "types": "./dist/cad-async.d.ts",
+      "import": "./dist/cad-async.js"
+    },
+    "./stage": {
+      "types": "./dist/stage.d.ts",
+      "import": "./dist/stage.js"
+    },
+    "./closed": {
+      "types": "./dist/closed.d.ts",
+      "import": "./dist/closed.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "dependencies": {
+    "@margoengine/brep": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/stage": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/stage": {
+      "optional": true
+    }
+  }
+}

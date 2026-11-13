@@ -52,6 +52,16 @@ const WHY = {
  */
 export const BUNDLED = [
   {
+    package: '@margoengine/brep, @margoengine/cad',
+    component: 'JT Data Format data structures and operators (Siemens JT File Format Reference, ISO 14306)',
+    licence:
+      'Siemens JT Data Format Reference Intellectual Property License Terms; patents royalty-free under the Siemens JT Data Format Reference Patent Clarification Notice',
+    files: 'brep: dist/jt/*.js (the JT reader); cad: dist/workers/cad-runtime.js, which bundles it',
+    source: 'packages/brep/src/jt: written for Margo from the published JT File Format Reference and ISO 14306; no Siemens code',
+    modified: 'not applicable: no third-party code, the format is read as the reference describes it',
+    notices: ['NOTICE'],
+  },
+  {
     package: '@margoengine/decoders',
     component: 'Draco 3D decoder (Google)',
     licence: 'Apache-2.0',
@@ -700,6 +710,10 @@ ${table(
     \`jxl_oxide_wasm_bg.wasm\` (sha256 \`3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69\`) and
     \`jxl_oxide_wasm.js\` (\`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7\`). The crates inside it are named in
     \`dist/THIRD-PARTY-NOTICE.md\`.
+- **Siemens JT notice (\`@margoengine/brep\`, \`@margoengine/cad\`).** The JT reader in \`packages/brep/src/jt\` reads the
+  format as described in the Siemens JT File Format Reference and ISO 14306 (\`docs/jt-licensing.md\`). Both packages'
+  tracked \`NOTICE\` files ship in their tarballs with the reference licence terms, the royalty-free patent notice and the
+  trademark note, and every JT reader source file carries the same notice in its header.
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
   (LGPL-3.0) are installed as an optional dependency of Next.js for \`examples/next\`, and
   \`scripts/optimize-demo-assets.js\` and \`scripts/build-scifi-helmet.mjs\` use sharp to resize textures. \`margo-convert

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15188055,
+  "total": 15425950,
   "history": [
     {
       "date": "2026-10-24",
@@ -8729,6 +8729,12 @@
       "commit": "8f663de49",
       "reason": "environment/volumetric +412 B gzip (10,093 to 10,505): clustered lights in the fog are taken at four stratified depths with a cell distance floor, so narrow beams no longer break into one block per slice and a froxel holding a light no longer takes 1/d^2 at one point",
       "grew": 1
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "d2efddb3b",
+      "reason": "new packages @margoengine/brep and @margoengine/cad (2026-11-13, from the kernel repository): brep 120,991 B gzip is the whole B-rep kernel (STEP, IGES, SAT, XT and JT readers, exact geometry, modelling and tessellation) in one entry; cad's worker 81,069 B bundles the kernel's readers and tessellator so the page never loads them; cad 12,710 B, cad/stage 13,692 B (addCAD with the loader behind import()), cad/cad-async 1,814 B, cad/closed 252 B",
+      "grew": 6
     }
   ],
   "items": {
@@ -8832,6 +8838,7 @@
     "@margoengine/blender/nodes": 11505,
     "@margoengine/blender/objects": 5201,
     "@margoengine/blender/pbr-ext": 13434,
+    "@margoengine/brep": 124621,
     "@margoengine/bvh": 24403,
     "@margoengine/bvh/alpha": 17382,
     "@margoengine/bvh/alpha-triangles": 1381,
@@ -8855,6 +8862,11 @@
     "@margoengine/cache/ranges": 4902,
     "@margoengine/cache/stream": 5047,
     "@margoengine/cache/vary": 821,
+    "@margoengine/cad": 13092,
+    "@margoengine/cad dist/workers/cad-runtime.js": 83502,
+    "@margoengine/cad/cad-async": 2070,
+    "@margoengine/cad/closed": 508,
+    "@margoengine/cad/stage": 14103,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,
@@ -9762,7 +9774,7 @@
     "@margoengine/sprites/skeletal": 8208,
     "@margoengine/sprites/slice": 9259,
     "@margoengine/sprites/spine": 16920,
-    "@margoengine/stage": 3489,
+    "@margoengine/stage": 3488,
     "@margoengine/stage/effects": 764,
     "@margoengine/stage/environment": 784,
     "@margoengine/stage/gltf": 4050,
