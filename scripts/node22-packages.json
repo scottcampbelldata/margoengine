@@ -139,6 +139,7 @@
     "@margoengine/water": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/weather": "renders hail with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/xr": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
-    "@margoengine/cad": "imports into a live engine and reads B-rep files in a Web Worker; runs in the browser"
+    "@margoengine/cad": "imports into a live engine and reads B-rep files in a Web Worker; runs in the browser",
+    "@margoengine/machinery": "renders sections, feature edges and dimensions with WebGPU and runs its Wasm kernel beside a live engine; runs in the browser"
   }
 }

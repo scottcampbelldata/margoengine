@@ -14,13 +14,14 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inflateRawSync } from 'node:zlib';
+import { gunzipSync, inflateRawSync } from 'node:zlib';
 import { margoError } from '../packages/shared/errors.js';
 
 const repository = resolve(import.meta.dirname, '..');
 
 /** Every shipped Wasm crate. `crate` is the crate folder, `blueprint` the committed file, `script` (+ `args`) the build
- * that writes it; `deflated` marks a TypeScript module holding the raw-deflate base64 blueprint; `own` names the crate's
+ * that writes it; `deflated` marks a TypeScript module holding the raw-deflate base64 blueprint (`'gzip'`: gzip, and
+ * `exportName` names the constant when it is not `wasmBase64`); `own` names the crate's
  * own record check, older than this list, which then stays the one check of that crate. */
 export const BLUEPRINTS = [
   {
@@ -159,6 +160,14 @@ export const BLUEPRINTS = [
     script: 'packages/sciviz/scripts/build-flow.mjs',
   },
   {
+    name: 'machinery-kernel',
+    crate: 'packages/machinery/kernel',
+    blueprint: 'packages/machinery/src/wasm.ts',
+    script: 'packages/machinery/scripts/build-kernel.mjs',
+    deflated: 'gzip',
+    exportName: 'machineryWasm',
+  },
+  {
     name: 'trace-mesh',
     crate: 'packages/voxel-pathtracer/mesh-kernel',
     blueprint: 'packages/voxel-pathtracer/src/mesh.wasm',
@@ -228,9 +237,11 @@ export function sourceHash(entry, root = repository) {
 export function blueprintBytes(entry, root = repository) {
   const bytes = readFileSync(join(root, entry.blueprint));
   if (!entry.deflated) return bytes;
-  const base64 = /wasmBase64(?::\s*string)?\s*=\s*'([^']+)'/.exec(bytes.toString('utf8'))?.[1];
-  if (!base64) throw margoError('WASM_BLUEPRINT_UNREADABLE', `${entry.blueprint} holds no wasmBase64 blueprint`);
-  return inflateRawSync(Buffer.from(base64, 'base64'));
+  const name = entry.exportName ?? 'wasmBase64';
+  const base64 = new RegExp(`${name}(?::\\s*string)?\\s*=\\s*'([^']+)'`).exec(bytes.toString('utf8'))?.[1];
+  if (!base64) throw margoError('WASM_BLUEPRINT_UNREADABLE', `${entry.blueprint} holds no ${name} blueprint`);
+  const packed = Buffer.from(base64, 'base64');
+  return entry.deflated === 'gzip' ? gunzipSync(packed) : inflateRawSync(packed);
 }
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');

@@ -85,7 +85,7 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
 
 ## CAD formats
 
-Scott's decision (2026-11-06, replacing the 2026-10-29 no-CAD rule): CAD file import and CAD formats are fine here. Since 2026-11-13 Margo's own kernel, `@margoengine/brep`, and the CAD import package built on it, `@margoengine/cad`, are public engine packages (Apache-2.0); the packages built on them in the kernel repository stay out, and `tests/cad-packages-public.test.js` fails if either package imports, depends on or names them. `npm run check:banned-terms` (in verify) rejects an encoded list of terms that must not appear in the tree. The list is `scripts/banned-terms.json`.
+Scott's decision (2026-11-06, replacing the 2026-10-29 no-CAD rule): CAD file import and CAD formats are fine here. Since 2026-11-13 Margo's own kernel, `@margoengine/brep`, the CAD import package built on it, `@margoengine/cad`, and `@margoengine/machinery` (with its Rust kernel crate) are public engine packages (Apache-2.0). Scott, 2026-11-13: "there should be no private packages at all now"; `tests/no-private-packages.test.js` fails on a private or unlicensed package manifest, on the kernel repository's npm scope in any tracked file, and on an import a returned package does not declare. `npm run check:banned-terms` (in verify) rejects an encoded list of terms that must not appear in the tree. The list is `scripts/banned-terms.json`.
 
 ## How work lands
 

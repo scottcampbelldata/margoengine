@@ -2175,6 +2175,66 @@
       "types": "./dist/lod/stream.d.ts",
       "import": "./dist/lod/stream.js"
     },
+    "./machinery": {
+      "types": "./dist/machinery.d.ts",
+      "import": "./dist/machinery.js"
+    },
+    "./machinery/kinematics": {
+      "types": "./dist/machinery/kinematics.d.ts",
+      "import": "./dist/machinery/kinematics.js"
+    },
+    "./machinery/surface": {
+      "types": "./dist/machinery/surface.d.ts",
+      "import": "./dist/machinery/surface.js"
+    },
+    "./machinery/telemetry": {
+      "types": "./dist/machinery/telemetry.d.ts",
+      "import": "./dist/machinery/telemetry.js"
+    },
+    "./machinery/section": {
+      "types": "./dist/machinery/section.d.ts",
+      "import": "./dist/machinery/section.js"
+    },
+    "./machinery/assembly": {
+      "types": "./dist/machinery/assembly.d.ts",
+      "import": "./dist/machinery/assembly.js"
+    },
+    "./machinery/metrology": {
+      "types": "./dist/machinery/metrology.d.ts",
+      "import": "./dist/machinery/metrology.js"
+    },
+    "./machinery/spatial": {
+      "types": "./dist/machinery/spatial.d.ts",
+      "import": "./dist/machinery/spatial.js"
+    },
+    "./machinery/clearance": {
+      "types": "./dist/machinery/clearance.d.ts",
+      "import": "./dist/machinery/clearance.js"
+    },
+    "./machinery/materials": {
+      "types": "./dist/machinery/materials.d.ts",
+      "import": "./dist/machinery/materials.js"
+    },
+    "./machinery/overlays": {
+      "types": "./dist/machinery/overlays.d.ts",
+      "import": "./dist/machinery/overlays.js"
+    },
+    "./machinery/exploded": {
+      "types": "./dist/machinery/exploded.d.ts",
+      "import": "./dist/machinery/exploded.js"
+    },
+    "./machinery/edges": {
+      "types": "./dist/machinery/edges.d.ts",
+      "import": "./dist/machinery/edges.js"
+    },
+    "./machinery/dimensions": {
+      "types": "./dist/machinery/dimensions.d.ts",
+      "import": "./dist/machinery/dimensions.js"
+    },
+    "./machinery/react": {
+      "types": "./dist/machinery/react.d.ts",
+      "import": "./dist/machinery/react.js"
+    },
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"
@@ -5349,6 +5409,7 @@
     "@margoengine/lines": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",
     "@margoengine/lod": "^1.0.0",
+    "@margoengine/machinery": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/mcp": "^1.0.0",

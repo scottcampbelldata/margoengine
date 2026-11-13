@@ -44,6 +44,7 @@
     "@margoengine/lines",
     "@margoengine/loaders",
     "@margoengine/lod",
+    "@margoengine/machinery",
     "@margoengine/materials",
     "@margoengine/math",
     "@margoengine/mcp",

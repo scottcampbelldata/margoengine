@@ -378,7 +378,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-104 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+105 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 
@@ -516,10 +516,11 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### Geometry and spatial (4)
+### Geometry and spatial (5)
 
 | Package | What it is |
 | --- | --- |
+| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine. |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |

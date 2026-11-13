@@ -39,6 +39,7 @@
     "packages/exporters",
     "packages/brep",
     "packages/cad",
+    "packages/machinery",
     "packages/kinematics-constraints",
     "packages/creative",
     "packages/scenery",

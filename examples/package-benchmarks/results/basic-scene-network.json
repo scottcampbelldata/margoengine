@@ -1,5 +1,5 @@
 {
-  "commit": "bf6692e48",
+  "commit": "76a8a40fe",
   "dirty": false,
   "browser": "msedge 157.0.4341.46 headless",
   "buildManifest": {
@@ -379,15 +379,6 @@
       "brotli": 23505
     },
     {
-      "path": "assets/geometry-BGTjAxRm.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 2420,
-      "raw": 3990,
-      "gzip": 2050,
-      "brotli": 1858
-    },
-    {
       "path": "assets/version-YYhCZP03.js",
       "role": "Shared chunk",
       "encoding": "gzip",
@@ -395,6 +386,15 @@
       "raw": 1077,
       "gzip": 587,
       "brotli": 526
+    },
+    {
+      "path": "assets/geometry-BGTjAxRm.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 2420,
+      "raw": 3990,
+      "gzip": 2050,
+      "brotli": 1858
     },
     {
       "path": "assets/preload-helper-CRzLMJPS.js",

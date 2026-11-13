@@ -11,8 +11,6 @@ const word = (...codes) => String.fromCharCode(...codes);
 const b64 = (text) => Buffer.from(text, 'base64').toString('utf8');
 const repo = `${word(109, 97, 114, 103, 111)}-${word(99, 97, 100)}-${word(107, 101, 114, 110, 101, 108)}`; // the private repo name
 const banned = [
-  b64('QG1hcmdvZW5naW5lL21hY2hpbmVyeQ=='), // the removed package's specifier
-  b64('U2VjdGlvblBsYW5lcw=='), // the removed section class
   b64('bWFyZ29lbmdpbmUvc3RhZ2UvY2Fk'), // the removed stage entry
   b64('T3BlbkNhc2NhZGU='), // the CAD kernel the removed importer used
 ];
@@ -45,32 +43,31 @@ test('the public kernel and CAD import names pass', () => {
     assert.deepEqual(hitsInPath(path), [], path);
 });
 
+// Scott, 2026-11-13: "Just put machinery and everything back In public" and "there should be no private packages at
+// all now". Machinery and its API, the building-model package and its runtime, the robot planning entries and the CAD
+// converter's name pass; the kernel repository's name, the earlier importer's third-party kernel and the removed stage
+// entry are still reported.
+test('the packages that came back from the kernel repository pass, with their API and runtime names', () => {
+  const name = word(105, 102, 99),
+    engine = word(109, 97, 114, 103, 111, 101, 110, 103, 105, 110, 101),
+    pkg = `${word(107, 105, 110, 101, 109, 97, 116, 105, 99, 115)}-${word(99, 111, 110, 115, 116, 114, 97, 105, 110, 116, 115)}`;
+  for (const text of [
+    `import x from '@${engine}/machinery/section'`,
+    'SectionPlanes, SectionPlanesProps, ExplodedView, AssemblyBVH, AssemblyIndex, TelemetryChannel',
+    'industrialMaterial, industrialMaterials, SurfacePhysics, boxSection, measureDistance, measureClearance',
+    'EngineeringAnnotations, WorldAnchor, projectAnnotation, VertexAnchor, EdgeAnchor, FaceAnchor, HoleAnchor, snapFeature',
+    `@${engine}/${name}`,
+    `${engine}/${name}/worker`,
+    `web-${name} and web${name}`,
+    `margoengine/${pkg}/robot`,
+    'cad-cli',
+  ])
+    assert.deepEqual(hitsInLine(text), [], text);
+  assert.deepEqual(hitsInPath('packages/machinery/kernel/src/lib.rs'), []);
+});
+
 test('every removed CAD name is reported', () => {
   for (const text of banned) assert.notDeepEqual(hitsInLine(`a line with ${text} in it`), [], text.length);
-});
-
-test('the removed building-model package and its runtime are reported, and the bare format name is not', () => {
-  const name = word(105, 102, 99),
-    engine = word(109, 97, 114, 103, 111, 101, 110, 103, 105, 110, 101);
-  for (const text of [`@${engine}/${name}`, `${engine}/${name}`, `${engine}/${name}/worker`, `web-${name}`, `web${name}`])
-    assert.notDeepEqual(hitsInLine(`import x from '${text}'`), [], text);
-  assert.deepEqual(hitsInLine(`a .${name} file, ${name.toUpperCase()}4 and ${name}`), []);
-});
-
-test('the five entries that moved out of the kinematics package are reported; the kept entries and the bare words are not', () => {
-  const pkg = `${word(107, 105, 110, 101, 109, 97, 116, 105, 99, 115)}-${word(99, 111, 110, 115, 116, 114, 97, 105, 110, 116, 115)}`,
-    gone = [
-      word(114, 111, 98, 111, 116),
-      word(112, 108, 97, 110),
-      word(117, 114, 100, 102),
-      word(103, 112, 117),
-      word(108, 105, 109, 105, 116, 115),
-    ];
-  for (const name of gone) {
-    assert.notDeepEqual(hitsInLine(`import x from 'margoengine/${pkg}/${name}'`), [], name);
-    assert.deepEqual(hitsInLine(`a ${name} in a sentence`), [], name);
-  }
-  for (const name of ['swept', 'sdf']) assert.deepEqual(hitsInLine(`import x from 'margoengine/${pkg}/${name}'`), [], name);
 });
 
 test('ordinary text, IFC files and the kept names pass; binary data is skipped', () => {
@@ -82,7 +79,7 @@ test('ordinary text, IFC files and the kept names pass; binary data is skipped',
 
 test('a removed name in a file or folder name is reported; kept names that merely contain the letters pass', () => {
   assert.notDeepEqual(hitsInPath(`packages/${repo}/src/index.ts`), []);
-  assert.notDeepEqual(hitsInPath(`examples/${banned[0].split('/')[1]}-demo/index.html`), []);
+  assert.notDeepEqual(hitsInPath(`examples/${b64('T3BlbkNhc2NhZGU=')}-demo/index.html`), []);
   for (const kept of [
     'tests/modern-facade-isolation.test.js',
     'packages/shadows/src/cascades.ts',
@@ -126,7 +123,7 @@ function pdf(text) {
 
 test('the text a PDF shows is read through its fonts, so a banned name in a printed page is reported', () => {
   assert.equal(pdfText(pdf('Margo Engine whitepaper')), 'Margo Engine whitepaper\nMargo Engine whitepaper');
-  assert.notDeepEqual(scan(Buffer.from(pdfText(pdf(`loads ${banned[3]} files`)))), []);
+  assert.notDeepEqual(scan(Buffer.from(pdfText(pdf(`loads ${banned[1]} files`)))), []);
   assert.deepEqual(scan(Buffer.from(pdfText(pdf('loads glTF files')))), []);
   assert.equal(pdfText(Buffer.from('%PDF-1.4\n%%EOF\n')), null);
 });

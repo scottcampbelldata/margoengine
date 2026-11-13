@@ -1,5 +1,5 @@
 {
-  "commit": "bf6692e48",
+  "commit": "76a8a40fe",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -524,20 +524,20 @@
     },
     "@margoengine/cad": {
       ".": {
-        "raw": 33473,
-        "gzip": 12710
+        "raw": 33505,
+        "gzip": 12720
       },
       "./cad-async": {
         "raw": 3936,
         "gzip": 1814
       },
       "./stage": {
-        "raw": 35961,
-        "gzip": 13692
+        "raw": 35993,
+        "gzip": 13696
       },
       "./closed": {
-        "raw": 326,
-        "gzip": 252
+        "raw": 356,
+        "gzip": 266
       },
       "dist/workers/cad-runtime.js": {
         "raw": 228953,
@@ -5606,6 +5606,68 @@
         "gzip": 1598
       }
     },
+    "@margoengine/machinery": {
+      ".": {
+        "raw": 68974,
+        "gzip": 30837
+      },
+      "./kinematics": {
+        "raw": 9711,
+        "gzip": 3545
+      },
+      "./surface": {
+        "raw": 20216,
+        "gzip": 13880
+      },
+      "./telemetry": {
+        "raw": 19443,
+        "gzip": 13431
+      },
+      "./section": {
+        "raw": 11787,
+        "gzip": 4345
+      },
+      "./assembly": {
+        "raw": 1894,
+        "gzip": 849
+      },
+      "./metrology": {
+        "raw": 5996,
+        "gzip": 2655
+      },
+      "./spatial": {
+        "raw": 25843,
+        "gzip": 16218
+      },
+      "./clearance": {
+        "raw": 2783,
+        "gzip": 1357
+      },
+      "./materials": {
+        "raw": 826,
+        "gzip": 392
+      },
+      "./overlays": {
+        "raw": 4535,
+        "gzip": 2040
+      },
+      "./exploded": {
+        "raw": 1446,
+        "gzip": 714
+      },
+      "./edges": {
+        "raw": 11038,
+        "gzip": 4673
+      },
+      "./dimensions": {
+        "raw": 10063,
+        "gzip": 4443
+      },
+      "./react": {
+        "raw": 12076,
+        "gzip": 4483
+      }
+    },
     "margoengine": {
       ".": {
         "raw": 32,
@@ -9468,12 +9530,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 52015,
-        "gzip": 18080
+        "raw": 52129,
+        "gzip": 18111
       },
       "./base": {
-        "raw": 18873,
-        "gzip": 7304
+        "raw": 18985,
+        "gzip": 7338
       },
       "./preetham": {
         "raw": 1657,
@@ -12928,8 +12990,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 66258,
-        "gzip": 20839
+        "raw": 66364,
+        "gzip": 20888
       },
       "./fft": {
         "raw": 20654,
@@ -15139,9 +15201,9 @@
       "brotli": 6628
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 24827,
-      "gzip": 9777,
-      "brotli": 8742
+      "raw": 24939,
+      "gzip": 9811,
+      "brotli": 8770
     },
     "packages/creative/dist/particles.js": {
       "raw": 45675,

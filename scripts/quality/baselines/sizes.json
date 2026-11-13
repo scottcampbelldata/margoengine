@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15425950,
+  "total": 15534785,
   "history": [
     {
       "date": "2026-10-24",
@@ -8735,6 +8735,12 @@
       "commit": "d2efddb3b",
       "reason": "new packages @margoengine/brep and @margoengine/cad (2026-11-13, from the kernel repository): brep 120,991 B gzip is the whole B-rep kernel (STEP, IGES, SAT, XT and JT readers, exact geometry, modelling and tessellation) in one entry; cad's worker 81,069 B bundles the kernel's readers and tessellator so the page never loads them; cad 12,710 B, cad/stage 13,692 B (addCAD with the loader behind import()), cad/cad-async 1,814 B, cad/closed 252 B",
       "grew": 6
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "49182025b",
+      "reason": "new package @margoengine/machinery (2026-11-13, from the kernel repository, Scott: no private packages): root 30.8 kB re-exports every tool; spatial 16.2 kB, surface 13.9 kB and telemetry 13.4 kB each embed the 10.9 kB gzip Wasm kernel; dimensions reaches lines and text and react reaches @margoengine/react, which it declares",
+      "grew": 18
     }
   ],
   "items": {
@@ -9286,6 +9292,21 @@
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/msft": 2266,
     "@margoengine/lod/stream": 1778,
+    "@margoengine/machinery": 31736,
+    "@margoengine/machinery/assembly": 1105,
+    "@margoengine/machinery/clearance": 1613,
+    "@margoengine/machinery/dimensions": 4699,
+    "@margoengine/machinery/edges": 4929,
+    "@margoengine/machinery/exploded": 970,
+    "@margoengine/machinery/kinematics": 3801,
+    "@margoengine/machinery/materials": 648,
+    "@margoengine/machinery/metrology": 2911,
+    "@margoengine/machinery/overlays": 2296,
+    "@margoengine/machinery/react": 4713,
+    "@margoengine/machinery/section": 4575,
+    "@margoengine/machinery/spatial": 16705,
+    "@margoengine/machinery/surface": 14297,
+    "@margoengine/machinery/telemetry": 13834,
     "@margoengine/materials": 64979,
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
@@ -10141,6 +10162,9 @@
     "leak @margoengine/loaders/mtl -> @margoengine/materials": 1,
     "leak @margoengine/loaders/render -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/lod -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/machinery/dimensions -> @margoengine/lines": 1,
+    "leak @margoengine/machinery/dimensions -> @margoengine/text": 1,
+    "leak @margoengine/machinery/react -> @margoengine/react": 1,
     "leak @margoengine/materials -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/materials/batched -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf-pro/model": 1,

@@ -123,7 +123,7 @@ const layers = {
     'netcode',
     'voxel-net',
   ],
-  'Geometry and spatial': ['bvh', 'geometry', 'mesh-edit', 'scene'],
+  'Geometry and spatial': ['machinery', 'bvh', 'geometry', 'mesh-edit', 'scene'],
   'Data and science': ['compute', 'sciviz'],
   'AI tools': ['mcp'],
   'Frameworks': ['react'],

@@ -384,7 +384,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-104 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
+105 packages in 12 layers, the same layers as the searchable catalog that `npm run catalog` serves.
 
 ### Start here (7)
 
@@ -522,10 +522,11 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### Geometry and spatial (4)
+### Geometry and spatial (5)
 
 | Package | What it is |
 | --- | --- |
+| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine. |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
@@ -1226,7 +1227,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,633 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,663 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -24680,6 +24681,106 @@ await server.close();
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file pe
 
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
+
+=== @margoengine/machinery (packages/machinery/README.md) ===
+
+# @margoengine/machinery
+
+Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/machinery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+
+Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, stencil sections, assembly BVH picking and metrology for Margo Engine.
+
+Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+
+```sh
+npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0
+```
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { Kinematics } from 'margoengine/machinery/kinematics';
+import { industrialMaterial } from 'margoengine/machinery/materials';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const arm = engine.createMesh().setGeometry(box()).setScale([0.3, 1.5, 0.3])
+  .setMaterial(industrialMaterial('anodizedAluminum'));
+const kinematics = new Kinematics([
+  { node: arm, axis: 'y', kind: 'revolute', min: -Math.PI / 2, max: Math.PI / 2 },
+]);
+engine.use(kinematics);
+let elapsed = 0;
+engine.onFrame((_, delta) => {
+  elapsed += delta;
+  kinematics.setAngle(0, Math.sin(elapsed));
+});
+engine.start();
+```
+
+CAD import (`loadCAD`, `parseCADAsync`, `parseCAD`, `deduplicateParts`, `PartInstancer`) lives in `@margoengine/cad`; see its README. STEP, IGES, SAT, XT and JT go through Margo's own B-rep kernel there.
+
+Import individual systems from these subpaths to keep unrelated code out of direct browser imports and lazy-loaded modules. Each entry includes its associated TypeScript types. Existing imports from `@margoengine/machinery` remain supported and use the same classes and functions.
+
+| Subpath | Public system |
+| --- | --- |
+| `/kinematics` | `Kinematics` joints, couplings and constraints |
+| `/surface` | `SurfacePhysics` transport |
+| `/telemetry` | `TelemetryChannel` binary playback |
+| `/section` | `SectionPlanes`, `boxSection` |
+| `/assembly` | `AssemblyIndex` |
+| `/metrology` | Vertex, edge, face, hole and snap anchors; `measureDistance` |
+| `/spatial` | `AssemblyBVH` picking |
+| `/clearance` | `measureClearance` |
+| `/materials` | `industrialMaterials`, `industrialMaterial` |
+| `/overlays` | `EngineeringAnnotations`, `worldAnchor`, `projectAnnotation` |
+| `/exploded` | `ExplodedView` |
+
+Find parts by name or tag, measure the gap between two parts, and explode an assembly (zero configuration; `amount` starts at 0, `measureClearance` defaults to `'obb'`):
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { AssemblyIndex } from 'margoengine/machinery/assembly';
+import { measureClearance } from 'margoengine/machinery/clearance';
+import { ExplodedView } from 'margoengine/machinery/exploded';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const base = engine.createMesh().setGeometry(box());
+base.name = 'Base plate';
+const lid = engine.createMesh().setGeometry(box()).setPosition([0, 2, 0]);
+lid.name = 'Base lid';
+
+const index = new AssemblyIndex(engine); // call index.refresh() after renaming or adding meshes
+index.tag(lid, 'cover');
+const plates = index.findChildrenByName('Base*'); // '*' is the only wildcard
+const covers = index.findByTag('cover');
+index.setSubtreeVisible(covers[0], true);
+
+engine.render();
+const { distance, interfering } = measureClearance(base, lid); // 'obb' (default) or 'aabb'
+console.log(plates.length, distance, interfering);
+
+const exploded = ExplodedView.attach(engine, [{ node: lid, offset: [0, 3, 0] }]);
+exploded.amount = 1; // 0 = assembled, 1 = fully exploded
+```
+
+One short example per system (every option has a default; `engine.render()` first so world transforms are current):
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { Kinematics } from 'margoengine/machinery/kinematics';
+import { SurfacePhysics } from 'margoengine/machinery/surface';
+import { TelemetryChannel } from 'margoengine/machinery/telemetry';
+import { SectionPlanes, boxSection } from 'margoengine/machinery/section';
+import { vertexAnchor, measureDistance } from 'margoengine/machinery/metrology';
+import { EngineeringAnnotations } from 'margoengine/machinery/overlays';
+import { AssemblyBVH } from 'margoengine/machinery/spatial';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const belt = engine.createMesh().setGeometry(box()).setScale([4, 0.1, 1]);
+const crate = engine.createMesh().setGeometry(box()).setScale([0.4, 0.4, 0.4]).setPosition([-1, 0.25, 0]);
+```
+
+[README continues: https://margoengine.com/llms/packages/machinery.md]
 
 === @margoengine/bvh (packages/bvh/README.md) ===
 

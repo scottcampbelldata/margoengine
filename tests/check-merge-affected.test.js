@@ -437,7 +437,10 @@ test('a documents-only change skips every GPU step, the example types and the bu
 
 test('owner/lifetime runs affected packages and their dependents, and whole when its harness changes', () => {
   const ownerStep = (files) => planFor(files).planned.find((p) => stepName(p.command) === 'check:owners');
-  assert.match(ownerStep(['packages/video/src/index.ts']).command, /--packages=.*\bvideo\b/);
+  // viewcube and its 8 dependents stay under the 12-package threshold. video did until @margoengine/machinery, whose
+  // ./react entry declares @margoengine/react, became its 13th dependent.
+  assert.match(ownerStep(['packages/viewcube/src/index.ts']).command, /--packages=.*\bviewcube\b/);
+  assert.match(ownerStep(['packages/viewcube/src/index.ts']).command, /--packages=.*\bmachinery\b/);
   assert.equal(planFor(['packages/animation/src/index.ts']).decision.mode, 'full', 'existing dependent threshold applies');
   assert.deepEqual(ownerStep(['packages/animation/src/index.ts']), { command: 'npm run check:owners' });
   assert.equal(ownerStep(['docs/known-bugs.md']).skip, 'no affected package uses it');
