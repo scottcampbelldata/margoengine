@@ -71,6 +71,9 @@ const bloom = new Bloom({ strength: 0.18, threshold: 1.4, radius: 0.85 }),
   stack = PostStack.attach(engine, [bloom, tonemap]);
 TAA.attach(engine, { depth: () => stack.depthTexture });
 
+// The night sky light on everything the lamp does not reach: the overcast deck lit by the moon above it, so the cliffs,
+// the foam and the boat keep their shapes (the deck itself does not light the scene; see the zenith colour below).
+const nightAmbient: Vec3 = [0.05, 0.065, 0.1];
 // The sky: dusk light fading behind the storm, a moon behind the clouds, the cloud deck closing in with the storm.
 const sky = Sky.attach(
   engine,
@@ -81,7 +84,9 @@ const sky = Sky.attach(
     turbidity: 6,
     exposure: -0.6,
     night: {
-      zenithColor: [0.004, 0.007, 0.016],
+      // The sea reflects, and the sky lights the scene from, the night sky's own colours: the volumetric cloud deck is
+      // in neither (docs/known-bugs.md), so the zenith stands in for the deck's moonlit underside.
+      zenithColor: [0.012, 0.021, 0.048],
       horizonColor: [0.03, 0.04, 0.06],
       hazeDensity: 1.4,
       // The night's moon sits where the lighting moon is (it lights the scene and casts the shadows): a dim disc whose
@@ -97,7 +102,7 @@ const sky = Sky.attach(
     lighting: {
       intensity: 3,
       moon: { intensity: 0.22, color: [0.55, 0.68, 1] },
-      ambient: { day: [0.03, 0.035, 0.045], night: [0.02, 0.026, 0.04] },
+      ambient: { day: [0.03, 0.035, 0.045], night: nightAmbient },
     },
   },
   { preetham, night, reflection, lighting },
@@ -176,11 +181,13 @@ water = Water.attach(engine, {
   waves: [
     { direction: [-0.8, -0.6], amplitude: 1, wavelength: 78, steepness: 0.55, phase: 0.4 },
     { direction: [-0.55, -0.83], amplitude: 0.55, wavelength: 41, steepness: 0.5, phase: 2.1 },
-    { direction: [-0.95, -0.2], amplitude: 0.25, wavelength: 19, steepness: 0.45, phase: 4.3 },
+    // The wind sea: short and steep enough that its crests break into foam as the storm rises (gentle crests never
+    // reach the water's whitecap steepness), with a low crest sharpness so a full storm still does not fold it.
+    { direction: [-0.95, -0.2], amplitude: 0.82, wavelength: 12, steepness: 0.3, phase: 4.3 },
   ],
 });
 
-// Far out the sea fades into the rain haze, so it meets the sky without a seam (the volumetric fog ends at its range).
+// Far out, past the volumetric fog's range, the sea fades into the rain haze; it stays darker than the sky above it.
 const haze = { color: [0.012, 0.016, 0.026] as Vec3, near: 220, far: 2600 };
 water.setFog(haze);
 
@@ -260,7 +267,7 @@ const fill: ClusteredLight = {
   decay: 2,
   range: 420,
   color: [0.42, 0.52, 0.78],
-  intensity: 9000,
+  intensity: 25000,
 };
 const mastLocal = scene.boat.mastLight as Vec3;
 // ?beam=<radians> holds the beams at one bearing (for stills and tests); otherwise they turn once every twelve seconds.
@@ -453,7 +460,7 @@ const ramp = (a: number, b: number, x: number) => {
 const NAMES = ['Calm', 'Breeze', 'Fresh', 'Squall', 'Gale', 'Storm'];
 let storm = Number(slider.value),
   windSpeed = 0,
-  moonLight = 0.6;
+  moonLight = 1.2;
 function setStorm(value: number) {
   storm = value;
   force.value = NAMES[Math.min(NAMES.length - 1, Math.floor(value * NAMES.length))];
@@ -461,7 +468,7 @@ function setStorm(value: number) {
   const wind: [number, number] = [-0.8 * windSpeed * 0.7, -0.6 * windSpeed * 0.7];
   sky.options.hours = 20.1 + 2.4 * ramp(0, 1, value);
   haze.far = 4200 - 2600 * ramp(0.2, 1, value);
-  moonLight = 0.6 * (1 - 0.5 * ramp(0.3, 1, value));
+  moonLight = 1.2 * (1 - 0.5 * ramp(0.3, 1, value));
   deck.options.coverage = 0.62 + 0.33 * ramp(0, 0.9, value);
   deck.options.density = 0.02 + 0.03 * value;
   deck.options.wind = [wind[0] * 1.5, wind[1] * 1.5];
@@ -470,7 +477,9 @@ function setStorm(value: number) {
   // No flashes for anyone who asks for reduced motion.
   weather.options.lightning!.rate = still ? 0 : 2 + 10 * ramp(0.5, 1, value);
   water?.setWaveHeight(0.25 + 1.95 * value ** 1.4);
-  fog.options.density = 0.002 + 0.007 * ramp(0.1, 1, value);
+  // Thin enough near the sea that a level ray keeps about a fifth of its light across the fog's 480 m: the fog covers
+  // the far sea and the sky behind it alike (both get its full range), so any thicker and the horizon is lost.
+  fog.options.density = 0.001 + 0.0035 * ramp(0.1, 1, value);
   fog.options.noise = 0.3 + 0.5 * value;
   fog.options.wind = [wind[0] * 0.6, 0, wind[1] * 0.6];
 }
@@ -551,7 +560,11 @@ stage.use({
     // flare together for a moment.
     const flash = weather.flash;
     sky.options.lighting!.moon!.intensity = moonLight + flash * 6;
-    sky.options.lighting!.ambient!.night = [0.02 + flash * 0.9, 0.026 + flash * 0.95, 0.04 + flash * 1.1];
+    sky.options.lighting!.ambient!.night = [
+      nightAmbient[0] + flash * 0.9,
+      nightAmbient[1] + flash * 0.95,
+      nightAmbient[2] + flash * 1.1,
+    ];
     glow.uniforms.beam.value = beamAngle;
     streak.uniforms.time.value = time;
     fog.options.ambient = [0.004 + weather.flash * 0.3, 0.005 + weather.flash * 0.33, 0.008 + weather.flash * 0.42];

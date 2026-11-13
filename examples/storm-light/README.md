@@ -12,7 +12,8 @@ to full gale. Everything moves live in WebGPU.
   when a beam swings toward the camera.
 - **The sea.** `@margoengine/water`: three Gerstner swell trains from the south-west, Fresnel reflection of the sky,
   moon glints, refraction of the rocks below the surface, and the headland's height map coupling the sea to the shore
-  for run-up, breakers, foam and spray. The far sea fades into the rain haze so it meets the sky without a seam.
+  for run-up, breakers, foam and spray. A short, steep wind sea breaks into foam on its crests as the storm rises, and
+  the fog stays thin enough at sea level that the sea meets the sky in a soft horizon line.
 - **The sky.** `@margoengine/sky`: a stylized night with the moon behind an overcast deck of real 3D cloud
   (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. A flash lights the clouds, the cliffs and
   the sea for a moment. Click the sky to strike lightning toward where you clicked.
@@ -55,5 +56,8 @@ node examples/storm-light/blender/compress.mjs
 
 - The cloud deck is lit by the moon, the night sky and lightning, not by the beam: `VolumetricClouds` takes the sky's
   lights only. The beam's glow in the rain haze below the deck stands in for it.
+- The deck is not in the sky's reflection map or its scene light either (docs/known-bugs.md), so the sea would reflect,
+  and the cliffs would be lit by, a near-black night. The page sets the night zenith and the night sky light to the
+  deck's moonlit level instead.
 - The water takes glints from up to two directional lights, so the cabin's glow on the sea is a drawn streak, not a
   reflection the water computes.

@@ -10361,6 +10361,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-13: the volumetric cloud deck is missing from the sky's reflection map and scene light (sky, lane S1g)
+
+- **Repro:** `examples/storm-light` before 2026-11-13 S1g (night zenith `[0.004, 0.007, 0.016]`, night ambient
+  `[0.02, 0.026, 0.04]`), 1920x1080, `?tour=0&storm=0.78`. The moonlit `VolumetricClouds` deck fills the sky at a
+  mean luma of about 95, yet the near sea measures 1.7 and the cliffs 0.4 (with the volumetric fog off): the water
+  reflects `sky.reflectionTexture` and `lighting.ambient` lights the meshes from the same 64 x 32 map, and both show
+  only the stylized night gradient behind the deck.
+- **Cause:** `packages/sky/src/reflection.ts` fills the map from `skyEnvironment` (the day model, `night` and the
+  sky's own 2D `clouds`); `VolumetricClouds` reads that map to light itself but never writes into it, so nothing that
+  reflects or takes sky light sees the deck.
+- **Workaround:** set the night `zenithColor` and `lighting.ambient.night` near the deck's lit underside, as Storm
+  Light now does.
+- **Needed to close:** let `VolumetricClouds` composite a coarse march of the deck over the 64 x 32 map before the
+  sky's harmonics and mips are built, with a browser test that a lit deck raises the map's upper-hemisphere mean and
+  a mesh's ambient by the deck's coverage times its radiance.
+
 ### Open 2026-11-13: IGES parametric spline surfaces (entity 114) are refused; their coefficient order is not checked (brep)
 
 - **Repro:** an IGES 5.3 file with a parametric spline surface (entity 114) through `parseIGES` or `igesToSTEP` in
