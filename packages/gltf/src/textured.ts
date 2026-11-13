@@ -142,6 +142,8 @@ interface Part {
   surface: Surface;
   bitmap?: ImageBitmap;
   sampler: GPUSamplerDescriptor;
+  /** The kept alpha byte of the texture both the colour and the shadow pass sample (0: a plain mip chain). */
+  keep: number;
   uvBuffer?: GPUBuffer;
   block?: GPUBuffer;
   /** 80-byte vertices of a cut-out, for shadow passes: positions, and uv where the depth shader reads it. */
@@ -245,13 +247,11 @@ class TexturedDraw implements EnginePlugin {
     return texture;
   }
   private upload(part: Part): void {
+    // Mips are sampled unless the sampler clamps to level 0 (NEAREST or LINEAR minification).
+    part.keep =
+      part.bitmap && part.sampler.lodMaxClamp !== 0 ? maskKeepByte(part.surface.cutoff, part.surface.alpha) : 0;
     const device = this.engine.gpu!,
-      // Mips are sampled unless the sampler clamps to level 0 (NEAREST or LINEAR minification).
-      texture = this.texture(
-        part.bitmap,
-        part.surface,
-        part.bitmap && part.sampler.lodMaxClamp !== 0 ? maskKeepByte(part.surface.cutoff, part.surface.alpha) : 0,
-      );
+      texture = this.texture(part.bitmap, part.surface, part.keep);
     setGeometrySurface(part.geometry, {
       uv: part.uv,
       caster: part.surface.cutoff > 0 ? this.caster(part, texture) : undefined,
@@ -354,7 +354,7 @@ class TexturedDraw implements EnginePlugin {
       group = c.device.createBindGroup({
         layout: pipeline.getBindGroupLayout(1),
         entries: [
-          { binding: 0, resource: this.texture(part.bitmap).createView() },
+          { binding: 0, resource: this.texture(part.bitmap, part.surface, part.keep).createView() },
           { binding: 1, resource: c.device.createSampler(part.sampler) },
           { binding: 2, resource: { buffer: part.block! } },
         ],
@@ -595,6 +595,7 @@ export const textured: GLTFExtension = {
         surface,
         bitmap: surface.image === undefined ? undefined : images.get(surface.image),
         sampler: samplerOf(surface.sampler === undefined ? undefined : file.doc.samplers?.[surface.sampler]),
+        keep: 0,
         groups: new WeakMap(),
         sent: false,
       });

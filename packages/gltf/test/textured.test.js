@@ -199,6 +199,34 @@ test('a cut-out keeps a depth pass that reads its alpha, and only a cut-out', as
   }
 });
 
+test('a cut-out draws with the mip chain that keeps its coverage, not a second plain chain', async (t) => {
+  withBitmaps(t);
+  const { engine, device } = await gpuEngine(t);
+  try {
+    const cut = await load(engine, file({ material: { alphaMode: 'MASK', alphaCutoff: 0.25 } })),
+      plugin = engine.plugins.get('gltf-textured'),
+      part = plugin.parts.get(cut.meshes[0].geometry),
+      live = device.liveTextures(),
+      made = [],
+      create = device.createTexture.bind(device);
+    device.createTexture = (d) => {
+      const texture = create(d);
+      made.push(texture);
+      return texture;
+    };
+    plugin.surfaceGroup({ device }, { getBindGroupLayout: () => ({}) }, part);
+    // Before the fix the colour pass asked for the image's plain chain (keep byte 0) and built a second texture, so
+    // only the shadow pass saw the coverage-keeping mips and distant cut-outs thinned out on screen.
+    assert.deepEqual(made, []);
+    assert.equal(device.liveTextures(), live);
+    assert.deepEqual([...plugin.textures.get(part.bitmap).keys()], [part.keep]);
+    assert.ok(part.keep > 0);
+    cut.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('texturedAlphaMasks gives a cut-out its pixels, cutoff, factor and wrap, and other meshes none', async (t) => {
   withBitmaps(t);
   const { engine } = await gpuEngine(t);
