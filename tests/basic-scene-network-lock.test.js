@@ -72,3 +72,12 @@ test('basic-scene-network has a server port no other script or suite uses', () =
     .map((file) => relative(root, file));
   assert.deepEqual(users, []);
 });
+
+// Regression: the record listed files in the order requestfinished fired, which changes between runs, so two captures of
+// the same build differed by a moved chunk and the landing gate saw a size change that was not one.
+test('basic-scene-network lists the fetched files in a fixed order', () => {
+  const from = script.indexOf('const fetched = requests'),
+    to = script.indexOf('for (const { path, status } of fetched)');
+  assert.ok(from > 0 && to > from, 'the fetched list is built before it is checked');
+  assert.match(script.slice(from, to), /\.sort\(/, 'the fetched list is sorted by path');
+});

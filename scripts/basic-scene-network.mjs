@@ -212,7 +212,9 @@ try {
   };
   const fetched = requests
     .map((request) => (request.url.startsWith('data:') ? null : { ...request, path: path(request.url) }))
-    .filter(Boolean);
+    .filter(Boolean)
+    // requestfinished fires in network completion order, which differs from run to run: sort so the record is stable
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   for (const { path, status } of fetched) assert.equal(status, 200, `${path} answered ${status}`);
   assert.deepEqual(errors, []);
   assert.deepEqual(

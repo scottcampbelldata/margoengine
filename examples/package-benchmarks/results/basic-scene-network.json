@@ -1,5 +1,5 @@
 {
-  "commit": "b026fe291",
+  "commit": "029a7cd93",
   "dirty": false,
   "browser": "msedge 157.0.4341.46 headless",
   "buildManifest": {
@@ -361,58 +361,13 @@
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
-      "path": "index.html",
-      "role": "Page",
-      "encoding": "identity",
-      "transferred": 969,
-      "raw": 719,
-      "gzip": 412,
-      "brotli": 261
-    },
-    {
-      "path": "assets/version-YYhCZP03.js",
-      "role": "Shared chunk",
+      "path": "assets/dist-BdppTv2c.js",
+      "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 957,
-      "raw": 1077,
-      "gzip": 587,
-      "brotli": 526
-    },
-    {
-      "path": "assets/geometry-BGTjAxRm.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 2420,
-      "raw": 3990,
-      "gzip": 2050,
-      "brotli": 1858
-    },
-    {
-      "path": "assets/preload-helper-CRzLMJPS.js",
-      "role": "Shared chunk",
-      "encoding": "gzip",
-      "transferred": 1168,
-      "raw": 1534,
-      "gzip": 798,
-      "brotli": 682
-    },
-    {
-      "path": "assets/index-qFbGWFiK.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 27001,
-      "raw": 64833,
-      "gzip": 26619,
-      "brotli": 23505
-    },
-    {
-      "path": "model.glb",
-      "role": "Model",
-      "encoding": "identity",
-      "transferred": 1605,
-      "raw": 1332,
-      "gzip": 454,
-      "brotli": 359
+      "transferred": 7761,
+      "raw": 19615,
+      "gzip": 7389,
+      "brotli": 6607
     },
     {
       "path": "assets/extension-Bn1Wm_pY.js",
@@ -424,13 +379,58 @@
       "brotli": 113
     },
     {
-      "path": "assets/dist-BdppTv2c.js",
-      "role": "@margoengine/gltf (addGLTF)",
+      "path": "assets/geometry-BGTjAxRm.js",
+      "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 7761,
-      "raw": 19615,
-      "gzip": 7389,
-      "brotli": 6607
+      "transferred": 2420,
+      "raw": 3990,
+      "gzip": 2050,
+      "brotli": 1858
+    },
+    {
+      "path": "assets/index-qFbGWFiK.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 27001,
+      "raw": 64833,
+      "gzip": 26619,
+      "brotli": 23505
+    },
+    {
+      "path": "assets/preload-helper-CRzLMJPS.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 1168,
+      "raw": 1534,
+      "gzip": 798,
+      "brotli": 682
+    },
+    {
+      "path": "assets/version-YYhCZP03.js",
+      "role": "Shared chunk",
+      "encoding": "gzip",
+      "transferred": 957,
+      "raw": 1077,
+      "gzip": 587,
+      "brotli": 526
+    },
+    {
+      "path": "index.html",
+      "role": "Page",
+      "encoding": "identity",
+      "transferred": 969,
+      "raw": 719,
+      "gzip": 412,
+      "brotli": 261
+    },
+    {
+      "path": "model.glb",
+      "role": "Model",
+      "encoding": "identity",
+      "transferred": 1605,
+      "raw": 1332,
+      "gzip": 454,
+      "brotli": 359
     }
   ],
   "total": {
