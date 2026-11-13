@@ -12,13 +12,18 @@ to full gale. Everything moves live in WebGPU.
   when a beam swings toward the camera.
 - **The sea.** `@margoengine/water`: three Gerstner swell trains from the south-west, Fresnel reflection of the sky,
   moon glints, refraction of the rocks below the surface, and the headland's height map coupling the sea to the shore
-  for run-up, breakers, foam and spray. A short, steep wind sea breaks into foam on its crests as the storm rises, and
-  the fog stays thin enough at sea level that the sea meets the sky in a soft horizon line.
-- **The sky.** `@margoengine/sky`: a stylized night with the moon behind an overcast deck of real 3D cloud
-  (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. A flash lights the clouds, the cliffs and
-  the sea for a moment. Click the sky to strike lightning toward where you clicked.
+  for run-up, breakers, foam and spray. The water's `whitecaps` break the steep crests into foam and streaks, ring
+  the cliff foot and the stacks with foam lines and throw spray off the breakers, and its `chop` roughens the swell;
+  the Storm slider raises both. The sea fog stays thin enough that the sea meets the sky in a soft horizon line.
+- **The sky.** `@margoengine/sky`: a stylized night with the moon behind a broken deck of real 3D cloud
+  (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. A flash lights the deck from inside
+  (the clouds' `flash`, above the strike), and the bolt's light from behind the headland, the moon and the night sky
+  flare with it for a moment. Every visit opens with one strike behind the headland 1.6 s in. Click the sky to strike
+  lightning toward where you clicked.
 - **The light.** Moonlight casts shadows through `@margoengine/shadows`; the cottage windows, the lamp post, the boat's
-  mast and cabin are small clustered lights, and a cool fill from the open sea keeps the cliffs' form in the dark. TAA,
+  mast and cabin are small clustered lights, and two cool fills, from the open sea and from the moonlit deck over the
+  camera's shoulder, keep the rock faces and their strata in the dark. A soft sphere of thicker storm air round the
+  headland (`FogVolumes`) gives the beam rain and haze to light. TAA,
   bloom and AgX tone mapping finish the frame.
 - **The boat.** The sea is read back from the GPU (`WaveQuery`) under the hull, and a damped spring per axis eases the
   boat toward that pose, so it heaves, pitches and rolls with the swell. Its cabin glow runs across the water toward you.
@@ -36,7 +41,8 @@ node scripts/dev-examples.mjs
 ```
 
 URL options: `storm=0..1` sets the slider, `tour=0` skips the opening camera tour, `view=x,y,z,tx,ty,tz` places the
-camera, `beam=<radians>` holds the beams at one bearing (for stills). `npm run test:storm-light` builds the page and
+camera, `beam=<radians>` holds the beams at one bearing and `flash=0..1` holds the opening lightning flash at one
+brightness (for stills). `npm run test:storm-light` builds the page and
 checks it in a real browser.
 
 ## The model
@@ -54,8 +60,8 @@ node examples/storm-light/blender/compress.mjs
 
 ## Limits
 
-- The cloud deck is lit by the moon, the night sky and lightning, not by the beam: `VolumetricClouds` takes the sky's
-  lights only. The beam's glow in the rain haze below the deck stands in for it.
+- The cloud deck is lit by the moon, the night sky and the lightning flash, not by the beam: `VolumetricClouds` takes
+  the sky's lights and one flash. The beam's glow in the rain haze below the deck stands in for it.
 - The deck is not in the sky's reflection map or its scene light either (docs/known-bugs.md), so the sea would reflect,
   and the cliffs would be lit by, a near-black night. The page sets the night zenith and the night sky light to the
   deck's moonlit level instead.

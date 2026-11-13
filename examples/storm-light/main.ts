@@ -24,6 +24,7 @@ import { Clustered, type PointLight, type SpotLight } from '@margoengine/cluster
 type ClusteredLight = PointLight | SpotLight;
 import { LocalShadows } from '@margoengine/clustered/shadows';
 import { VolumetricFog } from '@margoengine/environment/volumetric';
+import { FogVolumes } from '@margoengine/environment/fog-volumes';
 import { Water } from '@margoengine/water';
 import { WaterRain } from '@margoengine/water/rain';
 import { WaveQuery } from '@margoengine/water/query';
@@ -115,7 +116,7 @@ const deck = VolumetricClouds.attach(engine, {
   bottom: 650,
   top: 2600,
   density: 0.03,
-  scale: 9000,
+  scale: 6000,
   wind: [-14, -9],
   evolution: 6,
   steps: tier === 'phone' ? 32 : 56,
@@ -178,6 +179,9 @@ water = Water.attach(engine, {
   lights: sky.lights,
   shadows,
   terrain: { heightmap: () => heightmap, origin: map.origin, size: map.size },
+  // Breaking whitecaps, foam lines off the rocks, spray and wind chop; the Storm slider sets them (setStorm).
+  whitecaps: 0.5,
+  chop: 0.5,
   waves: [
     { direction: [-0.8, -0.6], amplitude: 1, wavelength: 78, steepness: 0.55, phase: 0.4 },
     { direction: [-0.55, -0.83], amplitude: 0.55, wavelength: 41, steepness: 0.5, phase: 2.1 },
@@ -191,7 +195,13 @@ water = Water.attach(engine, {
 const haze = { color: [0.012, 0.016, 0.026] as Vec3, near: 220, far: 2600 };
 water.setFog(haze);
 
+// Thicker storm air round the headland: rain haze and spray the beam lights up close, a soft-edged sphere of fog on the
+// tower that thins out to the open sea (where the thin sea fog keeps the horizon).
+const stormAir = new FogVolumes([
+  { shape: 'sphere', center: [-6, 20, -6], radius: 80, edge: 55, density: 0.008, noise: 0.6, noiseScale: 22 },
+]);
 const fog = VolumetricFog.attach(engine, {
+  volumes: stormAir,
   density: 0.008,
   heightFalloff: 0.035,
   height: 0,
@@ -267,8 +277,36 @@ const fill: ClusteredLight = {
   decay: 2,
   range: 420,
   color: [0.42, 0.52, 0.78],
-  intensity: 25000,
+  intensity: 60000,
 };
+// The moonlit cloud deck over the camera's shoulder: a broad, soft, cool light on the seaward rock faces and their
+// strata, which the moon (behind the headland from the sea) leaves in shadow.
+const skyAt: Vec3 = [150, 170, 170],
+  skyTo: Vec3 = [-8, 10, 0],
+  skySpan = Math.hypot(skyTo[0] - skyAt[0], skyTo[1] - skyAt[1], skyTo[2] - skyAt[2]);
+const skyFill: ClusteredLight = {
+  position: skyAt,
+  direction: [(skyTo[0] - skyAt[0]) / skySpan, (skyTo[1] - skyAt[1]) / skySpan, (skyTo[2] - skyAt[2]) / skySpan],
+  angle: 0.42,
+  penumbra: 1,
+  decay: 2,
+  range: 600,
+  color: [0.5, 0.6, 0.85],
+  intensity: 90000,
+};
+// Lightning: the bolt's light from behind the headland while a flash lasts (setLights), and the opening strike: the
+// first seconds of every visit (not under reduced motion) flash once, at the same time and place, so stills and the
+// tour show the deck lit from inside. ?flash=<0..1> holds that flash at one brightness for stills.
+const held = new URLSearchParams(location.search).get('flash');
+const heldFlash = held !== null && Number(held) >= 0 && Number(held) <= 1 ? Number(held) : undefined;
+const opening = { distance: 1800, azimuth: -2.2, strength: 1, seconds: 1.6 };
+const strikeAt = (distance: number, azimuth: number): Vec3 => [
+  hero.position[0] + Math.sin(azimuth) * distance,
+  0,
+  hero.position[2] + Math.cos(azimuth) * distance,
+];
+let strikePosition = strikeAt(opening.distance, opening.azimuth);
+const bolt: ClusteredLight = { position: [0, 0, 0], range: 5000, color: [0.75, 0.82, 1], intensity: 0, decay: 2 };
 const mastLocal = scene.boat.mastLight as Vec3;
 // ?beam=<radians> holds the beams at one bearing (for stills and tests); otherwise they turn once every twelve seconds.
 const heldBeam = new URLSearchParams(location.search).get('beam');
@@ -297,6 +335,8 @@ function setLights() {
     mast,
     cabin,
     fill,
+    skyFill,
+    bolt,
   ]);
 }
 
@@ -469,8 +509,10 @@ function setStorm(value: number) {
   sky.options.hours = 20.1 + 2.4 * ramp(0, 1, value);
   haze.far = 4200 - 2600 * ramp(0.2, 1, value);
   moonLight = 1.2 * (1 - 0.5 * ramp(0.3, 1, value));
-  deck.options.coverage = 0.62 + 0.33 * ramp(0, 0.9, value);
-  deck.options.density = 0.02 + 0.03 * value;
+  // Broken enough that the deck shows its masses and the dark rifts between them, the moon glowing through the thin
+  // places; a flash lights them from inside.
+  deck.options.coverage = 0.5 + 0.2 * ramp(0, 0.9, value);
+  deck.options.density = 0.012 + 0.016 * value;
   deck.options.wind = [wind[0] * 1.5, wind[1] * 1.5];
   weather.options.intensity = ramp(0.18, 0.9, value);
   weather.options.wind = wind;
@@ -480,6 +522,8 @@ function setStorm(value: number) {
   // Thin enough near the sea that a level ray keeps about a fifth of its light across the fog's 480 m: the fog covers
   // the far sea and the sky behind it alike (both get its full range), so any thicker and the horizon is lost.
   fog.options.density = 0.001 + 0.0035 * ramp(0.1, 1, value);
+  stormAir.volumes[0].density = 0.001 + 0.008 * ramp(0.1, 1, value);
+  water?.setWhitecaps(ramp(0.2, 0.95, value)).setChop(0.25 + 0.75 * ramp(0, 1, value));
   fog.options.noise = 0.3 + 0.5 * value;
   fog.options.wind = [wind[0] * 0.6, 0, wind[1] * 0.6];
 }
@@ -539,7 +583,13 @@ stage.canvas.addEventListener('pointerup', (event) => {
   const dx = camera.target[0] - camera.position[0],
     dz = camera.target[2] - camera.position[2],
     across = (event.clientX / innerWidth - 0.5) * 0.9;
-  weather.strike({ distance: 1200 + Math.random() * 1500, azimuth: Math.atan2(dz, dx) + across, strength: 1 });
+  weather.strike({ distance: 1200 + Math.random() * 1500, azimuth: Math.atan2(dx, dz) + across, strength: 1 });
+});
+// Each strike moves the flash's light over it.
+let lastStrike: { azimuth: number; time: number } | undefined, openingStrike: typeof lastStrike;
+weather.onLightning((strike) => {
+  strikePosition = [strike.position[0], 0, strike.position[2]];
+  lastStrike = strike;
 });
 
 let time = 0,
@@ -554,20 +604,24 @@ stage.use({
     if (heldBeam === null) beamAngle += delta * ((Math.PI * 2) / 12);
     lens?.setQuaternion([0, Math.sin(beamAngle / 2), 0, Math.cos(beamAngle / 2)]);
     moveBoat(delta, time);
+    if (!still && heldFlash === undefined && time - delta < opening.seconds && time >= opening.seconds)
+      openingStrike = weather.strike(opening);
+    // A lightning flash lights the cloud deck from inside (a light in the deck above the strike), the cliffs and the
+    // sea (the bolt's light from behind the headland), and the moon's light and the night sky flare with it.
+    const flash = heldFlash ?? weather.flash;
+    bolt.position = [strikePosition[0], 420, strikePosition[2]];
+    bolt.intensity = flash * 4e6;
+    deck.options.flash = { position: [strikePosition[0], 950, strikePosition[2]], intensity: flash * 1.6e6 };
     setLights();
-    // Lightning lights the fog, the cliffs and the sea for a moment.
-    // A lightning flash lights the cloud deck from inside, the cliffs and the sea: the moon's light and the night sky
-    // flare together for a moment.
-    const flash = weather.flash;
-    sky.options.lighting!.moon!.intensity = moonLight + flash * 6;
+    sky.options.lighting!.moon!.intensity = moonLight + flash * 3;
     sky.options.lighting!.ambient!.night = [
-      nightAmbient[0] + flash * 0.9,
-      nightAmbient[1] + flash * 0.95,
-      nightAmbient[2] + flash * 1.1,
+      nightAmbient[0] + flash * 0.3,
+      nightAmbient[1] + flash * 0.32,
+      nightAmbient[2] + flash * 0.37,
     ];
     glow.uniforms.beam.value = beamAngle;
     streak.uniforms.time.value = time;
-    fog.options.ambient = [0.004 + weather.flash * 0.3, 0.005 + weather.flash * 0.33, 0.008 + weather.flash * 0.42];
+    fog.options.ambient = [0.004 + flash * 0.06, 0.005 + flash * 0.066, 0.008 + flash * 0.084];
     if (status.isConnected && ++frames > 30) {
       status.remove();
       document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
@@ -586,6 +640,8 @@ setLights();
   weather,
   lights,
   beam: () => beamAngle,
+  strike: () => lastStrike,
+  opening: () => openingStrike,
 };
 engine.start();
 window.addEventListener('pagehide', () => stage.dispose(), { once: true });
