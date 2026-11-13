@@ -53,6 +53,38 @@ function compile(value: StyleExpression | undefined, fallback: unknown): Express
     return undefined;
   };
 }
+/**
+ * The point cloud semantics of the Styling specification's "Point Cloud" section, for point `i`, or undefined for a
+ * batch property: POSITION before RTC_CENTER (after QUANTIZED_VOLUME_SCALE, before QUANTIZED_VOLUME_OFFSET),
+ * POSITION_ABSOLUTE after RTC_CENTER or the offset and the tile transform, COLOR (alpha 1 for RGB, CONSTANT_RGBA or white
+ * when the points carry none), NORMAL (undefined when absent).
+ */
+function pointSemantics(
+  points: Extract<TilesDecorationContext, { kind: 'points' }>['content'],
+  transform: ArrayLike<number> | undefined,
+): (name: string, i: number) => unknown {
+  const table = points.featureTable,
+    quantized = table?.json?.POSITION === undefined && table?.json?.POSITION_QUANTIZED !== undefined,
+    offset = quantized ? (table.global('QUANTIZED_VOLUME_OFFSET', 'FLOAT', 3) as ArrayLike<number>) : undefined,
+    origin = offset ?? points.rtcCenter ?? [0, 0, 0],
+    m = transform?.length === 16 ? transform : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  return (name, i) => {
+    const p = points.positions;
+    if (name === 'POSITION') return [0, 1, 2].map((k) => p[i * 3 + k] - (offset ? offset[k] : 0));
+    if (name === 'POSITION_ABSOLUTE') {
+      const [x, y, z] = [0, 1, 2].map((k) => p[i * 3 + k] + (offset ? 0 : origin[k]));
+      return [0, 1, 2].map((k) => m[k] * x + m[4 + k] * y + m[8 + k] * z + m[12 + k]);
+    }
+    if (name === 'COLOR')
+      return points.colors
+        ? Array.from(points.colors.subarray(i * 4, i * 4 + 4), (v) => v / 255)
+        : points.constantColor
+          ? points.constantColor.map((v) => v / 255)
+          : [1, 1, 1, 1];
+    if (name === 'NORMAL') return points.normals ? Array.from(points.normals.subarray(i * 3, i * 3 + 3)) : undefined;
+    return undefined;
+  };
+}
 const unit = (v: number) => Math.max(0, Math.min(1, v));
 const linear = (c: readonly number[]) => c.map((v, i) => (i < 3 ? SRGBToLinear(unit(v)) : unit(v)));
 function binding(apply: (style: TilesStyle) => void, restore: () => void, initial: TilesStyle): TileStyleBinding {
@@ -100,20 +132,13 @@ export class TilesStyle {
     const content = context.content;
     if (context.kind === 'points') {
       const cloud = context.cloud as PointCloud,
-        points = context.content;
+        points = context.content,
+        semantics = pointSemantics(points, context.tile?.transform);
       bindings.push(
         this.bindPoints(cloud, (i) => {
           const source = cloud.sourceIndex?.[i] ?? i,
             id = points.batchIds?.[source] ?? source;
-          return (name) =>
-            name === 'POSITION' || name === 'POSITION_ABSOLUTE'
-              ? Array.from(
-                  points.positions.subarray(source * 3, source * 3 + 3),
-                  (v, k) => v + (name === 'POSITION_ABSOLUTE' ? (points.rtcCenter?.[k] ?? 0) : 0),
-                )
-              : name === 'COLOR'
-                ? Array.from((points.colors ?? []).slice(source * 4, source * 4 + 4), (v) => v / 255)
-                : points.batchTable?.get(id, name);
+          return (name) => semantics(name, source) ?? points.batchTable?.get(id, name);
         }),
       );
       bytes = cloud.count * (4 + (points.colors ? 0 : 4)); // added GPU size buffer and, if absent, colour buffer
@@ -260,7 +285,8 @@ export class TilesStyle {
   bindPoints(cloud: PointCloud, properties: (point: number) => StyleProperties): TileStyleBinding {
     const colors = cloud.colors?.slice() ?? null,
       sizes = cloud.sizes?.slice() ?? null;
-    const floats = cloud.floatColors?.slice() ?? null;
+    const floats = cloud.floatColors?.slice() ?? null,
+      components = cloud.colorComponents;
     const original = {
       size: cloud.material.size,
       minPixelSize: cloud.material.minPixelSize,
@@ -272,6 +298,8 @@ export class TilesStyle {
     };
     const restore = () => {
       cloud.setColors(floats ?? (colors && new Uint8Array(colors.buffer)), 4);
+      // The packed words hold RGBA either way; the cloud keeps reading later updateColors calls as it did before.
+      cloud.colorComponents = components;
       cloud.setSizes(sizes);
       Object.assign(cloud.material, original);
     };

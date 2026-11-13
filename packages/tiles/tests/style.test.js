@@ -202,3 +202,63 @@ test('model binding is atomic, non-accumulating and restores materials and exten
   assert.equal(primitive.extension, extension);
   assert.deepEqual(primitive.vertices, vertices);
 });
+test('point semantics follow the Styling specification: POSITION, POSITION_ABSOLUTE with the tile transform, COLOR, NORMAL', () => {
+  const content = {
+    type: 'pnts',
+    positions: new Float32Array([1, 2, 3, 4, 5, 6]),
+    normals: new Float32Array([0, 0, 1, 1, 0, 0]),
+    rtcCenter: [100, 0, 0],
+    featureTable: new FeatureTable({ POSITION: { byteOffset: 0 } }, new Uint8Array()),
+    byteLength: 24,
+  };
+  const cloud = new PointCloud({ positions: content.positions }),
+    // Column-major: translate by (0, 0, 1000).
+    transform = Float64Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1000, 1]);
+  const style = new TilesStyle({
+    meta: {
+      position: '${POSITION}',
+      absolute: '${POSITION_ABSOLUTE}',
+      color: '${COLOR}',
+      normal: '${NORMAL}',
+    },
+    pointSize: '${POSITION_ABSOLUTE}.z > 1004 ? 2 : 1',
+    show: '${NORMAL}.z === 0 && ${COLOR}.a === 1',
+  });
+  const decoration = style.decorate({ kind: 'points', cloud, content, tile: { transform } });
+  // Before: POSITION_ABSOLUTE skipped the tile transform (z 3 and 6, both size 1), NORMAL was undefined (show threw
+  // on a non-boolean) and COLOR was an empty vector.
+  assert.deepEqual([...cloud.sizes], [0, 2]);
+  decoration.dispose();
+  // Quantized: POSITION is before QUANTIZED_VOLUME_OFFSET, POSITION_ABSOLUTE after it; CONSTANT_RGBA is the colour.
+  const offset = new Float32Array([10, 20, 30]);
+  const quantized = {
+    type: 'pnts',
+    positions: new Float32Array([11, 22, 33]),
+    constantColor: [255, 0, 0, 51],
+    featureTable: new FeatureTable(
+      { POSITION_QUANTIZED: { byteOffset: 0 }, QUANTIZED_VOLUME_OFFSET: [...offset], QUANTIZED_VOLUME_SCALE: [1, 1, 1] },
+      new Uint8Array(),
+    ),
+    byteLength: 6,
+  };
+  const reads = [];
+  const probe = new TilesStyle({ meta: { p: '${POSITION}', a: '${POSITION_ABSOLUTE}', c: '${COLOR}' } });
+  const evaluate = probe.evaluate.bind(probe);
+  probe.evaluate = (properties) => {
+    const result = evaluate(properties);
+    reads.push(result.meta);
+    return result;
+  };
+  probe.decorate({ kind: 'points', cloud: new PointCloud({ positions: quantized.positions }), content: quantized, tile: {} })
+    .dispose();
+  assert.deepEqual([...reads[0].p], [1, 2, 3]);
+  assert.deepEqual([...reads[0].a], [11, 22, 33]);
+  assert.deepEqual([...reads[0].c], [1, 0, 0, 0.2]);
+});
+test('point styling restores the cloud\'s colour component count for later updateColors calls', () => {
+  const cloud = new PointCloud({ positions: [0, 0, 0], colors: new Uint8Array([1, 2, 3]), colorComponents: 3 });
+  new TilesStyle({ color: 'color("red")' }).bindPoints(cloud, () => ({})).dispose();
+  // Before: dispose left colorComponents at 4, so an RGB update of one point threw (3 values, 4 needed).
+  assert.equal(cloud.colorComponents, 3);
+  cloud.updateColors(0, [9, 8, 7]);
+});
