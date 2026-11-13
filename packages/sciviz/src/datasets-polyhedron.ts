@@ -1,4 +1,4 @@
-// Plane arrangement decomposition of nonconvex cells, not a boundary-representation kernel.
+// Plane arrangement decomposition of nonconvex cells, not a solid-modelling kernel.
 // Naylor/Amanatides/Thibault (1990); Ju/Schaefer/Warren (2005), equations 10 and 11.
 import { rangeError } from '../../shared/errors.js';
 import { cross3, dot3, sub3 } from './cell-complex.js';

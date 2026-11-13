@@ -14,7 +14,7 @@ const root = resolve(import.meta.dirname, '..');
 export const OUTPUT = 'examples/all-entries/entries.ts';
 
 /**
- * Entries left out, each with its reason; the list must shrink to empty. Sciviz is still being built on the dev PC
+ * Entries left out, each with its reason; the list must shrink to empty. Sciviz is still being built on the workstation
  * (work list 5: batches 175, 176 and 178), so its entries and the kit entries that re-export it join when those are done.
  */
 export const PENDING = [{ match: /(^@margoengine\/sciviz(\/|$))|(\/sciviz(\/|$))/, reason: 'sciviz batches 175, 176, 178' }];

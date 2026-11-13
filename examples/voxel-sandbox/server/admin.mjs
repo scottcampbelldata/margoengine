@@ -1,4 +1,4 @@
-// The operator's tool, run over SSH on the Plaza server. It talks to the running router over a local socket that nginx
+// The operator's tool, run from a remote shell on the Plaza server. It talks to the running router over a local socket that nginx
 // cannot reach and only the service's user can open.
 //   node server/admin.mjs status --data=DIR
 //   node server/admin.mjs snapshots --data=DIR --shard=N

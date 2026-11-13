@@ -2,14 +2,14 @@
   "$comment": "Which GPU tests a machine can run and how it guards its temperature. Choose one with MARGO_MACHINE_PROFILE=<name>. Unset, exactly one profile's `match` must fit this machine: `platform` and `arch` (Node process.platform and process.arch) and, when given, `gpu` (some hardware display adapter name matches one of these patterns) and `withoutGpu` (no adapter name matches any of them); adapter names come from DXGI on Windows, read before any GPU work. No match, or several, stops the run before any GPU test with a message listing these profiles. There is no fallback profile: one ran the mini PC as the workstation (no heat watch, and the path tracer its profile excludes) and it crashed twice. No machine names or paths here. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/check-merge.mjs. `heat` null means no heat watch. `split` runs heavy suites as short steps. `exclude` records packages this hardware must not run and why.",
   "profiles": {
     "workstation": {
-      "description": "a desktop with a discrete GPU and active cooling, the maintainer's RTX A6000 PC; every test runs as one step; chosen on Windows x64 with an NVIDIA display adapter when no profile is named",
+      "description": "a desktop with a discrete GPU and active cooling (RTX A6000 class); every test runs as one step; chosen on Windows x64 with an NVIDIA display adapter when no profile is named",
       "match": { "platform": "win32", "arch": "x64", "gpu": ["^NVIDIA "] },
       "heat": null,
       "split": false,
       "exclude": {}
     },
     "apple-silicon": {
-      "description": "an Apple silicon Mac (the maintainer's M6 Mac mini, 24 GB unified memory) with WebGPU on Metal; chosen on macOS arm64 when no profile is named; no heat watch, every test runs as one step",
+      "description": "an Apple silicon Mac with WebGPU on Metal; chosen on macOS arm64 when no profile is named; no heat watch, every test runs as one step",
       "match": { "platform": "darwin", "arch": "arm64" },
       "heat": null,
       "split": false,

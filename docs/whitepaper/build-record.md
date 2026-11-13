@@ -1205,7 +1205,7 @@ Seven jobs, each in its own optional entry of `@margoengine/exporters`, so a mod
 - **Job 5, unproven and unmeasured:** `MSFT_lod` itself is unproven, as the validator does not implement it and no outside reader is here; the extension's JSON is checked in `tests/optimize.test.js` only. ABeautifulGame took 30.5 s with simplify and levels against 0.4 s for `gltfpack -si 0.5` at one level, diagnostic. How much of that gap is work the two do differently has not been measured.
 - **Job 5, bugs caught in the draft, each with a test in `tests/optimize.test.js`:** shared primitive objects renumbered twice by `dropUnreadAccessors`, an accessor key without bounds, an all-degenerate primitive writing empty accessors, a mesh merge that ignored pointer extensions, `EXT_lights_image_based` image indices, `verticesBefore` counting a shared POSITION twice, a camera copied to level nodes, pointer channels not cloned, quantized normals scale, and flat levels now take normals and tangents from rows.
 - **Job 6, proved:** 76 clips of 8 real GLBs (Fox, RiggedFigure, InterpolationTest, CommercialRefrigerator, MorphStressTest, robot-expressive, two KayKit rigs) pass Apple's `usdchecker --arkit`. Apple's `usdcat --flatten` output, evaluated by UsdSkel's rules at up to five frames of each clip, matches plain glTF maths: worst 3.1e-4 of the model's size, inside the 5.9e-3 that half-float scales allow on a chain of 12, and 4.6e-7 on clips with scale 1. ModelIO reads the joints and samples, SceneKit's joints match glTF's (worst 4.9e-4 on a model 2.2 across, 1.1e-5 on Fox, 154.7 across), RealityKit reads each clip's length, and NegativeScaleTest under a moving root shows every tick in SceneKit. The `exportUSDZ` code moved into `usdz-write.ts` so both entries share it: sha256 of 25 real files is unchanged. The reader inside `tests/usdz-anim.test.js` is a stand-in; Apple's tools are the proof.
-- **Job 6, unproven:** no AR Quick Look run on a device: there is no iPhone here and `qlmanage` writes nothing over ssh, so "plays in AR Quick Look" rests on Apple's checker and frameworks on a Mac. Morph weights are named in `skipped`, not written.
+- **Job 6, unproven:** no AR Quick Look run on a device: there is no iPhone here and `qlmanage` writes nothing in a remote session, so "plays in AR Quick Look" rests on Apple's checker and frameworks on a Mac. Morph weights are named in `skipped`, not written.
 - **Job 6, bugs the real files found in the draft, none of which its own tests saw:** `primvars:skel:jointIndices` wrote its metadata with a comma, which `usdcat` refused on every skinned file while the stand-in reader passed (regression in `tests/usdz-anim.test.js`). A KayKit clip that scales a character up from nothing was refused as a shear, because a zero matrix has no rotation to read; joints now multiply their parts and need no inverse (two regressions there). The draft's own `faceNormals` duplicated the collector's fallback and went; a `Math.min` a mutation showed did nothing went too. robot-expressive's weights sum to as much as 1.76, against the spec; the collector scales them, so the proof's maths was corrected to do the same, and it first read as a 33% error. 32 mutations caught, after two more tests.
 - **Job 7, proved:** 25 real Khronos GLBs and AnimatedColorsCube, written by `export3MF`, opened in two outside readers. Microsoft's `Windows.Graphics.Printing3D`, driven from PowerShell, read the unit, vertices, triangles, meshes, items, base colours, colour group colours and title of all 26 with no gap against what was written, and refused a garbage file, so it can say no. PrusaSlicer 2.9.7's merged STL holds exactly the triangles the build items place on all 26, 268,268 on NodePerformanceTest's 10,000 items, and its X and Y extents match glTF maths within 7.9e-8 of the model's size. Z only compares on one object, as the slicer drops each object to the bed; on one-object files all three axes hold. 19 mutations caught. The reader inside `tests/threemf.test.js` is a stand-in; these two are the proof.
 - **Job 7, unproven:** no part was printed. 12 of 26 sliced to G-code (BoomBox, BoxVertexColors, CommercialRefrigerator, Corset, DirectionalLight, Fox, Lantern, MaterialsVariantsShoe, NormalTangentMirrorTest, OrientationTest, RiggedFigure, AnimatedColorsCube). The other 14 did not: 7 crashed the slicer with 0xC0000005, at least 6 of them right after it logged path conflicts between overlapping parts, InterpolationTest's last message being cut from the log; 4 gave no layers or no first layer (AlphaBlendModeTest, MetalRoughSpheres, SheenChair, ToyCar); 3 fell outside its default bed. None of these was fixed or chased further, and no test shows the crash is the slicer's alone, though Margo's files for those samples read clean in both readers. `--info` on NodePerformanceTest passed the 560 s limit and was killed at 3,405 of 10,000 objects; its STL above is complete. Many samples are open meshes in their source, and the slicer says so.
@@ -1589,7 +1589,7 @@ Scott's order after the first iPhone failure: passing checks is not the same as 
 - **Not proved:** anything on a phone or headset, and Unity, which needs a maintainer to sign in to Unity Hub. Quick Look drew 18 of 28 static files on this run; the other 10 got no thumbnail, as the system's extension stopped answering after the 99 MB NodePerformanceTest and was not restarted. Traced on 2026-11-06: with a fresh extension 24 of the 25 exported Khronos files give a thumbnail, and only NodePerformanceTest does not. It has 10,000 meshes and 10,000 materials as in its source, passes `usdchecker --arkit`, and `RAQLThumbnailExtension` returns nothing for it and then refuses every later file until it restarts, so this is the extension's limit and not a fault in the file. Safari ran by hand, on one Mac, with no test suite.
 - **Unmeasured:** no speed number. Nothing here was timed.
 - **Gate:** lint, hygiene, verify, the tests of each package changed and `tests/claims-file.test.js`, the push from one script that stops at the first failing step. 672a18ac3 and the push before it went by the same script without verify on the last tree, after main moved under a full pass with changes that did not touch these files. So did 72ecd93f1, after a full pass at 8723c4ceb with only the cutscene take recorder moved under it; `npm run quality` ran on that tree, and this record and the audit recount followed it.
-- **Slips:** `git stash list`, read only, ran three times in a worktree where the rule bars any form of it. Scratch went outside the worktree on the shared Mac (`/tmp/lu-*.usda`, `~/margo-lane-u`), cleared at the end. 163 `tail -f` helpers were left running in the first pass and stopped by pid. Safari tabs from the check were left for Scott to close, and the Quick Look extension was left stuck, as it is not a process this batch started.
+- **Slips:** `git stash list`, read only, ran three times in a worktree where the rule bars any form of it. Scratch went outside the worktree on the shared Mac (`temporary USDA files`, `a local lane folder`), cleared at the end. 163 `tail -f` helpers were left running in the first pass and stopped by pid. Safari tabs from the check were left for Scott to close, and the Quick Look extension was left stuck, as it is not a process this batch started.
 ## Lane B batch 43: FBX from real files
 
 Eight jobs, and a rule that came in half way: a check that shares a mistake with our writer proves nothing, so proof comes from files other tools wrote.
@@ -1883,9 +1883,9 @@ Scott asked for a static report to be proved or disproved: `Engine.retain` chang
 - **Limits:** a real GPU out-of-memory does not throw, so it is not rolled back (LIM-330). One defect stays open in `docs/known-bugs.md`: a failed manual restore on a healthy device.
 - **Size:** core 21,487 to 21,541 B gzip, core plus stage 22,878 to 22,930 B. The core cap is now 21,542 B on Scott's ruling; it was documented at 21,504 B and enforced at 22,016 B.
 
-## Three allocation tests that failed verify on the Beelink
+## Three allocation tests that failed verify on the AMD mini PC
 
-Jobs Scott approved on 2026-11-07 ("Fix those packages"): `npm run verify` failed on clean `main` on the Beelink (Node 24.18.0, V8 13.6) on three allocation tests.
+Jobs Scott approved on 2026-11-07 ("Fix those packages"): `npm run verify` failed on clean `main` on the AMD mini PC (Node 24.18.0, V8 13.6) on three allocation tests.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -1937,7 +1937,7 @@ Scott asked for a second static report to be proved or disproved: `addViewer` ch
 - **Size:** `viewer` is its own entry, so core and core plus stage do not change.
 ## Batch 46: cache
 
-Six jobs for `@margoengine/cache` on the Beelink (lane H, work list 3), each a new optional entry or option. Every
+Six jobs for `@margoengine/cache` on the AMD mini PC (lane H, work list 3), each a new optional entry or option. Every
 job is proved in Node on stand-ins: an in-memory IndexedDB (`packages/cache/test/support.js`) and stand-in HTTP servers.
 The range cache (job 1) and the eviction index (job 3) are also proved in a real browser, with its own IndexedDB, fetch
 and offline mode, on a real Khronos file (`packages/cache/scripts/test-browser.js`). Nothing is timed.
@@ -2028,7 +2028,7 @@ Limits and what is unmeasured: every entry has a row in `docs/limits.md`. No tim
 
 ## Lane I batch 57: sky, part 1
 
-Eight jobs for `@margoengine/sky` on the Beelink (lane I, work list 3), each a new optional entry or option of the sky
+Eight jobs for `@margoengine/sky` on the AMD mini PC (lane I, work list 3), each a new optional entry or option of the sky
 package; core and stage are untouched. Every job is proved on a real GPU, a Radeon 680M, at 4x and 1x MSAA through
 `packages/sky/test/features-check.mjs`, and the astronomical sky also against Meeus' worked examples and a real star
 catalogue. Nothing is timed: timings taken while other lanes ran are diagnostic.
@@ -2108,7 +2108,7 @@ quality gate refuse a baseline whose total is not the sum of its items; this com
 
 ## Lane H batch 47: tiles
 
-Eight jobs for `@margoengine/tiles` on the Beelink (lane H, work list 3), each a new optional entry or a renderer
+Eight jobs for `@margoengine/tiles` on the AMD mini PC (lane H, work list 3), each a new optional entry or a renderer
 option; core and stage are untouched. Jobs 1, 3, 5 and 6 are proved on real files and on a real GPU, a Radeon 680M,
 through `packages/tiles/tests/tiles-browser.ts` (16 checks); jobs 2, 4, 7 and 8 in Node. Nothing is timed.
 
@@ -2167,14 +2167,14 @@ byte-identical; regression `packages/tiles/tests/terrain.test.js`).
 - **Gate:** jobs 1 and 2 by the full landing (lint, hygiene, verify, the tiles tests, the tiles browser checks under the
   GPU lock). Jobs 3 to 6 by Scott's quick landing that day (rebase, records, build, api:check, supply-chain check, the
   tiles tests, the claims, llms, lock and api-conventions tests, the 16 browser checks), with lint, hygiene, readmes,
-  parity, the API quality gate and the tiles README run (8 of 8) before it. Jobs 7 and 8 by machines.md item 5: rebase,
+  parity, the API quality gate and the tiles README run (8 of 8) before it. Jobs 7 and 8 by the landing checks in AGENTS.md: rebase,
   build, api:check, `npm run quality`, lint, hygiene, the tiles tests, the claims, llms and lock tests and the tiles
   browser checks under the GPU lock; the README run for tiles before each. One `npm run verify` on the newest main after
   the last push.
 
 ## Lane I batch 58: sky, part 2
 
-Two jobs for `@margoengine/sky` on the Beelink (lane I, work list 3): an option of the Bruneton entry and a new
+Two jobs for `@margoengine/sky` on the AMD mini PC (lane I, work list 3): an option of the Bruneton entry and a new
 optional entry. Core and stage are untouched. Both are proved on a real GPU, a Radeon 680M, at 4x and 1x MSAA through
 `packages/sky/test/features-check.mjs`. Nothing is timed.
 
@@ -2232,7 +2232,7 @@ Nothing is timed.
 
 ## Lane I batch 59: weather
 
-Seven jobs for `@margoengine/weather` on the Beelink (lane I, work list 3): five new optional entries, one option of
+Seven jobs for `@margoengine/weather` on the AMD mini PC (lane I, work list 3): five new optional entries, one option of
 the hail entry and a data reader. Core and stage are untouched; `packages/audio` is used through its public API only.
 GPU work is proved on a Radeon 680M through `packages/weather/tests/browser-check.mjs`, at 4x and 1x MSAA where the
 scene is drawn by core. Nothing is timed.
@@ -2388,7 +2388,7 @@ Four jobs for `@margoengine/save`, on this PC with the full check per job; each 
 
 ## Lane I batch 60: scenery
 
-Five jobs for `@margoengine/scenery` on the Beelink (lane I, work list 3): four new optional entries, one job already
+Five jobs for `@margoengine/scenery` on the AMD mini PC (lane I, work list 3): four new optional entries, one job already
 built. Core and stage are untouched; the sky entries use `@margoengine/sky/astro` through its public API. GPU work is
 proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x and 1x MSAA. Nothing is timed.
 
@@ -2434,7 +2434,7 @@ proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x
 
 ## Lane H batch 48: blender
 
-Eight jobs for `@margoengine/blender` and the Blender add-on (`tools/blender-addon`) on the Beelink (lane H, work list
+Eight jobs for `@margoengine/blender` and the Blender add-on (`tools/blender-addon`) on the AMD mini PC (lane H, work list
 3), each a new optional entry or an add-on step; core and stage are untouched. Every job is proved on a real Blender
 5.2.3 LTS export, and the GPU parts on a Radeon 680M through `scripts/modern-blender-tests.js`. Nothing is timed.
 
@@ -2485,7 +2485,7 @@ README runner's known-failure list; they now load the package's real fixtures an
   was written as LIM-421 and landed as LIM-428 after main took LIM-421 to LIM-427. The rebase script renumbers claims, limits and READMEs but not this record, so this section first named LIM-422; fixed after the push. Job 8's first landing stopped at verify on
   `tests/node22-packages.test.js`: `compressMargo` runs in Node, but `@margoengine/blender` sat in the browser-only list
   of `scripts/node22-packages.json`; it moved to the Node list, so its tests also run on Node 22 in CI.
-- **Gate:** per job by machines.md item 5: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the
+- **Gate:** per job by the landing checks in AGENTS.md: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the
   blender tests and the add-on's Python tests, the claims, llms, lock-sync, sizes-page and fixed-waits tests, the
   blender GPU checks under the GPU lock; `npm run verify` for jobs 6 and 8 (job 8 changes `scripts/`), which is also the
   verify on the newest main after the last push.
@@ -2656,7 +2656,7 @@ Nothing is timed; the million-edge graph step prints its time as a diagnostic on
 
 ## Lane F batch 95: voxel
 
-Eight jobs for `@margoengine/voxel` on the M6 Mac mini (Metal), each a new optional entry with its own check, landed one
+Eight jobs for `@margoengine/voxel` on the Apple silicon Mac (Metal), each a new optional entry with its own check, landed one
 commit at a time. Core, stage and `packages/voxel/src/physics.ts` are untouched. The batch's aim is a block world that
 lights, flows, ticks, meshes on the GPU and draws smooth terrain, each piece paid for only when imported. Timings are
 diagnostic, one machine, a loaded one.
@@ -2696,7 +2696,7 @@ diagnostic, one machine, a loaded one.
 
 ## Lane E batch 70: post
 
-Eight jobs for `@margoengine/post` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+Eight jobs for `@margoengine/post` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are
 untouched. New looks go in new optional entries; rough reflections and multi-bounce GI are options of the existing
 `/ssr` and `/ssgi` entries, and decal culling is part of `/decals`. Nothing is timed.
 
@@ -2734,7 +2734,7 @@ untouched. New looks go in new optional entries; rough reflections and multi-bou
 
 ## Lane E batch 71: post (part 2)
 
-One job for `@margoengine/post` on the M6 Mac mini (Metal), landed as one commit. Core and stage are untouched. The
+One job for `@margoengine/post` on the Apple silicon Mac (Metal), landed as one commit. Core and stage are untouched. The
 Panini part of the job already exists as the `WideAngle` camera in `@margoengine/cameras/panini`, so it is SKIPPED and
 the new effect's README points to it. Nothing is timed.
 
@@ -2758,7 +2758,7 @@ the new effect's README points to it. Nothing is timed.
 
 ## Lane I batch 61: terrain
 
-Eight jobs for `@margoengine/terrain` on the Beelink (lane I, work list 3): six new optional entries, one job already
+Eight jobs for `@margoengine/terrain` on the AMD mini PC (lane I, work list 3): six new optional entries, one job already
 built (documented), and job 8 below. Core and stage are untouched. GPU work is proved on a Radeon 680M through each
 entry's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
 
@@ -2797,7 +2797,7 @@ entry's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
   6.5); the manager added the short lost-race rule. Job 8 was first handed off BLOCKED on the self-shadow above.
 ## Lane E batch 72: tonemap
 
-Six jobs for `@margoengine/tonemap` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+Six jobs for `@margoengine/tonemap` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are
 untouched. Tonemap gained `extensions`, a hook that lets an entry patch its presentation shader, bind a uniform and up
 to four resources, and encode passes of its own; without extensions the shaders and bindings are unchanged. The
 physical camera job already exists as `PhysicalCamera` in `@margoengine/cameras/physical`, so it is SKIPPED. Nothing
@@ -2904,7 +2904,7 @@ side can see. Nothing is timed.
 
 ## Lane F batch 96: voxel (part 2)
 
-One job for `@margoengine/voxel` on the M6 Mac mini (Metal): voxel destruction as a new optional entry, landed as one
+One job for `@margoengine/voxel` on the Apple silicon Mac (Metal): voxel destruction as a new optional entry, landed as one
 commit. Core, stage, `@margoengine/physics` and `packages/voxel/src/physics.ts` are untouched; the entry takes the
 caller's `Physics` and imports only its types.
 
@@ -2930,7 +2930,7 @@ caller's `Physics` and imports only its types.
 
 ## Lane H batch 80: splats
 
-Eight jobs for `@margoengine/splats` on the Beelink (lane H, work list 3): six new optional entries, two additions to
+Eight jobs for `@margoengine/splats` on the AMD mini PC (lane H, work list 3): six new optional entries, two additions to
 existing entries. Core and stage are untouched. GPU work is proved on a Radeon 680M through
 `packages/splats/test/gpu/check.mjs` (in `test:gpu`), mostly on a real capture (8,385 raccoon splats from Niantic's SPZ
 sample). Nothing is timed.
@@ -2978,7 +2978,7 @@ sample). Nothing is timed.
 
 ## Lane N batch 78: vfx (part 1)
 
-Eight jobs for `@margoengine/vfx` on the dev PC (lane N, work list 1): eight new optional entries, each carried by the
+Eight jobs for `@margoengine/vfx` on the workstation (lane N, work list 1): eight new optional entries, each carried by the
 root `VFX`. Core and stage are untouched. GPU work is proved on an RTX A6000 through
 `packages/vfx/test/features-check.mjs` and `lit-check.mjs` (in `test:gpu`), by reading back pictures and particle
 buffers of generated scenes against the same frames worked on the CPU; each check was mutation-tested once. Nothing is
@@ -3008,7 +3008,7 @@ timed.
   `position` on top of the mesh `transform` (caught by the GPU check, regression in `skinned.test.js`).
 ## Lane I batch 62: terrain
 
-Four jobs for `@margoengine/terrain` on the Beelink (lane I, work list 3): three new optional entries and one
+Four jobs for `@margoengine/terrain` on the AMD mini PC (lane I, work list 3): three new optional entries and one
 compatibility check with no new entry. Core and stage are untouched. GPU work is proved on a Radeon 680M through each
 job's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
 
@@ -3041,7 +3041,7 @@ job's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
 
 ## Lane H batch 104: ui
 
-Six jobs for `@margoengine/ui` on the Beelink (lane H, work list 3): two new optional entries and four features in the
+Six jobs for `@margoengine/ui` on the AMD mini PC (lane H, work list 3): two new optional entries and four features in the
 root entry. Core and stage are untouched. GPU work is proved on a Radeon 680M in headless Chromium through
 `packages/ui/tests/ui-browser.mjs` and `world-browser.mjs`. Nothing is timed.
 
@@ -3080,7 +3080,7 @@ root entry. Core and stage are untouched. GPU work is proved on a Radeon 680M in
 
 ## Lane E batch 73: taa
 
-Five jobs for `@margoengine/taa` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are untouched.
+Five jobs for `@margoengine/taa` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are untouched.
 Job 2 also changes `@margoengine/shader` (the manager's decision: NodeMaterial hands TAA its move and uniform block, and
 raw WGSL meshes get an opt-in), and the last of the five to land is job 2.
 
@@ -3117,7 +3117,7 @@ raw WGSL meshes get an opt-in), and the last of the five to land is job 2.
 
 ## Lane E batch 74: dof
 
-Five jobs for `@margoengine/dof` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are untouched.
+Five jobs for `@margoengine/dof` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are untouched.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -3151,7 +3151,7 @@ Five jobs for `@margoengine/dof` on the M6 Mac mini (Metal), each landed as one 
 
 ## Lane H batch 105: labels
 
-Five jobs for `@margoengine/labels` on the Beelink (Radeon 680M), four landed as one commit each and one skipped.
+Five jobs for `@margoengine/labels` on the AMD mini PC (Radeon 680M), four landed as one commit each and one skipped.
 Core and stage are untouched (23,626 B gzip together after the batch).
 
 | # | Job | Status | Commit | Entry | Claim |
@@ -3165,7 +3165,7 @@ Core and stage are untouched (23,626 B gzip together after the batch).
 - **Built from:** `docs/clean-room.md` rows S76 (Christensen, Marks and Shieber 1995; Imhof 1975), S78 (Sutherland and
   Hodgman 1974; CSS Masking 1, CSS Transforms 2), S79 (SVG 2) and S81 (CSSOM View, CSS Transforms 1). Nothing from
   another engine was read.
-- **Proved (real GPU, this Beelink, Chromium on WebGPU and WebGL2):** `node packages/labels/scripts/test-browser.js`:
+- **Proved (real GPU, this AMD mini PC, Chromium on WebGPU and WebGL2):** `node packages/labels/scripts/test-browser.js`:
   a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not its near half; a callout
   line starts 0.0007 px from the projected point and ends 0.00001 px from the nearest point of the laid-out box; with
   the canvas's frame at `scale(0.75)` and `scale(2)` labels beside the canvas and in an overlay in `document.body`
@@ -3183,7 +3183,7 @@ Core and stage are untouched (23,626 B gzip together after the batch).
 
 ## Lane D batch 50: environment (part 1)
 
-Eight jobs for `@margoengine/environment` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+Eight jobs for `@margoengine/environment` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are
 untouched (23,590 B gzip together after the batch).
 
 | # | Job | Status | Commit | Entry | Claim |
@@ -3222,7 +3222,7 @@ untouched (23,590 B gzip together after the batch).
 
 ## Lane D batch 51: environment (part 2)
 
-Three jobs for `@margoengine/environment` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+Three jobs for `@margoengine/environment` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are
 untouched.
 
 | # | Job | Status | Commit | Entry | Claim |
@@ -3253,7 +3253,7 @@ untouched.
 
 ## Lane I batch 63: biomes
 
-Six jobs for `@margoengine/biomes` on the Beelink (lane I, work list 3): three new optional entries, one skipped, one
+Six jobs for `@margoengine/biomes` on the AMD mini PC (lane I, work list 3): three new optional entries, one skipped, one
 waiting on lane J and a smaller worker file. Core and stage are untouched. Nothing is timed.
 
 | # | Job | Status | Commit | Entry | Claim |
@@ -3265,7 +3265,7 @@ waiting on lane J and a smaller worker file. Core and stage are untouched. Nothi
 | 5 | Ecosystem growth simulation | DONE | `5c20844dc` | `/ecosystem` (`growEcosystem`, `plantsFromTile`) | LIM-544 |
 | 6 | Smaller worker file | PARTIAL | this commit | `dist/workers/biomes.js` (no new entry) | none |
 
-- **Job 2:** waited for batch 66 jobs 2 and 8, then done on the M6 Mac mini (2026-11-10) after water/rivers landed
+- **Job 2:** waited for batch 66 jobs 2 and 8, then done on the Apple silicon Mac (2026-11-10) after water/rivers landed
   (f677f5975): `water: { rivers, flow: true | { discharge, substeps } }` attaches water/rivers (loaded with import()
   only when set) with one inflow per river line at its high end (`riverSources`). Proof: the biomes water GPU check on
   Metal WebGPU (90 frames: the still river is bit-identical, the flowing one changes 3,646 cells and holds 61 m^3 more
@@ -3307,7 +3307,7 @@ waiting on lane J and a smaller worker file. Core and stage are untouched. Nothi
 
 ## Lane F batch 97: voxel-edit
 
-Five jobs for `@margoengine/voxel-edit` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+Five jobs for `@margoengine/voxel-edit` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are
 untouched. Job 4 was first blocked for the clean room and landed after Scott's decision; this follow-up commit records it
 and sets row 97 of work list 2 to done.
 
@@ -3346,7 +3346,7 @@ and sets row 97 of work list 2 to done.
 
 ## Lane H batch 106: html
 
-Four jobs for `@margoengine/html` on the Beelink (Radeon 680M, Chromium 157), each landed as one commit: two in the
+Four jobs for `@margoengine/html` on the AMD mini PC (Radeon 680M, Chromium 157), each landed as one commit: two in the
 root entry, one new optional entry and one capacity change. Core and stage are untouched (23,626 B gzip together after
 the batch).
 
@@ -3361,7 +3361,7 @@ the batch).
   (WebGL 2.0 and OpenGL ES 3.0 occlusion queries), S85 (WICG HTML-in-Canvas explainer, SVG 2 `foreignObject`, WebGPU
   `copyExternalImageToTexture`, CSSOM View `elementFromPoint`) and S86 (table doubling, Cormen et al.). Nothing from
   another engine was read.
-- **Proved (real GPU, this Beelink):** `npm run test:browser --workspace @margoengine/html`: on WebGPU and WebGL2 an
+- **Proved (real GPU, this AMD mini PC):** `npm run test:browser --workspace @margoengine/html`: on WebGPU and WebGL2 an
   anchor behind a box hidden, one beside it shown, shown again once the box moves, and the fade anchor on the box edge
   at exactly 0.5; on WebGPU with both rasterizers (`drawElementImage` and `foreignObject`) an element's and its
   button's colours on the quad, a box in front, `elementFromPoint` and a press at the projected button, the canvas
@@ -3423,7 +3423,7 @@ look and animated palettes. Nothing is timed.
 
 ## Lane E batch 75: toon
 
-Four jobs for `@margoengine/toon` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are untouched.
+Four jobs for `@margoengine/toon` on the Apple silicon Mac (Metal), each landed as one commit. Core and stage are untouched.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -3455,7 +3455,7 @@ Four jobs for `@margoengine/toon` on the M6 Mac mini (Metal), each landed as one
 
 ## Lane H batch 108: selection
 
-Three jobs for `@margoengine/selection` on the Beelink (Radeon 680M). Two were already built and are
+Three jobs for `@margoengine/selection` on the AMD mini PC (Radeon 680M). Two were already built and are
 skipped; the third landed as one commit. The splat overlay lives in `@margoengine/splats`, beside the line and point
 overlays in their own packages, so selection imports no drawing package. Core and stage are untouched (23,626 B gzip
 together after the batch).
@@ -3468,7 +3468,7 @@ together after the batch).
 
 - **Built from:** `docs/clean-room.md` row SP12 (Kerbl et al. 2023 App. C falloff and cap, Zwicker et al. 2001 EWA
   ellipses, the WebGPU specification). Nothing from another engine was read.
-- **Proved (real GPU, this Beelink):** `node packages/splats/test/gpu/check.mjs`: a 66-splat grid with a plane mesh
+- **Proved (real GPU, this AMD mini PC):** `node packages/splats/test/gpu/check.mjs`: a 66-splat grid with a plane mesh
   between its layers, under a perspective and an orthographic camera. `picking.pick` takes the splat in front of the
   plane (index 64, over the lower-index splat 36 behind it), the plane in front of a grid splat, a lone splat and
   nothing on a gap; `pickMany` answers the same; `engine.pick` answers the stand-in mesh; a 0.99 threshold lets the
@@ -3512,7 +3512,7 @@ untouched. A loss stays open in `docs/known-bugs.md`; publishing the number does
 
 ## Batch 112: video
 
-Five optional video entries, built clean room on the dev PC (RTX A6000, Edge). Each job is one commit and one push. Core and stage stay untouched at 23,626 B gzip. Existing features across all packages were searched before each job; none of these five already supplied the requested route.
+Five optional video entries, built clean room on the workstation (RTX A6000, Edge). Each job is one commit and one push. Core and stage stay untouched at 23,626 B gzip. Existing features across all packages were searched before each job; none of these five already supplied the requested route.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -3555,7 +3555,7 @@ motion, and clean-room extruded 3D vector text meshes from OpenType font files.
 
 ## Lane H batch 109: viewcube
 
-Five jobs for `@margoengine/viewcube` on the Beelink (Radeon 680M), one commit each. Jobs 1 to 4 extend the
+Five jobs for `@margoengine/viewcube` on the AMD mini PC (Radeon 680M), one commit each. Jobs 1 to 4 extend the
 `ViewCube` in the package's root entry; job 5 adds the entry `@margoengine/viewcube/axes`. Core and stage are
 untouched (23,626 B gzip together after the batch).
 
@@ -3570,7 +3570,7 @@ untouched (23,626 B gzip together after the batch).
 - **Built from:** the `docs/clean-room.md` section "View cube: `@margoengine/viewcube` (batch 109)": spherical
   coordinates, W3C Pointer Events, Rodrigues' rotation formula, WCAG 2.2 contrast, CSS Custom Properties, Media
   Queries Level 5, CSS Transforms. No other engine's or CAD application's view cube or gizmo source was read.
-- **Proved (real GPU, this Beelink):** `node packages/viewcube/test/browser-check.mjs` in Chromium with real mouse
+- **Proved (real GPU, this AMD mini PC):** `node packages/viewcube/test/browser-check.mjs` in Chromium with real mouse
   events: a 40 px drag turns one radian, the home button returns to the attach view, the roll button puts +X up the
   screen, the computed face colours follow the dark, high contrast and `'auto'` themes under an emulated dark and
   light scheme, and the triad's X and Y balls sit 23 px from its centre and a click on X turns to the right view.
@@ -3589,7 +3589,7 @@ untouched (23,626 B gzip together after the batch).
 
 ## Lane N batch 79: vfx (part 2)
 
-Three jobs for `@margoengine/vfx` on the dev PC (lane N, work list 1): three new optional entries, each carried by the root `VFX`. Core and stage are untouched. GPU work is proved on an RTX A6000 (NVIDIA Ampere) through `packages/vfx/test/features-check.mjs` (in `test:gpu`), by reading back pictures and particle buffers of generated scenes against the same frames worked on the CPU. The flipbook WebGL2 pixels are a separate commit on the flipbook entry. Nothing is timed.
+Three jobs for `@margoengine/vfx` on the workstation (lane N, work list 1): three new optional entries, each carried by the root `VFX`. Core and stage are untouched. GPU work is proved on an RTX A6000 (NVIDIA Ampere) through `packages/vfx/test/features-check.mjs` (in `test:gpu`), by reading back pictures and particle buffers of generated scenes against the same frames worked on the CPU. The flipbook WebGL2 pixels are a separate commit on the flipbook entry. Nothing is timed.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -3605,7 +3605,7 @@ Three jobs for `@margoengine/vfx` on the dev PC (lane N, work list 1): three new
 
 ## Batch 111: mixer
 
-Five optional audio entries, built in order on the dev PC, with no core/stage changes.
+Five optional audio entries, built in order on the workstation, with no core/stage changes.
 The initial all-package search and per-job README/export checks found none already implemented.
 Manual duck scheduling, native dynamics, a noise-only tail and peak/RMS existed and are reused
 where appropriate. No job was skipped. The claim landed first as dc727f60a.
@@ -3621,7 +3621,7 @@ where appropriate. No job was skipped. The claim landed first as dc727f60a.
 - **Built from:** W3C Web Audio Recommendation, ITU-R BS.1770-5 numeric tables and algorithms,
   EBU Tech 3341 windows/test definitions, Giannoulis/Massberg/Reiss compressor analysis, and
   Allen/Berkley image-source theory. References/derivations in clean-room.md; no external engine
-  or library source, paper-linked implementations, downloaded assets or paid packages.
+  or library source, paper-linked implementations, downloaded assets or paid third-party assets.
 - **Proved:** package Node tests and real OfflineAudioContext/AudioWorklet graphs beside WebGPU
   and WebGL2 in Edge. Generated signals are stand-ins. Sidechain follows the key without timers;
   snapshots restore JSON silence, gain/mute/solo and numeric effects, including underwater fades;
@@ -3671,7 +3671,7 @@ Repository gates additionally caught the handoff's fixed 100 ms cancellation-tes
 
 ## Batch 52: clustered
 
-Eight jobs in `@margoengine/clustered`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes E and I with one job
+Eight jobs in `@margoengine/clustered`, built on the Mac (Apple silicon Mac, WebGPU on Metal) by lanes E and I with one job
 (52.6) from the other machine, each in its own optional entry, option or hook, with no core or stage source changes.
 Rows left unfinished are in the finish-later list under 52.x; README examples owed are in
 the README-owed list.
@@ -3703,7 +3703,7 @@ the README-owed list.
 
 ## Batch 53: clustered part 2
 
-Two optional jobs for `@margoengine/clustered`, built on the M6 Mac mini (WebGPU on Metal) in lane E, with no core or
+Two optional jobs for `@margoengine/clustered`, built on the Apple silicon Mac (WebGPU on Metal) in lane E, with no core or
 stage source changes. Neither existed on main: the package had no contact shadows per light and fixed caps of 1,024
 point and spot lights and 64 area lights. Rows left unfinished are in the finish-later list under 53.x; README
 examples owed are in the README-owed list.
@@ -3737,7 +3737,7 @@ examples owed are in the README-owed list.
 - **Not proved (finish-later.md):** the check's point on the pebble's top also loses the light (self-shadowing, the
   0.01 bias below one depth texel's step at the 45-degree view), so that check fails; the check's local shadow-off
   baseline predates main's LTC and textured-light changes and fails its six comparisons until regenerated.
-- **Limits and unmeasured:** Apple Mac mini (Metal) only; not timed. Contact uses the first view's depth only and trails a
+- **Limits and unmeasured:** Apple silicon Mac (Metal) only; not timed. Contact uses the first view's depth only and trails a
   moving caster by one frame; culling tests every light per cluster; area lights are not clustered and only the first 64
   may cast shadows; IES, projector and contact per-light settings stop at index 1,024 (docs/limits.md LIM-655, LIM-656).
 - **Docs per job:** clustered README prose (examples owed, the README-owed list), operational playbook,
@@ -3745,7 +3745,7 @@ examples owed are in the README-owed list.
 
 ## Batch 54: lightmap
 
-Eight jobs in `@margoengine/lightmap`, built on the Mac (M6 Mac mini, WebGPU on Metal) by lanes F, J and K, each in
+Eight jobs in `@margoengine/lightmap`, built on the Mac (Apple silicon Mac, WebGPU on Metal) by lanes F, J and K, each in
 its own optional entry or option, with no core or stage source changes (core 21,775 B and stage 3,222 B gzip, under 25,000).
 Rows the build phase left unfinished are in the finish-later list under 54.x; README examples are owed in
 the README-owed list.
@@ -3776,7 +3776,7 @@ the README-owed list.
 
 ## Batch 55: lighting2d
 
-Six optional 2D lighting entries, built in order on the dev PC, with no core or stage changes.
+Six optional 2D lighting entries, built in order on the workstation, with no core or stage changes.
 The initial all-package search and per-job README/export checks found none already implemented.
 Hard shadows, point/spot/directional lights, normal maps and occluder edge chains existed and
 are extended or built over. No job was skipped.
@@ -4004,7 +4004,7 @@ release retest stays recorded honestly; this batch did not change its budget or 
 
 ## Lane F batch 98: voxel-net
 
-Seven jobs for `@margoengine/voxel-net` on the M6 Mac mini, each landed as one commit, each a new optional entry or
+Seven jobs for `@margoengine/voxel-net` on the Apple silicon Mac, each landed as one commit, each a new optional entry or
 option; core and stage are untouched. Job 5 landed before job 4 on purpose: lag compensation sends its shots as the
 client-to-server app messages job 5 added. This last commit (job 7) also sets row 98 of work list 2
 to done.
@@ -4038,7 +4038,7 @@ to done.
   command") fails on the old file.
 - **Limits and unmeasured:** a row in `docs/limits.md` for each job. Everything ran on one machine; no test over a real
   lossy or slow network, no browser WebTransport client, no Postgres server, no certificate authority chain.
-- **Not done here:** batch 99 (voxel-pathtracer), the rest of stream F, was claimed by the dev PC on 2026-11-09
+- **Not done here:** batch 99 (voxel-pathtracer), the rest of stream F, was claimed by the workstation on 2026-11-09
   (0b7009d68), so this lane stops at 98.
 
 ## Required test items audit (2026-11-09, first group)
@@ -4853,7 +4853,7 @@ Core + stage remains 23,924 B. Logs: item3-rebased-*.log.
 
 ## Batch 64: scatter
 
-List 3 batch 64, run on list 2 (Mac mini M6). Every entry is optional and tree-shakable; core and stage source
+List 3 batch 64, run on list 2 (Apple silicon Mac M6). Every entry is optional and tree-shakable; core and stage source
 are unchanged.
 
 | Job | Status | Commit | Entry and evidence |
@@ -4882,7 +4882,7 @@ Left for later: job 3's run against a real phone or headset browser, relay strea
 
 ## List 3 batch 66: water (2026-11-10)
 
-Eight requested jobs for @margoengine/water. Jobs 1, 2, 3, 4, 6 and 7 were built on the Beelink; jobs 5 and 8 on the M6 Mac mini (list 2, lane K). Every entry is optional; core and stage source are unchanged.
+Eight requested jobs for @margoengine/water. Jobs 1, 2, 3, 4, 6 and 7 were built on the AMD mini PC; jobs 5 and 8 on the Apple silicon Mac (list 2, lane K). Every entry is optional; core and stage source are unchanged.
 
 | Job | Status | Commit | Entry and evidence |
 | --- | --- | --- | --- |
@@ -4893,13 +4893,13 @@ Eight requested jobs for @margoengine/water. Jobs 1, 2, 3, 4, 6 and 7 were built
 | 5. Underwater rendering | DONE | ee255b572 | water/underwater; extinction within 0.0007 relative on Metal WebGPU and compat |
 | 6. Caustics | DONE | 3369f2e4f | water/caustics |
 | 7. Wakes and object interaction | DONE | fbf4775c3 | water/ripples (not /wakes) |
-| 8. Flowing rivers on steep beds | DONE | this commit | water/rivers; GPU against float64 model within 9.2e-6 m, 0.168 ms against 0.155 ms per frame on 256 x 256 (M6 Mac mini, loaded) |
+| 8. Flowing rivers on steep beds | DONE | this commit | water/rivers; GPU against float64 model within 9.2e-6 m, 0.168 ms against 0.155 ms per frame on 256 x 256 (Apple silicon Mac, loaded) |
 
 Job 5 landed with push-anyway (Scott, 2026-11-10) after its gates had passed except the then known-red webgl2-compat isolation step. Job 8 landed by the fast landing flow: water package tests (55 pass) and the rivers, coast, still, flow and bodies GPU checks on Metal WebGPU, rivers also with --compat. README examples are owed (readme-owed.md); leftovers are in finish-later.md (66.5, 66.8). No test, tolerance or budget was loosened. This commit sets row 66 done.
 
 ## Batch 67: water bodies, wave scattering and rain (2026-11-10)
 
-Three water jobs, started on the Beelink and finished on the M6 Mac mini (lane N). Each is an optional water entry, so the water root entry and core plus stage do not grow.
+Three water jobs, started on the AMD mini PC and finished on the Apple silicon Mac (lane N). Each is an optional water entry, so the water root entry and core plus stage do not grow.
 
 | Job | Feature | Status | Commit | Result |
 | --- | --- | --- | --- | --- |
@@ -4915,7 +4915,7 @@ Limits and unmeasured: bodies have no holes or islands and no per-body foam or f
 
 ## List 4 on the Mac: batches 121, R5 and 132 (2026-11-10)
 
-Run on the M6 Mac mini (Metal through WebGPU, ANGLE on Metal for the WebGL2 layer, Safari and WebKit 27.2). Every
+Run on the Apple silicon Mac (Metal through WebGPU, ANGLE on Metal for the WebGL2 layer, Safari and WebKit 27.2). Every
 commit landed with `push-anyway` (no repository gates at push time; each job ran its own package's CPU tests and its
 GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
 [perf-history.md](perf-history.md#what-our-checks-caught-and-what-we-got-wrong-2026-11-10-the-mac).
@@ -4937,9 +4937,9 @@ GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
   `implicitFootprint` oblique-gradient case, ANGLE's dropped draw after a texture upload, which is worked around in
   `60552800e` but not reported upstream) are in [known-bugs.md](../known-bugs.md).
 
-## List 5 on the Beelink: batch R6, AMD GPU bug hunt (2026-11-10)
+## List 5 on the AMD mini PC: batch R6, AMD GPU bug hunt (2026-11-10)
 
-Run on the Beelink (AMD Radeon 680M, RDNA 2 iGPU, driver 32.0.21030.2001, Windows 11; Chromium with WebGPU on Dawn
+Run on the AMD mini PC (AMD Radeon 680M, RDNA 2 iGPU, driver 32.0.21030.2001, Windows 11; Chromium with WebGPU on Dawn
 D3D12 and the WebGL2 layer on ANGLE D3D11), the project's only AMD GPU. Every package's GPU and browser tests ran on
 both backends, one GPU slot, the mini-pc heat profile; the failed suites ran again on current main after the fixes.
 Every row, with what came out, the cause and its state, is in the AMD GPU hunt list.
@@ -4954,7 +4954,7 @@ Every row, with what came out, the cause and its state, is in the AMD GPU hunt l
   transitions texel-edge oracle (row 21), the binary16 colour export (row 25).
 - **Open, for Scott or a dedicated hunt:** the weather lens long-time bound is below the shader's own f32 rounding
   (row 24, known-bugs); the instanced frame's allocation in core's `uploadRows` (row 15, core); compat-only rows 26,
-  28 and 29; rows 16 to 18 belong to the dev PC's commits of the same day.
+  28 and 29; rows 16 to 18 belong to the workstation's commits of the same day.
 - **Machine:** ffmpeg n9.0 installed for the headless check, from the build linked by ffmpeg.org, sha256 checked.
 - **Reruns on `b187ac2d4` (2026-11-11, after the 11/10 19:09 crash):** row 15 fixed by `2bea967e7` (304 B left, the
   open Edge 157 entry, same figures here); row 24 passes (4.05e-5 on both backends) after `eefc81bbc` and the f32
@@ -4967,12 +4967,12 @@ Every row, with what came out, the cause and its state, is in the AMD GPU hunt l
   9,105) on both backends; the 3x stays, and a local break (every blade decoded as blade 0) fails it. Row 18
   export-media: the 680M draws lines into render targets of 128 px or less with colours 1 apart; tiles now draw into
   targets of at least 256 px, and every tile size from 32 to 512 gives the whole image's bytes on both backends. Row
-  19 stays with the dev PC (the path tracer is banned on this machine); the dedicated hunts stay open, so the list 5
+  19 stays with the workstation (the path tracer is banned on this machine); the dedicated hunts stay open, so the list 5
   row stays in progress.
 
-## List 5 on the Beelink: batch I1, packages work together, part 1 (2026-11-10 to 2026-11-11)
+## List 5 on the AMD mini PC: batch I1, packages work together, part 1 (2026-11-10 to 2026-11-11)
 
-Run on the Beelink (AMD Radeon 680M, Windows 11; Chromium with WebGPU on Dawn D3D12 and the WebGL2 layer on ANGLE
+Run on the AMD mini PC (AMD Radeon 680M, Windows 11; Chromium with WebGPU on Dawn D3D12 and the WebGL2 layer on ANGLE
 D3D11), one GPU slot, the mini-pc heat profile. Sciviz stays out until its batches 175, 176 and 178 are done.
 
 - **J5, packaging (`fb8ac941d`, CPU only):** `examples/all-entries/entries.ts`, generated from the exports maps, imports

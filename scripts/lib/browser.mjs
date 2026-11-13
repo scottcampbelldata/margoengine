@@ -206,7 +206,7 @@ async function listOwnedPids(browser, listMs) {
 /**
  * How long a close waits for the host's word that the ended processes are gone before it moves on without it. Not a
  * budget: nothing fails when it runs out. The host keeps waiting (`REAP_MS`) and records any survivor in `HOST_LOG`.
- * Measured exits after `TerminateProcess` on the dev PC: 65 ms to 1.2 s beside the batches, 8.7 s beside `verify`.
+ * Measured exits after `TerminateProcess` on the workstation: 65 ms to 1.2 s beside the batches, 8.7 s beside `verify`.
  */
 export const TEARDOWN_GRACE_MS = 2_000;
 

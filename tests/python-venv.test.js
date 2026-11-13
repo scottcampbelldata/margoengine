@@ -195,7 +195,7 @@ const probe = (versions) => (command, args) => {
 };
 
 test('picks 3.13, 3.12 or 3.14, never a newer Python the pinned PyYAML has no wheel for (bug 24b)', () => {
-  // Python 3.15 is first on PATH, as on the Beelink; the py launcher also has 3.12.
+  // Python 3.15 is first on PATH, as on the AMD mini PC; the py launcher also has 3.12.
   const { exec } = fake(probe({ python: '3.15.0', python3: '3.15.0', 'py -3.12': '3.12.7' }));
   assert.deepEqual(findPython({ env: {}, exec, platform: 'win32' }), { command: ['py', '-3.12'], version: '3.12.7' });
   const linux = fake(probe({ python3: '3.15.0', 'python3.12': '3.12.4' }));
@@ -453,7 +453,7 @@ test('a freshly made venv whose interpreter is not its own is removed with the r
   }
 });
 
-// Mac bug (2026-11-07): the Jupyter check never ran on the M6 Mac mini. Its only Python is python.org's 3.14 (python3),
+// Mac bug (2026-11-07): the Jupyter check never ran on the Apple silicon Mac. Its only Python is python.org's 3.14 (python3),
 // which the check refused, and pip could not have installed the pins there anyway: pywinpty, a Windows-only dependency
 // of terminado taken from a Windows freeze, was pinned with no marker and has no macOS or Linux build.
 test('takes Python 3.14 (every pin has a 3.14 wheel), still after 3.13 and 3.12', () => {

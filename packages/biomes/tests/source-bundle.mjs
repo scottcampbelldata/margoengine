@@ -1,7 +1,7 @@
 // The hardware checks bundle the package from src. Every `@margoengine/biomes/<entry>` that a source loads by package
 // name must resolve to src too: a name left to node_modules pulls in the built dist copy, whose module state (the GPU
 // world registry, the erosion hook) is not the one src reads, and a check then passes while the GPU stage it names
-// never ran (the Beelink "GPU stage was not exercised: counts" failure, 2026-11-05).
+// never ran (the AMD mini PC "GPU stage was not exercised: counts" failure, 2026-11-05).
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

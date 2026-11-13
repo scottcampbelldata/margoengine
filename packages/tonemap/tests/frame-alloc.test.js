@@ -1,4 +1,4 @@
-// Bug (test:frame-alloc:browser on the M6 Mac mini, 2026-11-08): the post scene's steady frame read 1,688 B against its
+// Bug (test:frame-alloc:browser on the Apple silicon Mac, 2026-11-08): the post scene's steady frame read 1,688 B against its
 // 1,528 B floor. Tonemap's grading pass, recorded every frame, had come to allocate on each call: an empty extensions
 // array when none were given, a flatMap result and the closures of flatMap, some and forEach over the extensions,
 // a for-of iterator, and the pipeline key string. A frame without extensions now makes none of them, and the key is

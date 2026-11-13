@@ -798,7 +798,7 @@ export class PlazaRouter {
     this.#timers.add(timer);
   }
 
-  // The admin socket, for admin.mjs over SSH: one JSON line in, one out.
+  // The admin socket, for admin.mjs from a remote shell: one JSON line in, one out.
   async #listenAdmin() {
     const path = adminPath(this.#o.dataDir);
     if (process.platform !== 'win32') await rm(path, { force: true });

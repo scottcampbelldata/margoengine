@@ -107,7 +107,7 @@ try {
   assert.ok(Math.abs(rows.sharp.mean - rows.plain.mean) < 2, 'a row keeps its mean');
   // The CPU reference reads the plain frame rounded to 8 bits (half a level per tap) and the GPU's output is rounded too.
   // On these stripes room <= 0.334 (worst of 0.4 + 0.38 sin over 3 taps a pixel apart), so |k| <= 0.067 and the input
-  // error grows by at most (1 + 4|k|) / (1 + 4k) = 1.73: 0.87 + 0.5 = 1.37 levels. M6 Mac mini, Metal: 0.90.
+  // error grows by at most (1 + 4|k|) / (1 + 4k) = 1.73: 0.87 + 0.5 = 1.37 levels. Apple silicon Mac, Metal: 0.90.
   assert.ok(miss <= 1.4, `the GPU matches the CPU sharpen within 1.4 levels (${miss.toFixed(2)})`);
   assert.ok(moved > 1000, `the sharpen changes the frame (${moved} pixels)`);
   assert.deepEqual(await page.evaluate(() => window.t.gpuErrors()), []);

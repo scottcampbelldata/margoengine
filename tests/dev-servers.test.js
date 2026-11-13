@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 
 // Local CI (2026-11-11, commit 2a4eb62dbe) failed 16 servers with "Port 5401 ... 5416 is already in use": the check
-// gave server n the fixed port 5400 + n, and other work on the dev PC (GPU suites such as packages/toon on 5400 and
+// gave server n the fixed port 5400 + n, and other work on the workstation (GPU suites such as packages/toon on 5400 and
 // 5401, another lane's dev servers) held those ports. The check now asks the operating system for a free port per
 // server, so it passes while its old first port is held by another process.
 test('the root dev server starts without a dependency scan failure, while port 5400 is held by another process', { timeout: 150_000 }, async () => {
@@ -61,7 +61,7 @@ test('the root Vite config leaves every top-level git-ignored folder out of the 
 
 // The root server's file watcher used to crawl the whole checkout at start (chokidar opens one native watch per file:
 // about 30,000 here, built packages, examples and tests). Requests waited on that crawl, so the first sciviz demo after
-// `npm run dev:examples` took 38.5 to 55.6 s on the dev PC, and every tab already open at the start waited with it.
+// `npm run dev:examples` took 38.5 to 55.6 s on the workstation, and every tab already open at the start waited with it.
 // vite.config.mjs now watches only what the server serves. Work counts, not times: at ready the watcher holds a few
 // paths, after three demo tabs load at once it holds exactly the files they were served, and a served file still
 // reports its edit (which is what reloads the page).

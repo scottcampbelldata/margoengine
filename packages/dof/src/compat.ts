@@ -31,7 +31,7 @@ export const cocPixelShader = ({ cocShader, groupMax }: DOFShaders): string =>
     // keeps the nearest of the four: a silhouette pixel the object only partly covers then holds the background's
     // depth with the object's colour blended in, and every far gather around it picks that colour up, a faint ring
     // as wide as maxRadius around each bright object. The nearest depth of the pixel and its four neighbours puts
-    // those pixels back on the object (measured on the M6 Mac mini, Metal: the closest of the 3x3, plus, and one-
+    // those pixels back on the object (measured on the Apple silicon Mac, Metal: the closest of the 3x3, plus, and one-
     // sided neighbourhoods to the WebGPU route's pixels). p.ortho.w is 1 when the capture is multisampled.
     [
       'let d=textureLoad(depth,vec2i(id.xy),0);',

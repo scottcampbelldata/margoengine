@@ -392,7 +392,7 @@ engine.start();
   comparisons filter it against the receiver's tangent plane. Such a light's map covers its cone (a point light's
   cube face) plus a 0.1 UV guard band, the area lights' face tangent of 1.25, so the filter reads its own face; the
   map is the same size, so its texels are 25% wider than a radius 0 light's.
-- Proof, on an Apple Mac mini GPU (Metal) through `scripts/clustered-shadow-gpu-check.js`: a bar 1.5 over a
+- Proof, on an Apple silicon Mac GPU (Metal) through `scripts/clustered-shadow-gpu-check.js`: a bar 1.5 over a
   floor, lights 3 and 4.5 high. The 10-90% penumbra on the floor is within 2% of a disc light's analytic width,
   `1.374 radius (receiver - blocker) / blocker`, for a point light of radius 0.2 and 0.4 at blocker ratio 1, radius
   0.4 at ratio 0.5, and a spot of radius 0.4; doubling the radius or the ratio doubles it.

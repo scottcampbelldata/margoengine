@@ -72,11 +72,10 @@ project without the packages fails with `unsupported`.
 
 ## Porting guide
 
-`port_to_margo` reads the parity matrix and the "Coming from" guide in the repository's `docs/` (one row per
-feature of the other library, 195 rows today), copied into the package at build time, so a model converting code
-gets the Margo package, the calls, the status and the worked code in one answer. The library the guide compares
-comes from the docs: a docs page with a `## Matrix` table whose columns are `<library> | Status | Margo | Shows it |
-Notes` is a guide, and the page titled `Coming from <library>` gives its code sections. The lookup is also an entry
+`port_to_margo` reads the parity matrix in the repository's `docs/` (one row per
+feature, copied into the package at build time), so a lookup gets the Margo package, the calls and the status
+in one answer. A docs page with a `## Matrix` table whose columns are `<library> | Status | Margo | Shows it |
+Notes` is a guide. A page titled `Coming from <library>` adds code sections when that page is in the docs. The lookup is also an entry
 of its own, `@margoengine/mcp/porting`:
 
 ```ts

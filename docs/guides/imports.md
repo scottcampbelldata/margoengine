@@ -139,16 +139,3 @@ webpack, esbuild, Rollup and Next.js (webpack and Turbopack), checking each bund
 - `margoengine/<name>` and `@margoengine/<name>` are the same module. Mixing them in one app is fine; there is only
   ever one copy of each class.
 - A heavier feature can load when it is first used: `await import('margoengine/physics')`.
-
-## Coming from three.js
-
-| three.js | Margo Engine |
-| --- | --- |
-| `npm i three` | `npm i margoengine` |
-| `import * as THREE from 'three'` | `import * as M from 'margoengine'` |
-| `three/addons/loaders/GLTFLoader.js` | `margoengine/gltf-pro` (`loadGLTF`) |
-| `three/addons/controls/OrbitControls.js` | `margoengine/controls/orbit` |
-| `three/addons/postprocessing/EffectComposer.js` | `margoengine/post/stack` |
-| `three/addons/exporters/GLTFExporter.js` | `margoengine/exporters` (`exportGLB`) |
-
-More in [from-threejs.md](../from-threejs.md).

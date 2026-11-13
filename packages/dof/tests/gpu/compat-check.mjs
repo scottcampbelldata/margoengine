@@ -6,7 +6,7 @@
 // RGB difference), and every bokeh must cover the same pixels within 1 px each way. The scene before the blur ('sharp')
 // and a one-sample capture ('focus 1x') must match exactly: every difference left comes from the layer reading a
 // multisampled depth as one sample, which DOF's WebGL2 route widens back over silhouettes (src/compat.ts; measured
-// on the M6 Mac mini, Metal: 0.02% to 0.09% of pixels with d > 2, mean d at most 0.018; before that fix the 'focus'
+// on the Apple silicon Mac, Metal: 0.02% to 0.09% of pixels with d > 2, mean d at most 0.018; before that fix the 'focus'
 // case, no lens, drew a faint ring 72 px wide where native WebGPU draws 31). Autofocus must find the same focus on
 // both. Temporal DOF also draws on the layer through independent half-image and tile-max passes.
 import assert from 'node:assert/strict';

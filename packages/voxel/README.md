@@ -1054,7 +1054,7 @@ lod.stats; // {nodes: [per level], pending}
 - **Errors.** `TypeError` for a wrong world, generator, eye or option type, `RangeError` for options out of range.
 
 GPU check (`node packages/voxel/tests/lod-browser-check.mjs`, in `test:gpu`): a world drawn at scale 2 from twice the
-eye, near and far gives the same image as at scale 1 (0 of 29,823 drawn pixels differ on the M6 Mac mini, Metal), and four
+eye, near and far gives the same image as at scale 1 (0 of 29,823 drawn pixels differ on the Apple silicon Mac, Metal), and four
 levels of `noiseTerrainLod` draw terrain to the horizon from 90 blocks up with no validation error. Node generation runs
 on the main thread (about a millisecond a node; `budget` caps it per frame); frame cost at kilometre views is unmeasured.
 
@@ -1096,7 +1096,7 @@ lighting.dispose();
   `'attached'` for a second one on a world, `'disposed'` after `dispose()`; a worker failure is thrown by the next
   `update()` or `settled()`. Do not attach `VoxelLighting` to the same world.
 
-Measured with Node on the M6 Mac mini while other lanes ran (diagnostic; `node --test
+Measured with Node on the Apple silicon Mac while other lanes ran (diagnostic; `node --test
 packages/voxel/tests/light-worker-benchmark.test.js` prints yours): removing a 32 x 32 stone roof over a 39-deep room (89,088 cells) took 4.5-8.4 ms
 of `VoxelLighting.update()` on the page; with `VoxelLightWorker` the page spent 0.12-0.37 ms posting the edits and
 0.01-0.03 ms writing the 18 chunks back.
@@ -1154,7 +1154,7 @@ colored.setColor('lamp', [0.2, 1, 0.3]); // live
 
 GPU check (`node packages/voxel/tests/light-rgb-browser-check.mjs`, in `test:gpu`): a closed room with a red torch and
 a blue lamp, the renderer's block light off, is black without the effect and red by the torch, blue by the lamp with it
-(M6 Mac mini, Metal).
+(Apple silicon Mac, Metal).
 
 
 ## Flowing liquids (`@margoengine/voxel/fluids`)
@@ -1275,7 +1275,7 @@ console.log(mesh?.opaque.length, mesher.stats); // 3 words per quad; { gpu, cpu,
 ```
 
 - **Same output.** Faces, ambient occlusion, smooth light, greedy merges, cross blocks, liquid levels and visibility
-  match `meshChunk` word for word (checked on every chunk of a lit test terrain on the M6 Mac mini's Metal GPU).
+  match `meshChunk` word for word (checked on every chunk of a lit test terrain on the Apple silicon Mac's Metal GPU).
 - **Batches.** `mesh(world, key, priority, eye)` works like `VoxelMesher.mesh`: calls made in the same task go out
   together, up to `batch` chunks per dispatch (default 8, 1 to 32), lowest priority first; a newer call for a key
   supersedes the older one (null), `cancel(key)` drops one. Each batch slot takes about 3.5 MB of GPU memory.

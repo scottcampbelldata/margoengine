@@ -371,7 +371,7 @@ ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may 
   more bounce, so a room open to the sun fills with light and a still view settles to all of them. A hit the previous
   frame did not see on screen (and the first frame) takes the current input, so the first frame is exactly one bounce.
   The results ping-pong between two `rgba16float` targets; SSGI then hands the newer one to the next HDR effect, or
-  draws it with the display transform when it ends the stack. Checked on a real GPU (M6 Mac mini, Metal, Chromium;
+  draws it with the display transform when it ends the stack. Checked on a real GPU (Apple silicon Mac, Metal, Chromium;
   `node packages/post/test/ssgi-bounce-browser.mjs`): a white room open toward the camera, its ceiling over the back
   half: the first multi-bounce frame equals one bounce within 1/255 (the `rgba16float` step), after 42 frames the
   mean luma is 10.4/255 higher with 57,229 of 76,800 pixels brighter by more than 2/255, the next frame changes
@@ -765,7 +765,7 @@ sss.options.profile = [1, 0.85, 0.7]; // marble: options are read every frame
   keeps its size at any distance and works for orthographic cameras. Weights are normalised per channel, so a flat
   colour stays exactly that colour. A tap off the mask, on the background or across a depth step (a gap larger than
   `radius`) counts as the centre colour, so light does not bleed across silhouettes or onto unmarked objects.
-- **Checked on a real GPU** (`packages/post/test/sss-browser.mjs`, M6 Mac mini, Metal, Chromium): a light
+- **Checked on a real GPU** (`packages/post/test/sss-browser.mjs`, Apple silicon Mac, Metal, Chromium): a light
   and a dark box meeting in an edge, both masked, `radius` 0.12, 16 taps: the 10 to 90% edge is 15 px wide in red, 6 in
   green and 3 in blue (sharp without SSS), the flat faces keep their colour to 0/255, the background is untouched, and
   no mask equals no effect exactly.
@@ -803,7 +803,7 @@ streaks.options.tint = [1, 0.8, 0.6]; // warm streaks: options are read every fr
   taking the brightest of each four rows so a one-pixel light is never lost. Then `passes` horizontal passes of 9 taps
   each, pass k spaced 3^k texels apart with weights exp(-|i|/2): a chain of growing sparse kernels whose product is one
   smooth falloff. The composite adds the streaks times `intensity` and `tint`, sampled bilinearly back to full size.
-- **Checked on a real GPU** (`packages/post/test/anamorphic-browser.mjs`, M6 Mac mini, Metal, Chromium): one small
+- **Checked on a real GPU** (`packages/post/test/anamorphic-browser.mjs`, Apple silicon Mac, Metal, Chromium): one small
   white box in a dark frame, threshold 0.4: its row brightens out to both frame edges, rows 24 px or more above and
   below are unchanged to the bit, and a threshold above everything equals the effect disabled exactly.
 - **Limits.** Horizontal only; one colour per streak (no rainbow split); streaks are about 4 px tall. Two quarter-size
@@ -835,7 +835,7 @@ glass.radius = 4; // a focus pull: options are read every frame
 - **Method.** Separable: a horizontal pass of 2 radius + 1 taps into an `rgba16float` texture, then a vertical pass.
   Gaussian weights exp(-x^2 / (2 sigma^2)) normalised over the taps, box weights all equal. Taps past the frame edge
   read the nearest pixel.
-- **Checked on a real GPU** (`packages/post/test/blur-browser.mjs`, M6 Mac mini, Metal, Chromium): a box blur of
+- **Checked on a real GPU** (`packages/post/test/blur-browser.mjs`, Apple silicon Mac, Metal, Chromium): a box blur of
   radius 6 over a light and dark edge changes exactly 12 pixels on each middle row, all within 7 px of the edge; with
   `region` the top half, the bottom half equals the unblurred frame to the bit; radius 0 equals disabled exactly.
 - **Limits.** Cost grows with the radius (2 radius + 1 reads a pixel a pass); the region has a hard edge; a bright
@@ -871,7 +871,7 @@ lens.options.distortion = -0.1; // pincushion: options are read every frame
   centre c; for barrel s scales the corners back onto the corners. The dirt glow is the light above `threshold`
   averaged over 8 by 8 pixel blocks, blurred by a 25-tap Gaussian across and down at an eighth of the size, and added
   times the dirt at the undistorted point (the dirt sits on the glass).
-- **Checked on a real GPU** (`packages/post/test/lens-browser.mjs`, M6 Mac mini, Metal, Chromium): with k 0.3 a bar
+- **Checked on a real GPU** (`packages/post/test/lens-browser.mjs`, Apple silicon Mac, Metal, Chromium): with k 0.3 a bar
   moves to within 0.13 px of where the mapping predicts; with dirt white on the left half and black on the right, the
   dark background around the left bar brightens and the right half equals the frame without the effect to the bit; a
   threshold above everything, and no distortion with no dirt, equal disabled exactly.
@@ -1015,7 +1015,7 @@ console.log(`${decals.drawn} of ${decals.count} decals drawn`);
   'neutral'); over a cube's top edge the top face is marked and the 90-degree side faces are untouched (0/255), and the
   floor below the box's depth range stays untouched; an `over` decal on the atlas's red quadrant shows exactly
   tonemap(0.6, 0, 0); a box containing the camera still draws; an empty Decals equals none.
-- **Culling check** (M6 Mac mini, Metal, Chromium; `node packages/post/test/decals-cull-browser.mjs`): 4,096 decals
+- **Culling check** (Apple silicon Mac, Metal, Chromium; `node packages/post/test/decals-cull-browser.mjs`): 4,096 decals
   with one on screen (2,000 beside the view, 2,045 behind the camera, 50 under a tenth of a pixel across) equal the frame
   with that decal alone exactly, and `drawn` is 1. On the CPU, 200 random spheres anywhere in view, from 0.5 to 60 m:
   none whose real projected span (4,000 surface points) reaches `minPixels` is culled.
@@ -1072,7 +1072,7 @@ decals.setDecals([
 - **Light.** The relight uses core's lit model (Lambert plus GGX, the sun and the ambient of `engine.lighting`). Core
   meshes match it; gltf-pro and materials models, which add image-based light and more lights, get the sun and ambient
   part of the change only.
-- **Checks** (M6 Mac mini, Metal, Chromium; `node packages/post/test/material-decals-browser.mjs`): on a rough grey
+- **Checks** (Apple silicon Mac, Metal, Chromium; `node packages/post/test/material-decals-browser.mjs`): on a rough grey
   floor seen along the sun's mirror direction, a 1 m decal with a normal tilted 45 degrees toward the sun brightens
   3,949 pixels and darkens none, tilted away darkens 3,949 and brightens none, roughness 0.05 shows the highlight,
   metalness 1 darkens all it covers; a decal that changes nothing, no capture and `enabled: false` each equal the frame

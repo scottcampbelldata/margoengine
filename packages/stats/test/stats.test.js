@@ -552,7 +552,7 @@ test('unsupported devices and overflow omit GPU timing without creating invalid 
 });
 
 test('a pass that starts before the previous one ends is timed, as tile-based GPUs overlap passes', async (t) => {
-  // Recorded on the M6 Mac mini (Chrome, Metal) by the gallery's model cabinet: the second pass starts 1,416 ns before
+  // Recorded on the Apple silicon Mac (Chrome, Metal) by the gallery's model cabinet: the second pass starts 1,416 ns before
   // the first ends, on every frame. The profiler threw "time went backwards" and Stats logged it each sample.
   const { device, encoder, timestamps } = gpu(t),
     profiler = new GPUProfiler(device),

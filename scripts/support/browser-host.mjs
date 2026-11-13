@@ -3,7 +3,7 @@
 //
 // Why. After `TerminateProcess` the browser's exit code is set within about 60 ms, but Windows signals its process
 // object only once the kernel has torn the process down (handle table, address space, the GPU driver's share of both).
-// Measured on the dev PC (RTX A6000, Windows 11, Edge): 65 ms to 1.2 s beside the batches, 8.7 s beside `verify`, over
+// Measured on the workstation (RTX A6000, Windows 11, Edge): 65 ms to 1.2 s beside the batches, 8.7 s beside `verify`, over
 // 30 s in the failure that blocked batches 160, 171 and 234. Nothing in Margo runs during that time, and nothing can
 // shorten it. Everything of Playwright's that waits on that signal (the process handle, the stdio and CDP pipes, the
 // WebSocket server and the temporary profile removal) lives here, in this process. The suite ends the browser through

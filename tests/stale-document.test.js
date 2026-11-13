@@ -5,7 +5,7 @@
 // holdStaleDocumentGpu (scripts/support/stale-document.js) in every page.
 //
 // The first test runs in any browser. The second is the navigation itself: without the init script it fails under
-// MARGO_BROWSER=webkit (Apple M6 Mac, 2026-11-11) and passes in Chromium either way. Both pass in WebKit with it.
+// MARGO_BROWSER=webkit (Apple silicon Mac, 2026-11-11) and passes in Chromium either way. Both pass in WebKit with it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';

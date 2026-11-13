@@ -540,6 +540,20 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 - Automated runs in more places: Android, iPhone, macOS Safari, and more of the suites in Firefox and on Apple silicon.
 - Published benchmark comparisons with their method and raw results.
 
+## How the engine is built
+
+AI agents write the code. Scott Campbell sets the rules in [AGENTS.md](AGENTS.md). A core change, or a change that removes or renames an export of a locked package, waits for his yes.
+
+Every GPU check runs on our own machines, on real GPUs: NVIDIA RTX A6000, Intel Arc 140V, AMD Radeon 680M, and Apple silicon. Hosted runners have no GPU, so the workflows under `.github/workflows` are the CPU checks. The GPU checks run on those four machines.
+
+The [Size](#size) section states the measured core and stage gzip. The build fails at 25,000 bytes (`scripts/core-budget.js`, through `npm run build:packages` and `npm run measure:size`).
+
+A bug fix comes with a regression test that fails without the fix. A commit whose subject starts with `fix` changes a test file, or names the existing test in the message. A public claim goes in the same change, with its proof, in [docs/whitepaper/claims.md](docs/whitepaper/claims.md). `npm run api:check` fails when the reports in `api/` do not match the exports. Open bugs are written up with a repro and the cause in [docs/known-bugs.md](docs/known-bugs.md).
+
+Runtime dependencies are an allowlist. [scripts/supply-chain.mjs](scripts/supply-chain.mjs) accepts only MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, Zlib and 0BSD, and each one needs a written reason. `node scripts/supply-chain.mjs --check` fails when a new dependency has no reason.
+
+The docs are run by tests. `npm run check:readmes` type-checks README examples, and `npm run check:readme-run` runs them. [site/llms.txt](site/llms.txt) and [site/llms-full.txt](site/llms-full.txt) are generated from the docs and package READMEs, and `tests/llms.test.js` fails when they are stale. [@margoengine/mcp](packages/mcp/README.md) serves that same material to AI tools: search the docs, read a package API report, and type-check a snippet against the real types.
+
 ## Contributing
 
 Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, tests and what a good pull

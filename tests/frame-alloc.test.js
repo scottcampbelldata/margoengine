@@ -148,7 +148,7 @@ test('the cascade fit and the stable matrix inverse allocate little in the middl
 });
 
 // Regression (frame-alloc check on macOS, 2026-11-07): the post scene read 1,804 B a frame against its 1,528 B floor in
-// Chrome, Edge and Chromium 156 on an M6 Mac mini, whatever the V8 compiler-thread flags. SceneTarget.copyDepth, three
+// Chrome, Edge and Chromium 156 on an Apple silicon Mac, whatever the V8 compiler-thread flags. SceneTarget.copyDepth, three
 // calls a frame, allocated 92 B a call there that the Windows measurement did not: a 28 B context for the closures of
 // its once-only pipeline setup, made on every call, and a for-of iterator with its two results. At Maglev in Node the
 // same code allocates 552 B a frame. Its setup now lives outside the method and it loops by index.

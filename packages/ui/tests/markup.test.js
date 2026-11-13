@@ -15,7 +15,7 @@ test('parseMarkup reads elements, attributes, text, comments and character refer
   assert.deepEqual(root.attributes, { id: 'pause', class: 'menu big' });
   assert.equal(root.line, 3);
   assert.equal(root.children.length, 2);
-  assert.equal(root.children[0].text, 'Paused & waiting — !');
+  assert.equal(root.children[0].text, 'Paused & waiting \u2014 !');
   assert.deepEqual(root.children[1].attributes, { 'on-click': 'resume' });
   assert.equal(root.children[1].line, 5);
 });

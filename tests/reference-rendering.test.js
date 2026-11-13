@@ -199,7 +199,7 @@ test('volume transport budgets are the 2026-11-11 re-recorded measurements', () 
 });
 
 // Batch 160 job 5, measured on main's area-filter mip chain (65098f33fe): NVIDIA rows are the shared budget, the AMD
-// rows (re-measured 2026-11-11 on the dev PC's AMD RDNA2 iGPU after edcb6debb7, KB3584)
+// rows (re-measured 2026-11-11 on the workstation's AMD RDNA2 iGPU after edcb6debb7, KB3584)
 // rows gate AMD proofs. Each row: native absolute, compat absolute, native square, compat square.
 for (const [family, primitives, nvidia, amd] of [
   ['specular', 24, [877623, 877629, 45728851, 45729151], [879353, 873565, 45729003, 45668835]],

@@ -24,7 +24,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 ### Open 2026-11-12: sciviz bricks weight-model bound depends on the GPU's sin (AMD GPU hunt R7 row 42)
 
-- **Repro:** on the Beelink (Radeon 680M), `node packages/sciviz/tests/bricks-browser.mjs` (sciviz `test:browser`
+- **Repro:** on the AMD mini PC (Radeon 680M), `node packages/sciviz/tests/bricks-browser.mjs` (sciviz `test:browser`
   step 2), native WebGPU: "each hardware-filtered march stays within the 8-bit weight model of exact filtering" fails
   with bound 3 and hardware 4 on both marches (whole 701, bricked 700 of 172,800 pixels differ from exact, at most 4
   levels), in the sweep and alone. Every other brick check passes, exact against exact included.
@@ -37,7 +37,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   because its pattern of the model moved the picture less.
 - **Fix to build (needs a maintainer decision):** a model whose sign pattern is the same on every GPU (an integer hash of a quantized
   position, the march's own float positions differ in the last bits between GPUs), with the bound measured again on
-  the dev PC and here; or a bound that is the worst over the model, not one sample of it. Either changes what the
+  the workstation and here; or a bound that is the worst over the model, not one sample of it. Either changes what the
   check accepts, so it waits for Scott's ruling; the bound is not raised here.
 
 ### Open in core only: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
@@ -62,12 +62,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   tests/support/metal-mix.js). Clustered's sampling-text pins and materials' GGX loop text moved with the BRDF text
   (the clustered sampling text with the old BRDF text put back hashes to the old pins); six --current proofs advance.
   Landed: fix 1fdb55908, proof advance 8d6b26b84 (size budgets of materials mips and skin moved 4 and 10 bytes with
-  the reason). GPU on the Beelink, WebGPU and compat: clustered, animation, lod, post, voxel, materials and
+  the reason). GPU on the AMD mini PC, WebGPU and compat: clustered, animation, lod, post, voxel, materials and
   webgl2-compat (test:gpu with its path tracer step excluded by profile, see 1974f0bc0) 100 of 100 runs pass.
 - **Still open, core (Scott's call):** `packages/core/src/shaders.ts` keeps the metal-mixed weight until its held core
   commit lands. Until then a part-metal core mesh is darker than the same surface lit by a clustered light, a
   material decal relit over it, or its imposter (which now match the specification).
-- **Re-record on the dev PC:** every lit picture with a part-metal surface moves, so the visual baselines of part-metal
+- **Re-record on the workstation:** every lit picture with a part-metal surface moves, so the visual baselines of part-metal
   views (baselines are per machine) and any batch 160 budget that holds such a surface outside gltf-pro are re-recorded
   there.
 
@@ -88,7 +88,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 ### Open 2026-11-12: Vite test servers keep the HMR socket, and a failed one fails the test (AMD GPU hunt R7 row 38)
 
-- **Repro:** on the Beelink, with two other helpers testing, `decoders test:browser` (packages/decoders/scripts/test-browser.js)
+- **Repro:** on the AMD mini PC, with two other helpers testing, `decoders test:browser` (packages/decoders/scripts/test-browser.js)
   failed once with page console errors only: `WebSocket connection to 'ws://127.0.0.1:61962/?token=...' failed: ...
   net::ERR_NO_BUFFER_SPACE`, then `ws://127.0.0.1:0/` `net::ERR_UNSAFE_PORT` and `[vite] failed to connect to websocket`.
   Every decoder check passed; it passes alone. Not AMD and not time.
@@ -101,11 +101,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix (not landed):** `server: { host: '127.0.0.1', port: 0, hmr: false, watch: null }` as cache's, the README runner's
   and the visual suites' servers have, with a root check that every package browser script's Vite server turns HMR off.
   Blocked on this machine: a decoders change runs decoders' AVIF and Draco `cargo test`, which need the MSVC linker
-  (machines.md); the fix and its check go together, so they land on the dev PC or after Build Tools are installed here.
+  (the landing notes); the fix and its check go together, so they land on the workstation or after Build Tools are installed here.
 
 ### Fixed 2026-11-12: Radeon 680M, biomes flythrough on the WebGL2 layer took 0.5 to 0.75 s a frame (AMD GPU hunt row 34)
 
-- **Repro:** on the Beelink (Radeon 680M, Chromium with ANGLE D3D11),
+- **Repro:** on the AMD mini PC (Radeon 680M, Chromium with ANGLE D3D11),
   `MARGO_COMPAT=1 MARGO_MACHINE_PROFILE=mini-pc node packages/biomes/tests/flythrough-check.mjs` passed every
   scheduling check, then was ended by its own 15 minute GPU hold after 916 s; it needs about 2,000 frames and could not
   fit the 12.5 minute (750 s) suite limit. On WebGPU it passes in 286 s. Not a hang: the cost was the same every frame.
@@ -345,7 +345,7 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   (fails before: 0.00002 against 0.83).
 - **Still open:** core's own copy (packages/core/src/shaders.ts, since edcb6debb7) is fixed in the local commit tagged
   `K1-core-1` (core 22,225 to 22,231 B gzip, core + stage 24,848 to 24,853 B), which lands after the MSVC linker is installed and needs a maintainer decision. voxel-night-high needs its baseline re-recorded on the
-  dev PC (visual baselines are per machine): the old one predates the brighter G2 pixels of 29d79d3774.
+  workstation (visual baselines are per machine): the old one predates the brighter G2 pixels of 29d79d3774.
 
 ### Fixed 2026-11-11: a BatchedMesh over 262,144 vertices threw, so the batched-mesh demo never got ready (KB-VIS-bm)
 
@@ -460,7 +460,7 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
 
 ### gltf-pro extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
 
-- **Repro:** `MARGO_COMPAT=1 node packages/gltf-pro/scripts/test-extensions-browser.js` on the dev PC while 30 package
+- **Repro:** `MARGO_COMPAT=1 node packages/gltf-pro/scripts/test-extensions-browser.js` on the workstation while 30 package
   test suites ran beside it: "lights: the real EnvironmentTest" failed with `page.evaluate: Execution context was
   destroyed`. Run alone, and the full check run again on the same build and on origin/main 519906bcf6, it passed.
 - **Cause:** not found. The page was replaced or its renderer exited after about 40 earlier checks on one page, under
@@ -469,7 +469,7 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   exit (Chromium's `Target.targetCrashed` status and code), `crash`, `close` and a main-frame navigation, and samples
   the renderer's JS heap, documents and nodes after every check; a failed check prints one `page-loss {...}` line with
   them, and a passing run ends with a `memory {...}` line holding the first and last samples (regression:
-  `packages/gltf-pro/tests/page-loss.test.js`). Tried to reproduce on 2026-11-11 on the dev PC: `MARGO_COMPAT=1`
+  `packages/gltf-pro/tests/page-loss.test.js`). Tried to reproduce on 2026-11-11 on the workstation: `MARGO_COMPAT=1`
   twice, once beside two Draco encodes that each held 2.5 to 3.8 GB, and natively once; all 23 checks passed each
   time. Ruled out: a check that navigates (none does, and the watch now records any main-frame navigation). Still
   open: a repeat will name whether the renderer exited, with its status, or the page was closed or replaced.
@@ -574,7 +574,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 ### Radeon 680M: pixel's `screen` blend lands one step below the exact result (list 5 R6 row 14, 2026-11-10, open)
 
-- **What:** `packages/pixel/tests/browser-check.js`, case `screen`, on the Beelink (Radeon 680M, RDNA2, driver
+- **What:** `packages/pixel/tests/browser-check.js`, case `screen`, on the AMD mini PC (Radeon 680M, RDNA2, driver
   32.0.21030.2001, Chrome on D3D12): 80 pixels one step below the CPU image, the first at (44, 4), red 157 where the
   CPU image has 158. The other blend cases pass.
 - **Repro:** source 151 composited over destination 16 with `screen`, the fixed-function blend `color: one,
@@ -592,11 +592,11 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   ended, the covered region copied (or resolved) to a texture, and a new pass begun, or the whole composite moved to
   an extra target: a new copy and an extra render pass per frame, which Scott's ruling (2026-11-10) does not allow.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0171/report.md` with the raw WebGPU and WebGL2 page `screen-blend.html`. Reproduces on 2026-11-11 on this PC's AMD RDNA2 iGPU (19 of 1024 pixels off, including source 151 over destination 16: 157 instead of 158) and not on the RTX A6000.
-- **Gate:** on the Beelink this case is recorded and not counted; pixel's GPU step runs on the dev PC or Mac (Scott, 2026-11-12).
+- **Gate:** on the AMD mini PC this case is recorded and not counted; pixel's GPU step runs on the workstation or Mac (Scott, 2026-11-12).
 
 ### Fixed 2026-11-11: the transitions GLSL oracle and the WGSL port disagreed at a texel edge (list 5 R6 row 21)
 
-- **What:** `packages/transitions` `test:gpu` (`test/glsl-browser.js`) on the Beelink (Radeon 680M): fixture `matrix`
+- **What:** `packages/transitions` `test:gpu` (`test/glsl-browser.js`) on the AMD mini PC (Radeon 680M): fixture `matrix`
   at p = 0.25, texel (12, 2) channel 0: the native WebGL2 oracle gives 145, the WGSL port 133.
 - **Repro:** the rotated lookup of `matrix` lands at x = 10.99938 texels of a nearest-filtered gradient, 6e-4 of a texel
   below the edge between texels 10 and 11. 133 is texel 10 (167 and 32 mixed at 0.25), 145 is texel 11.
@@ -619,7 +619,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 ### Radeon 680M: the 4x MSAA resolve rounds an exact .5 average by draw history (list 5 R6 row 8, 2026-11-10, worked around in the checks)
 
-- **What:** `packages/culling` `dynamic-check.mjs`, `parts-check.mjs` and `lod-check.mjs` on the Beelink (Radeon 680M,
+- **What:** `packages/culling` `dynamic-check.mjs`, `parts-check.mjs` and `lod-check.mjs` on the AMD mini PC (Radeon 680M,
   driver 32.0.21030.2001, Chrome on D3D12) found 1-level channel differences on 6 to 67 resolved pixels between the
   culled engine and core, which draws the same instances in another order once a mesh hides.
 - **Cause:** below Margo. The multisampled colour samples of both engines are equal bit for bit (read before the
@@ -631,7 +631,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 ### Radeon 680M: a colour attachment's export narrows the shader output to binary16 by truncation (list 5 R6 row 25, 2026-11-10, worked around in webgl2-compat)
 
-- **What:** `packages/webgl2-compat` `test:gpu:preview-contract` (`test/package-tiers-browser.mjs`) on the Beelink
+- **What:** `packages/webgl2-compat` `test:gpu:preview-contract` (`test/package-tiers-browser.mjs`) on the AMD mini PC
   (Radeon 680M, driver 32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): the procedural texture baker (bricks,
   16 x 16) stored red 133 at texel (3, 0) on the WebGL2 layer where native WebGPU stores 134; the other 15 texels of
   the row matched.
@@ -645,7 +645,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   680M's driver exports the fragment output to an 8-bit target as binary16, truncating, before the UNORM conversion
   (the same truncation as R6 row 7's half targets). WGSL's inverse channel transfer function for 8unorm only clamps
   (WGSL, "Texel Formats"), so which of the two nearest steps a GPU stores is its own choice, and GPUs differ: the
-  dev PC's RTX A6000 (Chrome, D3D12 and ANGLE D3D11 alike) stores k for (k + 0.52) / 255 when k % 16 is 0 to 10 and
+  workstation's RTX A6000 (Chrome, D3D12 and ANGLE D3D11 alike) stores k for (k + 0.52) / 255 when k % 16 is 0 to 10 and
   k + 1 otherwise, and only from k + 0.57 up on every k (probe of 256 x 21 values, storage store, render target and
   raw WebGL2 all equal), where the 680M's storage store rounds to the nearest.
 - **Workaround (`packages/webgl2-compat/src/compute/glsl.ts`):** the fragment and scatter tiers round a float texel to
@@ -657,12 +657,12 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
   first version of this fix. The procedural texture baker (`texture-shader.ts`, `textures-webgl.ts`) rounds to the
   255 steps itself, as its PBR baker already did, so the store's rounding no longer depends on the GPU or tier;
   before that, the preview-contract baker comparison failed on the A6000 (layer 134, native 133 at texel (3, 0)).
-  Not rerun on the Radeon 680M (the Beelink was unreachable on 2026-11-10): by the spec both checks hold there, since
+  Not rerun on the Radeon 680M (the AMD mini PC was unreachable on 2026-11-10): by the spec both checks hold there, since
   its native store rounds to the nearest and the layer's grid values survive its truncation.
 
 ### Radeon 680M, ANGLE Direct3D 11: a clear of a texture level or layer whose last write was a clear is lost (list 5 R6 row 26, 2026-11-11, worked around in webgl2-compat)
 
-- **What:** `packages/creative` `test:gpu:targets` under compatibility mode on the Beelink (Radeon 680M, driver
+- **What:** `packages/creative` `test:gpu:targets` under compatibility mode on the AMD mini PC (Radeon 680M, driver
   32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): `cube texel 0,0 layer 4: 0 != 255`. Every level and layer of an
   rgba8unorm cube is cleared once by a render pass to its own colour and read back; native WebGPU passes.
 - **Repro (raw WebGL2, no Margo code):** a fresh 4 x 4 RGBA8 2D array or cube (3 levels, 6 layers), each subresource
@@ -690,7 +690,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 ### Radeon 680M, ANGLE Direct3D 11: acos is 6.75e-5 off (list 5 R6 row 31, 2026-11-11, worked around in webgl2-compat)
 
-- **What:** `packages/shader` `test:gpu` `utils-check.mjs` under compatibility mode on the Beelink (Radeon 680M, driver
+- **What:** `packages/shader` `test:gpu` `utils-check.mjs` under compatibility mode on the AMD mini PC (Radeon 680M, driver
   32.0.21030.2001, Chrome, WebGL2 on ANGLE D3D11): the equirect of the forward axis is (0.5, 0.5000215), 2.2e-5 off in
   v against the check's 1e-5; native WebGPU passes.
 - **Repro (raw WebGL2, no Margo code):** a fragment shader writing `floatBitsToUint(acos(x))` into an RGBA32UI target
@@ -714,7 +714,7 @@ Batch 190 job 1: no open defect found in depth peeling's distinct-depth transpor
 
 ### Fixed 2026-11-11: in WebKit a check's first run could be the previous document's, at 300 x 150 (KB-L4-W1)
 
-- **Repro:** on the Apple M6 Mac, `MARGO_BROWSER=webkit node packages/sky/test/browser-check.mjs` in a freshly copied
+- **Repro:** on the Apple silicon Mac, `MARGO_BROWSER=webkit node packages/sky/test/browser-check.mjs` in a freshly copied
   checkout failed `night-citadel 4x frame 0 scene vs control` in about 1 run in 10 (3 of 21, then 1 of 19 and 1 of
   12): the `full` frames were 300 x 150 (45,000 pixels) against 256 x 192. Smaller: tests/stale-document.test.js
   under `MARGO_BROWSER=webkit` fails both its cases without the fix.
@@ -800,7 +800,7 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
 
 ### Fixed 2026-11-12: Radeon 680M, environment fog-all `fog.enabled = false` one binary16 step from no fog on the WebGL2 layer (list 5 R6 row 28)
 
-- **What:** on the Beelink (Radeon 680M, driver 32.0.21030.2001, Chrome, ANGLE D3D11), `environment`
+- **What:** on the AMD mini PC (Radeon 680M, driver 32.0.21030.2001, Chrome, ANGLE D3D11), `environment`
   `test:gpu:fog-all` under `MARGO_COMPAT=1` finds `fog.enabled = false` differing from no fog in 55 VFX pixels by one
   binary16 step (max 2^-11, mean 5.2e-8, at 4x and 1x), and the two canvas variants report `{}` (4 of 87 checks).
   Native WebGPU passes.
@@ -878,7 +878,7 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
 
 - **Repro:** copy textures into a vertex, a uniform, a storage and an index buffer, then draw with them in the same
   submit (`packages/webgl2-compat/test/features.html` case `texelCopyReaders`): native WebGPU draws the triangle in the
-  copied colour, the layer drew nothing (the buffers' old zeros) on the Beelink (Radeon 680M, ANGLE D3D11); any GPU.
+  copied colour, the layer drew nothing (the buffers' old zeros) on the AMD mini PC (Radeon 680M, ANGLE D3D11); any GPU.
 - **Cause (webgl2-compat):** the layer lands a copy from a texture a task later (readPixels into a pixel pack buffer
   behind a fence, applied when the fence passes). Only CPU readers (mapping, `bytes()`, copies out of the buffer)
   applied a waiting copy first. Vertex, index and uniform bindings read the GL buffer as it was, and a bind group that
@@ -997,9 +997,9 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   `packages/webgl2-compat/test/task-polling.test.js` ("a device fence is followed by a command of its own ...") and
   `packages/webgl2-compat/test/idle-fence-browser.mjs` in `test:gpu` (18 fence checks before, 1 after).
 
-### Fixed 2026-11-11: a voxel path tracer run could overrun a small GPU's watchdog (KB-BL1, Beelink Radeon 680M)
+### Fixed 2026-11-11: a voxel path tracer run could overrun a small GPU's watchdog (KB-BL1, AMD mini PC Radeon 680M)
 
-- **Repro:** a path tracer GPU suite on the Beelink mini PC (Radeon 680M, integrated) crashed the machine. The tracer's
+- **Repro:** a path tracer GPU suite on the AMD mini PC mini PC (Radeon 680M, integrated) crashed the machine. The tracer's
   bound was 2^20 paths a dispatch (bug 25), measured on the RTX A6000 at the default 8 bounces: it did not count the
   path loop (1,312 iterations a path at `maxBounces` 64 against 192 at 8, 6.8 times the work), nor the GPU (the 680M
   runs the tracer about ten times slower), and the viewport put all of a frame's bands in the frame's one submission,
@@ -1130,7 +1130,7 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
 ### Fixed 2026-11-11: the weather lens long-time parity bound was below the shader's own f32 rounding (list 5 R6 row 24)
 
 - **What:** `packages/weather` `test:browser:parity` lens case (`tests/parity-browser.mjs`, `tests/lens-check.html`)
-  on the Beelink (Radeon 680M, Chrome on D3D12): `longTime` worst 1.374e-4 over 2,400 cases, over its bound 1e-4.
+  on the AMD mini PC (Radeon 680M, Chrome on D3D12): `longTime` worst 1.374e-4 over 2,400 cases, over its bound 1e-4.
   The `math` case passes (7.6e-5). Repeats exactly on every run.
 - **Repro:** a CPU model of `lens_field` that rounds every WGSL operation once to f32, with the inputs
   `lensSettings` packs, against `lensField` in f64 on the same 2,400 cases: worst 1.364e-4, at case 1441
@@ -1148,12 +1148,12 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   compatibility layer. The f64 `lensField` stays the truth for that reference: `tests/lens-f32.test.js` holds it within
   1e-4 of the f64 field on the same 2,400 cases (5.2e-5 measured) and fails it with the raw time * speed product (over
   100 times worse), so a broken packing still fails. The short-time `math` case still compares with f64 at 1e-4. On
-  the Radeon 680M (Beelink, `b187ac2d4`, 2026-11-11): long-time 4.05e-5 on WebGPU and on the WebGL2 layer, math 5.9e-5.
+  the Radeon 680M (AMD mini PC, `b187ac2d4`, 2026-11-11): long-time 4.05e-5 on WebGPU and on the WebGL2 layer, math 5.9e-5.
 
 ### Fixed 2026-11-11: the instanced frame allocated 4,048 B, over its 292 B floor (list 5 R6 row 15, Radeon 680M, then RTX A6000)
 
 - **What:** `npm run test:frame-alloc:browser`, `instanced` (10,000 moving instanced boxes): median 4,048 B a frame
-  against its 292 B floor, first on the Beelink (Radeon 680M), then on the RTX A6000 desktop with Edge 157.
+  against its 292 B floor, first on the AMD mini PC (Radeon 680M), then on the RTX A6000 desktop with Edge 157.
 - **Cause:** core's `uploadRows` (`packages/core/src/renderer.ts`) read each dirty-row word from the `Uint32Array`. A
   word with every row marked is 4294967295, outside V8's small integers (31 bits with pointer compression), so every
   tier that keeps the value tagged (the interpreter, the baseline, Maglev's loop) made a 12 B heap number of it: 312 full
@@ -1176,12 +1176,12 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
   in the instanced scene; it was in the profile before the KB0378 fix too, hidden by the 15-row listing. The floors are
   never raised: the fix is to find the boxed value (a fractional number passed to a call V8 does not inline is the
   usual one) and remove it.
-- **Also on the Radeon 680M** (Beelink, Chromium through Playwright, `b187ac2d4`, 2026-11-11): instanced 304 B, shadowed
+- **Also on the Radeon 680M** (AMD mini PC, Chromium through Playwright, `b187ac2d4`, 2026-11-11): instanced 304 B, shadowed
   880 B, basic 328 B, post 1,476 B, dynamic 376 B, the same figures, so it is not one GPU's (list 5 R6 row 15).
 
 ### Fixed 2026-11-11: sciviz tiled export differed from the whole image by one level on the Radeon 680M (list 5 R6 row 18)
 
-- **What:** `npm run test:browser:export-media -w packages/sciviz` (`tests/export-media-browser.mjs`) on the Beelink
+- **What:** `npm run test:browser:export-media -w packages/sciviz` (`tests/export-media-browser.mjs`) on the AMD mini PC
   (Radeon 680M, WebGPU on D3D12), 2026-11-10 and again on `b187ac2d4`: "Tile seams differ: max 1, changed 0". The
   RTX A6000 gives 0 on both backends.
 - **Repro:** the NOAA wind figure (`examples/sciviz-wind.html`, two line layers), `exportImage` at 320 x 240 with
@@ -1286,7 +1286,7 @@ makes it a GPU leaf. Regression: tests/gpu-command.test.js ("npm scripts with a 
 
 ### Fixed 2026-11-11: WebKit: cache `test:browser` evictionReads step over its limit
 
-- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` (Windows, busy dev PC): plain
+- **Repro:** `MARGO_BROWSER=webkit npm run test:browser --workspace @margoengine/cache` (Windows, busy workstation): plain
   `evictionReads` (2,030 fetches and writes) took 158.9 s and the indexed run passed the 180 s call limit; Chromium took
   17.7 s and 8.8 s in the same session.
 - **Cause:** not the check's `context.route` (the same with and without it). Measured in Playwright WebKit on Windows,
@@ -2528,7 +2528,7 @@ remaining unverified real-file variants. Their proof gaps are not claimed fixed 
 - **Cause, measured 2026-11-10 (lane-Q, 40 cycles of launch, GPU work and close beside the running lanes, `MARGO_TRACE_SHUTDOWN=1`, loop at `.lane/shutdown-loop.mjs` of that worktree):** after `TerminateProcess` the browser's exit code is set 50 to 65 ms later in every cycle, and every owned pipe (stdout, stderr, both CDP pipes) closes within 1 ms of its `destroy()`. The process object is signalled (Node's `exit`, then `close` 1 ms after) 65 ms to 1,172 ms later in those cycles, 8.7 s in lane-A's control beside `verify`, over 30 s in the failures. That gap is the kernel's teardown of the process after its threads are gone (its handle table and address space, which the GPU driver's cleanup is part of). The suite's event loop was never blocked (a 50 ms heartbeat saw no gap over 400 ms) and Playwright started no helper program (every child_process call was logged). Nothing in Margo runs during that time: it is Windows, Edge and the driver under load, which Margo cannot fix. Playwright's `BrowserServer.kill()` (observed as a black box) waits for that same signal and keeps its WebSocket server listening until it arrives, so an in-process server tied the suite to it.
 - **Workaround (the mechanism is gone, not the symptom):** `scripts/support/browser-host.mjs`. Playwright's browser server now runs in a host process of its own, which holds everything that waits on the browser process (its handle, its pipes, the WebSocket server, the temporary profile). The suite keeps the same connected browser as before. At close it reads Chromium's process list while connected, the host ends every process (`TerminateProcess` through its handle, each listed child by pid) and acknowledges at once (3 ms measured), the client disconnects (3 ms), and the suite waits for the host's proof that all are gone only up to `TEARDOWN_GRACE_MS` (2,000 ms). Past that the host carries on alone with the native waits, finishes Playwright's cleanup, and after `REAP_MS` (120 s) records any survivor in `test-results/browser-host-survivors.log` and ends. The 30,000 ms budget, the 5,000 ms process-list bound and every assertion are unchanged; no retry, no raised budget, no swallowed error (a host that dies fails the close with `HOST_GONE`).
 - **Evidence:** 40 cycles on the new path under the same load (2026-11-10 01:32 to 01:34): 0 timeouts, 0 leaks; close 347 ms median, 2,130 ms maximum; 5 cycles handed off at the grace, in which the kernel needed up to 9.3 s after the close to finish with the browser (cycles 33 to 35: 9,338, 4,950 and 5,230 ms), every browser, child and host process gone by then and no survivor file written; no Node process or pipe handle left in the suite. `tests/browser-host.test.js` (a real host process; a browser the kernel never finishes with is logged as a survivor at the bound, in the host) and `tests/browser-teardown.test.js` ("a browser process the kernel has not finished tearing down cannot hold the close past the grace"; the in-process design it replaces asserted `SHUTDOWN_TIMEOUT` for that case in its own test, and `tests/browser-host.test.js` runs it through `launchBrowser` against a real host whose browser never exits).
-- **False survivor, fixed 2026-11-10 (batch 217, lane P):** the host's waiter reported a listed child as a survivor 677 ms after the end, which failed the close with `SHUTDOWN_TIMEOUT` at `scripts/lib/browser.mjs:344`. The waiter read each pid's start time to tell ours from a newer process, and took a start time it could not read (PowerShell's getter gives `$null`) for a survivor. Measured as a black box: a process the waiter has found and the kernel then finishes with has no readable start time (its object already signalled: `WaitForExit(0)` true), while every process Chromium starts as this user stays readable through its teardown (9 of 9 listed; an 8 GB process killed mid-read stayed readable until it was gone); and 135 of 958 processes on the dev PC (services such as svchost, WmiPrvSE, SearchProtocolHost) are unreadable, so a pid such a service takes over was reported too. Both mean the pid names no process of ours, so the waiter now skips it. A survivor is still reported only after the waiter's bound. Regressions in `tests/browser-teardown.test.js`: "Windows waiter: an ended process gone before its start time was read is not a survivor" (the race widened by ending the process between lookup and read) and "a pid held by a process this user cannot query is not reported as ours" (pid 4); both fail on the parent with the pid reported.
+- **False survivor, fixed 2026-11-10 (batch 217, lane P):** the host's waiter reported a listed child as a survivor 677 ms after the end, which failed the close with `SHUTDOWN_TIMEOUT` at `scripts/lib/browser.mjs:344`. The waiter read each pid's start time to tell ours from a newer process, and took a start time it could not read (PowerShell's getter gives `$null`) for a survivor. Measured as a black box: a process the waiter has found and the kernel then finishes with has no readable start time (its object already signalled: `WaitForExit(0)` true), while every process Chromium starts as this user stays readable through its teardown (9 of 9 listed; an 8 GB process killed mid-read stayed readable until it was gone); and 135 of 958 processes on the workstation (services such as svchost, WmiPrvSE, SearchProtocolHost) are unreadable, so a pid such a service takes over was reported too. Both mean the pid names no process of ours, so the waiter now skips it. A survivor is still reported only after the waiter's bound. Regressions in `tests/browser-teardown.test.js`: "Windows waiter: an ended process gone before its start time was read is not a survivor" (the race widened by ending the process between lookup and read) and "a pid held by a process this user cannot query is not reported as ours" (pid 4); both fail on the parent with the pid reported.
 - **Still open:** why the kernel takes over 30 s in that machine state is not Margo's to find or fix. A line in `test-results/browser-host-survivors.log` is the signal to look at the Edge version or the driver; the GPU slot is released while the kernel may still be freeing the ended browser's allocations (docs/limits.md).
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB1703/report.md` with `teardown-latency.mjs` and `load.html`. On a quiet 2026-11-11 PC it does not give the multi-second case (median exit 104 ms with 4 busy browsers, 253 ms with 12, max 470 ms); the report says a Windows trace from a slow run is still needed.
 
@@ -2823,8 +2823,8 @@ does not own. Each entry says exactly what is needed to close it.
   normal, occlusion, emissive, `st`/`st1` texcoords with the V flip, a base-colour `UsdTransform2d`, wrap modes) and
   stores each image 64-byte aligned and uncompressed.
 - **Verified:** the USDZ tests (`packages/exporters/tests/usdz.test.js`) check the shader graph text, every file's
-  alignment, the image bytes and a round trip through our own USD reader (`@margoengine/usdz`). On a Mac mini with
-  macOS 27.2 (2026-11-05, over SSH), the eight kit files: `usdchecker --arkit` passes all of them, and their Quick Look
+  alignment, the image bytes and a round trip through our own USD reader (`@margoengine/usdz`). On an Apple silicon Mac with
+  macOS 27.2 (2026-11-05, in a remote session), the eight kit files: `usdchecker --arkit` passes all of them, and their Quick Look
   thumbnails draw the alpha mask, the blended texture and the transforms as intended, 07 (+30) leaning clockwise and
   08 (-30) anticlockwise.
 - **Open:**
@@ -3088,7 +3088,7 @@ Regression: packages/gltf-pro/tests/node-images.test.js, six PNG/JPEG source cas
 
 ### Apple M6 sweep, 2026-11-05 (Chrome 157 and Playwright WebKit; Safari not run)
 
-Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6, macOS 27.2). Repro for each: on a Mac,
+Sweep record: every package's tests and browser or GPU tests on the Apple silicon Mac (M6, macOS 27.2). Repro for each: on a Mac,
 `MARGO_BROWSER=chrome` or `MARGO_BROWSER=webkit` with the named script.
 
 - **Fixed (2026-11-11, L4, KB2224a): `sky` `test:gpu`, Playwright WebKit only: full Sky and `sky/base` differ by one half-float step.** Up to 2 pixels a frame in `afterlight`, `meadow`, `preetham` and
@@ -3101,7 +3101,7 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   Fix (2026-11-11, Scott approved): Sky compiles only the day model in use (`compose` in `packages/sky/src/base.ts`); editing
   `options.model` live recompiles the sky, fog, reflection and lighting shaders on the next frame, with `reflectionTexture` and
   the lighting map, buffer and bindings kept, and binds the Bruneton tables only for the Bruneton model (auto layouts drop an
-  unread binding). Steady frames compile nothing; the recorded traces keep their command and resource counts. Mac mini M6,
+  unread binding). Steady frames compile nothing; the recorded traces keep their command and resource counts. Apple silicon Mac M6,
   macOS 27.2, Playwright WebKit, `browser-check.mjs`: origin/main still fails `afterlight 4x frame 1 scene vs narrow` (1 pixel,
   0.0000153); with the fix all 12 runs (6 configurations, 4x and 1x) give 0 differing pixels, so the KB2224b baselines need no
   re-record for this. Regression: `packages/sky/test/sky.test.js` "KB2224a" (fails on the old build: a model branch in every
@@ -3330,7 +3330,7 @@ Fixed by 03a7d22ea (2026-10-28). packages/text/tests/color-font.js builds an ori
   needs. No limit is changed and nothing is skipped. The one lever left in the pool is to run fewer workers at once
   than the hardware threads, a throughput loss, and even 2 of 4 failed one run in 2 here; Scott's call. The
   diagnostics (per-post timing by busy workers, the trace reader, the wake page) are kept on the box in
-  `~/margo-test/repo` (`diag-flythrough.mjs`, `wake-check.html`, `wake-check.mjs`).
+  `a local diagnostic folder` (`diag-flythrough.mjs`, `wake-check.html`, `wake-check.mjs`).
 - **Held for the speed phase (2026-11-11, bug sweep lane L4):** the slow sends assertion is a timing budget, and
   `scripts/speed-phase.json` defers every timing assertion from the correctness gates until Scott ends the build
   phase (row `biomes-slow-sends` in the speed-phase inventory). The measured cause above is the operating
@@ -3520,20 +3520,20 @@ these four calls through by file and call text in its OPEN list; drop each row w
 
 ### plugin scene owner (sciviz)
 
-Open, sciviz held out of list 5 (dev PC owns it). Same cause and repro as above in two sites the check found:
+Open, sciviz held out of list 5 (workstation owns it). Same cause and repro as above in two sites the check found:
 packages/sciviz/src/progressive.ts (`ProgressiveRendering.dispose`) and packages/sciviz/src/render.ts. (axes, media-tiles
 and pointcloud were fixed on main by 69eb1e69f.) The OPEN list in scripts/support/plugin-scene-owner.mjs names these two
 calls; drop each row with its fix.
 
 ### check:owners browser leaf: "Failed to fetch dynamically imported module" for the fixture (2026-11-12, open)
 
-- **What:** `node scripts/check-owner-lifetime-gate.mjs` on the Beelink (Radeon 680M, WebGL2 compatibility layer),
+- **What:** `node scripts/check-owner-lifetime-gate.mjs` on the AMD mini PC (Radeon 680M, WebGL2 compatibility layer),
   leaf `culling/DynamicInstances`: `page.evaluate` rejected with "Failed to fetch dynamically imported module:
   .../packages/culling/test/owner-lifetime.fixture.js" before any case ran. The three culling leaves before it in the
   same run passed with the same module graph, and all 122 culling and post leaves on the same tree passed two
   hours earlier.
 - **Repro:** not reproduced yet. Lane O helper 12's landing GPU rerun, 2026-11-12 02:23, log
-  `margoengine-lane-O/.lane/logs/gpu.log` (git-excluded).
+  `the lane GPU log` (git-excluded).
 - **Cause:** not found. The browser reports only the importing file; the module in its graph that failed and the
   answer it got were not recorded. `scripts/check-owner-lifetime-browser.mjs` now prints every failed request and
   every answer of 400 or more (`OWNER_GPU_PAGE:` lines) when a leaf ends this way, so a recurrence names the module
@@ -3915,9 +3915,9 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
 | The gallery's model cabinet (`examples/gallery/khronos.html`) loaded 126,206 B gzip of JavaScript before its first frame, over its 120,000 B budget (`scripts/test-gallery-browser.mjs`) | The page lights from pixels (`Environment.attach` with an image it makes), yet `EnvironmentLighting` imported the EXR, Radiance HDR and UltraHDR decoders and EXR's inflate (about 9.3 KB gzip) statically for `EnvironmentLighting.load(url)`. The growth past the budget since 2026-10-31 was gltf-pro features (+6,582 B); the decoders were the part the page never runs. A plain `import()` was not enough: a bundler keeps a dynamically imported module in the static chunk when a module that holds code also imports it statically, and the root's `index.js` both held the code and re-exported the decoders | `@margoengine/environment` publishes `index.js` as re-exports only, of `main.js` (everything else) and `loaders.js` (the decoders, `src/loaders.ts`); `EnvironmentLighting.load` imports `loaders.js` on its first URL. Same exports and the same code; the page loads 116,849 B | `packages/environment/tests/lazy-loaders.test.js` (an app of `Environment` and `EnvironmentLighting` bundles no decoder; fails without the split); `npm run test:gallery:browser` |
-| `stats`: GPU profiling on the M6 Mac mini (Chrome, Metal) threw `Invalid GPU timestamps (end before start or time went backwards)` on every sample, so `Stats` with `profiling: true` logged it each time and `npm run test:gallery:browser` failed on console errors | `GPUProfiler` required each pass to start after the previous pass ended. A tile-based GPU overlaps passes, running the next pass's vertex work under the last one's fragment work: the second pass started 1,416 to 26,500 ns before the first ended (read back from the gallery's model cabinet); each pass's own start and end were in order | A pass is rejected only when it starts before the previous pass's start, or ends before its own start; the elapsed time runs from the first start to the latest end (`packages/stats/src/profiler.ts`) | `packages/stats/test/stats.test.js`, "a pass that starts before the previous one ends is timed" (the M6's own timestamps; fails without the fix) |
-| `stats`: on the M6 Mac mini (Chrome, Metal) a later pass started about 9.5 us before the pass recorded ahead of it, so `GPUProfiler` still threw `Invalid GPU timestamps` and `npm run test:gallery:browser` failed on console errors | Not a Margo bug (query indices, resolve range, 16-byte stride, word order, nanosecond units and the 64-bit borrow were checked; all passes come from one encoder in encoding order). WebGPU section 20.4 makes timestamp values implementation-defined, and Metal on Apple silicon samples at stage boundaries without waiting for earlier commands (citations in docs/clean-room.md). Scott's ruling, 2026-11-08: reject only a genuine bug | A pass is discarded only when it ends before its own start or ends before the previous pass starts (a counter reset); overlapping passes in any start order are timed, the elapsed time from the earliest start to the latest end (`packages/stats/src/profiler.ts`) | `packages/stats/test/stats.test.js`, "a pass that starts before the previous one ends is timed" (the M6's starts; fails without the fix) |
-| `animation`: zero extra skin influences (JOINTS_1 and WEIGHTS_1 all zero) moved one skinned position by 1 ulp on the M6 Mac mini (Metal), so `scripts/animation-influences-browser-tests.js` failed its bit-for-bit check | WGSL lets a compiler reassociate and fuse floating-point operations (15.7.5): the eight-influence blend adds four zero-weighted bone terms, and Metal folds `skin*vec4f(p,1)` into it, so the position differs by 1 ulp; the skin matrix itself is the same (normals and tangents bit for bit) | Both eight-influence shaders (`deformationShader8` and the batched `linearBlend(true)` in `packages/animation/src/shader.ts`) run the four-influence blend text verbatim where a vertex's extra weights are all zero, and the eight-term blend otherwise; the four-influence shaders are unchanged | `packages/animation/tests/influences.test.js`, "eight influences run the four-influence blend verbatim" (fails without the fix); `scripts/animation-influences-browser-tests.js` passes on Metal |
+| `stats`: GPU profiling on the Apple silicon Mac (Chrome, Metal) threw `Invalid GPU timestamps (end before start or time went backwards)` on every sample, so `Stats` with `profiling: true` logged it each time and `npm run test:gallery:browser` failed on console errors | `GPUProfiler` required each pass to start after the previous pass ended. A tile-based GPU overlaps passes, running the next pass's vertex work under the last one's fragment work: the second pass started 1,416 to 26,500 ns before the first ended (read back from the gallery's model cabinet); each pass's own start and end were in order | A pass is rejected only when it starts before the previous pass's start, or ends before its own start; the elapsed time runs from the first start to the latest end (`packages/stats/src/profiler.ts`) | `packages/stats/test/stats.test.js`, "a pass that starts before the previous one ends is timed" (the M6's own timestamps; fails without the fix) |
+| `stats`: on the Apple silicon Mac (Chrome, Metal) a later pass started about 9.5 us before the pass recorded ahead of it, so `GPUProfiler` still threw `Invalid GPU timestamps` and `npm run test:gallery:browser` failed on console errors | Not a Margo bug (query indices, resolve range, 16-byte stride, word order, nanosecond units and the 64-bit borrow were checked; all passes come from one encoder in encoding order). WebGPU section 20.4 makes timestamp values implementation-defined, and Metal on Apple silicon samples at stage boundaries without waiting for earlier commands (citations in docs/clean-room.md). Scott's ruling, 2026-11-08: reject only a genuine bug | A pass is discarded only when it ends before its own start or ends before the previous pass starts (a counter reset); overlapping passes in any start order are timed, the elapsed time from the earliest start to the latest end (`packages/stats/src/profiler.ts`) | `packages/stats/test/stats.test.js`, "a pass that starts before the previous one ends is timed" (the M6's starts; fails without the fix) |
+| `animation`: zero extra skin influences (JOINTS_1 and WEIGHTS_1 all zero) moved one skinned position by 1 ulp on the Apple silicon Mac (Metal), so `scripts/animation-influences-browser-tests.js` failed its bit-for-bit check | WGSL lets a compiler reassociate and fuse floating-point operations (15.7.5): the eight-influence blend adds four zero-weighted bone terms, and Metal folds `skin*vec4f(p,1)` into it, so the position differs by 1 ulp; the skin matrix itself is the same (normals and tangents bit for bit) | Both eight-influence shaders (`deformationShader8` and the batched `linearBlend(true)` in `packages/animation/src/shader.ts`) run the four-influence blend text verbatim where a vertex's extra weights are all zero, and the eight-term blend otherwise; the four-influence shaders are unchanged | `packages/animation/tests/influences.test.js`, "eight influences run the four-influence blend verbatim" (fails without the fix); `scripts/animation-influences-browser-tests.js` passes on Metal |
 | `bvh` `test:browser` on an Apple M6 (Chrome, Metal): 142 of 123,200 rays from inside a closed mesh leaked through it | WGSL lets a compile fuse and reassociate (15.7.5), and Metal fuses the edge function `p.x * q.y - p.y * q.x` into one fma, which is not antisymmetric: two triangles on a shared edge no longer got exactly opposite values, and a ray through the edge could miss both (Woop, Benthin and Wald 2013 need them opposite) | Each edge is evaluated with its two ends in one fixed order and negated for the other side (`bvhEdge` in `packages/bvh/src/gpu.ts`) | `packages/bvh/tests/gpu-browser.js` watertight check (142 leaks on the M6 without the fix, 0 with it) |
 | `oit` `ExactOIT` at 4x MSAA on an Apple M6 (Chrome, Metal): each layer counted up to four times, so `exact-check.mjs` failed at 4x | A fragment shader that is not sample-frequency may still run more than once per pixel (WebGPU 23.2.10); Apple GPUs run the list shader up to once per sample, at the pixel centre with a whole or partial coverage mask, so one layer entered the list several times | A multisampled sort merges nodes equal in depth, colour and alpha into one whose coverage is the union (`packages/oit/src/exact.ts`); the test page draws at 4x until the list has grown, as Apple fills the starting pool on the first frames | `packages/oit/test/gpu/exact-check.mjs` 4x cases (fail on the M6 without the merge) |
 | `oit` `MomentOIT`: two splats added in either order differed by 1 of 255 on an Apple M6 (Chrome), so `vfx-check.mjs` failed "the order of the data changes nothing" (hidden until now behind `moments-check.mjs`) | The M6 adds a fragment's float output to the stored half and rounds once, so round(round(a) + b) and round(round(b) + a) differ by a step. Rounding the outputs with `quantizeToF16` or a `pack2x16float` round trip changed nothing under Chrome on Metal: the stored sums were bit for bit the same | Both passes round every output to a half float on its bits, to nearest even (`margoHalf` in `packages/oit/src/moments.ts`); two halves then sum the same in either order | `packages/oit/test/gpu/vfx-check.mjs`, splat order (fails on the M6 without the rounding, and with `quantizeToF16` in its place) |
@@ -4545,8 +4545,8 @@ docs/limits.md, "Batch 160 budgets re-recorded". The picture residual against th
 
 The `amd` rows of batch-160-specular.json and batch-160-ior.json and the receipts batch-160-amd-transmission.json and
 batch-160-amd-volume.json were measured before da12bd07e1, 65098f33fe, 401c2e032b and KB5875a; only the NVIDIA rows
-were re-recorded. They were recorded on the dev PC's own AMD RDNA2 iGPU (PCI 1002:13C0, driver 32.0.21042.62, picked
-with `MARGO_GPU=amd GPU_POWER=low-power`), not the Beelink's 680M, so they were re-measured there under the same
+were re-recorded. They were recorded on the workstation's own AMD RDNA2 iGPU (PCI 1002:13C0, driver 32.0.21042.62, picked
+with `MARGO_GPU=amd GPU_POWER=low-power`), not the AMD mini PC's 680M, so they were re-measured there under the same
 2026-11-11 ruling. Two tool defects hid this: `run.mjs` gated an AMD run by the NVIDIA budget and stopped before printing
 what it measured, and `proof.mjs` gated an AMD transmission or volume proof by the NVIDIA budgets, which the re-record
 set at NVIDIA's exact figures (AMD differs by a few units: volume native square 22,587,619 against 22,496,007,
@@ -6166,7 +6166,7 @@ Dependent audio GPU validation is incomplete for the version-guard landing: the 
 
 Audio follow-up: the bounded instrumented diagnostic ran every unchanged audio assertion successfully and wrote the full report (test-results/version-guard-resume/audio-phase.log, 2026-11-10). It does not explain or waive the initial monitor-reclaimed run; retain that stall for the fix phase.
 
-Audio follow-up (sweep L6, 2026-11-11, still open): not reproduced; the whole suite takes 9 to 10 s on the dev PC. The reclaimed run was the audio step of a serial `scripts/gpu-package-tests.mjs` run (local GPU idle record, 02:28:06Z, 211,623 ms idle), and the Windows System log holds no driver reset (4101, nvlddmkm 153) between 02:15 and 02:30Z, so a GPU reset did not cause it. Every page call of `packages/audio/scripts/test-browser.js` now has a 60 s limit that names its step and prints the state and clock of every real AudioContext the page made, so the next stall fails in about a minute and names the call (a real-time `resume()` that never settles, an `Engine.create`, or a media element that never plays).
+Audio follow-up (sweep L6, 2026-11-11, still open): not reproduced; the whole suite takes 9 to 10 s on the workstation. The reclaimed run was the audio step of a serial `scripts/gpu-package-tests.mjs` run (local GPU idle record, 02:28:06Z, 211,623 ms idle), and the Windows System log holds no driver reset (4101, nvlddmkm 153) between 02:15 and 02:30Z, so a GPU reset did not cause it. Every page call of `packages/audio/scripts/test-browser.js` now has a 60 s limit that names its step and prints the state and clock of every real AudioContext the page made, so the next stall fails in about a minute and names the call (a real-time `resume()` that never settles, an `Engine.create`, or a media element that never plays).
 - Fixed while recording the VRM asset: appended WebXR generic-hand provenance is now part of the notices generator asset table, preserving the original licence and hashes. The existing supply-chain consistency test covers both records.
 
 - Fixed 2026-11-11 (4e703eb6e6): `addVRM` in packages/rigging/src/vrm.ts registered and removed its plugin through the active scene rather than the model scene. Dispose now removes it from its own scene (`engine.sceneOf(plugin)`); regression: the "dispose removes the face plugin from its own scene" test in `packages/rigging/tests/face.test.js`.
@@ -6284,7 +6284,7 @@ Origin/main 43e08376d added exporters/sparse without its umbrella facade. The or
 Fixed during integration: synchronous parent/creation notifications could expose attach transforms or clone metadata before initialization. Optional graph/clone now batch notifications until commit; the tags.test.js attach/clone listener and failed-allocation regression fails without that boundary. Failed observer installation restores any already-installed wrappers. No open defect found in the requested row; pre-saved method references and private-store mutation are documented observation limits.
 Fixed 2026-11-10: Batch 245 GPU planner registrations. GPU planner registrations and command ordering are repaired on main (af4b357e1, d7be06653). Current plan() and tests/gpu-browser-registration.test.js plus modern-extension-suite.test.js pass without omitting any browser leaf.
 
-- Fixed 2026-11-10 (lane I, batch 132 Mac sweep): XR AR-extras GPU fixture: node packages/xr/tests/ar-extra.browser.mjs fails on clean origin/main 6ab64e777 as well as batch 265 with missing AR observations. The fixture counts session frames started before its async observation helpers attach; under shared load it reads before those helpers receive a frame. Receipt: test-results/batch265-resume-cleanmain-xr-ar.log. Owning fixture fix waits for the fix phase (rule 21). Fix: the injected check now waits three session frames counted from after MeshDetection and ImageTracking attach before it reads them (packages/xr/tests/ar-extra.browser.mjs). On the M6 Mac mini it failed in both the native and MARGO_COMPAT=1 sweeps before the change and passed 3 of 3 runs in each after it. No assertion or threshold changed.
+- Fixed 2026-11-10 (lane I, batch 132 Mac sweep): XR AR-extras GPU fixture: node packages/xr/tests/ar-extra.browser.mjs fails on clean origin/main 6ab64e777 as well as batch 265 with missing AR observations. The fixture counts session frames started before its async observation helpers attach; under shared load it reads before those helpers receive a frame. Receipt: test-results/batch265-resume-cleanmain-xr-ar.log. Owning fixture fix waits for the fix phase (rule 21). Fix: the injected check now waits three session frames counted from after MeshDetection and ImageTracking attach before it reads them (packages/xr/tests/ar-extra.browser.mjs). On the Apple silicon Mac it failed in both the native and MARGO_COMPAT=1 sweeps before the change and passed 3 of 3 runs in each after it. No assertion or threshold changed.
 
 
 
@@ -6837,7 +6837,7 @@ Fixed upstream: batch 183 navmesh package-directory bundle probes. e295cc68a anc
 Batch 183 gate finding (fixed 2026-11-11 by 38e03b1187): the sciviz package-local `npm test` lacked `--experimental-test-module-mocks` although tests/pointcloud.test.js calls mock.module. The package test script now passes the flag.
 Fixed batch 180 landing integration: the generated margoengine/sciviz/monitor alias was present in the working tree but omitted by tracked-only staging while its generated manifest mapping was committed. A clean checkout could not build that entry. The generated source is now committed. The new packages/margoengine/tests/export-order.test.js index-membership regression catches this class even when an unstaged generated source exists locally; it runs in the normal merge CPU suite. Existing tests/umbrella.test.js also checks complete generator output and every runtime alias.
 
-Batch 179 state capture: default MSAA transparent rendering is not self-bit-stable (Aeroflow repeated unchanged captures differed in 14 of 3042432 bytes by one level on this GPU); the same source scene varies while serialized resources, limits and camera are identical; the renderer cause remains to isolate. ExactSize round-trip proofs remain exact. Default-MSAA bit identity is retained for the rendering fix phase; no core change is made. Update 2026-11-11 (bug sweep L3b, KB5700f, still open): isolated to the Aeroflow surface layer, not core or the line layers. Repro: load packages/sciviz/tests/pages/sciviz-aeroflow.html, stop the engine and call `figure.toPNG({ overlays: false })` 24 times on the unchanged view (RTX A6000, Chromium 157). Measured with each layer set rebuilt alone from the same heights: all three layers 23 of 23 captures differ; the two line layers alone 0 of 23; the surface alone (opacity 0.85, `cullMode` none, no depth write, one draw) 22 of 23 natively and 23 of 23 on the WebGL2 layer (ANGLE D3D11); the same surface at opacity 1 (no blend, depth write) 0 of 23; with contours off still 23 of 23; at opacity 0.999 23 of 23; the same surface flattened to a plane or tilted (no fold, varied shading, contours on) 0 of 23 and 0 of 31. So the flips need a blended surface that covers a pixel more than once in one draw (its folds). With the blend swapped for an order-independent `max` blend the folded surface still flipped (31 of 31), and with a blend that adds nothing it was stable, so it is not the order in which the overlapping fragments are blended: the values or sample coverage of the overlapping fragments themselves change from frame to frame, below the calls Margo makes (two GPU back ends on the same NVIDIA board agree). Compared with KB-GEO1 (13ad07d3e7): the same family (only blended pipelines flip; unblended ones and identical inputs are stable), but there a single-coverage tile at alpha 1 flipped, while here single coverage is stable and only self-overlap flips. Still to do: repeat on a second GPU vendor (M6 Mac mini or the Arc laptop) before any upstream report; owner for any Margo-side change is the sciviz surface layer, where a folded transparent surface drawn in grid order is also not composited back to front (a depth pre-pass so only the nearest layer blends, or the optional OIT entry, would make the result order-free and stable), which is a sciviz look decision routed to the sciviz lane. Update 2026-11-11 (L3b, KB5700f, closed as an NVIDIA limit): a raw-API page with no Margo code (`scripts/reference-rendering/fold-blend-repeat.html`, one folded height field, alpha 0.85, 4x MSAA) flips the same way on the RTX A6000 (WebGPU D3D12 23 of 23 repeats, up to 62 bytes; ANGLE D3D11 23 of 23, up to 86) and repeats exactly on an AMD RDNA 2 iGPU (same PC, D3D12 and D3D11) and on an Apple M6 (Metal, 63 of 63); the opaque and flat cases repeat exactly everywhere. So it is NVIDIA-specific. Upstream draft docs/upstream-reports/KB5700f/report.md; limit in docs/limits.md; regression `packages/sciviz/tests/surface-repeat-browser.mjs` pins the stable cases (opacity 1, and flat or tilted translucent surfaces) on WebGPU and the WebGL2 layer. The Aeroflow page itself was not run on the Mac (its checkout has no repository access); the raw page carries the same trigger. The sciviz look is unchanged.
+Batch 179 state capture: default MSAA transparent rendering is not self-bit-stable (Aeroflow repeated unchanged captures differed in 14 of 3042432 bytes by one level on this GPU); the same source scene varies while serialized resources, limits and camera are identical; the renderer cause remains to isolate. ExactSize round-trip proofs remain exact. Default-MSAA bit identity is retained for the rendering fix phase; no core change is made. Update 2026-11-11 (bug sweep L3b, KB5700f, still open): isolated to the Aeroflow surface layer, not core or the line layers. Repro: load packages/sciviz/tests/pages/sciviz-aeroflow.html, stop the engine and call `figure.toPNG({ overlays: false })` 24 times on the unchanged view (RTX A6000, Chromium 157). Measured with each layer set rebuilt alone from the same heights: all three layers 23 of 23 captures differ; the two line layers alone 0 of 23; the surface alone (opacity 0.85, `cullMode` none, no depth write, one draw) 22 of 23 natively and 23 of 23 on the WebGL2 layer (ANGLE D3D11); the same surface at opacity 1 (no blend, depth write) 0 of 23; with contours off still 23 of 23; at opacity 0.999 23 of 23; the same surface flattened to a plane or tilted (no fold, varied shading, contours on) 0 of 23 and 0 of 31. So the flips need a blended surface that covers a pixel more than once in one draw (its folds). With the blend swapped for an order-independent `max` blend the folded surface still flipped (31 of 31), and with a blend that adds nothing it was stable, so it is not the order in which the overlapping fragments are blended: the values or sample coverage of the overlapping fragments themselves change from frame to frame, below the calls Margo makes (two GPU back ends on the same NVIDIA board agree). Compared with KB-GEO1 (13ad07d3e7): the same family (only blended pipelines flip; unblended ones and identical inputs are stable), but there a single-coverage tile at alpha 1 flipped, while here single coverage is stable and only self-overlap flips. Still to do: repeat on a second GPU vendor (Apple silicon Mac or the Arc laptop) before any upstream report; owner for any Margo-side change is the sciviz surface layer, where a folded transparent surface drawn in grid order is also not composited back to front (a depth pre-pass so only the nearest layer blends, or the optional OIT entry, would make the result order-free and stable), which is a sciviz look decision routed to the sciviz lane. Update 2026-11-11 (L3b, KB5700f, closed as an NVIDIA limit): a raw-API page with no Margo code (`scripts/reference-rendering/fold-blend-repeat.html`, one folded height field, alpha 0.85, 4x MSAA) flips the same way on the RTX A6000 (WebGPU D3D12 23 of 23 repeats, up to 62 bytes; ANGLE D3D11 23 of 23, up to 86) and repeats exactly on an AMD RDNA 2 iGPU (same PC, D3D12 and D3D11) and on an Apple M6 (Metal, 63 of 63); the opaque and flat cases repeat exactly everywhere. So it is NVIDIA-specific. Upstream draft docs/upstream-reports/KB5700f/report.md; limit in docs/limits.md; regression `packages/sciviz/tests/surface-repeat-browser.mjs` pins the stable cases (opacity 1, and flat or tilted translucent surfaces) on WebGPU and the WebGL2 layer. The Aeroflow page itself was not run on the Mac (its checkout has no repository access); the raw page carries the same trigger. The sciviz look is unchanged.
 
 Fixed 2026-11-11 (2413bb2901): quality scanner race. Running quality alongside React subpath tests could list then read a temporary .subpaths-* fixture after the test deleted it, yielding ENOENT in clean-room.js (found during batch 179, outside the state codec). The scanners now read through readRepoFile, which skips a listed file removed before the read, so the gates may run side by side. Regression: tests/quality-inventory.test.js (scanners skip a removed file).
 
@@ -6914,7 +6914,7 @@ converging). Fix to build: treat a column whose norm falls below eps times the l
 zero (skip its rotations and complete its singular vector by the existing basis completion), checked against the
 relative accuracy the Jacobi method keeps for graded columns.
 
-Fixed (bug sweep L5): a column whose norm times the input scale is below 2^-150 (its f32 singular value is 0 in every case) is set to exactly zero, takes no more rotations and is completed orthogonally; graded columns above that floor keep every rotation (Rust test `svd_floor_keeps_graded_values_and_zeroes_only_f32_zero_columns`). The repro converges in 11 to 20 sweeps. The basis completion now picks the axis with the smallest row norm and orthogonalizes only it twice (CGS2), so the repro takes 8 s instead of 85 s on a loaded dev PC. Regression: packages/compute/tests/decomp.test.js "svd converges on a 512 x 512 matrix of many repeated columns".
+Fixed (bug sweep L5): a column whose norm times the input scale is below 2^-150 (its f32 singular value is 0 in every case) is set to exactly zero, takes no more rotations and is completed orthogonally; graded columns above that floor keep every rotation (Rust test `svd_floor_keeps_graded_values_and_zeroes_only_f32_zero_columns`). The repro converges in 11 to 20 sweeps. The basis completion now picks the axis with the smallest row norm and orthogonalizes only it twice (CGS2), so the repro takes 8 s instead of 85 s on a loaded workstation. Regression: packages/compute/tests/decomp.test.js "svd converges on a 512 x 512 matrix of many repeated columns".
 
 Fixed 2026-11-10: review 3 SV4 transfer-binding reentrant abort. The abort listener now exists before the initial caller render callback; an already-disposed initialization cannot subscribe to later transfer changes. Failed initialization restores the previous classifier and releases listeners, with both errors retained if restoration also fails. Regression: packages/sciviz/tests/transfer.test.js covers initial synchronous abort, throwing render callbacks and failed restoration; all three fail on the parent. Default LUT work, numerical transfer tests and rendering bounds are unchanged.
 
@@ -7016,7 +7016,7 @@ See whitepaper/results/batch-137-quality-r10.json and basis-zstd.test.js.
 
 ## Batch 132 audit: core (read-only package; findings for Scott)
 
-Base dab36e5f9, M6 Mac mini. Core CPU 90/90 and `core test:gpu` (native, WebGL2 compat and preview) pass on Metal.
+Base dab36e5f9, Apple silicon Mac. Core CPU 90/90 and `core test:gpu` (native, WebGL2 compat and preview) pass on Metal.
 
 ### Fixed: core Euler lanes lose the orientation at pitch +-90 degrees
 
@@ -7098,7 +7098,7 @@ environment budget (already 1 over, KB3574), which needs a re-record ruling. Fix
 
 ## Batch 132 audit: stage (read-only package; findings for Scott)
 
-Base dab36e5f9, M6 Mac mini. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
+Base dab36e5f9, Apple silicon Mac. Stage CPU 134/134; `test:gpu`, `test:gpu:features` (each on WebGPU and with
 MARGO_COMPAT=1), `test:gpu:gltf`, `test:gpu:lights` and `test:gpu:viewer-extras` (both modes inside) pass on Metal.
 
 ### Fixed: stage `addScene` and `addLights` remove each other's clustered lights
@@ -7491,7 +7491,7 @@ refusing during setup or holding a tested preview route.
 
 ## Batch 132 audit: animation (fixed, Mac sweep)
 
-Found by lane I's Mac sweep on 2026-11-10 (M6 Mac mini, Metal; forced compatibility with `MARGO_COMPAT=1`, which runs the WebGPU code on the WebGL2 layer). Both checks pass natively. Neither script asks for a compat pass in package.json, so no gate ran them this way before. Both fixed by lane I the same day; the commit is the one that changed this section.
+Found by lane I's Mac sweep on 2026-11-10 (Apple silicon Mac, Metal; forced compatibility with `MARGO_COMPAT=1`, which runs the WebGPU code on the WebGL2 layer). Both checks pass natively. Neither script asks for a compat pass in package.json, so no gate ran them this way before. Both fixed by lane I the same day; the commit is the one that changed this section.
 - `MARGO_COMPAT=1 npm run test:gpu:morph` (scripts/animation-morph-gpu-tests.js): every STEP and LINEAR weight read back wrong, worst error 1 (CUBICSPLINE 0.79); first failure STEP loop, copy 1, at 0.4: expected 1, read 0. None of the three first suspects (the scatter tier's `num_workgroups` index, `arrayLength(&items)`, a readback at an offset) was it: the first frame was right and every later frame read the CPU's zeros. **Cause: a browser bug below the layer**, Chrome on ANGLE's Metal back end. When the first draw through a framebuffer after the WebGL2 context's OffscreenCanvas was shown with `transferToImageBitmap` comes after an upload into the framebuffer's texture (`texSubImage2D`, from memory or from a pixel unpack buffer, before or after the frame was shown), that draw is dropped: no GL error, the framebuffer reports complete, the texture keeps the uploaded data. The layer refreshes a buffer's "word texture" with such an upload before each scatter dispatch, so from the second frame on (the first one shown) the morph pass's stores never landed and the Animation's own weight upload (zeros) won. Raw WebGL2 repro with no layer: `node packages/webgl2-compat/test/metal-dropped-draw-repro.mjs` (prints one line per order; not a gate): an R32UI 4096x1 texture attached to a framebuffer; draw 7 into it, read 7; show the canvas; upload zeros; draw 9; read 0 (9 without the frame shown, 9 with no upload, 9 when the texture is attached to the framebuffer again before the draw, 9 when any draw through the framebuffer comes first). Measured with `ANGLE (Apple, ANGLE Metal Renderer: Apple M6, Unspecified Version)`, HeadlessChrome 156.0.8078.4. Not reported upstream from here (this repository does not read or file against Chromium or ANGLE code). **Workaround in the layer** (packages/webgl2-compat/src/device/device.ts `framebuffer`, canvas.ts `present`): each shown frame bumps `CompatDevice.frame`, and a cached framebuffer is attached again (its attachments, draw buffers and status check) on its first use in each new frame. Cost: one re-attach per framebuffer used per frame, no new GL objects. Regression: `scatterAfterWrite` in packages/webgl2-compat/test/compute.html (run by `test:gpu` through compute-browser.mjs): a scatter dispatch, a frame shown, 70 small writes into the same buffer, a second dispatch; without the workaround the layer read `second[0..3]` as 0 where native WebGPU read 10, 20, 30, 40. The morph check now passes under `MARGO_COMPAT=1` (worst error 6.0e-6, under its 1e-5 bound; the bound is unchanged).
 - `MARGO_COMPAT=1 npm run test:gpu:uploads` (packages/animation/tests/upload-copies-browser.mjs): "a held pose stays certified as uploaded" failed; the page reported `{"skinned":4,"palettes":2,"copies":0,"mismatched":0,"held":false}`. **Cause in animation's design, not a wrong result**: the uploaded-palette and morph weight caches (packages/animation/src/index.ts `reusableWriter`) only trust the browser's own `GPUQueue.prototype.writeBuffer`, because a custom writer could change its input while it copies and restore it before returning, so comparing afterwards could not certify the upload. The layer's `CompatQueue.writeBuffer` is a JavaScript method, so on the layer every held palette and every unchanged morph weight went up again each frame and `bonesUploaded` never held. That method copies its input before it returns (straight into GL, or into a slice that waits its turn) and never changes it. **Fix**: it now carries the mark `Symbol.for('margoengine.writeBuffer.copiesInput')` (non-writable), and `reusableWriter` also accepts a queue whose prototype's own `writeBuffer` is the writer and carries that mark, with the same own-property and getter checks as the native path. Like the native check, it is a host filter, not a security boundary. Regressions: the compat run of `test:gpu:uploads` (held true) and `writeBuffer carries the copies-input mark` in packages/webgl2-compat/test/device.test.js.
 
@@ -7502,7 +7502,7 @@ the coordinate's own `dpdx`/`dpdy`, where native Metal (and WGSL's definition) u
 now samples implicitly in that case. `features-browser.mjs` passes on the M6 at `5a6087049` (all `implicitFootprint`
 texels match native). The original report follows.
 
-Found 2026-11-10 by the Mac's full `packages/webgl2-compat` `npm run test:gpu` on `main` 5dfe40d1f (M6 Mac mini,
+Found 2026-11-10 by the Mac's full `packages/webgl2-compat` `npm run test:gpu` on `main` 5dfe40d1f (Apple silicon Mac,
 "ANGLE Metal Renderer: Apple M6", HeadlessChrome 156.0.8078.4). `node packages/webgl2-compat/test/features-browser.mjs`
 stops at `implicitFootprint: compat differs from native`: all eight `.linear/oblique-grad/false` texels read
 1054299991 (0.42059 as f32 bits) on the compatibility layer against 1052145270 (0.35637) on native WebGPU. The case
@@ -7529,7 +7529,7 @@ changed. Repro: `MARGO_GPU_SLOTS=2 node packages/webgl2-compat/test/features-bro
 
 ## webgl2-compat explicit gradients on ANGLE Metal (lane L, 2026-11-10, fixed)
 
-Fixed: on the M6 Mac mini, `textureSampleGrad(t, s, uv, dpdx(uv), dpdy(uv))` through the WebGL2 layer chose a
+Fixed: on the Apple silicon Mac, `textureSampleGrad(t, s, uv, dpdx(uv), dpdy(uv))` through the WebGL2 layer chose a
 different mip (0.4205882 against native 0.3563725 on the bias-browser oblique map), because ANGLE Metal's GLSL
 `textureGrad` takes the generic explicit-gradient path while native Metal returns the implicit footprint for those
 gradients. Repro before the fix: `node packages/webgl2-compat/test/bias-browser.mjs` on a Mac (128 of 1280 words
@@ -7549,7 +7549,7 @@ showed the path from the registry's WeakCells through `gl` to the disposed engin
 `WeakRef` to the device and an id into a per-device `WeakMap` of shared textures. Regression:
 packages/webgl2-compat/test/bind-group-release.test.js (fails with the old held value), and vfx-check under compat.
 
-### Fixed: ANGLE D3D11 on an AMD driver hung the GPU under the old flipped-blit present (2026-11-10, Beelink)
+### Fixed: ANGLE D3D11 on an AMD driver hung the GPU under the old flipped-blit present (2026-11-10, AMD mini PC)
 
 Repro (Radeon 680M, Windows 11, AMD driver 32.0.21030.2001, Edge 157.0.4341.42): `node
 packages/materials/test/features-browser.mjs` failed its compat half 2 of 2 on 48ca54edd, at a different step each run
@@ -7570,10 +7570,10 @@ first suspected (compat source at 42d6e24ae^ hung the same). 450015cb1 ("present
 not a flipped blit", for the NVIDIA uniform-block bug above) removes the old present, and with it the hang: 0 in 60
 devices, and the features test passes 2 of 2 on 000a11e1d. Regression: packages/webgl2-compat/test/device-churn-browser.mjs
 (in test:gpu; 30 fresh devices must each show their frame) fails at device 1 with compat source at 450015cb1^ on the
-Beelink and passes on main. Diagnostics kept outside the repository in lane M1's `.lane/diag` (raw-launch.mjs, wrap.js
+AMD mini PC and passes on main. Diagnostics kept outside the repository in lane M1's `.lane/diag` (raw-launch.mjs, wrap.js
 GL wrappers, feat.html, min.html).
 
-### Accepted: AMD D3D11 compressed mip blend makes implicitFootprint differ from native (2026-11-10, Beelink)
+### Accepted: AMD D3D11 compressed mip blend makes implicitFootprint differ from native (2026-11-10, AMD mini PC)
 
 Repro (Radeon 680M, Windows 11, AMD driver 32.0.21030.2001): `node packages/webgl2-compat/test/features-browser.mjs`
 on main 50b7ceddc stopped at `implicitFootprint: compat differs from native`, `.linear/implicit/false[0..7]: native
@@ -7599,7 +7599,7 @@ native's own textureSampleLevel and raw WebGL2 textureLod at one shared LOD k/25
 self-test scales the layer's footprint coordinates by 1.01 (LOD 3.7/256 high, inside the clamp, so the blend alone
 cannot see it) and must fail through the sweeps. bias-browser.mjs (test:gpu:bias) uses the same scheme: D3D11
 compressed, Vulkan linear and exact. Regression: blend-check.test.js (classification and the comparison on synthetic
-probes); on the Beelink features-browser.mjs passes with the self-test failing as required. No system or driver
+probes); on the AMD mini PC features-browser.mjs passes with the self-test failing as required. No system or driver
 setting was changed (the AMD "Texture Filtering Quality" setting may control the compression; not tried).
 
 ### Fixed: weather lens drops lost sub-cell precision far from the origin (2026-11-10)
@@ -7616,7 +7616,7 @@ Repro: `node --test tests/vite-cache-isolation.test.js` on main printed 5 passin
 
 ### Open (below Margo): AMD Direct3D 11 steepens the trilinear blend, so AMD compat IOR stays over its budget (2026-11-10)
 
-Repro: `MARGO_GPU=amd GPU_POWER=low-power node scripts/gpu-lock.mjs run --owner=<you> --gpu=render-correctness -- node scripts/reference-rendering/mip-blend-control.mjs` on the dev PC's AMD Radeon iGPU (RDNA 2, driver 32.0.21042.62). The page is raw WebGL2 and raw WebGPU with no Margo code: level 0 white, every other level black, one sampler with linear min, mag and mip filters, sampled at LOD fractions 0.125 to 0.875 both by explicit LOD and by implicit derivatives. Raw WebGL2 on ANGLE D3D11 uses level-1 weights 0.03125, 0.1875, 0.34375, 0.5, 0.65625, 0.8125, 0.96875, that is clamp(1.25 f - 0.125), flat below 0.1 and above 0.9 (worst error 0.098), for explicit and implicit sampling alike. Raw WebGPU (Dawn on D3D12) on the same GPU gives exactly f (worst 0 explicit, 1/256 implicit, the hardware's 8-bit LOD fraction), and both APIs give exactly f on the RTX A6000. So the steepened blend is the AMD driver's Direct3D 11 trilinear path under ANGLE, not compat state: compat binds LINEAR_MIPMAP_LINEAR, MIN_LOD/MAX_LOD from the descriptor, base level 0, and no anisotropy for an isotropic sampler, exactly the raw page's state.
+Repro: `MARGO_GPU=amd GPU_POWER=low-power node scripts/gpu-lock.mjs run --owner=<you> --gpu=render-correctness -- node scripts/reference-rendering/mip-blend-control.mjs` on the workstation's AMD Radeon iGPU (RDNA 2, driver 32.0.21042.62). The page is raw WebGL2 and raw WebGPU with no Margo code: level 0 white, every other level black, one sampler with linear min, mag and mip filters, sampled at LOD fractions 0.125 to 0.875 both by explicit LOD and by implicit derivatives. Raw WebGL2 on ANGLE D3D11 uses level-1 weights 0.03125, 0.1875, 0.34375, 0.5, 0.65625, 0.8125, 0.96875, that is clamp(1.25 f - 0.125), flat below 0.1 and above 0.9 (worst error 0.098), for explicit and implicit sampling alike. Raw WebGPU (Dawn on D3D12) on the same GPU gives exactly f (worst 0 explicit, 1/256 implicit, the hardware's 8-bit LOD fraction), and both APIs give exactly f on the RTX A6000. So the steepened blend is the AMD driver's Direct3D 11 trilinear path under ANGLE, not compat state: compat binds LINEAR_MIPMAP_LINEAR, MIN_LOD/MAX_LOD from the descriptor, base level 0, and no anisotropy for an isotropic sampler, exactly the raw page's state.
 
 Effect: since 42d6e24ae compat keeps the hardware's implicit footprint (the Euclidean derivative estimate chose a different mip from native, J6 ToyCar). On AMD D3D11 that footprint is blended with the steepened weight, which native AMD WebGPU does not do, so batch 160's AMD compat IOR proof scores 2,423,682 against its frozen 2,421,642 while native AMD scores 2,421,894. Compat cannot undo it: WebGL2 exposes no query of the hardware LOD (textureQueryLod is not in GLSL ES 3.00), and the flat zones throw the fraction away, so no shader arithmetic recovers f. Computing LOD in the shader instead brings back the J6 footprint mismatch on every vendor. Coordinator ruling (2026-11-10): the AMD compat IOR budget is not re-frozen; this one AMD D3D11 compat case is recorded here, every other case still stops. Fix condition: a driver or ANGLE change that makes the control print f for WebGL2, then the proof rerun against the unchanged budget.
 
@@ -7657,7 +7657,7 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-comp
   slices and called `figure.render()`, which can change the size of the canvases it observes in the same frame.
 - **Fix:** the callback schedules one refit and redraw on the next animation frame (deliveries before it share it;
   dispose cancels it). Regression: packages/sciviz/tests/views-browser.mjs counts renders inside the delivery (must be
-  0) and after it. WebKit evidence: on the Mac mini (Apple M6, macOS 27.2) the views browser test passed 10 of 10
+  0) and after it. WebKit evidence: on the Apple silicon Mac (Apple M6, macOS 27.2) the views browser test passed 10 of 10
   Playwright WebKit runs at 397545736b, compatibility layer off and on, with no ResizeObserver page error.
 
 ## Batch 132b audit: materials (fixed, 2026-11-11, lane N)
@@ -7708,7 +7708,7 @@ Repro: `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-comp
 
 ### Fixed 2026-11-11: four root tests failed only in a parallel root run (KB-FL1, KB-FL2, KB-FL3, gpu-lock slots)
 
-Found by running the root suite as the full run does (`node --test --test-concurrency=4 tests/*.test.js`) ten times on the dev PC beside other lanes. Each cause is shared state or a step deadline, not the code under test being slow.
+Found by running the root suite as the full run does (`node --test --test-concurrency=4 tests/*.test.js`) ten times on the workstation beside other lanes. Each cause is shared state or a step deadline, not the code under test being slow.
 
 - KB-FL1, `tests/gpu-lock-limits.test.js` ("a holder ... hangs in a synchronous loop is ended by its heartbeat process"). On Windows the heartbeat waits for its starter process to exit before it ends an overrunning holder, and it asked whether the starter was alive by pid. Windows gives a freed pid to the next new process (6 repeats in 300 back-to-back spawns here), so a stranger that took the starter's pid held the kill back for the whole one-minute bound: 60.7 s measured with a live process at that pid, past the test's 20 s bound. Fix in `scripts/gpu-lock.mjs`: the starter gives the heartbeat a stdin pipe it alone writes, so the pipe's end is the starter's exit, which no other process can fake. Regression: "a heartbeat waits for its starter by the starter pipe, not by a pid another process may have taken" in `tests/gpu-lock-limits.test.js` (fails on the old code after 22 s, passes in 3 s).
 - KB-FL2, `tests/package-browser-root.test.js`. Each cwd probe (a shell running `node -p`) had a 5 s step limit. Measured during parallel root runs: median 85 ms, slowest 2.6 s of 1,340 samples; the original failing run had more load beside it, and the message gave no reason. The probes now run without a step deadline, the test has one 120 s hang bound, and a failed probe reports its exit code, signal and output. Regression: `tests/package-browser-root-load.test.js` holds the first probe back 6 s with a preload (fails on the old test at 5.1 s, passes on the new one). Not reproduced in the ten runs, so the cause is the one load-sensitive step the test had, ruled in by measurement; it shares no temp folder, port, lock or env with other files.

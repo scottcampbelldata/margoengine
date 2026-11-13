@@ -1,5 +1,5 @@
 // Absolute machine paths: a tracked file must not name a drive-letter or Git Bash drive-mount path into a user's home
-// folder (a drive followed by Users) or the dev PC's project folder (a drive followed by Development). Such a path
+// folder (a drive followed by Users) or the workstation's project folder (a drive followed by Development). Such a path
 // leaks a machine layout and does not exist in a clone. Name a sibling checkout as `../name`, a tool cache by its
 // environment variable (`%LOCALAPPDATA%`), and a home folder as `~`. scripts/check-banned-terms.mjs runs this scan
 // over every tracked text file; tests/machine-paths.test.js holds the regression.

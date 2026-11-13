@@ -7,7 +7,7 @@
     "GPU_POWER": "low-power",
     "enginePowerPreference": "low-power"
   },
-  "reason": "KB3584: re-measured on the dev PC AMD RDNA2 iGPU (0x13C0, the adapter of the 2026-11-09 receipt) after da12bd07e1, 65098f33fe, 401c2e032b and edcb6debb7, under Scott 2026-11-11 re-record ruling. These metrics are the AMD budgets of this case (proof-contract amdReceiptBudgets).",
+  "reason": "KB3584: re-measured on the workstation AMD RDNA2 iGPU (0x13C0, the adapter of the 2026-11-09 receipt) after da12bd07e1, 65098f33fe, 401c2e032b and edcb6debb7, under Scott 2026-11-11 re-record ruling. These metrics are the AMD budgets of this case (proof-contract amdReceiptBudgets).",
   "budgets": "Each backend proof gates every reference (viewer, full, direct) by its own metrics here; the NVIDIA rows stay the shared budget for every other adapter.",
   "proofs": [
     {

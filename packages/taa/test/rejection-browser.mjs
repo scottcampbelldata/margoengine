@@ -77,7 +77,7 @@ try {
     };
   }
   console.log('trail brightening in sRGB levels', trail);
-  // M6 Mac mini, Metal: 53.0 levels clamped, 35.1 clipped. Near a dot the box keeps white history up to the dot's 0.9;
+  // Apple silicon Mac, Metal: 53.0 levels clamped, 35.1 clipped. Near a dot the box keeps white history up to the dot's 0.9;
   // the variance box of one bright pixel in nine reaches about half that, and pixels far from dots clear in both.
   assert.ok(trail.clamp.trail > 30, `the min/max clamp keeps a trail (${trail.clamp.trail.toFixed(1)})`);
   assert.ok(
@@ -97,7 +97,7 @@ try {
   }
   // The line is at the view's centre, between columns 159 and 160. Its brightness in a frame: the brightest of columns
   // 157 to 162, averaged over rows 60 to 180. The clamped line vanishes on the frames the jitter misses it (5 of 8 on
-  // M6 Mac mini, Metal: dimmest frame 5 levels, the background); the locked one stays (dimmest frame 54).
+  // Apple silicon Mac, Metal: dimmest frame 5 levels, the background); the locked one stays (dimmest frame 54).
   const flicker = {};
   for (const mode of lines) {
     const levels = frames[mode].map((image) => {

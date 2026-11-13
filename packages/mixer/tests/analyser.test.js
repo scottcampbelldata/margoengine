@@ -57,7 +57,7 @@ test('bus analyser is owned, preserves serial stages and releases worklet resour
 });
 
 test('LUFS windows read -Infinity again once a loud passage has left them, and stay drift free', async t => {
-  // M6 Mac mini: a 0.37 stereo chirp for 5 s then 4 s of digital silence read momentary -149 and short-term -143.5
+  // Apple silicon Mac: a 0.37 stereo chirp for 5 s then 4 s of digital silence read momentary -149 and short-term -143.5
   // LUFS, because the running window sums kept the rounding left by adding and removing loud samples.
   for (const amp of [0.9, 0.37]) {
     const h = processorHarness(t);

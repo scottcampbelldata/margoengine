@@ -185,7 +185,7 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
     };
   }
   console.log('against the matrix-moved plane, in sRGB levels', result);
-  // M6 Mac mini, Metal: the raw shape without its own motion trails 24.7 levels; with it, and the graph, the frames
+  // Apple silicon Mac, Metal: the raw shape without its own motion trails 24.7 levels; with it, and the graph, the frames
   // match the reference but for rounding (a level at most).
   assert.ok(result.rawPlain.trail > 15, `a raw shape without its own motion trails (${result.rawPlain.trail.toFixed(1)})`);
   for (const id of ['graph', 'raw']) {

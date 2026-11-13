@@ -55,7 +55,6 @@ the migration. Historical evidence is retained with its original measurement con
 - `docs/api-surface.md`
 - `docs/architecture/operational-playbook.md`
 - `docs/catalog.json`
-- `docs/from-threejs.md`
 - `docs/guides/blender-game.md`
 - `docs/guides/imports.md`
 - `docs/guides/textures-and-materials.md`

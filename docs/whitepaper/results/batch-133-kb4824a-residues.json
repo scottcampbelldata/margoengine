@@ -1,5 +1,5 @@
 {
-  "about": "KB4824a residues (bug sweep L5b, 2026-11-11). Frozen clean-room Wasm sha256 9384f0512fa8fdb5ccf17173fe926e9d83f485e3557b0af2e6accba5bdd5d5e4 (packages/decoders/src/draco-native.wasm at the KB4824a commit). Node v26.12.0, win32, dev PC under build-phase load. Driver scripts/acceptance/draco-resources.mjs; inputs from the pinned original corpus (results/batch-133-corpus-manifest.json identities).",
+  "about": "KB4824a residues (bug sweep L5b, 2026-11-11). Frozen clean-room Wasm sha256 9384f0512fa8fdb5ccf17173fe926e9d83f485e3557b0af2e6accba5bdd5d5e4 (packages/decoders/src/draco-native.wasm at the KB4824a commit). Node v26.12.0, win32, workstation under build-phase load. Driver scripts/acceptance/draco-resources.mjs; inputs from the pinned original corpus (results/batch-133-corpus-manifest.json identities).",
   "pointCloudsApiOutputs": {
     "method": "one-shot, --outputs=api: each side returns what DracoPointsDecoder returns (stored type only, no float conversion on either decoder)",
     "summary": {

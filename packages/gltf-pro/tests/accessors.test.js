@@ -1,4 +1,4 @@
-// The conveyor example's Untitled.glb (Blender I/O 5.3; example deleted 2026-10-24) was rejected with
+// A Blender 5.3 glTF, not kept in this repository, was rejected with
 // "Unsupported glTF accessor" only because two uint32 index accessors held more than 1,000,000 elements (accessor 174:
 // 1,021,494 for mesh 66 "Mesh_16"; accessor 487: 1,480,944 for mesh 171 "Mesh_15"). The decoded-size budget bounds
 // accessors now; vertices stay capped at 1M per primitive on both the main-thread and worker paths. Errors name mesh,

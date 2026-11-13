@@ -4,7 +4,7 @@
 // with WrongDocumentError ("The root document of this element is not valid for pointer lock."). On macOS a view has
 // that focus only in the key window of the active (front) application. On an unattended Mac with the console locked
 // the front application is loginwindow, so no browser window can be key, headed or headless, and every request is
-// refused (measured on the M6 Mac mini, Chromium 156.0.8078.4, 2026-11-10: headless shell, new headless and headed,
+// refused (measured on the Apple silicon Mac, Chromium 156.0.8078.4, 2026-11-10: headless shell, new headless and headed,
 // with and without page.bringToFront() and CDP Emulation.setFocusEmulationEnabled). That is the operating system, not
 // Margo or the harness, so no launch flag fixes it. docs/limits.md "Native pointer lock on a locked Mac" records it.
 //

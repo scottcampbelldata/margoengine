@@ -33,7 +33,7 @@ if (selected.length) {
       const which = entry === undefined ? name : `${name}/${entry}`;
       const label = `owner/lifetime GPU ${which}${compat ? ' (WebGL2 compatibility)' : ''}`;
       const gpu = await runLimited('node scripts/gpu-lock.mjs run --owner=check-owner-lifetime --wait-max=60 ' +
-        // Measured 2026-11-10 (busy dev PC): animation, the largest, 45 s native and 69 s on the WebGL2 layer. The
+        // Measured 2026-11-10 (busy workstation): animation, the largest, 45 s native and 69 s on the WebGL2 layer. The
         // leaf ends itself at 180 s, so the slot is held for 3 minutes at most.
         '--max=3 --gpu=owner-lifetime-real-render-device-loss -- ' +
         `node ${GPU_ENTRY} --packages=${name}${entry === undefined ? '' : ` --entry=${JSON.stringify(entry)}`}`,

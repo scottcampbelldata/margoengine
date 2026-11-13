@@ -31,7 +31,6 @@ lit scene with shadows, orbit controls and click-to-select.
 | Decide what goes in React state and what in the frame loop | [React: state or the frame loop?](guides/react-state-vs-frame-loop.md) |
 | Fix a first guess about frame callbacks, `marchingCubes`, ray input or `PostStack` | [Four calls people guess wrong](guides/first-guesses.md) |
 | See what the engine draws; keep the inspector from covering your buttons | [Debugging with the inspector](guides/debugging.md) |
-| Move a three.js project over | [Coming from three.js](from-threejs.md) |
 | Ship a smaller or faster app | [Quality tiers](guides/quality-tiers.md), [limits](limits.md), [deploying](deploying.md) |
 | Find a package | [Package list](../README.md#packages) and the [catalog](README.md) |
 | Understand how it is built | [Architecture](../MODERN-ENGINE.md), [API overview](api-overview.md) |

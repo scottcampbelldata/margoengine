@@ -78,7 +78,7 @@ All are off by default and compiled in only when asked for: without them the sha
   12) and averages only those between `percentiles` (default `[0.1, 0.9]`), so a small light or a dark corner does not
   swing the exposure; `'mean'` (default) is the weighted log-average. A mask of zero weight keeps the last exposure.
   Every mode shares one compute pipeline; checked on a real GPU against a CPU oracle of the meter within 0.002 stops in
-  all eight combinations (`packages/tonemap/tests/metering-browser.mjs`, M6 Mac mini, Metal).
+  all eight combinations (`packages/tonemap/tests/metering-browser.mjs`, Apple silicon Mac, Metal).
 
 ```ts
 import {createStage} from 'margoengine';
@@ -134,7 +134,7 @@ Classic curves: `curve: 'reinhard'` (x / (1 + x) per channel), `'cineon'` (the f
 taken back to linear with a 2.2 power before the sRGB encoding) and `'linear'` (a clamp to 0..1 after exposure) match
 the curves of the same names in other engines, so a scene ported with its tone mapping keeps its look. They compile a
 separate shader variant only when selected, and switching among them compiles nothing. Checked on a real GPU
-(`packages/tonemap/tests/curves-browser.mjs`, M6 Mac mini, Metal): over 144 input levels at exposures -4 to 1, each
+(`packages/tonemap/tests/curves-browser.mjs`, Apple silicon Mac, Metal): over 144 input levels at exposures -4 to 1, each
 pixel lands within 1.1 levels of a CPU oracle of its formula.
 
 GPU resources and JS descriptors are reused in steady state. Resize, LUT updates and device restoration rebuild the necessary resources; removal frees them. Opaque and transparent scene color are graded together.
@@ -185,7 +185,7 @@ grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter gr
   midtones the rest. Curves are monotone cubics through the points (no overshoot), sampled 33 times a frame and read
   with linear interpolation; the master curve runs first, then each channel's. Hue against saturation interpolates the
   six multipliers around the HSV hue circle and scales each colour's distance from its luma.
-- **Checked on a real GPU** (`packages/tonemap/tests/grade-browser.mjs`, M6 Mac mini, Metal, Chromium): default
+- **Checked on a real GPU** (`packages/tonemap/tests/grade-browser.mjs`, Apple silicon Mac, Metal, Chromium): default
   options change no pixel; a blue shadows offset lifts the blue of the dark pixels by 59 levels and leaves the bright
   ones; a red highlights cut lands within half a level of a CPU oracle of the wheel math; saturation 0 turns every
   pixel grey and a flat curve at 0.5 gives sRGB 188 everywhere.
@@ -227,7 +227,7 @@ const soft = new CustomCurve({curve: (x) => 1 - Math.exp(-x)});
   interpolation in log2; below 2^-12 it runs linearly from its value at 0, above 2^8 it holds. A new `wgsl` string
   compiles a new pipeline; `params` and `curve` changes do not. Under an HDR `ColorOutput` the result takes the same
   rolloff toward the display peak as AgX and ACES.
-- **Checked on a real GPU** (`packages/tonemap/tests/custom-browser.mjs`, M6 Mac mini, Metal, Chromium): a WGSL
+- **Checked on a real GPU** (`packages/tonemap/tests/custom-browser.mjs`, Apple silicon Mac, Metal, Chromium): a WGSL
   x / (x + k) with k = 1 from `params`, and a JavaScript x / (1 + x), match a CPU oracle on every pixel over 111 input
   levels at exposures -4 to 1, within what each 8-bit input level allows; a live `params` change to k = 0.25 does too;
   the WGSL curve compiles and draws without a GPU error under an HDR `ColorOutput`.
@@ -265,7 +265,7 @@ local.options.strength = 0.7; // a flatter, more "HDR photo" look
   `autoExposure`, and runs before the curve, so every curve, `Grade` and a LUT apply after it.
 - **Cost.** Three render passes at quarter resolution before the presentation pass and three `r32float` textures (a
   1920 by 1080 view: 480 by 270, about 1.5 MB). Dispose it (or `using`) to free them. GPU time not measured.
-- **Checked on a real GPU** (`packages/tonemap/tests/local-browser.mjs`, M6 Mac mini, Metal, Chromium): on a synthetic
+- **Checked on a real GPU** (`packages/tonemap/tests/local-browser.mjs`, Apple silicon Mac, Metal, Chromium): on a synthetic
   source with a bright window and a dark interior, both with a checker of detail, every pixel lands within one 8-bit
   level of a CPU oracle of the whole chain; strength 0 changes no pixel; the interior comes up 3 stops (the clamp), the
   window goes down 0.75, and neighbouring checker cells differ in local stops by under 0.02.

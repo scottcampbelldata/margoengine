@@ -1,7 +1,7 @@
 # Everything integration test pages
 
 J6 composes public calls from package READMEs in `examples/integration/`, with entry pages under
-`examples/test-pages/`. These are test pages. No package implementation or private CAD API is imported.
+`examples/test-pages/`. These are test pages. No package implementation or outside CAD API is imported.
 The build phase defers README edits and Works with lines to the README-owed list.
 
 Run `npm run build:packages`, then `npm run test:integration:browser -- --scene=game`.
