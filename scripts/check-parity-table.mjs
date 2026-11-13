@@ -120,6 +120,9 @@ export function pageSource(page) {
   if (m) return `examples/${m[1]}.html`;
   m = /^\/demos\/(dof|tonemap|animator)\/$/.exec(page);
   if (m) return `packages/${m[1]}/examples`;
+  // The example folders scripts/build-site.js builds to /demos/<name>/.
+  m = /^\/demos\/(orrery|storm-light|molten-words|cathedral-light|biomes)\/$/.exec(page);
+  if (m) return `examples/${m[1]}`;
   return undefined;
 }
 

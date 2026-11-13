@@ -94,6 +94,9 @@ test('a stale repository path, package or page in the table fails, and example n
   assert.equal(problems.length, 5);
   assert.ok(problems.some((p) => /example name/.test(p)));
   assert.equal(pageSource('/gallery/khronos.html'), 'examples/gallery/khronos.html');
+  // The flagship demos are folders under examples/, built to /demos/<name>/.
+  assert.equal(pageSource('/demos/storm-light/'), 'examples/storm-light');
+  assert.equal(pageSource('/demos/orrery/'), 'examples/orrery');
 });
 
 test('the real table names only things that exist', () => {
