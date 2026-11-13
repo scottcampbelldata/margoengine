@@ -10,6 +10,7 @@ const {
   boolean,
   box,
   cylinder,
+  curveEvaluator,
   fillet,
   frameOf,
   massProperties,
@@ -590,4 +591,29 @@ test('mass properties: a spline face round its poles integrates across the knots
   const whole = new Body('whole', 'solid');
   whole.shell().add(new Face('f', s, true));
   exact(massProperties(whole), 'whole');
+});
+
+test('mass properties: a spline sphere whose seam passes a hair off its poles', { timeout: 60000 }, () => {
+  // The seam's circle tilted 1e-5 rad off the poles' meridian, as tolerant as that (80 nm). Near a pole Su is almost
+  // nothing, and the step from an edge point's foot towards it (for finding knot lines the foot crosses) divided the
+  // point's few nanometres along u by it: thousands of turns of u, every knot line of each listed, until the list
+  // outgrew memory (abc 00000217 step_004: "Invalid array length"). Only a parameter held at an end is now stepped.
+  const r = 4 * mm,
+    tilt = 1e-5,
+    meridian = {
+      kind: 'circle',
+      frame: frameOf([0, 0, 0], [0, -Math.cos(tilt), Math.sin(tilt)], [0, 0, -1]),
+      radius: r,
+    },
+    c = curveEvaluator(meridian),
+    south = new Vertex('s', c.at(0).slice(0, 3)),
+    north = new Vertex('n', c.at(Math.PI).slice(0, 3)),
+    seam = new Edge('seam', meridian, south, north),
+    body = new Body('seamed', 'solid'),
+    loop = body.shell().add(new Face('f', splineSphere(r), true)).loop();
+  seam.tolerance = south.tolerance = north.tolerance = 2 * r * tilt;
+  loop.use(seam, true);
+  loop.use(seam, false);
+  const m = massProperties(body);
+  close(m.volume, (4 / 3) * Math.PI * r ** 3, 'volume', 1e-9);
 });

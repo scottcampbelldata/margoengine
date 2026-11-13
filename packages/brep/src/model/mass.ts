@@ -506,17 +506,24 @@ function holds(
 
 /**
  * Where the foot uv of p stands for crossing knot lines and the surface's edges: the foot itself, carried on past an
- * open parameter's end as far as p lies beyond it (stepTowards; zero inside, where the foot is p's own). Undefined at
- * a pole, where u has no meaning.
+ * open parameter's end as far as p lies beyond it (stepTowards). Only a parameter held at an end is carried on:
+ * inside, the foot is p's own and the step is zero but for the projection's last digits, which near a pole (Su almost
+ * nothing, a revolved spline's end row) it divides by almost nothing, thousands of periods round. Undefined at a
+ * pole, where u has no meaning.
  */
 function past(s: Surface, flip: boolean, uv: UV, p: readonly number[]): UV | undefined {
-  const d = s.at(flip ? -uv[0] : uv[0], uv[1]),
+  const u = flip ? -uv[0] : uv[0],
+    d = s.at(u, uv[1]),
     a = d[3] * d[3] + d[4] * d[4] + d[5] * d[5],
     b = d[3] * d[6] + d[4] * d[7] + d[5] * d[8],
     e = d[6] * d[6] + d[7] * d[7] + d[8] * d[8];
   if (!(Math.abs(a * e - b * b) > 1e-30 * (a * e + 1e-300))) return undefined;
-  const [ou, ov] = stepTowards(d, p, a, b, e);
-  return [uv[0] + (flip ? -ou : ou), uv[1] + ov];
+  const atEnd = (t: number, period: number, [lo, hi]: readonly [number, number]) => !period && (t <= lo || t >= hi),
+    [ou, ov] = stepTowards(d, p, a, b, e);
+  return [
+    uv[0] + (atEnd(u, s.uPeriod, s.uDomain) ? (flip ? -ou : ou) : 0),
+    uv[1] + (atEnd(uv[1], s.vPeriod, s.vDomain) ? ov : 0),
+  ];
 }
 
 /**
