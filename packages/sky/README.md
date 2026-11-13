@@ -193,6 +193,13 @@ in front of the clouds hides them. Without it the clouds draw only over the empt
 | `sunIntensity` | 1.6 | sun radiance on the clouds in the sky's units, as the sky's own layer |
 | `sunDirection`, `ambient` | [0.3, 0.6, 0.4]; a clear day's | the light without a sky |
 | `depth` | none | the scene depth each frame |
+| `flash` | none | a lightning flash lighting the clouds from inside: `{position, intensity, color?, radius?}` |
+
+`flash` puts a point of light in the layer, read every frame: `color` (a cool white by default) times `intensity` in
+the sky's radiance units at 1 metre, falling with the square of the distance past `radius` (200 m). Each cloud sample
+takes it through the base shape between it and the flash (three samples), with three octaves of weaker extinction for
+the light the cloud scatters onward (Wrenninge et al. 2013), so a flash glows through thick cloud round it. Drive
+`intensity` from `Weather.flash` and place it above `strike.position` (`weather.onLightning`); 0 costs nothing.
 
 `clouds.drift` holds how far the shapes have moved and risen; `volumetricCloudShadows(clouds)` from
 `@margoengine/sky/cloud-shadows` casts their shadows on the ground (below). Cost: one fragment per pixel marching up to `steps` + `steps` ×

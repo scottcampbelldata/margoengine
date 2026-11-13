@@ -54,6 +54,14 @@ window.check={samples:sceneSamples,
   view(...views.ground);await frame();const bare=await frame();
   clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9});const noDepth=await frame();clouds.dispose();
   out.noDepth={pillar:diff(noDepth,bare,centre),sky:diff(noDepth,bare,(i)=>i%w<w/4)};
+  // A lightning flash in the layer lights the cloud round it from inside; intensity 0 draws exactly as no flash.
+  view(...views.ground);clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9,depth:()=>post.depthTexture});await frame();const unlit=await frame();
+  clouds.options.flash={position:[0,2000,-2600],intensity:0};const off=await frame();
+  clouds.options.flash={position:[0,2000,-2600],intensity:4e7};const lit=await frame();
+  let thrown=0;for(const bad of [{position:[0,0,Number.NaN],intensity:1},{position:[0,0,0],intensity:-1},{position:[0,0,0],intensity:1,radius:0}]){clouds.options.flash=bad;try{clouds.onPreUpdate(0);}catch(e){thrown+=+(e instanceof RangeError||e instanceof TypeError);}}
+  clouds.dispose();
+  const brightness=(f)=>{let s=0;for(let p=0;p<f.length;p+=4)s+=f[p]+f[p+1]+f[p+2];return s;};
+  out.flash={off:diff(off,unlit).changed,lit:diff(lit,unlit),gain:brightness(lit)/brightness(unlit),thrown};
   const error=await device.popErrorScope();
   return {...out,error:error?.message??null,errors:errors.splice(0)};
  }};

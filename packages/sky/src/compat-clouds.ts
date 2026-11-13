@@ -5,7 +5,7 @@
  * Importing this entry does not install the layer or change browser globals. The small WebGL2 preview is unsupported.
  */
 export { VolumetricClouds } from './volumetric-clouds.js';
-export type { VolumetricCloudOptions, VolumetricCloudSky } from './volumetric-clouds.js';
+export type { VolumetricCloudFlash, VolumetricCloudOptions, VolumetricCloudSky } from './volumetric-clouds.js';
 export { Weather, lightningFlash, speedOfSound, thunderDelay } from './weather.js';
 export type {
   LightningStrike,

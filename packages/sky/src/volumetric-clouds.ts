@@ -69,6 +69,23 @@ export interface VolumetricCloudOptions {
    * over the empty sky.
    */
   depth?: () => GPUTexture | undefined;
+  /**
+   * A lightning flash in or under the layer, read every frame: a point light at world `position` of `color` times
+   * `intensity` (the sky's radiance units at 1 metre, falling with the square of the distance past `radius`), lighting
+   * the cloud round it from inside, dimmed by the cloud in between. Omitted or `intensity` 0: no flash, at no cost.
+   */
+  flash?: VolumetricCloudFlash;
+}
+/** {@link VolumetricCloudOptions.flash}: a lightning flash that lights the clouds from inside. */
+export interface VolumetricCloudFlash {
+  /** World position of the flash, usually inside the layer. */
+  position: Vec3;
+  /** Brightness, 0 to 1e12; 0 turns it off. */
+  intensity: number;
+  /** Linear RGB, each 0 or more. Default a cool white [0.75, 0.82, 1]. */
+  color?: Vec3;
+  /** Size of the flash's core in metres, 1 to 100,000: the light stops growing closer than this. Default 200. */
+  radius?: number;
 }
 const defaults = {
   coverage: 0.5,
@@ -152,7 +169,7 @@ fn perlinFbm(p:vec3f,period:i32)->f32 {
 // three quarters of the layer's slant depth, of the base shape only.
 /** WGSL of the cloud uniform and its density field, shared with `@margoengine/sky/cloud-shadows`. */
 export const cloudField = /* wgsl */ `
-struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f}
+struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f}
 fn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}
 fn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}
 fn cloudDensityAt(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,erode:bool)->f32 {
@@ -237,7 +254,17 @@ fn cloudPhaseK(nu:f32,k:f32)->f32 {return mix(cloudHG(nu,0.8*k),cloudHG(nu,-0.3*
     sun=clouds.sunColor.rgb*clouds.sun.w*octaves*powder;
    }
    let h=clamp((cloudAltitude(clouds,p)-bottom)/(top-bottom),0.0,1.0);
-   let source=sun+mix(horizon,above,h)+moon;
+   // A lightning flash inside the cloud (VolumetricCloudOptions.flash): inverse-square past its core, through the base
+   // shape between it and the sample (three samples); the cloud's multiple scattering carries a flash far through thick
+   // cloud, so three octaves of weaker extinction (1, 0.3, 0.08) add up the light, after Wrenninge et al. 2013.
+   var flash=vec3f(0);
+   if(clouds.flash.w>0.0){
+    let toward=clouds.flash.xyz-p;let r2=dot(toward,toward);var od=0.0;
+    for(var f=1u;f<=3u;f++){od+=cloudDensityAt(clouds,shapeNoise,erosionNoise,noiseSampler,p+toward*(f32(f)*0.25),false);}
+    od*=clouds.layer.w*sqrt(r2)*0.25;
+    flash=clouds.flashColor.rgb*clouds.flash.w*(exp(-od)+0.5*exp(-0.3*od)+0.25*exp(-0.08*od))/(r2+clouds.flashColor.w*clouds.flashColor.w);
+   }
+   let source=sun+mix(horizon,above,h)+moon+flash;
    let step=exp(-sigma*dt);let haze=exp(-t/40000.0);
    light+=transmittance*(1.0-step)*source*haze;opacity+=transmittance*(1.0-step)*haze;transmittance*=step;
    if(transmittance<0.01){break;}
@@ -396,6 +423,20 @@ export class VolumetricClouds implements EnginePlugin {
       throw new RangeError('VolumetricClouds sunDirection needs a nonzero length');
     if (o.wind) finiteVector(o.wind, 2, 'VolumetricClouds wind');
     if (o.ambient) for (const c of o.ambient) finiteVector(c, 3, 'VolumetricClouds ambient');
+    if (o.flash !== undefined) {
+      if (typeof o.flash !== 'object' || o.flash === null)
+        throw new TypeError('VolumetricClouds flash must be an object with a position and an intensity');
+      finiteVector(o.flash.position, 3, 'VolumetricClouds flash position');
+      if (o.flash.color) finiteVector(o.flash.color, 3, 'VolumetricClouds flash color');
+      if (
+        !inRange(o.flash.intensity, 0, 1e12) ||
+        (o.flash.color && o.flash.color.some((c) => c < 0)) ||
+        !inRange(o.flash.radius ?? 200, 1, 100000)
+      )
+        throw new RangeError(
+          'Invalid VolumetricClouds flash; use an intensity of 0 to 1e12, a color of 0 or more and a radius of 1 to 100000',
+        );
+    }
     const bottom = o.bottom ?? defaults.bottom,
       top = o.top ?? defaults.top;
     if (
@@ -481,6 +522,11 @@ export class VolumetricClouds implements EnginePlugin {
     const moon = sky?.lights?.[1];
     for (let i = 0; i < 4; i++) v[44 + i] = moon ? moon.direction[i] : 0;
     for (let i = 0; i < 3; i++) v[48 + i] = moon ? moon.radiance[i] : 0;
+    const flash = o.flash;
+    v.set(flash?.position ?? [0, 0, 0], 52);
+    v[55] = flash?.intensity ?? 0;
+    v.set(flash?.color ?? [0.75, 0.82, 1], 56);
+    v[59] = flash?.radius ?? 200;
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     return v[30] > 0;
   }

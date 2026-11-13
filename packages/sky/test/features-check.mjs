@@ -44,6 +44,11 @@ const checks = {
       `without depth the clouds covered geometry: ${JSON.stringify(r.noDepth)}`,
     );
     assert.ok(r.noDepth.sky.changed > r.noDepth.sky.total * 0.2, `without depth: ${JSON.stringify(r.noDepth)}`);
+    // A lightning flash inside the layer lights the clouds round it (a fifth of the view or more, brighter overall);
+    // intensity 0 changes nothing, and an invalid flash throws (TypeError for a bad position, RangeError for a bad value).
+    assert.equal(r.flash.off, 0, `a flash of intensity 0 changed ${r.flash.off} pixels`);
+    assert.ok(r.flash.lit.changed > r.flash.lit.total * 0.2 && r.flash.gain > 1.2, `flash: ${JSON.stringify(r.flash)}`);
+    assert.equal(r.flash.thrown, 3, `invalid flashes accepted: ${3 - r.flash.thrown}`);
     console.log(
       `ok volumetric ${samples}x: ground ${r.ground.shown.changed}/${r.ground.shown.total}, inside ${r.inside.shown.changed}, above ${r.above.shown.changed}; frame ${r.ground.ms.toFixed(1)} / ${r.inside.ms.toFixed(1)} / ${r.above.ms.toFixed(1)} ms (diagnostic)`,
     );
