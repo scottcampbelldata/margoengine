@@ -271,3 +271,31 @@ test('i3dm: SCALE and SCALE_NON_UNIFORM together apply both scalings (3D Tiles i
   }
   assert.deepEqual(Array.from(m.subarray(12, 15)), [10, 20, 30]);
 });
+
+// Batch 132b (lane N, 2026-11-13): a decoration that failed (or a load aborted) after the model root was placed
+// disposed the model but left the root tracked by the floating origin, which kept moving a disposed mesh on every
+// origin shift. The glTF and pnts paths already forgot their root on failure.
+test('i3dm: a failed decoration forgets the placed root before disposing the model', async () => {
+  const content = parseI3dm(writeI3dm(boxGLB(), { positions: [0, 0, 0, 5, 0, 0] }));
+  const { engine, loadModel, models } = fakeEngine();
+  const placed = new Set(),
+    host = {
+      engine,
+      url: 'https://tiles.test/tileset.json',
+      loadModel: (gltf, signal) => loadModel(engine, gltf, signal),
+      place: (mesh) => placed.add(mesh),
+      forget: (mesh) => placed.delete(mesh),
+      contentMatrix: () => new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+      fetch: async () => new Uint8Array(0),
+      decorate: async () => {
+        throw new Error('decoration failed');
+      },
+    };
+  await assert.rejects(
+    i3dm(host, content, { contentUrls: ['https://tiles.test/a.i3dm'] }, new AbortController().signal),
+    /decoration failed/,
+  );
+  assert.equal(models.length, 1);
+  assert.equal(models[0].disposed, 1);
+  assert.equal(placed.size, 0, 'the root is no longer tracked by the origin');
+});

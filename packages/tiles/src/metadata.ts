@@ -586,12 +586,35 @@ export async function dracoPoints(
   if (!position) throw new TypeError('Draco pnts must compress POSITION (3DTILES_draco_point_compression)');
   let colors = content.colors;
   if (rgba || rgb) {
+    // pnts colours are UNSIGNED_BYTE (3D Tiles 1.0, Point Cloud). Draco hands back byte samples as they are; other
+    // normalized integer samples stand for 0 to 1 over their type's range, and float samples for 0 to 1 directly. Before
+    // batch 132b (2026-11-13) every non-byte normalized array was multiplied by 255, so a Uint16 sample of 65535 wrapped
+    // to 1 in the byte, and floats were truncated rather than rounded.
     const source = (rgba ?? rgb)!,
       size = rgba ? 4 : 3,
-      scale = source.normalized && !(source.array instanceof Uint8Array) ? 255 : 1;
+      array = source.array,
+      full =
+        array instanceof Uint8Array
+          ? 255
+          : array instanceof Float32Array
+            ? 1
+            : array instanceof Uint16Array
+              ? 65535
+              : array instanceof Uint32Array
+                ? 4294967295
+                : array instanceof Int8Array
+                  ? 127
+                  : array instanceof Int16Array
+                    ? 32767
+                    : 2147483647;
+    if (!(array instanceof Uint8Array) && !(array instanceof Float32Array) && !source.normalized)
+      throw new TypeError(
+        'Draco pnts colours are integers that are not normalized; re-encode them as bytes or normalized samples',
+      );
     colors = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) {
-      for (let k = 0; k < size; k++) colors[i * 4 + k] = source.array[i * size + k] * scale;
+      for (let k = 0; k < size; k++)
+        colors[i * 4 + k] = Math.round(Math.min(1, Math.max(0, array[i * size + k] / full)) * 255);
       if (size === 3) colors[i * 4 + 3] = 255;
     }
   }

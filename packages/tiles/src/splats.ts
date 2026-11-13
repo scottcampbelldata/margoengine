@@ -109,7 +109,7 @@ export class TileSplats {
   private readonly entries = new Set<Entry>();
   private dirty = false;
   private built: readonly number[] = [0, 0, 0];
-  private readonly stop: () => void;
+  private stop?: () => void;
   constructor(
     private readonly host: TilesContentHost,
     private readonly attach: (engine: EngineKernel, data: SplatData) => Cloud,
@@ -125,6 +125,16 @@ export class TileSplats {
     return n;
   }
   add(placed: PlacedSplats): Entry {
+    // A tile that took this scene before the last tile left (its load awaited the scene) arrives after the scene
+    // stopped following updates; follow them again, and be the host's scene again, or its splats never draw. Before
+    // batch 132b (2026-11-13) such a tile was added to a scene nothing flushed.
+    if (!this.stop) {
+      this.stop = this.host.onUpdate(() => this.flush());
+      if (!scenes.has(this.host)) {
+        scenes.set(this.host, Promise.resolve(this));
+        owners.set(this.host, this);
+      }
+    }
     const entry: Entry = { placed, visible: false };
     this.entries.add(entry);
     return entry;
@@ -154,8 +164,12 @@ export class TileSplats {
     // Nothing left (the renderer is being disposed, or the last tile went): free the GPU clouds now.
     if (!this.entries.size) {
       this.release();
-      this.stop();
-      scenes.delete(this.host);
+      this.stop?.();
+      this.stop = undefined;
+      if (owners.get(this.host) === this) {
+        scenes.delete(this.host);
+        owners.delete(this.host);
+      }
     }
   }
   /** Rebuilds the clouds if the visible tiles or the floating origin changed since the last build. */
@@ -212,7 +226,8 @@ export class TileSplats {
   }
 }
 
-const scenes = new Map<TilesContentHost, Promise<TileSplats>>();
+const scenes = new Map<TilesContentHost, Promise<TileSplats>>(),
+  owners = new Map<TilesContentHost, TileSplats>();
 
 /** The splat scene of a renderer (its content host), made on its first splat tile. */
 export function tileSplats(host: TilesContentHost): Promise<TileSplats> | undefined {
@@ -222,9 +237,11 @@ export function tileSplats(host: TilesContentHost): Promise<TileSplats> | undefi
 async function scene(host: TilesContentHost): Promise<TileSplats> {
   let made = scenes.get(host);
   if (!made) {
-    made = import('@margoengine/splats').then(
-      ({ Splats }) => new TileSplats(host, (engine, data) => Splats.attach(engine, data)),
-    );
+    made = import('@margoengine/splats').then(({ Splats }) => {
+      const made = new TileSplats(host, (engine, data) => Splats.attach(engine, data));
+      owners.set(host, made);
+      return made;
+    });
     scenes.set(host, made);
   }
   return made;

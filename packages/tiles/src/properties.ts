@@ -383,12 +383,16 @@ export function readPropertyMetadata(asset: GLTFAsset, options: PropertyReadOpti
       const triangles = mode === 4 ? Math.floor(count / 3) : Math.max(0, count - 2);
       if (!Number.isInteger(triangle) || triangle < 0 || triangle >= triangles)
         throw new RangeError('Metadata triangle index is outside the primitive; use a source triangle index');
+      // glTF 2.0 section 3.7.2.1: strip P_i = {v_i, v_(i+1+i%2), v_(i+2-i%2)}, fan P_i = {v_(i+1), v_(i+2), v_0}, the
+      // order gltf-pro lists them in and so the order a ray hit's barycentric weights follow. Before batch 132b
+      // (2026-11-13) an odd strip triangle was read as {v_(i+1), v_i, v_(i+2)} and a fan as {v_0, v_(i+1), v_(i+2)}: the
+      // same triangles, with the weights applied to the wrong corners.
       const corners =
         mode === 4
           ? [triangle * 3, triangle * 3 + 1, triangle * 3 + 2]
           : mode === 5
-            ? [triangle + (triangle % 2 ? 1 : 0), triangle + (triangle % 2 ? 0 : 1), triangle + 2]
-            : [0, triangle + 1, triangle + 2];
+            ? [triangle, triangle + 1 + (triangle % 2), triangle + 2 - (triangle % 2)]
+            : [triangle + 1, triangle + 2, 0];
       const vertices = corners.map((i) => (indices ? indices[i] : i));
       return sets.textures.map((texture) =>
         texture.row((set) => {

@@ -338,3 +338,22 @@ test('per-content fade intervals survive globally merged cloud rebuilds and upda
   scene.remove(a);
   scene.remove(b);
 });
+
+// Batch 132b (lane N, 2026-11-13): a tile whose load took the scene before the last tile left was added to a scene that
+// had stopped following updates, so its splats never drew. The scene follows updates again on such an add.
+test('a tile added after the last tile left still draws on the next update', () => {
+  const s = scene();
+  const first = s.splats.add(part(2, 1));
+  s.splats.show(first, true);
+  s.update();
+  assert.equal(s.built.length, 1);
+  s.splats.remove(first);
+  assert.equal(s.listeners.size, 0, 'the empty scene stops following updates');
+  const late = s.splats.add(part(3, 2));
+  s.splats.show(late, true);
+  s.update();
+  assert.equal(s.built.length, 2, 'the late tile is built into a cloud');
+  assert.equal(s.splats.count, 3);
+  s.splats.remove(late);
+  assert.equal(s.listeners.size, 0);
+});

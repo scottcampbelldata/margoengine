@@ -221,3 +221,29 @@ test('draco pnts: without the dracoPoints option the renderer fails the tile wit
   assert.match(errors[0].message, /@margoengine\/tiles\/metadata/);
   renderer.dispose();
 });
+
+// Batch 132b (lane N, 2026-11-13): Draco may hand back colour samples wider than a byte. A normalized Uint16 sample was
+// multiplied by 255 (65535 wrapped to 1 in the byte) and a float sample truncated; both now map 0..1 onto 0..255.
+test('draco pnts: normalized 16-bit and float colours map onto bytes, not past them', async () => {
+  const bytes = drc('pc_color.drc'),
+    want = decodeDracoPoints(draco, bytes),
+    content = parsePnts(dracoPnts(bytes, { length: want.pointCount, properties: { POSITION: 0, RGB: 1 } })),
+    n = want.pointCount,
+    position = want.attributes[0];
+  const fake = (array, normalized) => ({
+    decode: async () => ({
+      pointCount: n,
+      indices: new Uint32Array(n),
+      attributes: [position, { name: 'COLOR_0', semantic: 'COLOR', uniqueId: 1, array, itemSize: 3, normalized }],
+    }),
+  });
+  const wide = new Uint16Array(n * 3);
+  wide.set([65535, 32768, 0]);
+  const wideColors = (await dracoPoints(content, undefined, fake(wide, true))).colors;
+  assert.deepEqual([...wideColors.subarray(0, 4)], [255, 128, 0, 255]);
+  const float = new Float32Array(n * 3);
+  float.set([1, 0.5, 0.2]);
+  const floatColors = (await dracoPoints(content, undefined, fake(float, false))).colors;
+  assert.deepEqual([...floatColors.subarray(0, 4)], [255, 128, 51, 255]);
+  await assert.rejects(dracoPoints(content, undefined, fake(new Uint16Array(n * 3), false)), /not normalized/);
+});

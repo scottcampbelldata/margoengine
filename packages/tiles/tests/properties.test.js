@@ -317,12 +317,36 @@ test('source triangle strips, fans and indexed lists use the correct corner orde
   f.asset.accessor = (index) =>
     index === 1 ? Float32Array.from([0, 0, 1, 0, 0, 1, 1, 1]) : Float32Array.from([3, 2, 1, 0]);
   const image = { width: 2, height: 2, data: new Uint8Array([10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0]) };
+  // Corner order of glTF 2.0 section 3.7.2.1, as gltf-pro's listIndices (pack.ts, not in its dist entry points) builds
+  // the triangles a ray hit refers to.
+  // Batch 132b (lane N, 2026-11-13) changed these expectations: they were 30 (strip) and 10 (fan), the corners of an
+  // order that put the weights on other vertices. The loop below checks every weight against the specification's corners.
   primitive.mode = 5;
   let metadata = readPropertyMetadata(f.asset, { image: () => image });
-  assert.equal(metadata.sample(0, 0, 1, [1, 0, 0])[0].value, 30);
+  assert.equal(metadata.sample(0, 0, 1, [1, 0, 0])[0].value, 20);
   primitive.mode = 6;
   metadata = readPropertyMetadata(f.asset, { image: () => image });
-  assert.equal(metadata.sample(0, 0, 1, [1, 0, 0])[0].value, 10);
+  assert.equal(metadata.sample(0, 0, 1, [1, 0, 0])[0].value, 30);
+  const uvs = [0, 0, 1, 0, 0, 1, 1, 1],
+    texelOf = (vertex) => image.data[(uvs[vertex * 2 + 1] * 2 + uvs[vertex * 2]) * 4];
+  for (const mode of [5, 6]) {
+    primitive.mode = mode;
+    metadata = readPropertyMetadata(f.asset, { image: () => image });
+    const listed =
+      mode === 5
+        ? [0, 1, 2, 1, 3, 2] /* P_i = {v_i, v_(i+1+i%2), v_(i+2-i%2)} */
+        : [1, 2, 0, 2, 3, 0]; /* {v_(i+1), v_(i+2), v_0} */
+    for (let triangle = 0; triangle < 2; triangle++)
+      for (let corner = 0; corner < 3; corner++) {
+        const weights = [0, 0, 0];
+        weights[corner] = 1;
+        assert.equal(
+          metadata.sample(0, 0, triangle, weights)[0].value,
+          texelOf(listed[triangle * 3 + corner]),
+          `mode ${mode} triangle ${triangle} corner ${corner}`,
+        );
+      }
+  }
   primitive.mode = 4;
   primitive.indices = 2;
   metadata = readPropertyMetadata(f.asset, { image: () => image });

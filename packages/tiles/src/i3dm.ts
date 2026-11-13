@@ -83,7 +83,8 @@ export const i3dm: TilesInstancesDrawer = async (
     import('@margoengine/gltf-pro/instancing'),
     host.loadModel(gltf, signal) as Promise<InstancedModel>,
   ]);
-  let nodes = 0;
+  let nodes = 0,
+    placed = false;
   let decoration: TilesContentDecoration | undefined;
   try {
     signal.throwIfAborted();
@@ -112,11 +113,14 @@ export const i3dm: TilesInstancesDrawer = async (
     }
     nodes = byNode.size;
     host.place(root, host.contentMatrix(tile, [rtc[0] + center[0], rtc[1] + center[1], rtc[2] + center[2]], false));
+    placed = true;
     root.visible = false;
     decoration = await host.decorate?.({ kind: 'instances', model, content, tile, signal, fetch: host.fetch });
     signal.throwIfAborted();
   } catch (error) {
     decoration?.dispose();
+    // A placed root is tracked by the floating origin until forgotten, as the glTF and pnts paths do on failure.
+    if (placed) host.forget(model.root);
     model.dispose();
     throw error;
   }
