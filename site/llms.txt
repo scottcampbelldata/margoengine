@@ -56,6 +56,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/exporters](https://margoengine.com/llms/packages/exporters.md): glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data.
 - [@margoengine/cad](https://margoengine.com/llms/packages/cad.md): CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a…
 - [@margoengine/brep](https://margoengine.com/llms/packages/brep.md): Margo's own CAD kernel: STEP (ISO 10303-21), IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) reading, product structure, units and colours, exact B-rep geometry…
+- [@margoengine/ifc](https://margoengine.com/llms/packages/ifc.md): IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.
 - [@margoengine/blender](https://margoengine.com/llms/packages/blender.md): Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.
 - [@margoengine/cache](https://margoengine.com/llms/packages/cache.md): Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a…
 - [@margoengine/splats](https://margoengine.com/llms/packages/splats.md): Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.
@@ -194,6 +195,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 48 entry points
 - [@margoengine/cad API](https://margoengine.com/llms/api/cad.md): 4 entry points
 - [@margoengine/brep API](https://margoengine.com/llms/api/brep.md): 1 entry point
+- [@margoengine/ifc API](https://margoengine.com/llms/api/ifc.md): 2 entry points
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 11 entry points
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 10 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 13 entry points

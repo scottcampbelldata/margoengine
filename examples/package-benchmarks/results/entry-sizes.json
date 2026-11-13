@@ -1,5 +1,5 @@
 {
-  "commit": "331a20aae",
+  "commit": "0d64bcb9c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -5146,6 +5146,20 @@
       "./inline": {
         "raw": 5408,
         "gzip": 2509
+      }
+    },
+    "@margoengine/ifc": {
+      ".": {
+        "raw": 5796,
+        "gzip": 2568
+      },
+      "./worker": {
+        "raw": 2557,
+        "gzip": 1219
+      },
+      "dist/workers/ifc.js": {
+        "raw": 7284,
+        "gzip": 3204
       }
     },
     "@margoengine/input": {
@@ -15501,6 +15515,26 @@
       "raw": 2404467,
       "gzip": 912133,
       "brotli": 673073
+    },
+    "packages/ifc/dist/workers/ifc.js": {
+      "raw": 7252,
+      "gzip": 3186,
+      "brotli": 2821
+    },
+    "node_modules/web-ifc/web-ifc-api-iife.js": {
+      "raw": 6089952,
+      "gzip": 504591,
+      "brotli": 213065
+    },
+    "node_modules/web-ifc/web-ifc.wasm": {
+      "raw": 1595268,
+      "gzip": 578495,
+      "brotli": 439717
+    },
+    "node_modules/web-ifc/web-ifc-mt.wasm": {
+      "raw": 1558039,
+      "gzip": 574912,
+      "brotli": 424250
     }
   },
   "splits": {

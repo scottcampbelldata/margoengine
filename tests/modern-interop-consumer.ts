@@ -1,12 +1,16 @@
 import { Engine } from '@margoengine/core';
 import { XR, XRManager, XRController, useXRSession, type XRFrameState } from '@margoengine/xr';
 import { parseUSDC, parseUSDZ as parsePBRUSDZ, type USDAsset } from '@margoengine/usdz';
-import { parseUSDA, parseUSDZ } from '@margoengine/loaders';
+import { parseIFC, type IFCResult } from '@margoengine/ifc';
+import { parseUSDA, parseUSDZ, createMeshes } from '@margoengine/loaders';
 import { exportUSDZ } from '@margoengine/exporters';
 import { decodeMargo, parseMargo, loadMargo, type MargoAsset } from '@margoengine/blender';
+import type { IfcAPI } from 'web-ifc';
 
-export async function scene(canvas: HTMLCanvasElement) {
+export async function scene(canvas: HTMLCanvasElement, api: IfcAPI, data: Uint8Array) {
   const engine = await Engine.create(canvas, { backend: 'webgpu' });
+  const ifc: IFCResult = parseIFC(api, data);
+  const meshes = createMeshes(engine, ifc);
   const xr = await XR.create(engine);
   const render = (frame: XRFrameState) => {
     for (const input of frame.inputs) {
@@ -34,7 +38,9 @@ export async function scene(canvas: HTMLCanvasElement) {
     enter,
     archive,
     loaded,
+    products: ifc.products,
     dispose() {
+      meshes.dispose();
       xr.dispose();
       engine.dispose();
     },

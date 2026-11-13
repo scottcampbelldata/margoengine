@@ -1,5 +1,5 @@
 // Scott, 2026-11-13: "there should be no private packages at all now". Everything the kernel repository held came back
-// into this repository as public Apache-2.0 packages (brep, cad, machinery, robot-planning). No package manifest is
+// into this repository as public Apache-2.0 packages (brep, cad, machinery, robot-planning, ifc). No package manifest is
 // private or unlicensed, no tracked file names that repository's npm scope, and each package that came back imports
 // only node built-ins, its own entries and the public engine packages it declares. The scope is written in base64
 // here, so this file does not name it either.
@@ -12,7 +12,9 @@ import test from 'node:test';
 const root = resolve(import.meta.dirname, '..');
 const scope = Buffer.from('QG1hcmdvLWVudGVycHJpc2U=', 'base64').toString('utf8');
 /** The packages that came back from the kernel repository. */
-const RETURNED = ['brep', 'cad', 'machinery', 'robot-planning'];
+const RETURNED = ['brep', 'cad', 'machinery', 'robot-planning', 'ifc'];
+/** Reviewed third-party peers a returned package may declare (each has its row in scripts/supply-chain.mjs). */
+const THIRD_PARTY = new Set(['react', 'web-ifc']);
 
 /** Every file under `dir`, recursively. */
 const files = (dir) =>
@@ -72,7 +74,7 @@ for (const pkg of RETURNED) {
     for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies', 'devDependencies'])
       for (const name of Object.keys(manifest[field] ?? {}))
         assert.ok(
-          publicPackages.has(name) || name === 'react',
+          publicPackages.has(name) || THIRD_PARTY.has(name),
           `${pkg} ${field}: ${name} is not a public package of this repository`,
         );
   });

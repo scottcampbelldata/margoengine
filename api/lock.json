@@ -35,6 +35,7 @@
     "@margoengine/gltf-pro",
     "@margoengine/headless",
     "@margoengine/html",
+    "@margoengine/ifc",
     "@margoengine/input",
     "@margoengine/inspector",
     "@margoengine/kinematics-constraints",

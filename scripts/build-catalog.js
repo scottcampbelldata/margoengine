@@ -44,6 +44,7 @@ const layers = {
     'exporters',
     'cad',
     'brep',
+    'ifc',
     'blender',
     'cache',
     'splats',

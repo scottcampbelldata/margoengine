@@ -5,7 +5,6 @@ import { crc32, inflateSync } from 'node:zlib';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Engine, TransformStore } from '@margoengine/core/extension';
 import { headless } from '../../../tests/support/pbr-snapshot.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -40,12 +39,8 @@ export async function validate(data, resources = {}) {
   };
 }
 
-/** A real Engine and TransformStore with a no-op renderer, so the Mesh API and the Wasm kernel run in Node. */
-export async function headlessEngine(capacity = 256) {
-  const store = await TransformStore.create(capacity);
-  const renderer = { backend: 'webgl2', add() {}, remove() {}, dispose() {}, render() {} };
-  return new Engine({ width: 1, height: 1, getContext() {} }, store, renderer, undefined, null);
-}
+// The headless engine is shared with other packages' tests; it lives in tests/support.
+export { headlessEngine } from '../../../tests/support/headless-engine.js';
 
 /** A materials mesh's v-up UVs as exportModel writes them for glTF (v down): v -> 1 - v. */
 export const glTFUV = (uvs) => Array.from(uvs, (v, i) => (i % 2 ? 1 - v : v));

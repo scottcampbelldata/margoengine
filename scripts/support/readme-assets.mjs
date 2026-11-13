@@ -1,6 +1,6 @@
 // Explicit, format-aware aliases. They prove runnable API examples, not the fictional asset's identity.
 import { createReadStream, readFileSync, statSync } from 'node:fs';
-import { delimiter, dirname, resolve } from 'node:path';
+import { delimiter, dirname, extname, resolve } from 'node:path';
 import { requiredFixture } from './required-fixture.mjs';
 import { readmeCache, readmeExternalFiles } from '../fetch-readme-assets.mjs';
 import { externalAssets, externalAssetRoot, requireExternalAssets } from './external-test-assets.mjs';
@@ -55,6 +55,10 @@ export const README_FILES = {
   '/texture.dds': 'examples/assets/texture-formats/checker-rgba.dds',
   '/studio.exr': 'packages/environment/tests/fixtures/BrightRings.exr',
   '/assembly.step': 'packages/cad/test/fixtures/bracket-assembly.step',
+  // The ifc README loads a model and serves web-ifc's own runtime files from /ifc/ (the app hosts them).
+  '/building.ifc': 'packages/ifc/tests/fixtures/wall.ifc',
+  '/ifc/web-ifc.wasm': 'node_modules/web-ifc/web-ifc.wasm',
+  '/ifc/web-ifc-api-iife.js': 'node_modules/web-ifc/web-ifc-api-iife.js',
   '/bracket.step': 'packages/cad/test/fixtures/bracket-assembly.step',
   '/parts/bracket.3mf': 'packages/loaders/tests/fixtures/gears.3mf',
   '/scans/part.ply': 'packages/loaders/tests/fixtures/torus_colored.ply',
@@ -153,11 +157,14 @@ export function sampleRange(range, size) {
 }
 
 /** Serve the real file, preserving Range semantics for streaming texture and point-cloud readers. */
+/** Media types a page needs to run a served file: a worker's importScripts refuses a script sent as octet-stream. */
+const SAMPLE_TYPES = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm' };
+
 export function serveSample(request, response, path) {
   const size = statSync(path).size,
     range = sampleRange(request.headers.range, size);
   response.setHeader('accept-ranges', 'bytes');
-  response.setHeader('content-type', 'application/octet-stream');
+  response.setHeader('content-type', SAMPLE_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream');
   if (range === null) {
     response.statusCode = 416;
     response.setHeader('content-range', `bytes */${size}`);

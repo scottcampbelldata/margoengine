@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15601553,
+  "total": 15609312,
   "history": [
     {
       "date": "2026-10-24",
@@ -8765,6 +8765,12 @@
       "commit": "28481a622",
       "reason": "@margoengine/brep grows from 137,178 to 137,955 B gzip (+777) and the cad worker that bundles it from 83,502 to 83,586 B (+84): the tangent rim fix, a surface of revolution laid out as it lies for meshing (its profile's turn about the axis and its meridian length, each a sampled table) and a relative test for a degenerate normal",
       "grew": 2
+    },
+    {
+      "date": "2026-11-14",
+      "commit": "444fb5776",
+      "reason": "IFC returns as public @margoengine/ifc (Scott, 2026-11-13: no private packages): the root and /worker entries and the dist/workers/ifc.js worker, built by build-optional",
+      "grew": 3
     }
   ],
   "items": {
@@ -9206,6 +9212,9 @@
     "@margoengine/html/inline": 2744,
     "@margoengine/html/texture": 5167,
     "@margoengine/html/texture-gl": 6858,
+    "@margoengine/ifc": 2824,
+    "@margoengine/ifc dist/workers/ifc.js": 3460,
+    "@margoengine/ifc/worker": 1475,
     "@margoengine/input": 5722,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,

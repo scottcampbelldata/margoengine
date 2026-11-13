@@ -647,6 +647,38 @@ export const LAZY_FILES = [
     measure: 'file',
     when: '`await Physics2D.load()`, once per app, compiled while it downloads; its JavaScript is the lazy rapier-solver chunk of the entry',
   },
+  {
+    package: '@margoengine/ifc',
+    file: 'packages/ifc/dist/workers/ifc.js',
+    label: 'workers/ifc.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'Each `parseIFCInWorker()` (`@margoengine/ifc/worker`)',
+  },
+  {
+    package: '@margoengine/ifc',
+    file: 'node_modules/web-ifc/web-ifc-api-iife.js',
+    label: 'web-ifc-api-iife.js',
+    kind: 'Script',
+    measure: 'file',
+    when: 'Each `parseIFCInWorker()`: the worker loads the web-ifc build at its `webIfc` URL',
+  },
+  {
+    package: '@margoengine/ifc',
+    file: 'node_modules/web-ifc/web-ifc.wasm',
+    label: 'web-ifc.wasm',
+    kind: 'Wasm',
+    measure: 'file',
+    when: 'Your `await api.Init()` on the web-ifc `IfcAPI` you pass to `parseIFC()`, fetched from `api.SetWasmPath()`; or each `parseIFCInWorker()`, from its `wasmPath`',
+  },
+  {
+    package: '@margoengine/ifc',
+    file: 'node_modules/web-ifc/web-ifc-mt.wasm',
+    label: 'web-ifc-mt.wasm',
+    kind: 'Wasm',
+    measure: 'file',
+    when: 'Instead of web-ifc.wasm when the page is cross-origin isolated (multithreaded build)',
+  },
 ];
 
 /**

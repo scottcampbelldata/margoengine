@@ -306,6 +306,32 @@ test('real HTTP byte-range reads return exactly the requested file bytes', async
   }
 });
 
+test('a served script or Wasm file carries its media type, so a worker can importScripts it; data stays octet-stream', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'readme-types-'));
+  const files = { 'runtime.js': 'text/javascript', 'runtime.wasm': 'application/wasm', 'model.ifc': 'application/octet-stream' };
+  for (const name of Object.keys(files)) writeFileSync(join(folder, name), 'x');
+  const server = createServer((request, response) =>
+    serveSample(request, response, join(folder, new URL(request.url, 'http://x').pathname.slice(1))),
+  );
+  try {
+    await new Promise((done) => server.listen(0, '127.0.0.1', done));
+    for (const [name, type] of Object.entries(files)) {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/${name}`, { signal: AbortSignal.timeout(5000) });
+      assert.equal(response.headers.get('content-type'), type, name);
+      await response.arrayBuffer();
+    }
+  } finally {
+    await new Promise((done) => server.close(done));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('the ifc README model and web-ifc runtime aliases resolve to real files', () => {
+  assert.equal(README_FILES['/building.ifc'], 'packages/ifc/tests/fixtures/wall.ifc');
+  for (const name of ['/building.ifc', '/ifc/web-ifc.wasm', '/ifc/web-ifc-api-iife.js'])
+    assert.ok(readmeFixture(name)?.path, name);
+});
+
 test('material texture aliases preserve 2D and cube shape, and E57 resolves the complete room sample', () => {
   assert.equal(README_FILES['/textures/albedo.ktx2'], README_FILES['/texture.ktx2']);
   assert.equal(README_FILES['/textures/sky-cube.ktx2'], README_FILES['/sky.ktx2']);

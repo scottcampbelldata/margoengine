@@ -58,6 +58,7 @@ install.
 | --- | --- | --- |
 | `margoengine/physics2d` | `npm i @dimforge/rapier2d-compat` | Only to pass a Rapier 2D you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
 | `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | Only to pass a Rapier you initialized yourself through the `rapier` option; the bundled solver needs nothing installed |
+| `margoengine/ifc` | `npm i web-ifc` | You pass an initialized `IfcAPI` to `parseIFC` |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 | `margoengine/ui/react` | `npm i react` | React bindings for the UI package |
 

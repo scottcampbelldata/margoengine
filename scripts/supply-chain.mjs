@@ -35,12 +35,13 @@ export function noticeAddenda(current) {
 /** Licences any runtime dependency may carry without review. */
 const ALLOWED = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'Zlib', '0BSD']);
 /** Reviewed exceptions: package -> licence it may carry (see the obligations section of the output). */
-const EXCEPTIONS = {};
+const EXCEPTIONS = { 'web-ifc': 'MPL-2.0' };
 
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
   '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional: @margoengine/physics bundles Rapier, and an app may pass its own through the rapier option',
   '@dimforge/rapier2d-compat': 'Rapier 2D rigid-body solver; optional: @margoengine/physics2d bundles Rapier 2D, and an app may pass its own through the rapier option',
+  'web-ifc': 'IFC (BIM) parser; the app installs and initializes it, the package only reads its output',
   react: 'React component bindings for the stage',
   'react-dom': 'React DOM root and portal rendering for scene and HTML components',
   scheduler: 'React DOM scheduling dependency',
@@ -714,6 +715,8 @@ ${table(
   format as described in the Siemens JT File Format Reference and ISO 14306 (\`docs/jt-licensing.md\`). Both packages'
   tracked \`NOTICE\` files ship in their tarballs with the reference licence terms, the royalty-free patent notice and the
   trademark note, and every JT reader source file carries the same notice in its header.
+- **MPL-2.0 (web-ifc, peer of \`@margoengine/ifc\`).** Not redistributed in any tarball: the app installs it. A site or
+  app that serves \`web-ifc.wasm\` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
   (LGPL-3.0) are installed as an optional dependency of Next.js for \`examples/next\`, and
   \`scripts/optimize-demo-assets.js\` and \`scripts/build-scifi-helmet.mjs\` use sharp to resize textures. \`margo-convert
