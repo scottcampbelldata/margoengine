@@ -167,10 +167,13 @@ ${
 }
 ${
   lights
-    ? `fn localLight(pixel:vec2f,p:vec3f,v:vec3f,g:f32)->vec3f {
+    ? // spread: the distance whose inverse square is the mean of 1/d^2 over the sample's cell (3 / R^2 over a ball of
+      // radius R, so R / sqrt(3)). Without it a froxel holding a light took 1/d^2 at one point, up to 2^12 times the
+      // light the cell can scatter, and drew a bright square around every bulb and lighthouse lens.
+      `fn localLight(pixel:vec2f,p:vec3f,v:vec3f,g:f32,spread:f32)->vec3f {
 ${/* @__PURE__ */ clusterCell('p')}
   for(var j=0u;j<count;j++){
-    let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-p;let distance=length(delta);
+    let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-p;let distance=max(length(delta),spread);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);
     ${lights.includes(decayTerms) ? decayTerms : legacyTerms}
     result+=light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone*phase(dot(-l,v),g)${lights.includes('fn clusterShadow(') ? '*clusterShadow(light,p,vec3f(0))' : ''};
@@ -198,7 +201,19 @@ ${/* @__PURE__ */ clusterCell('p')}
     }
     light+=volume.sunColor.rgb*phase(dot(-volume.sun.xyz,v),volume.scatter.w)*lit;${ms ? 'sun=volume.sunColor.rgb*lit;' : ''}
   }${ms ? multiple : ''}
-  ${lights ? 'light+=localLight(uv*volume.screen.xy+volume.screen.zw,p,v,volume.scatter.w);' : ''}
+  ${
+    lights
+      ? // Four stratified samples along the froxel's depth, as for the sun: a narrow cone (a lighthouse beam) crossing
+        // a deep slice otherwise lights it from one point per frame, so the beam broke into one block per slice. Each
+        // sample stands for a cell a quarter of the slice deep and one froxel wide (the neighbouring column's ray).
+        `let pixel=uv*volume.screen.xy+volume.screen.zw;
+  let side=(vec2f(id.xy)+vec2f(1.5,0.5)+volume.jitter.xy)/volume.grid.xy;let n2=unproject(vec3f(side.x*2-1,1-side.y*2,1));
+  let d2=unproject(vec3f(side.x*2-1,1-side.y*2,0.5))-n2;let at=sliceDepth(f32(id.z)+0.5+volume.jitter.z);
+  let wide=length(n2+d2*(at/dot(d2,volume.plane.xyz))-p);let deep=0.25*(sliceDepth(f32(id.z)+1.0)-sliceDepth(f32(id.z)));
+  let spread=0.28867513*max(wide,deep);
+  for(var k=0u;k<4u;k++){light+=0.25*localLight(pixel,n+d*(sliceDepth(f32(id.z)+(f32(k)+0.5+volume.jitter.z)*0.25)/dot(d,volume.plane.xyz)),v,volume.scatter.w,spread);}`
+      : ''
+  }
   ${medium ? 'let local=fogMedium(p);var value=vec4f((sigma*volume.scatter.rgb+local.rgb)*light,sigma+local.a);' : 'var value=vec4f(sigma*volume.scatter.rgb*light,sigma);'}
   if(volume.grid.w>0.0){
     // Reproject the froxel's centre, not the jittered sample: a still camera reads its own texel unfiltered (no drift).

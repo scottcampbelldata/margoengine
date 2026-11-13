@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15187643,
+  "total": 15188055,
   "history": [
     {
       "date": "2026-10-24",
@@ -8723,6 +8723,12 @@
       "commit": "1533ccc08",
       "reason": "TAAUpscale fix: a scene background or layer mask frame (one full-canvas view) upscales instead of throwing; 7880 -> 7923 B for the view check and its restore, no split would remove them",
       "grew": 1
+    },
+    {
+      "date": "2026-11-13",
+      "commit": "8f663de49",
+      "reason": "environment/volumetric +412 B gzip (10,093 to 10,505): clustered lights in the fog are taken at four stratified depths with a cell distance floor, so narrow beams no longer break into one block per slice and a froxel holding a light no longer takes 1/d^2 at one point",
+      "grew": 1
     }
   ],
   "items": {
@@ -9025,7 +9031,7 @@
     "@margoengine/environment/reflector-pbr": 3556,
     "@margoengine/environment/refractor": 11397,
     "@margoengine/environment/studio": 1493,
-    "@margoengine/environment/volumetric": 10093,
+    "@margoengine/environment/volumetric": 10505,
     "@margoengine/exporters": 37300,
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
