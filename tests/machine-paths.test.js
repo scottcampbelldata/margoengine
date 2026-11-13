@@ -13,6 +13,9 @@ test('absolute machine paths are found in every separator style', () => {
     `d:\\users\\name\\AppData`,
     'cd /c/Development/Projects/x',
     'ls /mnt/c/Users/name',
+    // A home folder's 8.3 short name with no drive, as a scripts/bundler-matrix.mjs comment once held one.
+    '// The real path, not a Windows 8.3 short one (JSMITH~1): Turbopack loads React twice.',
+    'cd ALEXSM~2\\AppData',
   ])
     assert.ok(hasMachinePath(line), line);
 });
@@ -25,6 +28,9 @@ test('checkout-relative paths, URLs and ordinary words pass', () => {
     'Users and Development teams',
     'packages/c/Users.ts',
     '~/.cargo/registry',
+    'C:\\PROGRA~1\\nodejs',
+    'reached through RUNNER~1 or DEVELO~1',
+    'git diff HEAD~1',
   ])
     assert.ok(!hasMachinePath(line), line);
 });

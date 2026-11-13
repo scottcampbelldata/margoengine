@@ -10,6 +10,10 @@ const PATTERNS = [
   new RegExp(String.raw`(?<![A-Za-z0-9])[A-Za-z]:${SEP}(?:Users|Development)(?=${SEP}|$|[^A-Za-z0-9])`, 'i'),
   // Git Bash and WSL drive mounts.
   new RegExp(String.raw`(?<![\w.~-])/(?:mnt/)?[a-z]/(?:Users|Development)(?=/|$|[^A-Za-z0-9])`, 'i'),
+  // A Windows 8.3 short name of a home folder (the first six letters of a user name, then ~1) names a person even with no
+  // drive in front, as in a comment naming the short form of a checkout's folder. Generic short names stay allowed: the CI runner's home,
+  // Program Files, the Development and Documents folders and the ABCDEF placeholder.
+  /(?<![A-Za-z0-9])(?!(?:RUNNER|PROGRA|DEVELO|DOCUME|ABCDEF)~)[A-Z0-9]{6}~[0-9](?![A-Za-z0-9])/,
 ];
 
 /**
