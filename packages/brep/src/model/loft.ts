@@ -123,8 +123,8 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
     let n = unit(p0.normal);
     if (!n) throw new RangeError(`profile ${p0.name}: normal must not be zero`);
     const d = unit(i + 1 < sections.length ? sub(centres[i + 1], centres[i]) : sub(centres[i], centres[i - 1]));
-    if (!d) throw new RangeError(`loft sections ${p0.name} and its neighbour lie at one place`);
-    if (Math.abs(dot(n, d)) < 1e-9) throw new RangeError(`profile ${p0.name} lies along the loft`);
+    if (!d) throw new RangeError(`loft sections ${p0.name} and its neighbour lie at one place; give the sections different positions`);
+    if (Math.abs(dot(n, d)) < 1e-9) throw new RangeError(`profile ${p0.name} lies along the loft; put each section across the loft direction`);
     let p: Profile = p0;
     if (dot(n, d) < 0) {
       n = scale(n, -1);
@@ -132,11 +132,11 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
     }
     p = { ...p, normal: n };
     if (!same(p.segments[count - 1].to, p.start, tolerance))
-      throw new RangeError(`profile ${p0.name} does not end where it starts`);
+      throw new RangeError(`profile ${p0.name} does not end where it starts; pass a closed profile that does not cross itself`);
     for (const q of [...pointsOf(p), ...p.segments.flatMap((s) => (s.center ? [s.center] : []))])
-      if (Math.abs(dot(sub(q, p.start), n)) > tolerance) throw new RangeError(`profile ${p0.name} is not planar`);
+      if (Math.abs(dot(sub(q, p.start), n)) > tolerance) throw new RangeError(`profile ${p0.name} is not planar; put every point and arc centre of the profile in one plane`);
     const area = signedArea(p, n);
-    if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${p0.name} encloses no area`);
+    if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${p0.name} encloses no area; pass a closed profile that does not cross itself`);
     refuseSelfContact(p, n, tolerance);
     if (area < 0) p = reversed(p);
     return { profile: p, normal: n, points: pointsOf(p) };

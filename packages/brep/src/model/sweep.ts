@@ -122,7 +122,7 @@ function along(piece: Piece, f: number): Rigid {
 
 /** The path's pieces with their ends and tangents; throws for a degenerate piece or a corner. */
 function resolvePath(path: Path, tolerance: number): Piece[] {
-  if (!path.segments.length) throw new RangeError(`path ${path.name} has no segments`);
+  if (!path.segments.length) throw new RangeError(`path ${path.name} has no segments; give the path at least one line or arc`);
   const pieces: Piece[] = [];
   let at = path.start;
   path.segments.forEach((s, k) => {
@@ -130,7 +130,7 @@ function resolvePath(path: Path, tolerance: number): Piece[] {
     if (s.kind === 'line') {
       const d = sub(s.to, at),
         l = length(d);
-      if (!(l > tolerance)) throw new RangeError(`path ${path.name}: line ${name} has no length`);
+      if (!(l > tolerance)) throw new RangeError(`path ${path.name}: line ${name} has no length; remove the line or move its end`);
       const t = scale(d, 1 / l);
       pieces.push({ kind: 'line', name, from: at, to: s.to, t0: t, t1: t, length: l, source: k });
     } else {
@@ -145,7 +145,7 @@ function resolvePath(path: Path, tolerance: number): Piece[] {
       if (!axis)
         throw new RangeError(`path ${path.name}: arc ${name} needs an axis (its ends are opposite or the same)`);
       if (Math.abs(dot(a0, axis)) > tolerance || Math.abs(dot(a1, axis)) > tolerance)
-        throw new RangeError(`path ${path.name}: arc ${name} does not lie in the plane across its axis`);
+        throw new RangeError(`path ${path.name}: arc ${name} does not lie in the plane across its axis; give the arc a centre in the plane of its ends`);
       let turn = Math.atan2(dot(cross(a0, a1), axis), dot(a0, a1));
       if (turn <= 0) turn += 2 * Math.PI;
       // Ends within the tolerance of each other: a whole turn.
@@ -307,14 +307,14 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
   n = T0;
   const same = (a: XYZ, b: XYZ) => length(sub(a, b)) <= tolerance;
   if (!p.segments.length || !same(p.segments[p.segments.length - 1].to, p.start))
-    throw new RangeError(`profile ${profile.name} does not end where it starts`);
+    throw new RangeError(`profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`);
   const area = signedArea(p, n);
-  if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area`);
+  if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
   refuseSelfContact(p, n, tolerance);
   if (area < 0) p = reversed(p);
   for (const s of [p.start, ...p.segments.map((s) => s.to), ...p.segments.flatMap((s) => (s.center ? [s.center] : []))])
     if (Math.abs(dot(sub(s, path.start), n)) > tolerance)
-      throw new RangeError(`profile ${profile.name} is not planar`);
+      throw new RangeError(`profile ${profile.name} is not planar; put every point and arc centre of the profile in one plane`);
   const count = p.segments.length,
     pointsOf = (q: Profile) => [q.start, ...q.segments.slice(0, -1).map((s) => s.to)];
   // How far the profile reaches from the path's start (an arc's whole circle bounds it).
@@ -337,7 +337,7 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
       length(cross(last.t1, T0)) <= 1e-9 &&
       dot(last.t1, T0) > 0;
   if (closed && !pointsOf(p).every((q) => same(moveP(joints[m], q), q)))
-    throw new RangeError(`path ${path.name} closes but turns the profile: its ends would not meet`);
+    throw new RangeError(`path ${path.name} closes but turns the profile: its ends would not meet; close the path where the profile can return to its start`);
   const sections = joints.map((j) => moveProfile(p, j));
   // Each arc must keep the whole profile on one side of its axis.
   pieces.forEach((piece, i) => {
@@ -366,7 +366,7 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
     if (!(least > tolerance))
       throw new RangeError(
         `path ${path.name}: arc ${piece.name} (radius ${piece.radius!.toPrecision(6)}) curves tighter than the ` +
-          `profile reaches towards its axis: the sweep would cross itself`,
+          `profile reaches towards its axis: the sweep would cross itself; use a larger arc radius or a smaller profile`,
       );
   });
   refuseSelfCrossing(path, pieces, reach, closed, tolerance);
@@ -443,7 +443,7 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
           else if (rho(sc) > r) surface = { kind: 'torus', frame: frameOf(level(sc), a, x), major: rho(sc), minor: r };
           else
             throw new RangeError(
-              `profile ${profile.name}: segment ${segName(k)} is an arc reaching the axis of path arc ${piece.name}: not supported yet`,
+              `profile ${profile.name}: segment ${segName(k)} is an arc reaching the axis of path arc ${piece.name}: not supported yet; keep the profile on one side of the path arc's axis`,
             );
         }
       }
