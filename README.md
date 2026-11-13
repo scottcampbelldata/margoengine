@@ -266,6 +266,12 @@ game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this R
 [Orrery](examples/orrery/README.md): pick any date and the planets move to where they really were, within arcminutes of
 JPL Horizons. Brass, walnut and glass, built in Blender from a script and rendered live.
 
+[![Storm Light: a lighthouse on a rocky headland at night, its beam sweeping through rain, rendered live by Margo Engine](site/images/storm-light.jpg)](examples/storm-light/README.md)
+
+[Storm Light](examples/storm-light/README.md): a lighthouse on a rocky headland at night as a storm builds. The beam
+sweeps through rain and fog in real light shafts, the sea heaves and breaks on the rocks, and one slider takes it from
+calm dusk to full gale.
+
 | | | |
 | --- | --- | --- |
 | ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |

@@ -89,6 +89,8 @@ export const ROOT = {
     'the Tokyo diorama example: production build, tram animation, reduced motion, phone layout, missing asset',
   'test:orrery':
     'the Orrery example: production build, a picture, arms and wheels at the computed angles, fly-in, play, phone, missing model',
+  'test:storm-light':
+    'the Storm Light example: production build, a lit night first frame, the Storm slider, reduced motion, phone, missing model',
 };
 /**
  * `test:release` suites that drive a browser yet stay out of check:merge, each with its reason. Anything else in

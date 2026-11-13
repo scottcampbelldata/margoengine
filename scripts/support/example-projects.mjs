@@ -21,6 +21,7 @@ export const EXAMPLE_FOLDERS = [
   'molten-words',
   'orrery',
   'quickstart',
+  'storm-light',
   'test-pages',
   'usdz-loader',
   'webxr-orbit',

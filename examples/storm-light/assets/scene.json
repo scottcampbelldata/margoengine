@@ -1,0 +1,156 @@
+{
+  "units": "metres, engine coordinates: Y up, sea level y = 0",
+  "file": "storm-light.glb",
+  "camera": {
+    "position": [55.0, 6.0, 75.0],
+    "target": [-4.0, 20.0, 0.0],
+    "fov": 50.0
+  },
+  "lamp": [0.0, 36.015, 0.0],
+  "lens": {
+    "node": "Lens",
+    "center": [0.0, 36.015, 0.0],
+    "rotationAxis": [0, 1, 0],
+    "beamAxesLocal": [
+      [1, 0, 0],
+      [-1, 0, 0]
+    ],
+    "note": "Lens node origin is on the rotation axis at the lamp focus; the two bullseye panels face local +x and -x, so rotating the node about Y sweeps two opposite beams."
+  },
+  "lampCore": {
+    "node": "LampCore",
+    "center": [0.0, 36.015, 0.0],
+    "color": [1.0, 0.82, 0.5],
+    "strength": 400,
+    "diameter": 0.35
+  },
+  "lighthouse": {
+    "ground": [0.0, 16.0, 0.0],
+    "door": [-3.182, 16.3, 1.684],
+    "galleryFloorY": 33.75
+  },
+  "cottage": {
+    "center": [-17.0, 15.5, 5.5],
+    "size": [9.0, 5.5],
+    "door": [-17.0, 16.5, 8.25]
+  },
+  "windows": [
+    {
+      "position": [-19.7, 16.875, 8.25],
+      "normal": [0.0, 0.0, 1.0],
+      "size": [0.82, 1.05]
+    },
+    {
+      "position": [-14.3, 16.875, 8.25],
+      "normal": [0.0, 0.0, 1.0],
+      "size": [0.82, 1.05]
+    },
+    {
+      "position": [-19.0, 16.925, 2.75],
+      "normal": [0.0, 0.0, -1.0],
+      "size": [0.76, 0.95]
+    },
+    {
+      "position": [-14.8, 16.925, 2.75],
+      "normal": [0.0, 0.0, -1.0],
+      "size": [0.76, 0.95]
+    },
+    {
+      "position": [-12.5, 16.95, 5.5],
+      "normal": [1.0, 0.0, 0.0],
+      "size": [0.7, 0.9]
+    }
+  ],
+  "lampPost": [-9.2, 18.169, 5.6],
+  "jetty": {
+    "start": [-22.0, 1.6, 16.0],
+    "end": [-22.0, 1.6, 40.0],
+    "width": 2.4
+  },
+  "jettyEnd": [-22.0, 1.6, 40.0],
+  "mooring": {
+    "position": [-19.05, 0.0, 32.5],
+    "heading": [0, 0, 1],
+    "note": "boat centre at the waterline, bow toward +z, port side to the jetty"
+  },
+  "jettyRamp": [
+    [-49.0, 15.72, 19.65],
+    [-48.04, 15.21, 19.44],
+    [-47.09, 14.7, 19.23],
+    [-46.13, 14.19, 18.98],
+    [-45.18, 13.68, 18.77],
+    [-44.22, 13.18, 18.61],
+    [-43.27, 12.67, 18.4],
+    [-42.31, 12.16, 18.19],
+    [-41.36, 11.65, 17.98],
+    [-40.4, 11.15, 17.81],
+    [-39.44, 10.64, 17.65],
+    [-38.49, 10.13, 17.44],
+    [-37.53, 9.62, 17.27],
+    [-36.58, 9.11, 17.02],
+    [-35.62, 8.61, 16.77],
+    [-34.67, 8.1, 16.52],
+    [-33.71, 7.59, 16.27],
+    [-32.76, 7.08, 16.02],
+    [-31.8, 6.58, 15.81],
+    [-30.84, 6.07, 15.6],
+    [-29.89, 5.56, 15.43],
+    [-28.93, 5.05, 15.35],
+    [-27.98, 4.55, 15.18],
+    [-27.02, 4.04, 15.1],
+    [-26.07, 3.53, 15.02],
+    [-25.11, 3.02, 14.89],
+    [-24.16, 2.51, 14.81],
+    [-23.2, 2.01, 14.68]
+  ],
+  "seaStacks": [
+    {
+      "position": [25.0, 0.0, 12.5],
+      "top": 12.0,
+      "radius": 3.0
+    },
+    {
+      "position": [31.5, 0.0, -3.0],
+      "top": 4.6,
+      "radius": 2.4
+    },
+    {
+      "position": [21.0, 0.0, 21.0],
+      "top": 1.7,
+      "radius": 1.7
+    }
+  ],
+  "heightmap": {
+    "file": "headland-height.bin",
+    "origin": [-160, -128],
+    "size": [256, 256],
+    "cells": [256, 256],
+    "format": "float32 little-endian, row-major, row = z index, column = x index, cell centre x = -160 + i + 0.5, z = -128 + j + 0.5, value = ground y"
+  },
+  "triangles": {
+    "HeadlandNear": 70000,
+    "HeadlandFar": 8999,
+    "SeaStacks": 8500,
+    "Cottage": 3540,
+    "CottageWindows": 60,
+    "Jetty": 7894,
+    "PropsMesh": 7944,
+    "CompoundWall": 7310,
+    "LampGlass": 12,
+    "Lighthouse": 11580,
+    "Gallery": 6960,
+    "Lantern": 10346,
+    "LanternGlass": 128,
+    "Lens": 10844,
+    "LampCore": 432
+  },
+  "trianglesTotal": 154549,
+  "boat": {
+    "file": "boat.glb",
+    "length": 7.0,
+    "beam": 2.5,
+    "origin": "waterline centre, bow toward +z",
+    "mastLight": [0.0, 4.722, 0.95],
+    "triangles": 9233
+  }
+}

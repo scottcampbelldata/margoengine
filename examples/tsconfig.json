@@ -20,6 +20,7 @@
     "molten-words/*.ts",
     "orrery/*.ts",
     "quickstart/*.ts",
+    "storm-light/*.ts",
     "test-pages/*.ts",
     "usdz-loader/*.ts",
     "webxr-orbit/*.ts",
