@@ -6,6 +6,7 @@ import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
 import { perSample } from '../../shared/msaa.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // random(): the xxHash32 avalanche finaliser (Y. Collet, xxHash specification): primes 2246822519 = 0x85EBCA77 and
 // 3266489917 = 0xC2B2AE3D with shifts 16 / 13 / 16.
@@ -47,30 +48,41 @@ const render =
   `
 @group(0) @binding(1) var<storage,read> droplets:array<Particle>;
 @group(0) @binding(2) var surface:texture_depth_2d;
-struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+@group(0) @binding(3) var environment:texture_2d<f32>;
+@group(0) @binding(4) var skySampler:sampler;
+struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32,@location(2) sky:vec3f}
+fn spraySky()->vec3f {
+ var sum=vec3f(0);
+ for(var k=0u;k<8u;k++){
+  let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);let r=vec3f(cos(a)*side,up,sin(a)*side);
+  if(frame.color.w>0.5){sum+=textureSampleLevel(environment,skySampler,vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(r.y)/3.14159265),0.0).rgb;}
+  else{sum+=mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(r.y))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));}
+ }
+ return sum*0.125;
+}
 @vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) index:u32)->Output {
- let p=droplets[index];if(p.position.w<=0){return Output(vec4f(-2,-2,0,1),vec2f(0),0);}
+ let p=droplets[index];if(p.position.w<=0){return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0));}
  let corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));let uv=corners[v];
  let right=normalize(vec3f(frame.camera[0].x,frame.camera[1].x,frame.camera[2].x));let up=normalize(vec3f(frame.camera[0].y,frame.camera[1].y,frame.camera[2].y));
  let size=(0.018+p.velocity.w*0.025)*(1.0+p.position.w*0.2)*(1.0+2.5*frame.grid.z);let world=p.position.xyz+(right*uv.x+up*uv.y)*size;
- return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0));
+ return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0),spraySky());
 }
 fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
 @fragment fn fragment(i:Output)->@location(0) vec4f {
  let radius=dot(i.uv,i.uv);if(radius>1){discard;}
  let gap=max(0.0,linear(textureLoad(surface,vec2i(i.clip.xy),0))-linear(i.clip.z));
  let alpha=(1.0-smoothstep(0.25,1.0,radius))*i.alpha*min(1.0,gap*12.0)*0.65;
- let color=vec3f(0.78,0.84,0.85)*(vec3f(0.05+frame.eye.w*frame.grid.z)+frame.radiance.rgb*min(1.0,frame.sun.w));
+ let color=vec3f(0.78,0.84,0.85)*(frame.eye.w+i.sky+frame.radiance.rgb*min(1.0,frame.sun.w));
  return vec4f(color*alpha,alpha);
 }`;
-// Scene fog (Water.setFog), uniform at binding 3: droplets blend over the water like the surface's own colour and are
+// Scene fog (Water.setFog), uniform at binding 5: droplets blend over the water like the surface's own colour and are
 // written as they are, so they fade toward the fog colour in the target's terms (sRGB-encoded on an 8-bit target).
 const fogEdits: Array<[string, string]> = [
-  ['@location(1) alpha:f32}', '@location(1) alpha:f32,@location(2) world:vec3f}'],
-  ['return Output(vec4f(-2,-2,0,1),vec2f(0),0);', 'return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0));'],
+  ['@location(2) sky:vec3f}', '@location(2) sky:vec3f,@location(3) world:vec3f}'],
+  ['return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0));', 'return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0),vec3f(0));'],
   [
-    'return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0));',
-    'return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0),world);',
+    'return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0),spraySky());',
+    'return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0),spraySky(),world);',
   ],
   [
     'return vec4f(color*alpha,alpha);',
@@ -87,7 +99,7 @@ function foggedRender(): string {
       );
     code = code.replace(from, to);
   }
-  return code + fogWgsl(0, 3);
+  return code + fogWgsl(0, 5);
 }
 
 /** Fixed GPU pool, born only where shallow flow is actively breaking. */
@@ -105,6 +117,9 @@ export class Spray {
   private depthFormat = '';
   private sampled?: GPUTexture;
   private sampledFog?: GPUBuffer;
+  private sampledSky?: GPUTexture;
+  // Bound in place of a sky map when the water has none (frame.color.w is then 0 and the shader never reads it).
+  private blank?: GPUTexture;
   constructor(
     device: GPUDevice,
     private readonly uniform: GPUBuffer,
@@ -135,7 +150,14 @@ export class Spray {
     pass.end();
   }
   /** Draws the droplets over the water; `fog` is Water's fog uniform while it has a fog. */
-  draw(c: Context, surface: GPUTexture, view: GPUTextureView, fog?: GPUBuffer): void {
+  draw(
+    c: Context,
+    surface: GPUTexture,
+    view: GPUTextureView,
+    sky: GPUTexture | undefined,
+    sampler: GPUSampler,
+    fog?: GPUBuffer,
+  ): void {
     const key = c.format + ':' + surface.sampleCount + (fog ? ':fog' : '');
     if (this.format !== key || this.depthFormat !== surface.format) {
       const source = fog ? foggedRender() : render,
@@ -183,18 +205,28 @@ export class Spray {
       this.depthFormat = surface.format;
       this.sampled = undefined;
     }
-    if (this.sampled !== surface || this.sampledFog !== fog) {
+    const environment =
+      sky ??
+      (this.blank ??= c.device.createTexture({
+        size: [1, 1],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    if (this.sampled !== surface || this.sampledFog !== fog || this.sampledSky !== environment) {
       const view = surface.createView({ aspect: 'depth-only' });
       this.renderGroups = this.renders.map((pipeline) =>
         group(c.device, pipeline, [
           { buffer: this.uniform },
           { buffer: this.buffer },
           view,
+          environment.createView(),
+          sampler,
           ...(fog ? [{ buffer: fog }] : []),
         ]),
       );
       this.sampled = surface;
       this.sampledFog = fog;
+      this.sampledSky = environment;
     }
     this.color.view = c.color;
     this.depth.view = view;
@@ -208,5 +240,6 @@ export class Spray {
   }
   dispose(): void {
     this.buffer.destroy();
+    this.blank?.destroy();
   }
 }

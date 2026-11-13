@@ -146,7 +146,11 @@ export interface WaterOptions {
 // rings of 1.2, 2.4 and 3.6 foam distances, nearer rings weighing more (0 in open water, about 0.5 beside a straight
 // cliff). Wind chop (frame.grid.w): the ripple layers grow and a short wind-sea layer joins them, turned -5 degrees.
 // With whitecaps on, foam also takes the light of the sky above it: a Lambert surface under a sky of radiance L returns
-// about L, here the mean of the zenith and the sky 30 degrees up toward the eye.
+// about the cosine-weighted mean of L over the sky (irradiance over pi). foamSky() takes that mean over the whole upper
+// sky in eight directions: two rings of four, 30 and 60 degrees up, turned 45 degrees from each other (cosine-weighted
+// quadrature with equal weights: the sines of the elevations are the square roots of 1/4 and 3/4). The zenith alone,
+// or the sky behind the viewer, misses the bright horizon band of an overcast deck lit from one side and leaves foam
+// darker than the water that reflects it.
 const shader =
   waterFrame +
   oceanWaves +
@@ -289,6 +293,11 @@ fn skyColor(direction:vec3f,rough:f32)->vec3f {
  if(frame.color.w>0.5){let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,0.0,1.0))/3.14159265);let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
  return mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(max(0.0,r.y)))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));
 }
+fn foamSky()->vec3f {
+ var sum=vec3f(0);
+ for(var k=0u;k<8u;k++){let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);sum+=skyColor(vec3f(cos(a)*side,up,sin(a)*side),0.4);}
+ return sum*0.125;
+}
 struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
 ${displayShader}
 @fragment fn fragment(i:Output)->Result{
@@ -347,7 +356,7 @@ ${displayShader}
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
  // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
  // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
- let skyLight=select(vec3f(0),0.5*(skyColor(vec3f(n.x,1.0,n.z),0.4)+skyColor(vec3f(v.x,0.58,v.z),0.4)),frame.grid.z>0.0);
+ var skyLight=vec3f(0);if(frame.grid.z>0.0){skyLight=foamSky();}
  color=mix(color,vec3f(0.72,0.77,0.74)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265+skyLight),foam*0.95);
  if(frame.cameraData.w<0.5){color=toDisplay(color);}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
@@ -1221,7 +1230,7 @@ export class Water implements EnginePlugin {
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
     pass.end();
-    this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!, fog ? this.fogBuffer : undefined);
+    this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!, reflection, this.skySampler!, fog ? this.fogBuffer : undefined);
   }
   /**
    * Lets a capture hook (`@margoengine/post` SSR: `ssr.add(water)`) draw the water surface with `draw(c, 'capture', ...)`
