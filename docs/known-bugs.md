@@ -6,6 +6,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-13: DOF near field draws stepped blocks along a bright surface far in front of focus (lane S2)
+
+- **Repro:** `examples/orrery/index.html` on the Radeon 680M (WebGPU, 1920x1080), camera
+  `orrery.controls.transitions.setLookAt([1.3, 0.52, 0.66], [-0.06, 0.24, 0], {duration: 0})`, then
+  `orrery.focus.options.target = [0, 0.33, 0]; orrery.dof.options.aperture = 2.2`. The brass calendar ring at the
+  front left, well in front of the focus and lit by the window, shows hard steps about 8 px tall along its outer edge
+  and round its engraved ticks instead of a smooth blur. The same steps show with TAAUpscale disposed; with
+  `orrery.dof.enabled = false` the ring is clean.
+- **Cause:** not isolated yet. Two parts of the near gather in `packages/dof/src/shaders.ts` (`bokehShader`) switch
+  per pixel or per tile and line up with the steps: a near tap counts as in front only within 1% of the centre's depth
+  (`nearCoC.y<=center.y+max(0.001,center.y*0.01)`), so a surface seen at a grazing angle splits into in-front and
+  behind bands along lines of equal depth; and the tap count comes from the 8x8 workgroup's `nearMax`.
+- **Done here:** the Orrery focuses on its mechanism at f/4, where the ring's blur stays small; nothing in the dof
+  package changed.
+- **Needed to close:** a GPU repro in `packages/dof` (a bright plane receding in front of focus) that measures the
+  steps, then a near-field classification that does not switch on a fixed depth ratio, with that check as its test.
+
 ### Open 2026-11-12: margoengine.com does not serve the pages the packages and docs link to (lane D1)
 
 - **Repro:** `curl -sIL https://margoengine.com/errors` answers 404, and so do `/llms.txt`, `/llms-full.txt`,

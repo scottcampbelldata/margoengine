@@ -260,6 +260,7 @@
     "build:boulder": "npm run build:packages && node scripts/build-boulder.mjs",
     "build:tokyo": "node scripts/build-tokyo-diorama.mjs",
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs",
+    "test:orrery": "node scripts/orrery-browser-test.mjs",
     "test:gallery:browser": "node scripts/test-gallery-browser.mjs",
     "typecheck": "node scripts/typecheck.js",
     "check:examples-types": "node scripts/check-example-types.mjs",

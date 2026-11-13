@@ -1,0 +1,2550 @@
+{
+ "units": "metres, Blender axes (z up)",
+ "plinth": {
+  "radius": 0.66,
+  "height": 0.075
+ },
+ "calendar": {
+  "inner": 0.5,
+  "split": 0.555,
+  "outer": 0.605,
+  "year": 2026,
+  "days": [
+   {
+    "longitude": 100.2087,
+    "day": 1,
+    "month": 0
+   },
+   {
+    "longitude": 101.2279,
+    "day": 2,
+    "month": 0
+   },
+   {
+    "longitude": 102.2471,
+    "day": 3,
+    "month": 0
+   },
+   {
+    "longitude": 103.2663,
+    "day": 4,
+    "month": 0
+   },
+   {
+    "longitude": 104.2855,
+    "day": 5,
+    "month": 0
+   },
+   {
+    "longitude": 105.3047,
+    "day": 6,
+    "month": 0
+   },
+   {
+    "longitude": 106.3239,
+    "day": 7,
+    "month": 0
+   },
+   {
+    "longitude": 107.3431,
+    "day": 8,
+    "month": 0
+   },
+   {
+    "longitude": 108.3622,
+    "day": 9,
+    "month": 0
+   },
+   {
+    "longitude": 109.3812,
+    "day": 10,
+    "month": 0
+   },
+   {
+    "longitude": 110.4002,
+    "day": 11,
+    "month": 0
+   },
+   {
+    "longitude": 111.4191,
+    "day": 12,
+    "month": 0
+   },
+   {
+    "longitude": 112.438,
+    "day": 13,
+    "month": 0
+   },
+   {
+    "longitude": 113.4567,
+    "day": 14,
+    "month": 0
+   },
+   {
+    "longitude": 114.4753,
+    "day": 15,
+    "month": 0
+   },
+   {
+    "longitude": 115.4938,
+    "day": 16,
+    "month": 0
+   },
+   {
+    "longitude": 116.5122,
+    "day": 17,
+    "month": 0
+   },
+   {
+    "longitude": 117.5304,
+    "day": 18,
+    "month": 0
+   },
+   {
+    "longitude": 118.5485,
+    "day": 19,
+    "month": 0
+   },
+   {
+    "longitude": 119.5664,
+    "day": 20,
+    "month": 0
+   },
+   {
+    "longitude": 120.5842,
+    "day": 21,
+    "month": 0
+   },
+   {
+    "longitude": 121.6018,
+    "day": 22,
+    "month": 0
+   },
+   {
+    "longitude": 122.6192,
+    "day": 23,
+    "month": 0
+   },
+   {
+    "longitude": 123.6364,
+    "day": 24,
+    "month": 0
+   },
+   {
+    "longitude": 124.6533,
+    "day": 25,
+    "month": 0
+   },
+   {
+    "longitude": 125.6701,
+    "day": 26,
+    "month": 0
+   },
+   {
+    "longitude": 126.6866,
+    "day": 27,
+    "month": 0
+   },
+   {
+    "longitude": 127.7029,
+    "day": 28,
+    "month": 0
+   },
+   {
+    "longitude": 128.719,
+    "day": 29,
+    "month": 0
+   },
+   {
+    "longitude": 129.7348,
+    "day": 30,
+    "month": 0
+   },
+   {
+    "longitude": 130.7503,
+    "day": 31,
+    "month": 0
+   },
+   {
+    "longitude": 131.7655,
+    "day": 1,
+    "month": 1
+   },
+   {
+    "longitude": 132.7805,
+    "day": 2,
+    "month": 1
+   },
+   {
+    "longitude": 133.7952,
+    "day": 3,
+    "month": 1
+   },
+   {
+    "longitude": 134.8095,
+    "day": 4,
+    "month": 1
+   },
+   {
+    "longitude": 135.8236,
+    "day": 5,
+    "month": 1
+   },
+   {
+    "longitude": 136.8373,
+    "day": 6,
+    "month": 1
+   },
+   {
+    "longitude": 137.8507,
+    "day": 7,
+    "month": 1
+   },
+   {
+    "longitude": 138.8638,
+    "day": 8,
+    "month": 1
+   },
+   {
+    "longitude": 139.8765,
+    "day": 9,
+    "month": 1
+   },
+   {
+    "longitude": 140.8889,
+    "day": 10,
+    "month": 1
+   },
+   {
+    "longitude": 141.9009,
+    "day": 11,
+    "month": 1
+   },
+   {
+    "longitude": 142.9125,
+    "day": 12,
+    "month": 1
+   },
+   {
+    "longitude": 143.9238,
+    "day": 13,
+    "month": 1
+   },
+   {
+    "longitude": 144.9347,
+    "day": 14,
+    "month": 1
+   },
+   {
+    "longitude": 145.9452,
+    "day": 15,
+    "month": 1
+   },
+   {
+    "longitude": 146.9552,
+    "day": 16,
+    "month": 1
+   },
+   {
+    "longitude": 147.9649,
+    "day": 17,
+    "month": 1
+   },
+   {
+    "longitude": 148.9742,
+    "day": 18,
+    "month": 1
+   },
+   {
+    "longitude": 149.983,
+    "day": 19,
+    "month": 1
+   },
+   {
+    "longitude": 150.9914,
+    "day": 20,
+    "month": 1
+   },
+   {
+    "longitude": 151.9994,
+    "day": 21,
+    "month": 1
+   },
+   {
+    "longitude": 153.0069,
+    "day": 22,
+    "month": 1
+   },
+   {
+    "longitude": 154.014,
+    "day": 23,
+    "month": 1
+   },
+   {
+    "longitude": 155.0207,
+    "day": 24,
+    "month": 1
+   },
+   {
+    "longitude": 156.0268,
+    "day": 25,
+    "month": 1
+   },
+   {
+    "longitude": 157.0325,
+    "day": 26,
+    "month": 1
+   },
+   {
+    "longitude": 158.0378,
+    "day": 27,
+    "month": 1
+   },
+   {
+    "longitude": 159.0425,
+    "day": 28,
+    "month": 1
+   },
+   {
+    "longitude": 160.0468,
+    "day": 1,
+    "month": 2
+   },
+   {
+    "longitude": 161.0506,
+    "day": 2,
+    "month": 2
+   },
+   {
+    "longitude": 162.0539,
+    "day": 3,
+    "month": 2
+   },
+   {
+    "longitude": 163.0566,
+    "day": 4,
+    "month": 2
+   },
+   {
+    "longitude": 164.0589,
+    "day": 5,
+    "month": 2
+   },
+   {
+    "longitude": 165.0607,
+    "day": 6,
+    "month": 2
+   },
+   {
+    "longitude": 166.062,
+    "day": 7,
+    "month": 2
+   },
+   {
+    "longitude": 167.0627,
+    "day": 8,
+    "month": 2
+   },
+   {
+    "longitude": 168.063,
+    "day": 9,
+    "month": 2
+   },
+   {
+    "longitude": 169.0627,
+    "day": 10,
+    "month": 2
+   },
+   {
+    "longitude": 170.0618,
+    "day": 11,
+    "month": 2
+   },
+   {
+    "longitude": 171.0605,
+    "day": 12,
+    "month": 2
+   },
+   {
+    "longitude": 172.0586,
+    "day": 13,
+    "month": 2
+   },
+   {
+    "longitude": 173.0562,
+    "day": 14,
+    "month": 2
+   },
+   {
+    "longitude": 174.0532,
+    "day": 15,
+    "month": 2
+   },
+   {
+    "longitude": 175.0497,
+    "day": 16,
+    "month": 2
+   },
+   {
+    "longitude": 176.0456,
+    "day": 17,
+    "month": 2
+   },
+   {
+    "longitude": 177.041,
+    "day": 18,
+    "month": 2
+   },
+   {
+    "longitude": 178.0358,
+    "day": 19,
+    "month": 2
+   },
+   {
+    "longitude": 179.0301,
+    "day": 20,
+    "month": 2
+   },
+   {
+    "longitude": 180.0238,
+    "day": 21,
+    "month": 2
+   },
+   {
+    "longitude": 181.017,
+    "day": 22,
+    "month": 2
+   },
+   {
+    "longitude": 182.0096,
+    "day": 23,
+    "month": 2
+   },
+   {
+    "longitude": 183.0016,
+    "day": 24,
+    "month": 2
+   },
+   {
+    "longitude": 183.9931,
+    "day": 25,
+    "month": 2
+   },
+   {
+    "longitude": 184.984,
+    "day": 26,
+    "month": 2
+   },
+   {
+    "longitude": 185.9744,
+    "day": 27,
+    "month": 2
+   },
+   {
+    "longitude": 186.9641,
+    "day": 28,
+    "month": 2
+   },
+   {
+    "longitude": 187.9534,
+    "day": 29,
+    "month": 2
+   },
+   {
+    "longitude": 188.942,
+    "day": 30,
+    "month": 2
+   },
+   {
+    "longitude": 189.9301,
+    "day": 31,
+    "month": 2
+   },
+   {
+    "longitude": 190.9176,
+    "day": 1,
+    "month": 3
+   },
+   {
+    "longitude": 191.9046,
+    "day": 2,
+    "month": 3
+   },
+   {
+    "longitude": 192.8909,
+    "day": 3,
+    "month": 3
+   },
+   {
+    "longitude": 193.8768,
+    "day": 4,
+    "month": 3
+   },
+   {
+    "longitude": 194.862,
+    "day": 5,
+    "month": 3
+   },
+   {
+    "longitude": 195.8467,
+    "day": 6,
+    "month": 3
+   },
+   {
+    "longitude": 196.8308,
+    "day": 7,
+    "month": 3
+   },
+   {
+    "longitude": 197.8144,
+    "day": 8,
+    "month": 3
+   },
+   {
+    "longitude": 198.7973,
+    "day": 9,
+    "month": 3
+   },
+   {
+    "longitude": 199.7798,
+    "day": 10,
+    "month": 3
+   },
+   {
+    "longitude": 200.7616,
+    "day": 11,
+    "month": 3
+   },
+   {
+    "longitude": 201.743,
+    "day": 12,
+    "month": 3
+   },
+   {
+    "longitude": 202.7237,
+    "day": 13,
+    "month": 3
+   },
+   {
+    "longitude": 203.7039,
+    "day": 14,
+    "month": 3
+   },
+   {
+    "longitude": 204.6836,
+    "day": 15,
+    "month": 3
+   },
+   {
+    "longitude": 205.6627,
+    "day": 16,
+    "month": 3
+   },
+   {
+    "longitude": 206.6412,
+    "day": 17,
+    "month": 3
+   },
+   {
+    "longitude": 207.6192,
+    "day": 18,
+    "month": 3
+   },
+   {
+    "longitude": 208.5967,
+    "day": 19,
+    "month": 3
+   },
+   {
+    "longitude": 209.5736,
+    "day": 20,
+    "month": 3
+   },
+   {
+    "longitude": 210.55,
+    "day": 21,
+    "month": 3
+   },
+   {
+    "longitude": 211.5259,
+    "day": 22,
+    "month": 3
+   },
+   {
+    "longitude": 212.5012,
+    "day": 23,
+    "month": 3
+   },
+   {
+    "longitude": 213.476,
+    "day": 24,
+    "month": 3
+   },
+   {
+    "longitude": 214.4503,
+    "day": 25,
+    "month": 3
+   },
+   {
+    "longitude": 215.4241,
+    "day": 26,
+    "month": 3
+   },
+   {
+    "longitude": 216.3974,
+    "day": 27,
+    "month": 3
+   },
+   {
+    "longitude": 217.3701,
+    "day": 28,
+    "month": 3
+   },
+   {
+    "longitude": 218.3423,
+    "day": 29,
+    "month": 3
+   },
+   {
+    "longitude": 219.3141,
+    "day": 30,
+    "month": 3
+   },
+   {
+    "longitude": 220.2853,
+    "day": 1,
+    "month": 4
+   },
+   {
+    "longitude": 221.2561,
+    "day": 2,
+    "month": 4
+   },
+   {
+    "longitude": 222.2263,
+    "day": 3,
+    "month": 4
+   },
+   {
+    "longitude": 223.1961,
+    "day": 4,
+    "month": 4
+   },
+   {
+    "longitude": 224.1654,
+    "day": 5,
+    "month": 4
+   },
+   {
+    "longitude": 225.1342,
+    "day": 6,
+    "month": 4
+   },
+   {
+    "longitude": 226.1026,
+    "day": 7,
+    "month": 4
+   },
+   {
+    "longitude": 227.0705,
+    "day": 8,
+    "month": 4
+   },
+   {
+    "longitude": 228.0379,
+    "day": 9,
+    "month": 4
+   },
+   {
+    "longitude": 229.0049,
+    "day": 10,
+    "month": 4
+   },
+   {
+    "longitude": 229.9715,
+    "day": 11,
+    "month": 4
+   },
+   {
+    "longitude": 230.9376,
+    "day": 12,
+    "month": 4
+   },
+   {
+    "longitude": 231.9033,
+    "day": 13,
+    "month": 4
+   },
+   {
+    "longitude": 232.8685,
+    "day": 14,
+    "month": 4
+   },
+   {
+    "longitude": 233.8333,
+    "day": 15,
+    "month": 4
+   },
+   {
+    "longitude": 234.7977,
+    "day": 16,
+    "month": 4
+   },
+   {
+    "longitude": 235.7617,
+    "day": 17,
+    "month": 4
+   },
+   {
+    "longitude": 236.7253,
+    "day": 18,
+    "month": 4
+   },
+   {
+    "longitude": 237.6885,
+    "day": 19,
+    "month": 4
+   },
+   {
+    "longitude": 238.6513,
+    "day": 20,
+    "month": 4
+   },
+   {
+    "longitude": 239.6138,
+    "day": 21,
+    "month": 4
+   },
+   {
+    "longitude": 240.5758,
+    "day": 22,
+    "month": 4
+   },
+   {
+    "longitude": 241.5375,
+    "day": 23,
+    "month": 4
+   },
+   {
+    "longitude": 242.4988,
+    "day": 24,
+    "month": 4
+   },
+   {
+    "longitude": 243.4598,
+    "day": 25,
+    "month": 4
+   },
+   {
+    "longitude": 244.4204,
+    "day": 26,
+    "month": 4
+   },
+   {
+    "longitude": 245.3807,
+    "day": 27,
+    "month": 4
+   },
+   {
+    "longitude": 246.3407,
+    "day": 28,
+    "month": 4
+   },
+   {
+    "longitude": 247.3003,
+    "day": 29,
+    "month": 4
+   },
+   {
+    "longitude": 248.2596,
+    "day": 30,
+    "month": 4
+   },
+   {
+    "longitude": 249.2186,
+    "day": 31,
+    "month": 4
+   },
+   {
+    "longitude": 250.1773,
+    "day": 1,
+    "month": 5
+   },
+   {
+    "longitude": 251.1357,
+    "day": 2,
+    "month": 5
+   },
+   {
+    "longitude": 252.0938,
+    "day": 3,
+    "month": 5
+   },
+   {
+    "longitude": 253.0517,
+    "day": 4,
+    "month": 5
+   },
+   {
+    "longitude": 254.0092,
+    "day": 5,
+    "month": 5
+   },
+   {
+    "longitude": 254.9665,
+    "day": 6,
+    "month": 5
+   },
+   {
+    "longitude": 255.9236,
+    "day": 7,
+    "month": 5
+   },
+   {
+    "longitude": 256.8804,
+    "day": 8,
+    "month": 5
+   },
+   {
+    "longitude": 257.8369,
+    "day": 9,
+    "month": 5
+   },
+   {
+    "longitude": 258.7933,
+    "day": 10,
+    "month": 5
+   },
+   {
+    "longitude": 259.7494,
+    "day": 11,
+    "month": 5
+   },
+   {
+    "longitude": 260.7053,
+    "day": 12,
+    "month": 5
+   },
+   {
+    "longitude": 261.661,
+    "day": 13,
+    "month": 5
+   },
+   {
+    "longitude": 262.6165,
+    "day": 14,
+    "month": 5
+   },
+   {
+    "longitude": 263.5718,
+    "day": 15,
+    "month": 5
+   },
+   {
+    "longitude": 264.5269,
+    "day": 16,
+    "month": 5
+   },
+   {
+    "longitude": 265.4818,
+    "day": 17,
+    "month": 5
+   },
+   {
+    "longitude": 266.4366,
+    "day": 18,
+    "month": 5
+   },
+   {
+    "longitude": 267.3913,
+    "day": 19,
+    "month": 5
+   },
+   {
+    "longitude": 268.3458,
+    "day": 20,
+    "month": 5
+   },
+   {
+    "longitude": 269.3001,
+    "day": 21,
+    "month": 5
+   },
+   {
+    "longitude": 270.2543,
+    "day": 22,
+    "month": 5
+   },
+   {
+    "longitude": 271.2085,
+    "day": 23,
+    "month": 5
+   },
+   {
+    "longitude": 272.1625,
+    "day": 24,
+    "month": 5
+   },
+   {
+    "longitude": 273.1163,
+    "day": 25,
+    "month": 5
+   },
+   {
+    "longitude": 274.0701,
+    "day": 26,
+    "month": 5
+   },
+   {
+    "longitude": 275.0239,
+    "day": 27,
+    "month": 5
+   },
+   {
+    "longitude": 275.9775,
+    "day": 28,
+    "month": 5
+   },
+   {
+    "longitude": 276.9311,
+    "day": 29,
+    "month": 5
+   },
+   {
+    "longitude": 277.8846,
+    "day": 30,
+    "month": 5
+   },
+   {
+    "longitude": 278.8381,
+    "day": 1,
+    "month": 6
+   },
+   {
+    "longitude": 279.7915,
+    "day": 2,
+    "month": 6
+   },
+   {
+    "longitude": 280.7449,
+    "day": 3,
+    "month": 6
+   },
+   {
+    "longitude": 281.6983,
+    "day": 4,
+    "month": 6
+   },
+   {
+    "longitude": 282.6517,
+    "day": 5,
+    "month": 6
+   },
+   {
+    "longitude": 283.605,
+    "day": 6,
+    "month": 6
+   },
+   {
+    "longitude": 284.5584,
+    "day": 7,
+    "month": 6
+   },
+   {
+    "longitude": 285.5118,
+    "day": 8,
+    "month": 6
+   },
+   {
+    "longitude": 286.4652,
+    "day": 9,
+    "month": 6
+   },
+   {
+    "longitude": 287.4186,
+    "day": 10,
+    "month": 6
+   },
+   {
+    "longitude": 288.3721,
+    "day": 11,
+    "month": 6
+   },
+   {
+    "longitude": 289.3256,
+    "day": 12,
+    "month": 6
+   },
+   {
+    "longitude": 290.2792,
+    "day": 13,
+    "month": 6
+   },
+   {
+    "longitude": 291.2329,
+    "day": 14,
+    "month": 6
+   },
+   {
+    "longitude": 292.1866,
+    "day": 15,
+    "month": 6
+   },
+   {
+    "longitude": 293.1405,
+    "day": 16,
+    "month": 6
+   },
+   {
+    "longitude": 294.0944,
+    "day": 17,
+    "month": 6
+   },
+   {
+    "longitude": 295.0484,
+    "day": 18,
+    "month": 6
+   },
+   {
+    "longitude": 296.0025,
+    "day": 19,
+    "month": 6
+   },
+   {
+    "longitude": 296.9568,
+    "day": 20,
+    "month": 6
+   },
+   {
+    "longitude": 297.9112,
+    "day": 21,
+    "month": 6
+   },
+   {
+    "longitude": 298.8657,
+    "day": 22,
+    "month": 6
+   },
+   {
+    "longitude": 299.8204,
+    "day": 23,
+    "month": 6
+   },
+   {
+    "longitude": 300.7752,
+    "day": 24,
+    "month": 6
+   },
+   {
+    "longitude": 301.7302,
+    "day": 25,
+    "month": 6
+   },
+   {
+    "longitude": 302.6853,
+    "day": 26,
+    "month": 6
+   },
+   {
+    "longitude": 303.6407,
+    "day": 27,
+    "month": 6
+   },
+   {
+    "longitude": 304.5962,
+    "day": 28,
+    "month": 6
+   },
+   {
+    "longitude": 305.552,
+    "day": 29,
+    "month": 6
+   },
+   {
+    "longitude": 306.5079,
+    "day": 30,
+    "month": 6
+   },
+   {
+    "longitude": 307.4641,
+    "day": 31,
+    "month": 6
+   },
+   {
+    "longitude": 308.4204,
+    "day": 1,
+    "month": 7
+   },
+   {
+    "longitude": 309.3771,
+    "day": 2,
+    "month": 7
+   },
+   {
+    "longitude": 310.3339,
+    "day": 3,
+    "month": 7
+   },
+   {
+    "longitude": 311.291,
+    "day": 4,
+    "month": 7
+   },
+   {
+    "longitude": 312.2484,
+    "day": 5,
+    "month": 7
+   },
+   {
+    "longitude": 313.206,
+    "day": 6,
+    "month": 7
+   },
+   {
+    "longitude": 314.1639,
+    "day": 7,
+    "month": 7
+   },
+   {
+    "longitude": 315.1221,
+    "day": 8,
+    "month": 7
+   },
+   {
+    "longitude": 316.0805,
+    "day": 9,
+    "month": 7
+   },
+   {
+    "longitude": 317.0393,
+    "day": 10,
+    "month": 7
+   },
+   {
+    "longitude": 317.9984,
+    "day": 11,
+    "month": 7
+   },
+   {
+    "longitude": 318.9577,
+    "day": 12,
+    "month": 7
+   },
+   {
+    "longitude": 319.9174,
+    "day": 13,
+    "month": 7
+   },
+   {
+    "longitude": 320.8775,
+    "day": 14,
+    "month": 7
+   },
+   {
+    "longitude": 321.8378,
+    "day": 15,
+    "month": 7
+   },
+   {
+    "longitude": 322.7985,
+    "day": 16,
+    "month": 7
+   },
+   {
+    "longitude": 323.7596,
+    "day": 17,
+    "month": 7
+   },
+   {
+    "longitude": 324.721,
+    "day": 18,
+    "month": 7
+   },
+   {
+    "longitude": 325.6828,
+    "day": 19,
+    "month": 7
+   },
+   {
+    "longitude": 326.6449,
+    "day": 20,
+    "month": 7
+   },
+   {
+    "longitude": 327.6074,
+    "day": 21,
+    "month": 7
+   },
+   {
+    "longitude": 328.5703,
+    "day": 22,
+    "month": 7
+   },
+   {
+    "longitude": 329.5336,
+    "day": 23,
+    "month": 7
+   },
+   {
+    "longitude": 330.4973,
+    "day": 24,
+    "month": 7
+   },
+   {
+    "longitude": 331.4614,
+    "day": 25,
+    "month": 7
+   },
+   {
+    "longitude": 332.4259,
+    "day": 26,
+    "month": 7
+   },
+   {
+    "longitude": 333.3908,
+    "day": 27,
+    "month": 7
+   },
+   {
+    "longitude": 334.3561,
+    "day": 28,
+    "month": 7
+   },
+   {
+    "longitude": 335.3219,
+    "day": 29,
+    "month": 7
+   },
+   {
+    "longitude": 336.2881,
+    "day": 30,
+    "month": 7
+   },
+   {
+    "longitude": 337.2547,
+    "day": 31,
+    "month": 7
+   },
+   {
+    "longitude": 338.2218,
+    "day": 1,
+    "month": 8
+   },
+   {
+    "longitude": 339.1894,
+    "day": 2,
+    "month": 8
+   },
+   {
+    "longitude": 340.1574,
+    "day": 3,
+    "month": 8
+   },
+   {
+    "longitude": 341.1258,
+    "day": 4,
+    "month": 8
+   },
+   {
+    "longitude": 342.0948,
+    "day": 5,
+    "month": 8
+   },
+   {
+    "longitude": 343.0642,
+    "day": 6,
+    "month": 8
+   },
+   {
+    "longitude": 344.0341,
+    "day": 7,
+    "month": 8
+   },
+   {
+    "longitude": 345.0044,
+    "day": 8,
+    "month": 8
+   },
+   {
+    "longitude": 345.9753,
+    "day": 9,
+    "month": 8
+   },
+   {
+    "longitude": 346.9466,
+    "day": 10,
+    "month": 8
+   },
+   {
+    "longitude": 347.9185,
+    "day": 11,
+    "month": 8
+   },
+   {
+    "longitude": 348.8908,
+    "day": 12,
+    "month": 8
+   },
+   {
+    "longitude": 349.8637,
+    "day": 13,
+    "month": 8
+   },
+   {
+    "longitude": 350.8371,
+    "day": 14,
+    "month": 8
+   },
+   {
+    "longitude": 351.8109,
+    "day": 15,
+    "month": 8
+   },
+   {
+    "longitude": 352.7853,
+    "day": 16,
+    "month": 8
+   },
+   {
+    "longitude": 353.7603,
+    "day": 17,
+    "month": 8
+   },
+   {
+    "longitude": 354.7357,
+    "day": 18,
+    "month": 8
+   },
+   {
+    "longitude": 355.7117,
+    "day": 19,
+    "month": 8
+   },
+   {
+    "longitude": 356.6882,
+    "day": 20,
+    "month": 8
+   },
+   {
+    "longitude": 357.6653,
+    "day": 21,
+    "month": 8
+   },
+   {
+    "longitude": 358.6429,
+    "day": 22,
+    "month": 8
+   },
+   {
+    "longitude": 359.621,
+    "day": 23,
+    "month": 8
+   },
+   {
+    "longitude": 0.59966,
+    "day": 24,
+    "month": 8
+   },
+   {
+    "longitude": 1.578883,
+    "day": 25,
+    "month": 8
+   },
+   {
+    "longitude": 2.558656,
+    "day": 26,
+    "month": 8
+   },
+   {
+    "longitude": 3.538982,
+    "day": 27,
+    "month": 8
+   },
+   {
+    "longitude": 4.519862,
+    "day": 28,
+    "month": 8
+   },
+   {
+    "longitude": 5.501298,
+    "day": 29,
+    "month": 8
+   },
+   {
+    "longitude": 6.483292,
+    "day": 30,
+    "month": 8
+   },
+   {
+    "longitude": 7.465846,
+    "day": 1,
+    "month": 9
+   },
+   {
+    "longitude": 8.448961,
+    "day": 2,
+    "month": 9
+   },
+   {
+    "longitude": 9.43264,
+    "day": 3,
+    "month": 9
+   },
+   {
+    "longitude": 10.41688,
+    "day": 4,
+    "month": 9
+   },
+   {
+    "longitude": 11.40169,
+    "day": 5,
+    "month": 9
+   },
+   {
+    "longitude": 12.38706,
+    "day": 6,
+    "month": 9
+   },
+   {
+    "longitude": 13.373,
+    "day": 7,
+    "month": 9
+   },
+   {
+    "longitude": 14.35951,
+    "day": 8,
+    "month": 9
+   },
+   {
+    "longitude": 15.34658,
+    "day": 9,
+    "month": 9
+   },
+   {
+    "longitude": 16.33422,
+    "day": 10,
+    "month": 9
+   },
+   {
+    "longitude": 17.32243,
+    "day": 11,
+    "month": 9
+   },
+   {
+    "longitude": 18.3112,
+    "day": 12,
+    "month": 9
+   },
+   {
+    "longitude": 19.30054,
+    "day": 13,
+    "month": 9
+   },
+   {
+    "longitude": 20.29045,
+    "day": 14,
+    "month": 9
+   },
+   {
+    "longitude": 21.28092,
+    "day": 15,
+    "month": 9
+   },
+   {
+    "longitude": 22.27196,
+    "day": 16,
+    "month": 9
+   },
+   {
+    "longitude": 23.26357,
+    "day": 17,
+    "month": 9
+   },
+   {
+    "longitude": 24.25573,
+    "day": 18,
+    "month": 9
+   },
+   {
+    "longitude": 25.24846,
+    "day": 19,
+    "month": 9
+   },
+   {
+    "longitude": 26.24175,
+    "day": 20,
+    "month": 9
+   },
+   {
+    "longitude": 27.23559,
+    "day": 21,
+    "month": 9
+   },
+   {
+    "longitude": 28.22999,
+    "day": 22,
+    "month": 9
+   },
+   {
+    "longitude": 29.22495,
+    "day": 23,
+    "month": 9
+   },
+   {
+    "longitude": 30.22045,
+    "day": 24,
+    "month": 9
+   },
+   {
+    "longitude": 31.21651,
+    "day": 25,
+    "month": 9
+   },
+   {
+    "longitude": 32.21311,
+    "day": 26,
+    "month": 9
+   },
+   {
+    "longitude": 33.21026,
+    "day": 27,
+    "month": 9
+   },
+   {
+    "longitude": 34.20795,
+    "day": 28,
+    "month": 9
+   },
+   {
+    "longitude": 35.20617,
+    "day": 29,
+    "month": 9
+   },
+   {
+    "longitude": 36.20493,
+    "day": 30,
+    "month": 9
+   },
+   {
+    "longitude": 37.20422,
+    "day": 31,
+    "month": 9
+   },
+   {
+    "longitude": 38.20404,
+    "day": 1,
+    "month": 10
+   },
+   {
+    "longitude": 39.20439,
+    "day": 2,
+    "month": 10
+   },
+   {
+    "longitude": 40.20525,
+    "day": 3,
+    "month": 10
+   },
+   {
+    "longitude": 41.20663,
+    "day": 4,
+    "month": 10
+   },
+   {
+    "longitude": 42.20852,
+    "day": 5,
+    "month": 10
+   },
+   {
+    "longitude": 43.21092,
+    "day": 6,
+    "month": 10
+   },
+   {
+    "longitude": 44.21382,
+    "day": 7,
+    "month": 10
+   },
+   {
+    "longitude": 45.21722,
+    "day": 8,
+    "month": 10
+   },
+   {
+    "longitude": 46.22111,
+    "day": 9,
+    "month": 10
+   },
+   {
+    "longitude": 47.22549,
+    "day": 10,
+    "month": 10
+   },
+   {
+    "longitude": 48.23035,
+    "day": 11,
+    "month": 10
+   },
+   {
+    "longitude": 49.23568,
+    "day": 12,
+    "month": 10
+   },
+   {
+    "longitude": 50.24149,
+    "day": 13,
+    "month": 10
+   },
+   {
+    "longitude": 51.24776,
+    "day": 14,
+    "month": 10
+   },
+   {
+    "longitude": 52.25449,
+    "day": 15,
+    "month": 10
+   },
+   {
+    "longitude": 53.26168,
+    "day": 16,
+    "month": 10
+   },
+   {
+    "longitude": 54.26931,
+    "day": 17,
+    "month": 10
+   },
+   {
+    "longitude": 55.27738,
+    "day": 18,
+    "month": 10
+   },
+   {
+    "longitude": 56.28588,
+    "day": 19,
+    "month": 10
+   },
+   {
+    "longitude": 57.29482,
+    "day": 20,
+    "month": 10
+   },
+   {
+    "longitude": 58.30417,
+    "day": 21,
+    "month": 10
+   },
+   {
+    "longitude": 59.31393,
+    "day": 22,
+    "month": 10
+   },
+   {
+    "longitude": 60.3241,
+    "day": 23,
+    "month": 10
+   },
+   {
+    "longitude": 61.33467,
+    "day": 24,
+    "month": 10
+   },
+   {
+    "longitude": 62.34564,
+    "day": 25,
+    "month": 10
+   },
+   {
+    "longitude": 63.35698,
+    "day": 26,
+    "month": 10
+   },
+   {
+    "longitude": 64.3687,
+    "day": 27,
+    "month": 10
+   },
+   {
+    "longitude": 65.38079,
+    "day": 28,
+    "month": 10
+   },
+   {
+    "longitude": 66.39324,
+    "day": 29,
+    "month": 10
+   },
+   {
+    "longitude": 67.40604,
+    "day": 30,
+    "month": 10
+   },
+   {
+    "longitude": 68.41918,
+    "day": 1,
+    "month": 11
+   },
+   {
+    "longitude": 69.43266,
+    "day": 2,
+    "month": 11
+   },
+   {
+    "longitude": 70.44647,
+    "day": 3,
+    "month": 11
+   },
+   {
+    "longitude": 71.46059,
+    "day": 4,
+    "month": 11
+   },
+   {
+    "longitude": 72.47503,
+    "day": 5,
+    "month": 11
+   },
+   {
+    "longitude": 73.48976,
+    "day": 6,
+    "month": 11
+   },
+   {
+    "longitude": 74.50479,
+    "day": 7,
+    "month": 11
+   },
+   {
+    "longitude": 75.5201,
+    "day": 8,
+    "month": 11
+   },
+   {
+    "longitude": 76.53568,
+    "day": 9,
+    "month": 11
+   },
+   {
+    "longitude": 77.55153,
+    "day": 10,
+    "month": 11
+   },
+   {
+    "longitude": 78.56763,
+    "day": 11,
+    "month": 11
+   },
+   {
+    "longitude": 79.58398,
+    "day": 12,
+    "month": 11
+   },
+   {
+    "longitude": 80.60056,
+    "day": 13,
+    "month": 11
+   },
+   {
+    "longitude": 81.61737,
+    "day": 14,
+    "month": 11
+   },
+   {
+    "longitude": 82.6344,
+    "day": 15,
+    "month": 11
+   },
+   {
+    "longitude": 83.65163,
+    "day": 16,
+    "month": 11
+   },
+   {
+    "longitude": 84.66906,
+    "day": 17,
+    "month": 11
+   },
+   {
+    "longitude": 85.68668,
+    "day": 18,
+    "month": 11
+   },
+   {
+    "longitude": 86.70447,
+    "day": 19,
+    "month": 11
+   },
+   {
+    "longitude": 87.72243,
+    "day": 20,
+    "month": 11
+   },
+   {
+    "longitude": 88.74055,
+    "day": 21,
+    "month": 11
+   },
+   {
+    "longitude": 89.75881,
+    "day": 22,
+    "month": 11
+   },
+   {
+    "longitude": 90.77722,
+    "day": 23,
+    "month": 11
+   },
+   {
+    "longitude": 91.79574,
+    "day": 24,
+    "month": 11
+   },
+   {
+    "longitude": 92.81439,
+    "day": 25,
+    "month": 11
+   },
+   {
+    "longitude": 93.83314,
+    "day": 26,
+    "month": 11
+   },
+   {
+    "longitude": 94.85198,
+    "day": 27,
+    "month": 11
+   },
+   {
+    "longitude": 95.87091,
+    "day": 28,
+    "month": 11
+   },
+   {
+    "longitude": 96.88991,
+    "day": 29,
+    "month": 11
+   },
+   {
+    "longitude": 97.90898,
+    "day": 30,
+    "month": 11
+   },
+   {
+    "longitude": 98.9281,
+    "day": 31,
+    "month": 11
+   }
+  ],
+  "months": [
+   "JANUARY",
+   "FEBRUARY",
+   "MARCH",
+   "APRIL",
+   "MAY",
+   "JUNE",
+   "JULY",
+   "AUGUST",
+   "SEPTEMBER",
+   "OCTOBER",
+   "NOVEMBER",
+   "DECEMBER"
+  ]
+ },
+ "dome": {
+  "radius": 0.622,
+  "wall": 0.3,
+  "cap": 0.22,
+  "thickness": 0.003
+ },
+ "plates": {
+  "bottom": 0.095,
+  "top": 0.2,
+  "thickness": 0.005,
+  "radius": 0.178
+ },
+ "wheelThickness": 0.0032,
+ "planetZ": 0.33,
+ "sun": {
+  "radius": 0.03,
+  "z": 0.33
+ },
+ "arbor": 0.004,
+ "centres": {
+  "C": [
+   0,
+   0
+  ],
+  "L1": [
+   0.078,
+   0.062
+  ],
+  "L2": [
+   0.078,
+   0
+  ],
+  "D2": 0.078,
+  "D12": 0.062
+ },
+ "planets": [
+  {
+   "name": "mercury",
+   "orbit": 0.064,
+   "radius": 0.0075,
+   "tilt": 0,
+   "tiltToward": 0,
+   "ring": null,
+   "moons": [],
+   "levelA": 0.1075,
+   "levelB": 0.1132,
+   "armZ": 0.2776,
+   "tube": 0.0045,
+   "train": {
+    "a": 125,
+    "b": 22,
+    "c": 114,
+    "d": 52
+   },
+   "module": {
+    "A": 0.0008435374,
+    "B": 0.000939759
+   },
+   "wheels": {
+    "a": {
+     "teeth": 125,
+     "module": 0.0008435374,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1075,
+     "pitch": 0.05272109,
+     "tip": 0.05356463,
+     "root": 0.05166667
+    },
+    "b": {
+     "teeth": 22,
+     "module": 0.0008435374,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1075,
+     "pitch": 0.009278912,
+     "tip": 0.01012245,
+     "root": 0.00822449
+    },
+    "c": {
+     "teeth": 114,
+     "module": 0.000939759,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1132,
+     "pitch": 0.05356627,
+     "tip": 0.05450602,
+     "root": 0.05239157
+    },
+    "d": {
+     "teeth": 52,
+     "module": 0.000939759,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.1132,
+     "pitch": 0.02443373,
+     "tip": 0.02537349,
+     "root": 0.02325904
+    }
+   }
+  },
+  {
+   "name": "venus",
+   "orbit": 0.096,
+   "radius": 0.0115,
+   "tilt": 0,
+   "tiltToward": 0,
+   "ring": null,
+   "moons": [],
+   "levelA": 0.1189,
+   "levelB": 0.1246,
+   "armZ": 0.2688,
+   "tube": 0.006,
+   "train": {
+    "a": 57,
+    "b": 23,
+    "c": 61,
+    "d": 31
+   },
+   "module": {
+    "A": 0.00155,
+    "B": 0.001695652
+   },
+   "wheels": {
+    "a": {
+     "teeth": 57,
+     "module": 0.00155,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1189,
+     "pitch": 0.044175,
+     "tip": 0.045725,
+     "root": 0.0422375
+    },
+    "b": {
+     "teeth": 23,
+     "module": 0.00155,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1189,
+     "pitch": 0.017825,
+     "tip": 0.019375,
+     "root": 0.0158875
+    },
+    "c": {
+     "teeth": 61,
+     "module": 0.001695652,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1246,
+     "pitch": 0.05171739,
+     "tip": 0.05341304,
+     "root": 0.04959783
+    },
+    "d": {
+     "teeth": 31,
+     "module": 0.001695652,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.1246,
+     "pitch": 0.02628261,
+     "tip": 0.02797826,
+     "root": 0.02416304
+    }
+   }
+  },
+  {
+   "name": "earth",
+   "orbit": 0.14,
+   "radius": 0.0125,
+   "tilt": 23.44,
+   "tiltToward": 90,
+   "ring": null,
+   "moons": [
+    {
+     "name": "moon",
+     "arm": 0.025,
+     "radius": 0.0042,
+     "period": 27.32166
+    }
+   ],
+   "levelA": 0.1303,
+   "levelB": 0.136,
+   "armZ": 0.26,
+   "tube": 0.0075,
+   "train": {
+    "a": 36,
+    "b": 18,
+    "c": 39,
+    "d": 26
+   },
+   "module": {
+    "A": 0.002296296,
+    "B": 0.0024
+   },
+   "wheels": {
+    "a": {
+     "teeth": 36,
+     "module": 0.002296296,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1303,
+     "pitch": 0.04133333,
+     "tip": 0.04362963,
+     "root": 0.03846296
+    },
+    "b": {
+     "teeth": 18,
+     "module": 0.002296296,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1303,
+     "pitch": 0.02066667,
+     "tip": 0.02296296,
+     "root": 0.0177963
+    },
+    "c": {
+     "teeth": 39,
+     "module": 0.0024,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.136,
+     "pitch": 0.0468,
+     "tip": 0.0492,
+     "root": 0.0438
+    },
+    "d": {
+     "teeth": 26,
+     "module": 0.0024,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.136,
+     "pitch": 0.0312,
+     "tip": 0.0336,
+     "root": 0.0282
+    }
+   }
+  },
+  {
+   "name": "mars",
+   "orbit": 0.197,
+   "radius": 0.0095,
+   "tilt": 25.19,
+   "tiltToward": 352.9,
+   "ring": null,
+   "moons": [
+    {
+     "name": "phobos",
+     "arm": 0.0145,
+     "radius": 0.0018,
+     "period": 0.31891
+    },
+    {
+     "name": "deimos",
+     "arm": 0.0195,
+     "radius": 0.0016,
+     "period": 1.26244
+    }
+   ],
+   "levelA": 0.1417,
+   "levelB": 0.1474,
+   "armZ": 0.2512,
+   "tube": 0.009,
+   "train": {
+    "a": 25,
+    "b": 32,
+    "c": 49,
+    "d": 24
+   },
+   "module": {
+    "A": 0.002175439,
+    "B": 0.002136986
+   },
+   "wheels": {
+    "a": {
+     "teeth": 25,
+     "module": 0.002175439,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1417,
+     "pitch": 0.02719298,
+     "tip": 0.02936842,
+     "root": 0.02447368
+    },
+    "b": {
+     "teeth": 32,
+     "module": 0.002175439,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1417,
+     "pitch": 0.03480702,
+     "tip": 0.03698246,
+     "root": 0.03208772
+    },
+    "c": {
+     "teeth": 49,
+     "module": 0.002136986,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1474,
+     "pitch": 0.05235616,
+     "tip": 0.05449315,
+     "root": 0.04968493
+    },
+    "d": {
+     "teeth": 24,
+     "module": 0.002136986,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.1474,
+     "pitch": 0.02564384,
+     "tip": 0.02778082,
+     "root": 0.0229726
+    }
+   }
+  },
+  {
+   "name": "jupiter",
+   "orbit": 0.282,
+   "radius": 0.027,
+   "tilt": 3.13,
+   "tiltToward": 248,
+   "ring": null,
+   "moons": [
+    {
+     "name": "io",
+     "arm": 0.034,
+     "radius": 0.0028,
+     "period": 1.769138
+    },
+    {
+     "name": "europa",
+     "arm": 0.0395,
+     "radius": 0.0025,
+     "period": 3.551181
+    },
+    {
+     "name": "ganymede",
+     "arm": 0.0455,
+     "radius": 0.0036,
+     "period": 7.154553
+    },
+    {
+     "name": "callisto",
+     "arm": 0.0525,
+     "radius": 0.0033,
+     "period": 16.68902
+    }
+   ],
+   "levelA": 0.1531,
+   "levelB": 0.1588,
+   "armZ": 0.2424,
+   "tube": 0.0105,
+   "train": {
+    "a": 33,
+    "b": 68,
+    "c": 37,
+    "d": 71
+   },
+   "module": {
+    "A": 0.001227723,
+    "B": 0.001444444
+   },
+   "wheels": {
+    "a": {
+     "teeth": 33,
+     "module": 0.001227723,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1531,
+     "pitch": 0.02025743,
+     "tip": 0.02148515,
+     "root": 0.01872277
+    },
+    "b": {
+     "teeth": 68,
+     "module": 0.001227723,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1531,
+     "pitch": 0.04174257,
+     "tip": 0.0429703,
+     "root": 0.04020792
+    },
+    "c": {
+     "teeth": 37,
+     "module": 0.001444444,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1588,
+     "pitch": 0.02672222,
+     "tip": 0.02816667,
+     "root": 0.02491667
+    },
+    "d": {
+     "teeth": 71,
+     "module": 0.001444444,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.1588,
+     "pitch": 0.05127778,
+     "tip": 0.05272222,
+     "root": 0.04947222
+    }
+   }
+  },
+  {
+   "name": "saturn",
+   "orbit": 0.396,
+   "radius": 0.0215,
+   "tilt": 28.05,
+   "tiltToward": 79.5,
+   "ring": {
+    "inner": 0.028,
+    "outer": 0.043
+   },
+   "moons": [
+    {
+     "name": "titan",
+     "arm": 0.051,
+     "radius": 0.0033,
+     "period": 15.94542
+    }
+   ],
+   "levelA": 0.1645,
+   "levelB": 0.1702,
+   "armZ": 0.2336,
+   "tube": 0.012,
+   "train": {
+    "a": 59,
+    "b": 73,
+    "c": 15,
+    "d": 119
+   },
+   "module": {
+    "A": 0.0009393939,
+    "B": 0.001164179
+   },
+   "wheels": {
+    "a": {
+     "teeth": 59,
+     "module": 0.0009393939,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1645,
+     "pitch": 0.02771212,
+     "tip": 0.02865152,
+     "root": 0.02653788
+    },
+    "b": {
+     "teeth": 73,
+     "module": 0.0009393939,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1645,
+     "pitch": 0.03428788,
+     "tip": 0.03522727,
+     "root": 0.03311364
+    },
+    "c": {
+     "teeth": 15,
+     "module": 0.001164179,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1702,
+     "pitch": 0.008731343,
+     "tip": 0.009895522,
+     "root": 0.007276119
+    },
+    "d": {
+     "teeth": 119,
+     "module": 0.001164179,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.1702,
+     "pitch": 0.06926866,
+     "tip": 0.07043284,
+     "root": 0.06781343
+    }
+   }
+  },
+  {
+   "name": "uranus",
+   "orbit": 0.49,
+   "radius": 0.0165,
+   "tilt": 97.77,
+   "tiltToward": 257.3,
+   "ring": null,
+   "moons": [
+    {
+     "name": "titania",
+     "arm": 0.026,
+     "radius": 0.0022,
+     "period": 8.705872
+    },
+    {
+     "name": "oberon",
+     "arm": 0.0315,
+     "radius": 0.0022,
+     "period": 13.46324
+    }
+   ],
+   "levelA": 0.1759,
+   "levelB": 0.1816,
+   "armZ": 0.2248,
+   "tube": 0.0135,
+   "train": {
+    "a": 15,
+    "b": 89,
+    "c": 25,
+    "d": 118
+   },
+   "module": {
+    "A": 0.001192308,
+    "B": 0.001090909
+   },
+   "wheels": {
+    "a": {
+     "teeth": 15,
+     "module": 0.001192308,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1759,
+     "pitch": 0.008942308,
+     "tip": 0.01013462,
+     "root": 0.007451923
+    },
+    "b": {
+     "teeth": 89,
+     "module": 0.001192308,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1759,
+     "pitch": 0.05305769,
+     "tip": 0.05425,
+     "root": 0.05156731
+    },
+    "c": {
+     "teeth": 25,
+     "module": 0.001090909,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1816,
+     "pitch": 0.01363636,
+     "tip": 0.01472727,
+     "root": 0.01227273
+    },
+    "d": {
+     "teeth": 118,
+     "module": 0.001090909,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.1816,
+     "pitch": 0.06436364,
+     "tip": 0.06545455,
+     "root": 0.063
+    }
+   }
+  },
+  {
+   "name": "neptune",
+   "orbit": 0.56,
+   "radius": 0.0165,
+   "tilt": 28.32,
+   "tiltToward": 293,
+   "ring": null,
+   "moons": [
+    {
+     "name": "triton",
+     "arm": 0.0265,
+     "radius": 0.0028,
+     "period": -5.876854
+    }
+   ],
+   "levelA": 0.1873,
+   "levelB": 0.193,
+   "armZ": 0.216,
+   "tube": 0.015,
+   "train": {
+    "a": 16,
+    "b": 113,
+    "c": 18,
+    "d": 140
+   },
+   "module": {
+    "A": 0.0009612403,
+    "B": 0.0009873418
+   },
+   "wheels": {
+    "a": {
+     "teeth": 16,
+     "module": 0.0009612403,
+     "centre": [
+      0.078,
+      0.062
+     ],
+     "z": 0.1873,
+     "pitch": 0.007689922,
+     "tip": 0.008651163,
+     "root": 0.006488372
+    },
+    "b": {
+     "teeth": 113,
+     "module": 0.0009612403,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.1873,
+     "pitch": 0.05431008,
+     "tip": 0.05527132,
+     "root": 0.05310853
+    },
+    "c": {
+     "teeth": 18,
+     "module": 0.0009873418,
+     "centre": [
+      0.078,
+      0
+     ],
+     "z": 0.193,
+     "pitch": 0.008886076,
+     "tip": 0.009873418,
+     "root": 0.007651899
+    },
+    "d": {
+     "teeth": 140,
+     "module": 0.0009873418,
+     "centre": [
+      0,
+      0
+     ],
+     "z": 0.193,
+     "pitch": 0.06911392,
+     "tip": 0.07010127,
+     "root": 0.06787975
+    }
+   }
+  }
+ ]
+}

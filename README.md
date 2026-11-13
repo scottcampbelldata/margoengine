@@ -261,6 +261,11 @@ game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this R
 
 ## Demos
 
+[![Orrery: a brass clockwork orrery under a glass dome, rendered live by Margo Engine](site/images/orrery.jpg)](examples/orrery/README.md)
+
+[Orrery](examples/orrery/README.md): pick any date and the planets move to where they really were, within arcminutes of
+JPL Horizons. Brass, walnut and glass, built in Blender from a script and rendered live.
+
 | | | |
 | --- | --- | --- |
 | ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |

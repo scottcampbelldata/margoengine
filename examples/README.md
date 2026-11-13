@@ -49,6 +49,7 @@ backend can run it.
 | [tokyo-diorama.html](tokyo-diorama.html) | A street corner animated in Blender and played back by the animation package |
 | [weather.html](weather.html) | Weather presets that blend: rain, snow, hail, lightning, wind and wet or snowy ground |
 | [windy-meadow.html](windy-meadow.html) | Grass, wind and a changing sky |
+| [orrery/](orrery/index.html) | A brass orrery under a glass dome: any date puts the planets at their real heliocentric longitudes ([details](orrery/README.md)) |
 | [molten-words/](molten-words/index.html) | Any typed word as dripping liquid chrome |
 | [cathedral-light/](cathedral-light/index.html) | Sun through stained glass into a dusty hall, with a time-of-day slider |
 | [biomes/](biomes/index.html) | A 4 km landscape from a biome map: climate controls, a Koppen and layer map, biome painting and height and mask exports |

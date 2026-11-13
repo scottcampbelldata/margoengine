@@ -19,6 +19,7 @@ export const EXAMPLE_FOLDERS = [
   'cathedral-light',
   'gallery',
   'molten-words',
+  'orrery',
   'quickstart',
   'test-pages',
   'usdz-loader',

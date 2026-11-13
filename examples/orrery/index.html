@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d0b09">
+  <meta name="description" content="A brass and walnut clockwork orrery under a glass dome. Pick any date and the planets move to where they really were. Rendered live in WebGPU with Margo Engine.">
+  <title>Orrery · Margo Engine</title>
+  <!-- Margo engine made for Margie -->
+  <link rel="stylesheet" href="./orrery.css">
+</head>
+<body>
+  <main id="viewport" aria-label="A brass orrery under a glass dome on a walnut desk; drag to look around, click a planet to fly to it"></main>
+  <header>
+    <h1>Orrery, <a href="../../">Margo Engine</a></h1>
+    <p id="readout" aria-live="polite"></p>
+  </header>
+  <div id="toggles" role="group" aria-label="View">
+    <button id="dome" type="button" aria-pressed="false">Lift the dome</button>
+    <button id="xray" type="button" aria-pressed="false">Gear trains</button>
+    <button id="names" type="button" aria-pressed="false">Names</button>
+    <button id="reset" type="button">Whole orrery</button>
+  </div>
+  <form id="dial" autocomplete="off">
+    <label class="hidden" for="date">Date</label>
+    <input id="date" type="date" min="1800-01-01" max="2049-12-31" required>
+    <button id="today" type="button">Today</button>
+    <button id="play" type="button" aria-pressed="false">Play</button>
+    <label class="hidden" for="speed">Speed</label>
+    <select id="speed">
+      <option value="1">1 day a second</option>
+      <option value="7">1 week a second</option>
+      <option value="30.436875">1 month a second</option>
+      <option value="365.2425">1 year a second</option>
+      <option value="3652.425">1 century in 10 seconds</option>
+    </select>
+    <input id="scrub" type="range" min="0" max="1" step="any" aria-label="Scrub through the years 1800 to 2050">
+  </form>
+  <p id="status" role="status" data-webgpu-status>Winding the clockwork. The first load can take half a minute.</p>
+  <p id="error" role="alert"></p>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

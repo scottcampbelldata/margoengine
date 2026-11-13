@@ -1,0 +1,86 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #0d0b09;
+  color: #efe6d6;
+  font: 16px/1.4 Georgia, 'Times New Roman', serif;
+  overflow: hidden;
+}
+#viewport { position: fixed; inset: 0; }
+canvas { touch-action: none; display: block; }
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 16px 24px 20px;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000, 0 0 12px #000c;
+  background: #0d0b09b8;
+  border-bottom-right-radius: 6px;
+}
+h1 { margin: 0; font-size: 17px; font-weight: 400; color: #ece2cf; }
+h1 a { color: inherit; pointer-events: auto; }
+#readout { margin: 6px 0 0; font-size: 15px; color: #e2d6bd; font-variant-numeric: tabular-nums; max-width: 44ch; }
+button, select, input[type='date'] {
+  min-height: 40px;
+  color: inherit;
+  border: 1px solid #8f8068;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 15px;
+  padding: 0 10px;
+  background: #15110dcc;
+}
+button { cursor: pointer; }
+button[aria-pressed='true'] { background: #3a2e1dee; border-color: #e0b866; }
+input[type='date'] { color-scheme: dark; }
+#toggles {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: calc(100% - 32px);
+}
+#dial {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(980px, calc(100% - 24px));
+  padding: 8px 10px;
+  background: #110e0bcc;
+  border: 1px solid #6d6150;
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#scrub { flex: 1 1 220px; min-width: 160px; height: 36px; margin: 0; accent-color: #e0b866; }
+.hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+:focus-visible { outline: 3px solid #ffd98a; outline-offset: 2px; }
+#status { position: fixed; top: 44%; left: 0; right: 0; margin: 0; padding: 0 24px; text-align: center; }
+#status:empty { display: none; }
+#error { position: fixed; top: 96px; left: 24px; right: 24px; margin: 0; color: #ffd9b5; }
+#error:empty { display: none; }
+.planet-label {
+  font: 13px/1.2 Georgia, serif;
+  color: #f4ead7;
+  padding: 2px 7px;
+  background: #0d0b09b3;
+  border: 1px solid #a8925f;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+body.clean header, body.clean #toggles, body.clean #dial { display: none; }
+@media (max-width: 720px) {
+  header { padding: 12px 14px; }
+  #readout { font-size: 13px; }
+  #toggles { top: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 104px); right: 12px; left: 12px; justify-content: center; }
+  #toggles button { min-height: 36px; font-size: 14px; }
+  #scrub { flex-basis: 100%; }
+}

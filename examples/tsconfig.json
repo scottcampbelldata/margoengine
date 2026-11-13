@@ -18,6 +18,7 @@
     "cathedral-light/*.ts",
     "gallery/*.ts",
     "molten-words/*.ts",
+    "orrery/*.ts",
     "quickstart/*.ts",
     "test-pages/*.ts",
     "usdz-loader/*.ts",

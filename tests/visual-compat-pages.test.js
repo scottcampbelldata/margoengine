@@ -20,6 +20,9 @@ function sourceOf(path, dev) {
   if (folders[url]) return folders[url];
   const package_ = url.match(/^demos\/(dof|tonemap|animator)\/$/);
   if (package_) return `packages/${package_[1]}/examples/index.html`;
+  // The example folders build-site.js builds under /demos/<name>/.
+  const folder = url.match(/^demos\/(orrery|molten-words|cathedral-light|biomes)\/$/);
+  if (folder) return `examples/${folder[1]}/index.html`;
   const page = url.match(/^demos\/([\w-]+)\.html$/);
   if (page) return `examples/${page[1]}.html`;
   const gallery = url.match(/^gallery\/([\w-]+)\.html$/);

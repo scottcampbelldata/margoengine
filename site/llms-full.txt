@@ -267,6 +267,11 @@ game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this R
 
 ## Demos
 
+[![Orrery: a brass clockwork orrery under a glass dome, rendered live by Margo Engine](site/images/orrery.jpg)](examples/orrery/README.md)
+
+[Orrery](examples/orrery/README.md): pick any date and the planets move to where they really were, within arcminutes of
+JPL Horizons. Brass, walnut and glass, built in Blender from a script and rendered live.
+
 | | | |
 | --- | --- | --- |
 | ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |
@@ -10328,6 +10333,23 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Open 2026-11-13: DOF near field draws stepped blocks along a bright surface far in front of focus (lane S2)
+
+- **Repro:** `examples/orrery/index.html` on the Radeon 680M (WebGPU, 1920x1080), camera
+  `orrery.controls.transitions.setLookAt([1.3, 0.52, 0.66], [-0.06, 0.24, 0], {duration: 0})`, then
+  `orrery.focus.options.target = [0, 0.33, 0]; orrery.dof.options.aperture = 2.2`. The brass calendar ring at the
+  front left, well in front of the focus and lit by the window, shows hard steps about 8 px tall along its outer edge
+  and round its engraved ticks instead of a smooth blur. The same steps show with TAAUpscale disposed; with
+  `orrery.dof.enabled = false` the ring is clean.
+- **Cause:** not isolated yet. Two parts of the near gather in `packages/dof/src/shaders.ts` (`bokehShader`) switch
+  per pixel or per tile and line up with the steps: a near tap counts as in front only within 1% of the centre's depth
+  (`nearCoC.y<=center.y+max(0.001,center.y*0.01)`), so a surface seen at a grazing angle splits into in-front and
+  behind bands along lines of equal depth; and the tap count comes from the 8x8 workgroup's `nearMax`.
+- **Done here:** the Orrery focuses on its mechanism at f/4, where the ring's blur stays small; nothing in the dof
+  package changed.
+- **Needed to close:** a GPU repro in `packages/dof` (a bright plane receding in front of focus) that measures the
+  steps, then a near-field classification that does not switch on a fixed depth ratio, with that check as its test.
 
 ### Open 2026-11-12: margoengine.com does not serve the pages the packages and docs link to (lane D1)
 
@@ -25114,6 +25136,7 @@ This first scene needs no model or texture files. For a reader moving from anoth
 - `examples/tokyo-diorama.html`: A street corner animated in Blender and played back by the animation package
 - `examples/weather.html`: Weather presets that blend: rain, snow, hail, lightning, wind and wet or snowy ground
 - `examples/windy-meadow.html`: Grass, wind and a changing sky
+- `examples/orrery/index.html`: A brass orrery under a glass dome: any date puts the planets at their real heliocentric longitudes
 - `examples/molten-words/index.html`: Any typed word as dripping liquid chrome
 - `examples/cathedral-light/index.html`: Sun through stained glass into a dusty hall, with a time-of-day slider
 - `examples/biomes/index.html`: A 4 km landscape from a biome map: climate controls, a Koppen and layer map, biome painting and height and mask exports

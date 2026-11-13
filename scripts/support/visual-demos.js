@@ -94,6 +94,15 @@ export const demos = [
     views: ['high'],
     lossOnly: true,
   },
+  // Orrery: checked for device loss only until its baselines are recorded on a baseline profile.
+  {
+    id: 'orrery',
+    path: 'demos/orrery/',
+    ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
+    mask: ['#readout'],
+    views: ['high', 'phone'],
+    lossOnly: true,
+  },
   { id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'" },
   { id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone'] },
   { id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone'] },
