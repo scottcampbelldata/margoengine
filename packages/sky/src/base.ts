@@ -138,6 +138,8 @@ export interface SkyOptions {
    */
   environment?: boolean;
 }
+// The lighting moon's direction when the stylized night does not place one (Margo choice).
+const DEFAULT_MOON: Vec3 = [-0.3, 0.22, -1];
 /** Least diffuse light (linear RGB) the `environment` fallback gives any side, by day and by night. */
 export const skyEnvironmentFloor: { readonly day: Vec3; readonly night: Vec3 } = {
   day: [0.04, 0.04, 0.04],
@@ -325,7 +327,7 @@ export class Sky implements EnginePlugin {
   private readonly scratch = new Float64Array(52);
   private readonly sunColor = new Float32Array(3);
   readonly sun = new Float32Array(3);
-  readonly moon = Float32Array.from([-0.3, 0.22, -1], (v) => v / Math.hypot(0.3, 0.22, 1));
+  readonly moon = Float32Array.from(DEFAULT_MOON, (v) => v / Math.hypot(...DEFAULT_MOON));
   private disposed = false;
   private cloudTime = 0;
   private reflectionRequested = false;
@@ -555,6 +557,12 @@ export class Sky implements EnginePlugin {
       night = 1 - t * t * (3 - 2 * t);
     if (night < 1 && !this.features.preetham && !this.features.bruneton)
       throw new RangeError('Daylight needs a day model: preetham or bruneton from @margoengine/sky');
+    // The lighting moon follows the stylized night's moon when one is placed, so the disc, the glints and the light
+    // agree; otherwise it keeps its fixed default.
+    const placed = this.options.night?.moonDirection,
+      to = placed ?? DEFAULT_MOON,
+      span = Math.hypot(to[0], to[1], to[2]);
+    for (let i = 0; i < 3; i++) this.moon[i] = to[i] / span;
     const moonT = Math.max(0, Math.min(1, -this.sun[1] / 0.12)),
       moonVisibility = moonT * moonT * (3 - 2 * moonT),
       moonIntensity = l?.moon ? (l.moon.intensity ?? (l.intensity ?? 1) * 0.1) : 0;

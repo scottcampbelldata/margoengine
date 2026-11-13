@@ -44,6 +44,35 @@ test('retained reflection lights track actual sun and moon directions through du
   assert.ok(unlit.lights.every((l) => l.direction[3] === 0));
 });
 
+test('the lighting moon follows the stylized night moon direction and falls back to its default', () => {
+  const h = optionalGPU();
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  const sky = new Sky({
+    hours: 23,
+    timeScale: 0,
+    night: { moonDirection: [3, 4, 0] },
+    lighting: { intensity: 2, moon: { intensity: 0.4, color: [0.5, 0.6, 1] } },
+  });
+  h.engine.use(sky);
+  const fallback = [-0.3, 0.22, -1].map((v) => Math.fround(v / Math.hypot(0.3, 0.22, 1)));
+  for (const [placed, expected] of [
+    [[3, 4, 0], [0.6, 0.8, 0].map(Math.fround)],
+    [[0, 1, -1], [0, Math.SQRT1_2, -Math.SQRT1_2].map(Math.fround)],
+    [undefined, fallback],
+  ]) {
+    sky.options.night.moonDirection = placed;
+    h.frame();
+    assert.deepEqual([...sky.moon], expected, 'The moon the sky lights with is the one the night draws');
+    assert.deepEqual([...sky.lights[1].direction.slice(0, 3)], expected, 'Water glints use the same moon');
+    const values = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 256).data);
+    assert.deepEqual([...values.slice(28, 31)], expected, 'The lighting moon disc sits where the night moon is');
+    assert.deepEqual(
+      [...h.engine.lighting.direction.slice(0, 3)],
+      expected,
+      'At night the scene light comes from the moon',
+    );
+  }
+});
 test('authored sun direction is normalized and shared by visible sky and scene lighting', () => {
   const h = optionalGPU();
   h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
