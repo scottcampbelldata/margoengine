@@ -169,10 +169,15 @@ test('shell and offset refuse what they cannot make', () => {
   assert.throws(() => offsetFaces('o', cube(), ['a/face:nope'], 1 * mm), { name: 'RangeError', message: /no face/ });
   assert.throws(() => offsetFaces('o', cube(), [], 1 * mm), { name: 'RangeError' });
   assert.throws(() => offsetFaces('o', cube(), [top], NaN), { name: 'RangeError', message: /finite/ });
-  // A cylinder's side is not on a plane: refused by name, not a wrong body.
-  assert.throws(() => offsetFaces('o', cylinder('c', 3 * mm, 5 * mm), ['c/face:+z'], 1 * mm), {
+  // A ruled spline face (a loft between turned squares) has no offset of its own kind: refused by name, not a wrong body.
+  const sq = (h, z, t) => {
+    const p = (x, y) => [(x * Math.cos(t) - y * Math.sin(t)) * mm, (x * Math.sin(t) + y * Math.cos(t)) * mm, z * mm];
+    return { name: 'sq' + z, start: p(-h, -h), normal: [0, 0, 1], segments: [[h, -h], [h, h], [-h, h], [-h, -h]].map(([x, y]) => ({ kind: 'line', to: p(x, y) })) };
+  };
+  const twisted = model.loft('l', [sq(5, 0, 0), sq(3, 10, 0.5)]);
+  assert.throws(() => offsetFaces('o', twisted, ['l/face:end'], 1 * mm), {
     name: 'RangeError',
-    message: /c\/face:side is on a cylinder/,
+    message: /l\/face:s0\/e0 is on a spline/,
   });
 });
 
