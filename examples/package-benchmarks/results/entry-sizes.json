@@ -1,5 +1,5 @@
 {
-  "commit": "94e9914a6",
+  "commit": "16ae66376",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -524,16 +524,16 @@
     },
     "@margoengine/cad": {
       ".": {
-        "raw": 33505,
-        "gzip": 12720
+        "raw": 33666,
+        "gzip": 12777
       },
       "./cad-async": {
         "raw": 3936,
         "gzip": 1814
       },
       "./stage": {
-        "raw": 35993,
-        "gzip": 13696
+        "raw": 25383,
+        "gzip": 9938
       },
       "./closed": {
         "raw": 356,
@@ -5608,8 +5608,8 @@
     },
     "@margoengine/machinery": {
       ".": {
-        "raw": 68974,
-        "gzip": 30837
+        "raw": 69192,
+        "gzip": 30907
       },
       "./kinematics": {
         "raw": 9711,
@@ -5624,12 +5624,12 @@
         "gzip": 13431
       },
       "./section": {
-        "raw": 11787,
-        "gzip": 4345
+        "raw": 11845,
+        "gzip": 4377
       },
       "./assembly": {
-        "raw": 1894,
-        "gzip": 849
+        "raw": 2089,
+        "gzip": 923
       },
       "./metrology": {
         "raw": 5996,
@@ -5656,16 +5656,16 @@
         "gzip": 714
       },
       "./edges": {
-        "raw": 11038,
-        "gzip": 4673
+        "raw": 11062,
+        "gzip": 4685
       },
       "./dimensions": {
         "raw": 10063,
         "gzip": 4443
       },
       "./react": {
-        "raw": 12076,
-        "gzip": 4483
+        "raw": 12134,
+        "gzip": 4521
       }
     },
     "margoengine": {
