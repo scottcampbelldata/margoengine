@@ -2834,7 +2834,10 @@ needs it. It is not Safari, which needs safaridriver, and it is not a visual pro
 At the audit snapshot, profiles existed for Intel Arc 140V/Edge 155 and RTX A6000/Edge 155 and 156. Intel on newer
 Edge, Intel UHD, AMD, and Linux coverage remained absent. RTX A6000/Edge 157 was added on 2026-11-08 (4 runs per
 view, 81 views, captured from `d9fa86e5b`) after Edge updated itself; against the 156 profile 16 of 81 views differ,
-the largest per-pixel difference being 221 (FlightHelmet).
+the largest per-pixel difference being 221 (FlightHelmet). AMD Radeon 680M/Edge 157 (`amd-rdna-2-msedge-157`) was
+added on 2026-11-13 (4 runs per view, 81 views, captured from `6a527e1bd`); every view repeated bit for bit, and against
+the RTX A6000 Edge 157 profile no view has more than 0.13% of pixels off by more than 24 (largest single pixel 145, a
+voxel leaf edge).
 
 ### 4.7 Public truth and benchmarking
 
