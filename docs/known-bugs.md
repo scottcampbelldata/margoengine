@@ -6,6 +6,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-13: IGES parametric spline surfaces (entity 114) are refused; their coefficient order is not checked (brep)
+
+- **Repro:** an IGES 5.3 file with a parametric spline surface (entity 114) through `parseIGES` or `igesToSTEP` in
+  `@margoengine/brep` (`packages/brep/src/iges/step.ts`): the 114 is refused with `MargoError` code `unsupported`; a
+  file that also holds other surfaces converts with the 114 left out and named in `warnings`. The refusal is tested in
+  `packages/brep/tests/iges.test.js`.
+- **Cause:** the IGES 5.3 specification (US PRO/IPO-100-1996) gives the 114 bicubic patch polynomial only as a formula
+  image, which could not be read when the reader was written. The order of the 16 coefficients per coordinate (48 per
+  patch: x, then y, then z, named A to S) was not taken from the text, so it was not shipped.
+- **Needed to close:** read section 4.15 ("Parametric Spline Surface Entity") and Appendix B.5 and write down which
+  power of s = u - TU(i) and t = v - TV(j) each coefficient multiplies; confirm the assumed order 1, s, s^2, s^3, t,
+  s t, ..., s^3 t^3 and the patch order (u patches outer, with the (N + 1)-th placeholder column per row); restore the
+  power-to-Bezier conversion of each patch into one B-spline surface (knots at the breakpoints with multiplicity 3);
+  test against an analytic bicubic with cross terms (for example x = s, y = t, z = s^2 t^3 over two patches each way),
+  comparing sampled points and the meshed area with the exact values, in place of the refusal test.
+
 ### Open 2026-11-13: DOF near field draws stepped blocks along a bright surface far in front of focus (lane S2)
 
 - **Repro:** `examples/orrery/index.html` on the Radeon 680M (WebGPU, 1920x1080), camera
