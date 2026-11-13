@@ -398,6 +398,13 @@ class Extrusion implements Surface {
 /** Most starts a spline surface's projection tries, nearest sample first, before taking the closest it reached. */
 const TRIES = 32;
 
+/** Where a projection's Gauss-Newton stopped, how far from the point, and how far its start lay (SplinePatch.newton). */
+interface Landing {
+  uv: [number, number];
+  miss: number;
+  along: number;
+}
+
 class SplinePatch implements Surface {
   readonly uPeriod: number;
   readonly vPeriod: number;
@@ -455,28 +462,38 @@ class SplinePatch implements Surface {
     // off it, as a ray or a traced curve does), Gauss-Newton finds the nearest place there. From a far one (the other
     // end of a line edge) it can settle on a wrong nearest place, such as the next turn of a helical sweep: it is kept
     // only when it lands within a millionth of the surface's size, else the samples decide.
+    // A hint on a pole (a row of control points collapsed to a point, as a curve turned round an axis through its end
+    // makes) holds no u there: Gauss-Newton from it can run down the wrong meridian to the pole and stop, a little way
+    // off in a straight line, which is all `along` can measure there. A start or landing on a pole is kept only when it
+    // lands on the point; else the samples decide. From no hint, the samples decide thoroughly (`nearest`).
     this.grid();
     if (hint) {
-      const r = this.newton(p, hint[0], hint[1]);
-      return r.along <= this.cell / 4 || r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r).uv;
+      const r = this.newton(p, hint[0], hint[1]),
+        free = !this.singular(hint[0], hint[1]) && !this.singular(r.uv[0], r.uv[1]);
+      return (free && r.along <= this.cell / 4) || r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r, false).uv;
     }
-    return this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, along: Infinity }).uv;
+    return this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, along: Infinity }, true).uv;
   }
   /**
-   * Up to 4 samples per knot span in each direction (at most 48 a direction, at least one a span), u-major, and the
-   * farthest apart two neighbouring samples lie.
+   * Up to 4 samples per knot span in each direction (at most 48 a direction, at least one a span, and the ends of an
+   * open one), u-major, and the farthest apart two neighbouring samples lie.
    */
   private grid(): void {
     if (this.seeds) return;
-    const samples = (breaks: number[]) => {
+    // And the ends of an open direction: a face's edges mostly lie along them, and a point there can sit past a fold of
+    // the surface from every inner sample (a profile hooking back within 1e-6 of its own end), whose Gauss-Newton then
+    // lands on the fold's near side.
+    const samples = (breaks: number[], closed: boolean) => {
         const out: number[] = [],
           per = Math.max(1, Math.min(4, Math.floor(48 / Math.max(1, breaks.length - 1))));
+        if (!closed) out.push(breaks[0]);
         for (let i = 1; i < breaks.length; i++)
           for (let k = 0; k < per; k++) out.push(breaks[i - 1] + ((breaks[i] - breaks[i - 1]) * (k + 0.5)) / per);
+        if (!closed) out.push(breaks[breaks.length - 1]);
         return out;
       },
-      us = samples(this.uBreaks),
-      vs = samples(this.vBreaks);
+      us = samples(this.uBreaks, this.uPeriod > 0),
+      vs = samples(this.vBreaks, this.vPeriod > 0);
     this.seeds = us.flatMap((su) => vs.map((sv) => ({ u: su, v: sv, p: this.at(su, sv) })));
     this.rows = [us.length, vs.length];
     let cell = 0;
@@ -491,11 +508,9 @@ class SplinePatch implements Surface {
   /**
    * From the samples nearer the point than their grid neighbours (one per stretch of the surface that passes it: one
    * per turn of a helical sweep), nearest first, until one lands or the rest lie farther than the best plus a cell.
+   * Not `thorough` (after a hint's landing missed), a landing within a thousandth of the surface's size is taken.
    */
-  private nearest(
-    p: readonly number[],
-    best: { uv: [number, number]; miss: number; along: number },
-  ): { uv: [number, number]; miss: number; along: number } {
+  private nearest(p: readonly number[], best: Landing, thorough: boolean): Landing {
     this.grid();
     const seeds = this.seeds!,
       [nu, nv] = this.rows,
@@ -505,25 +520,45 @@ class SplinePatch implements Surface {
       d[k] = distance(seeds[k].p, p);
       if (d[k] < d[nearest]) nearest = k;
     }
-    // Most points land from the nearest sample. A tolerant edge lies a little off the surface; a wrong turn of a
-    // helical sweep misses by its pitch, a few hundredths of the surface's size: within a thousandth is taken as landed.
+    // Most points land from the nearest sample. Not `thorough`, a tolerant edge lies a little off the surface and a
+    // wrong turn of a helical sweep misses by its pitch, a few hundredths of the surface's size: within a thousandth is
+    // taken as landed. Thorough, a landing off the point (a tolerant edge's; or one Gauss-Newton left on the near side
+    // of a fold, or held at a bound past which the surface hooks back, micrometres off on a profile hooking within its
+    // own length) is tried from the other samples nearer it than their grid neighbours and from the nearest sample's
+    // neighbours, nearest first, while they lie within the best miss plus a cell: a wrong turn, a pitch away, is not.
     const first = this.newton(p, seeds[nearest].u, seeds[nearest].v);
     if (first.miss < best.miss) best = first;
-    if (best.miss <= 1e-3 * this.size) return best;
-    const at = (i: number, j: number) => {
+    if (best.miss < 1e-9 * this.size || (!thorough && best.miss <= 1e-3 * this.size)) return best;
+    const index = (i: number, j: number) => {
         if (this.uPeriod) i = (i + nu) % nu;
         if (this.vPeriod) j = (j + nv) % nv;
-        return i < 0 || i >= nu || j < 0 || j >= nv ? Infinity : d[i * nv + j];
+        return i < 0 || i >= nu || j < 0 || j >= nv ? -1 : i * nv + j;
       },
-      minima: number[] = [];
+      at = (i: number, j: number) => {
+        const k = index(i, j);
+        return k < 0 ? Infinity : d[k];
+      },
+      tries = new Set<number>(),
+      ni = Math.floor(nearest / nv),
+      nj = nearest % nv;
     for (let i = 0; i < nu; i++)
       for (let j = 0; j < nv; j++) {
         const x = d[i * nv + j];
-        if (x <= at(i - 1, j) && x <= at(i + 1, j) && x <= at(i, j - 1) && x <= at(i, j + 1)) minima.push(i * nv + j);
+        if (x <= at(i - 1, j) && x <= at(i + 1, j) && x <= at(i, j - 1) && x <= at(i, j + 1)) tries.add(i * nv + j);
       }
-    minima.sort((a, b) => d[a] - d[b]);
-    for (const k of minima.slice(0, TRIES)) {
-      if (k === nearest) continue;
+    for (const [i, j] of thorough
+      ? [
+          [ni - 1, nj],
+          [ni + 1, nj],
+          [ni, nj - 1],
+          [ni, nj + 1],
+        ]
+      : []) {
+      const k = index(i, j);
+      if (k >= 0) tries.add(k);
+    }
+    tries.delete(nearest);
+    for (const k of [...tries].sort((a, b) => d[a] - d[b]).slice(0, TRIES)) {
       if (best.miss < 1e-9 * this.size || d[k] > best.miss + this.cell) break;
       const r = this.newton(p, seeds[k].u, seeds[k].v);
       if (r.miss < best.miss) best = r;
@@ -534,7 +569,7 @@ class SplinePatch implements Surface {
    * Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone (both bounds:
    * along the nearer).
    */
-  private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number; along: number } {
+  private newton(p: readonly number[], u: number, v: number): Landing {
     let along = Infinity,
       last: number[] | undefined;
     for (let i = 0; i < 50; i++) {

@@ -125,3 +125,128 @@ test('STEP import: a B-spline half circle turned round its diameter is a sphere'
   close(m.volume, (4 / 3) * Math.PI * r ** 3, 1e-9, 'sphere volume');
   close(m.area, 4 * Math.PI * r * r, 1e-9, 'sphere area');
 });
+
+test('a point projected onto a spline sphere from a hint at its pole lands on the point, whichever meridian it is on', () => {
+  // A half circle turned round its diameter, as revolvedSurface makes it: u turns, v runs pole to pole. At a pole u
+  // means nothing, so a hint there (an edge's first point, at the pole) gives no meridian to start down: from the hint's
+  // u, Gauss-Newton ran down the wrong one and stopped at the pole, up to 1.5 mm off a point 1.5 mm up a 4 mm sphere.
+  const r = 4 * mm,
+    w = Math.SQRT1_2,
+    arc = [
+      [0, -r, 1],
+      [r, -r, w],
+      [r, 0, 1],
+      [r, r, w],
+      [0, r, 1],
+    ],
+    ring = [
+      [1, 0, 1],
+      [1, 1, w],
+      [0, 1, 1],
+      [-1, 1, w],
+      [-1, 0, 1],
+      [-1, -1, w],
+      [0, -1, 1],
+      [1, -1, w],
+      [1, 0, 1],
+    ],
+    points = [],
+    weights = [];
+  for (const [radius, z, wv] of arc)
+    for (const [a, b, wr] of ring) {
+      points.push([radius * a, radius * b, z]);
+      weights.push(wv * wr);
+    }
+  const s = model.surfaceEvaluator({
+    kind: 'spline',
+    uClosed: true,
+    vClosed: false,
+    degrees: [2, 2],
+    counts: [9, 5],
+    knots: [
+      [0, 0.25, 0.5, 0.75, 1],
+      [0, 0.5, 1],
+    ],
+    multiplicities: [
+      [3, 2, 2, 2, 3],
+      [3, 2, 3],
+    ],
+    points,
+    weights,
+  });
+  for (const hint of [0, 0.25, 0.5, 0.75, 0.96875])
+    for (const lat of [-1.5, -1.4, -1.2, -0.8])
+      for (const lon of [0, 1.1, 2.5, 4]) {
+        const p = [r * Math.cos(lat) * Math.cos(lon), r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat)],
+          [u, v] = s.parameters(p, [hint, 0]),
+          q = s.at(u, v);
+        assert.ok(
+          Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) < 1e-12,
+          `hint u ${hint}, latitude ${lat}, longitude ${lon}: (${u}, ${v})`,
+        );
+      }
+});
+
+test('a B-spline profile hooking back near its end, extruded: its edges lie on its face, found from any start', () => {
+  // A cubic profile from (0, 0) that dips 0.3 um below its start and comes back within 1 um of it by a sixth of the
+  // way along, swept 5 mm up (writers make such hooks where a fillet's profile meets a flat). The samples' Gauss-Newton
+  // stopped on the hook's near side (0.8 um off the point at the profile's end) or held at the end (4 um off), and
+  // validateBody then reported edges lying on the face as off it.
+  const { Body, Edge, Face, Vertex, validateBody } = model,
+    s = 1e-5,
+    h = 5 * mm,
+    profile = [
+      [0, 0],
+      [0, -1],
+      [1, 4],
+      [3, 13],
+    ].map(([x, y]) => [x * s, y * s]),
+    at = (t, z) => {
+      const b = [(1 - t) ** 3, 3 * t * (1 - t) ** 2, 3 * t * t * (1 - t), t ** 3];
+      return [...[0, 1].map((k) => b.reduce((a, w, i) => a + w * profile[i][k], 0)), z];
+    },
+    surface = {
+      kind: 'spline',
+      degrees: [3, 1],
+      counts: [4, 2],
+      knots: [
+        [0, 1],
+        [0, h],
+      ],
+      multiplicities: [
+        [4, 4],
+        [2, 2],
+      ],
+      points: [...profile.map(([x, y]) => [x, y, 0]), ...profile.map(([x, y]) => [x, y, h])],
+    },
+    S = model.surfaceEvaluator(surface);
+  for (const z of [0, h / 2, h])
+    for (let i = 0; i <= 8; i++) {
+      const p = at(i / 8, z),
+        [u, v] = S.parameters(p),
+        q = S.at(u, v);
+      assert.ok(Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) < 1e-15, `t ${i / 8}, z ${z}: (${u}, ${v})`);
+    }
+  // The face as a sheet: the profile at the foot and at the top, and the two rulings.
+  const body = new Body('hook', 'sheet'),
+    shell = body.shell(),
+    v00 = new Vertex('v00', at(0, 0)),
+    v10 = new Vertex('v10', at(1, 0)),
+    v01 = new Vertex('v01', at(0, h)),
+    v11 = new Vertex('v11', at(1, h)),
+    curve = (z) => ({
+      kind: 'spline',
+      degrees: [3],
+      counts: [4],
+      knots: [[0, 1]],
+      multiplicities: [[4, 4]],
+      points: profile.map(([x, y]) => [x, y, z]),
+    }),
+    up = (name, a, b) => new Edge(name, { kind: 'line', origin: a.point, direction: [0, 0, 1] }, a, b),
+    loop = shell.add(new Face('hook/face', surface, true)).loop();
+  loop.use(new Edge('foot', curve(0), v00, v10), true);
+  loop.use(up('right', v10, v11), true);
+  loop.use(new Edge('top', curve(h), v01, v11), false);
+  loop.use(up('left', v00, v01), false);
+  assert.deepEqual(validateBody(body), []);
+});

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15551969,
+  "total": 15548103,
   "history": [
     {
       "date": "2026-10-24",
@@ -8884,7 +8884,7 @@
     "@margoengine/cad dist/workers/cad-runtime.js": 83502,
     "@margoengine/cad/cad-async": 2070,
     "@margoengine/cad/closed": 508,
-    "@margoengine/cad/stage": 14103,
+    "@margoengine/cad/stage": 10237,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,

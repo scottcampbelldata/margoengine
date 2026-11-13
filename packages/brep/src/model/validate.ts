@@ -2,6 +2,7 @@
 // shell one connected piece whose counts Euler-Poincare allows, vertices on their edges' curves and edges on their
 // faces' surfaces, each within its own tolerance. Every operation runs it on its result, so an invalid shape is
 // reported where it is made, not where it is next used. checkBody (check.ts) adds the costlier geometric checks.
+import type { Surface } from '../geometry/surfaces.js';
 import { cross, distance, dot, length, sub, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
 import type { Body, Edge, Face, Name, Vertex } from './topology.js';
@@ -190,6 +191,26 @@ function gapBound(curve: CurveDef, surface: SurfaceDef, t0: number, t1: number):
 }
 
 /**
+ * p's foot on a surface and its distance, the projection started from `hint`; one farther than `tolerance` is checked
+ * by the surface's own search from no hint, the nearer kept. From a hint, Gauss-Newton can stop at a place nearest
+ * only locally: on the near side of a fold (a profile hooking back within micrometres of itself), a few micrometres off
+ * an edge lying on the face. A gap is reported only once no foot nearer is found.
+ */
+function foot(
+  s: Surface,
+  p: XYZ,
+  hint: readonly number[] | undefined,
+  tolerance: number,
+): [[number, number], number] {
+  const uv = s.parameters(p, hint),
+    gap = distance(s.at(uv[0], uv[1]).slice(0, 3) as XYZ, p);
+  if (!hint || gap <= tolerance) return [uv, gap];
+  const again = s.parameters(p),
+    other = distance(s.at(again[0], again[1]).slice(0, 3) as XYZ, p);
+  return other < gap ? [again, other] : [uv, gap];
+}
+
+/**
  * Raises edge and vertex tolerances to the gaps a file's geometry has (a writer's spline fits leave edges a micrometre
  * off their faces, more than the accuracy it declares), half again for margin, where the gap is at most `cap` metres:
  * the tolerant edges a kernel keeps for an imported part. Larger gaps stay for validateBody to report.
@@ -227,9 +248,10 @@ export function measureTolerances(body: Body, cap: number): void {
                 ]
               : hint;
         prev = hint;
-        hint = s.parameters(p, from);
+        const [uv, g] = foot(s, p, from, e.tolerance);
+        hint = uv;
         if (p === points[0]) at.set(e.start, hint);
-        gap = Math.max(gap, distance(s.at(hint[0], hint[1]), p));
+        gap = Math.max(gap, g);
       }
       if (hint) at.set(e.end, hint);
     }
@@ -331,8 +353,7 @@ export function validateBody(body: Body): ValidityProblem[] {
       let hint: [number, number] | undefined;
       for (const t of ts) {
         const p = c.at(t).slice(0, 3) as XYZ,
-          uv: [number, number] = s.parameters(p, hint),
-          gap = distance(s.at(uv[0], uv[1]).slice(0, 3) as XYZ, p);
+          [uv, gap] = foot(s, p, hint, tolerance);
         hint = uv;
         if (gap > tolerance) {
           report(e.name, `${gap.toExponential(2)} m off the surface of ${use.loop.face.name}`);
