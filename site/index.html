@@ -11,7 +11,7 @@
   <meta property="og:title" content="Margo Engine">
   <meta property="og:description" content="A small Rust and Wasm 3D engine for web apps, with WebGPU rendering, an optional WebGL2 fallback and optional packs.">
   <meta property="og:url" content="https://margoengine.com/">
-  <meta property="og:image" content="https://margoengine.com/images/night-citadel.jpg">
+  <meta property="og:image" content="https://margoengine.com/images/orrery.jpg">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="./favicon.ico" sizes="32x32">
   <link rel="preload" href="./fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -39,12 +39,12 @@
         <p class="lede">A TypeScript engine with a Rust kernel compiled to WebAssembly, WebGPU rendering, an optional WebGL2 fallback, and optional packs.</p>
         <p class="actions">
           <a class="button primary" href="#start">Get started</a>
-          <a class="button" href="./night-citadel/">Open the live demo</a>
+          <a class="button" href="./demos/orrery/">Open the live demo</a>
           <a class="button" href="https://github.com/scottcampbelldata/margoengine">View on GitHub</a>
         </p>
       </div>
-      <a class="hero-shot" href="./night-citadel/">
-        <img src="./images/night-citadel.jpg" width="1280" height="800" alt="Night Citadel, a procedural castle under a moon, rendered live by Margo Engine" fetchpriority="high">
+      <a class="hero-shot" href="./demos/orrery/">
+        <img src="./images/orrery.jpg" width="1280" height="800" alt="Orrery, a brass clockwork orrery under a glass dome, rendered live by Margo Engine" fetchpriority="high">
       </a>
     </section>
 
@@ -105,15 +105,15 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
       <div class="tiles">
         <a class="tile full" href="./demos/orrery/">
           <img src="./images/orrery.jpg" width="1280" height="800" alt="" loading="lazy">
-          <span><strong>Orrery</strong> A brass clockwork orrery under a glass dome. Pick any date and the planets move to where they really were.</span>
+          <span><strong>Orrery</strong> A brass clockwork orrery under a glass dome. Pick any date and the planets move to their real positions, within arcminutes of JPL Horizons. Built with Margo Engine and Blender only.</span>
         </a>
         <a class="tile full" href="./demos/storm-light/">
           <img src="./images/storm-light.jpg" width="1280" height="800" alt="" loading="lazy">
-          <span><strong>Storm Light</strong> A lighthouse on a rocky headland at night. Its beam sweeps through rain and fog over a heaving sea, and one slider brings up the storm.</span>
+          <span><strong>Storm Light</strong> A lighthouse in a night storm: its beam sweeps through volumetric fog and rain over a heaving ocean, with lightning. Built with Margo Engine and Blender only.</span>
         </a>
-        <a class="tile wide" href="./night-citadel/">
-          <img src="./images/night-citadel.jpg" width="1280" height="800" alt="" loading="lazy">
-          <span><strong>Night Citadel</strong> A PBR fortress, moonlit water, soft shadows and glowing windows, with live controls.</span>
+        <a class="tile wide" href="./demos/earth/">
+          <img src="./images/earth.jpg" width="1280" height="800" alt="" loading="lazy">
+          <span><strong>Earth</strong> Orbit a globe with HDR city lights, drifting clouds, ocean highlights and atmosphere.</span>
         </a>
         <a class="tile" href="./gameplay-sandbox/">
           <img src="./images/gameplay-sandbox.jpg" width="1280" height="800" alt="" loading="lazy">
@@ -123,10 +123,6 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
           <img src="./images/flight-helmet.jpg" width="1280" height="800" alt="" loading="lazy">
           <span><strong>Flight helmet</strong> Textured PBR leather, glass and wood with an ambient occlusion toggle.</span>
         </a>
-        <a class="tile wide" href="./demos/earth/">
-          <img src="./images/earth.jpg" width="1280" height="800" alt="" loading="lazy">
-          <span><strong>Earth</strong> Orbit a globe with HDR city lights, drifting clouds, ocean highlights and atmosphere.</span>
-        </a>
         <a class="tile half" href="./demos/character-animation.html">
           <img src="./images/character-animation.jpg" width="1280" height="800" alt="" loading="lazy">
           <span><strong>Character study</strong> A walking robot with animation clips and facial morph sliders.</span>
@@ -134,10 +130,6 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
         <a class="tile half" href="./demos/windy-meadow.html">
           <img src="./images/windy-meadow.jpg" width="1280" height="800" alt="" loading="lazy">
           <span><strong>Windy meadow</strong> Wind-blown grass, drifting clouds, and daylight you control.</span>
-        </a>
-        <a class="tile full" href="./demos/tokyo-diorama.html">
-          <img src="./images/tokyo-diorama.jpg" width="1280" height="800" alt="" loading="lazy">
-          <span><strong>Tokyo corner</strong> A dense, keyframed street-corner diorama: a tram, a walking cat and a lantern-swinging tanuki, built in Blender.</span>
         </a>
       </div>
       <p class="more"><a href="./demos/boulder/">Boulder</a> · A robot climbs a wall with arms that keep clear of the wall and of itself. Choose a hold, or a route.</p>

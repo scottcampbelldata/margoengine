@@ -263,21 +263,21 @@ game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this R
 
 [![Orrery: a brass clockwork orrery under a glass dome, rendered live by Margo Engine](site/images/orrery.jpg)](examples/orrery/README.md)
 
-[Orrery](examples/orrery/README.md): pick any date and the planets move to where they really were, within arcminutes of
-JPL Horizons. Brass, walnut and glass, built in Blender from a script and rendered live.
+[Orrery](examples/orrery/README.md): real planet positions for any date you pick, within arcminutes, checked against
+JPL Horizons. Brass, walnut and glass under a dome, built with Margo Engine and Blender only.
 
-[![Storm Light: a lighthouse on a rocky headland at night, its beam sweeping through rain, rendered live by Margo Engine](site/images/storm-light.jpg)](examples/storm-light/README.md)
+[![Storm Light: a lighthouse on a headland in a night storm, rendered live by Margo Engine](site/images/storm-light.jpg)](examples/storm-light/README.md)
 
-[Storm Light](examples/storm-light/README.md): a lighthouse on a rocky headland at night as a storm builds. The beam
-sweeps through rain and fog in real light shafts, the sea heaves and breaks on the rocks, and one slider takes it from
-calm dusk to full gale.
+[Storm Light](examples/storm-light/README.md): a lighthouse in a night storm, its beam sweeping through volumetric fog
+and rain over the ocean, with lightning. Built with Margo Engine and Blender only.
 
 | | | |
 | --- | --- | --- |
-| ![Night Citadel](site/images/night-citadel.jpg) | ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) |
-| [Night Citadel](apps/showcase-night-citadel/README.md) | [glTF PBR](examples/flight-helmet.html) | [Gameplay sandbox](examples/gameplay-sandbox/README.md) |
+| ![Flight Helmet](site/images/flight-helmet.jpg) | ![Gameplay sandbox](site/images/gameplay-sandbox.jpg) | ![Earth](site/images/earth.jpg) |
+| [glTF PBR](examples/flight-helmet.html) | [Gameplay sandbox](examples/gameplay-sandbox/README.md) | [Earth](packages/creative/examples/earth/index.html) |
 
-![Tokyo corner diorama rendered by Margo Engine](site/images/tokyo-diorama.jpg)
+More in [examples/README.md](examples/README.md): character animation, a windy meadow, weather, a climbing robot,
+science views and feature pages.
 
 ## Build from source
 
@@ -297,7 +297,7 @@ npm test
 change the kernel.
 
 ```sh
-npm run dev               # Night Citadel showcase
+npm run dev               # the Orrery demo (after npm run build:packages)
 npm run dev:examples      # every page in examples/, e.g. /examples/flight-helmet.html
 npm run lint              # Biome
 npm run typecheck         # strict TypeScript for all packages
