@@ -268,7 +268,7 @@ export function demoSources(demo) {
   let m = /^demos\/(dof|tonemap|animator)\/$/.exec(path);
   if (m) return [`packages/${m[1]}/examples`];
   // The example folders scripts/build-site.js builds to demos/<name>/.
-  m = /^demos\/(orrery|molten-words|cathedral-light|biomes)\/$/.exec(path);
+  m = /^demos\/(orrery|storm-light|molten-words|cathedral-light|biomes)\/$/.exec(path);
   if (m) return [`examples/${m[1]}`];
   m = /^demos\/([a-z0-9-]+)\.html$/.exec(path);
   if (m) return [`examples/${m[1]}.html`];

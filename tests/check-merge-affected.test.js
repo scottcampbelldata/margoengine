@@ -667,7 +667,7 @@ test('every visual demo that is not a Khronos model maps to its sources, and the
 });
 
 test('a demo folder the site builds from examples/<name> maps to that folder (orrery had none after 32eb23e05)', () => {
-  for (const name of ['orrery', 'molten-words', 'cathedral-light', 'biomes']) {
+  for (const name of ['orrery', 'storm-light', 'molten-words', 'cathedral-light', 'biomes']) {
     assert.deepEqual(demoSources({ path: `demos/${name}/` }), [`examples/${name}`]);
     assert.ok(existsSync(resolve(root, `examples/${name}`)), `examples/${name} does not exist`);
   }
