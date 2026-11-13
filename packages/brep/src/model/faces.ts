@@ -122,6 +122,8 @@ export class FaceUV {
   cutInside = false;
   /** A millionth of the face's size (from its vertices): points this close to a pole are at it. */
   #miss = 0;
+  /** The v of the surface's poles at its high and low ends (undefined where it has none), found once. */
+  #poleVs?: (number | undefined)[];
   /** The surface's poles (where u, or v, has no meaning) and their points, found once. */
   #poles?: { at: { v: number } | { u: number }; point: number[] }[];
   /**
@@ -425,9 +427,13 @@ export class FaceUV {
 
   /** (u', v) of a point on the surface, its u (and v) moved by whole periods next to `hint` when given. */
   near(p: XYZ, hint?: UV): UV {
-    // A spline surface checks a far hint itself (it can settle on the next turn of a helical sweep).
+    // A spline surface checks a far hint itself (it can settle on the next turn of a helical sweep). A hint on a pole's
+    // line says nothing of u there (a B-spline's search from it stays near its u): it is passed without, and u is then
+    // moved by whole periods next to it as any other.
     const s = this.surface,
-      raw = s.parameters(p, hint ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
+      poleVs = (this.#poleVs ??= [s.pole(1), s.pole(-1)]),
+      atPole = hint !== undefined && (hint[1] === poleVs[0] || hint[1] === poleVs[1]),
+      raw = s.parameters(p, hint && !atPole ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
     let u = this.flip ? -raw[0] : raw[0],
       v = raw[1];
     if (hint) {

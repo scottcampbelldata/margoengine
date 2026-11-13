@@ -522,3 +522,72 @@ test('mass properties: a spline face with line edges across its knot spans', () 
     );
   }
 });
+
+/** A sphere of radius r as a rational B-spline surface: a half circle turned round z (u the turn, v pole to pole). */
+function splineSphere(r) {
+  const w = Math.SQRT1_2,
+    ring = [
+      [1, 0, 1],
+      [1, 1, w],
+      [0, 1, 1],
+      [-1, 1, w],
+      [-1, 0, 1],
+      [-1, -1, w],
+      [0, -1, 1],
+      [1, -1, w],
+      [1, 0, 1],
+    ],
+    arc = [
+      [0, -r, 1],
+      [r, -r, w],
+      [r, 0, 1],
+      [r, r, w],
+      [0, r, 1],
+    ],
+    points = [],
+    weights = [];
+  for (const [rho, z, wa] of arc)
+    for (const [x, y, wr] of ring) {
+      points.push([rho * x, rho * y, z]);
+      weights.push(wa * wr);
+    }
+  return {
+    kind: 'spline',
+    uClosed: true,
+    degrees: [2, 2],
+    counts: [9, 5],
+    knots: [
+      [0, 0.25, 0.5, 0.75, 1],
+      [0, 0.5, 1],
+    ],
+    multiplicities: [
+      [3, 2, 2, 2, 3],
+      [3, 2, 3],
+    ],
+    points,
+    weights,
+  };
+}
+
+test('mass properties: a spline face round its poles integrates across the knots of its rational arcs', () => {
+  const r = 4 * mm,
+    s = splineSphere(r),
+    exact = (m, what) => {
+      close(m.volume, (4 / 3) * Math.PI * r ** 3, `${what} volume`);
+      close(m.area, 4 * Math.PI * r * r, `${what} area`);
+    };
+  // Bounded by a meridian from pole to pole run both ways (as a STEP file has it): the poles' lines close the loop.
+  const south = new Vertex('s', [0, 0, -r]),
+    north = new Vertex('n', [0, 0, r]),
+    meridian = { kind: 'circle', frame: frameOf([0, 0, 0], [0, -1, 0], [0, 0, -1]), radius: r },
+    seam = new Edge('seam', meridian, south, north),
+    seamed = new Body('seamed', 'solid'),
+    loop = seamed.shell().add(new Face('f', s, true)).loop();
+  loop.use(seam, true);
+  loop.use(seam, false);
+  exact(massProperties(seamed), 'seamed');
+  // The whole surface, no loop.
+  const whole = new Body('whole', 'solid');
+  whole.shell().add(new Face('f', s, true));
+  exact(massProperties(whole), 'whole');
+});

@@ -200,21 +200,52 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
     }
   };
 
+  // A spline's knots, in (u', v).
+  const [uKnots, vKnots] = s.breaks?.() ?? [[], []],
+    uKnotsP = fuv.flip ? uKnots.map((k) => -k).reverse() : uKnots;
+  /**
+   * The integral of f along u' from a to b: a sixteenth of a turn a piece, and on a spline cut at its u knots (whole
+   * periods on where u' runs on round a closed surface), where its derivatives may jump: a line round a B-spline
+   * surface of revolution's pole crosses the knots of its rational arcs.
+   */
+  const alongU = (f: (up: number) => Float64Array, a: number, b: number, into: Float64Array) => {
+    const pieces = piecesOf(b - a, true);
+    if (uKnotsP.length < 2) return quad(f, a, b, pieces, into);
+    const period = fuv.period,
+      lo = Math.min(a, b),
+      hi = Math.max(a, b),
+      knots: number[] = [];
+    if (period) {
+      for (let k = Math.floor((lo - uKnotsP[uKnotsP.length - 1]) / period); ; k++) {
+        const shifted = uKnotsP.map((t) => t + k * period);
+        if (shifted[0] > hi) break;
+        knots.push(...shifted);
+      }
+    } else knots.push(...uKnotsP);
+    quadKnots(
+      f,
+      a,
+      b,
+      [...new Set(knots)].sort((x, y) => x - y),
+      pieces,
+      into,
+    );
+  };
+
   // A face with no loops covers its whole surface: integrate the parameter rectangle directly.
   if (!face.loops.length) {
     const [u0, u1] = s.uPeriod ? [0, s.uPeriod] : s.uDomain,
       [v0, v1] = s.vPeriod ? [0, s.vPeriod] : s.vDomain;
     if (![u0, u1, v0, v1].every(Number.isFinite)) throw new RangeError(`${face.name}: an unbounded face has no mass; pass a closed body`);
     const row = new Float64Array(K);
-    quad(
+    alongU(
       (u) => {
         row.fill(0);
-        quad((v) => integrand(u, v), v0, v1, vPieces(face, s, v1 - v0), row);
+        quadKnots((v) => integrand(u, v), v0, v1, vKnots, vPieces(face, s, v1 - v0), row);
         return row;
       },
       u0,
       u1,
-      piecesOf(u1 - u0, true),
       out,
     );
     return out;
@@ -231,12 +262,9 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   }
   const vStar = covered.length ? covered[0].v : s.vPeriod ? fuv.vCut : fuv.box[2],
     inner = new Float64Array(K);
-  // A spline's knots, in (u', v). One swept along many more spans of v than across u (a thread's flank: a ruling swept
-  // round dozens of turns) is integrated across u' inside and along v outside, the short way, when nothing about it
-  // wraps or collapses.
-  const [uKnots, vKnots] = s.breaks?.() ?? [[], []],
-    uKnotsP = fuv.flip ? uKnots.map((k) => -k).reverse() : uKnots,
-    across =
+  // A spline swept along many more spans of v than across u (a thread's flank: a ruling swept round dozens of turns) is
+  // integrated across u' inside and along v outside, the short way, when nothing about it wraps or collapses.
+  const across =
       uKnots.length >= 2 &&
       vKnots.length > uKnots.length &&
       !s.uPeriod &&
@@ -328,7 +356,7 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   // its edges run along into and out of the pole, as the walk along them reaches them.
   for (const l of fuv.poleLines) {
     const line = new Float64Array(K);
-    quad((up) => G(up, l.v), l.from, l.to, piecesOf(l.to - l.from, true), line);
+    alongU((up) => G(up, l.v), l.from, l.to, line);
     for (let k = 0; k < K; k++) out[k] -= line[k];
   }
 
@@ -336,14 +364,14 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   // below it (G is zero on its near side).
   if (fuv.cutInside) {
     const line = new Float64Array(K);
-    quad((up) => G(up, fuv.vCut + s.vPeriod), 0, s.uPeriod, piecesOf(s.uPeriod, true), line);
+    alongU((up) => G(up, fuv.vCut + s.vPeriod), 0, s.uPeriod, line);
     for (let k = 0; k < K; k++) out[k] += line[k];
   }
 
   // A second covered pole: its line, run with the face on its left (towards -u' at the high pole, +u' at the low).
   for (const pole of covered.slice(1)) {
     const line = new Float64Array(K);
-    quad((up) => G(up, pole.v), 0, s.uPeriod, piecesOf(s.uPeriod, true), line);
+    alongU((up) => G(up, pole.v), 0, s.uPeriod, line);
     for (let k = 0; k < K; k++) out[k] += pole.side === 1 ? line[k] : -line[k];
   }
   return out;
