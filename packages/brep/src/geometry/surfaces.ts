@@ -61,6 +61,23 @@ export interface Surface {
 }
 
 /**
+ * Whether (u, v) is a place where a parameter of `s` has no meaning: Su or Sv vanishes there (`singular`) and the whole
+ * line of that parameter through it lies within `reach` of the point (a pole or apex, listed or not). Where a derivative
+ * vanishes at the point alone (a B-spline's corner whose two control points there meet, so Su is zero at it) the line
+ * still runs away from it, and the point has its own (u, v), as any corner does.
+ */
+export function onPole(s: Surface, u: number, v: number, reach: number): boolean {
+  if (!s.singular(u, v)) return false;
+  const p = s.at(u, v),
+    along = (domain: readonly [number, number], at: number) =>
+      Number.isFinite(domain[0]) && Number.isFinite(domain[1])
+        ? [domain[0], (domain[0] + domain[1]) / 2, domain[1]]
+        : [at - 1, at + 1],
+    collapsed = (points: number[][]) => points.every((q) => distance(q, p) <= reach);
+  return collapsed(along(s.uDomain, u).map((x) => s.at(x, v))) || collapsed(along(s.vDomain, v).map((y) => s.at(u, y)));
+}
+
+/**
  * Su x Sv made unit; at a degenerate point, the normal a little way into the domain (`vDomain`, the surface's own by
  * default). Degenerate is Su x Sv within rounding of zero against |Su| |Sv|, not only exactly zero: along a line where
  * Su and Sv run parallel (a profile turned about an axis that ends tangent to its circle) their cross product is

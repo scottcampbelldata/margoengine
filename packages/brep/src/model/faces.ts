@@ -5,7 +5,7 @@
 // sphere's pole as well as for closed ones. On a torus the loops of a face that go round it all go the same way (two
 // that went different ways would cross): round its axis, in u; or round its tube, in v, and then u and v are swapped.
 import type { Curve } from '../geometry/curves.js';
-import type { Surface } from '../geometry/surfaces.js';
+import { onPole, type Surface } from '../geometry/surfaces.js';
 import { add, distance, dot, length, scale, sub, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Edge, Face } from './topology.js';
@@ -475,7 +475,7 @@ export class FaceUV {
       if (onPoles.has(k)) return;
       // A loop over a pole between samples (not through one of its vertices) jumps half a turn in u between them.
       if (
-        this.surface.singular(this.flip ? -u : u, v) ||
+        onPole(this.surface, this.flip ? -u : u, v, this.poleReach) ||
         (this.period && k && !onPoles.has(k - 1) && Math.abs(u - points[k - 1][0]) > this.period / 4)
       )
         throw new RangeError(`face ${this.face.name}: a loop over a pole between its vertices is not supported yet`);

@@ -10371,6 +10371,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-14: a B-spline face whose corner has a zero derivative is refused as a loop over a pole, or meshes open (brep)
+
+- **Repro:** abc 00000044 step_007 (validity check: "a loop over a pole between its vertices is not supported yet" on
+  face #18937, a degree 5 B-spline whose last two control points of its v = 0 row meet at the corner the loop starts
+  from). Small: the cube's top written as a quadratic in u whose first two control points of the row v = 0 meet at the
+  corner (0, 0, 10) (the test below): `model.checkBody` threw that RangeError, and `tessellateSTEP` left the top's edge
+  along y = 0 open (four edges used once).
+- **Cause:** Su vanishes at that corner, and only there: the line of u through it still runs away from it, so the
+  corner has its own (u, v) like any corner. `FaceUV.close` (`packages/brep/src/model/faces.ts`) refused every loop
+  point where `singular` held, and the tessellator's bounds (`packages/brep/src/mesh/tessellate.ts`) took every such
+  point for a pole and walked a line of the domain from it along v = 0, whose points it made up on the edge beside it:
+  the plane next to it has none of them, so the seam stayed open.
+- **Fix:** `onPole` (`packages/brep/src/geometry/surfaces.ts`): a point is a pole only where `singular` holds and the
+  whole line of the vanishing parameter through it lies at the point. Both use it.
+- **Regression:** `a B-spline face whose corner has Su zero there (two control points met) is a corner, not a pole` in
+  `packages/brep/tests/step-tessellate.test.js`: the mesh closed and outward, `checkBody` clean, the exact volume and
+  area to 1e-9. Before the fix it fails on the open mesh, and with the tessellator's half alone on the RangeError.
+
 ### Fixed 2026-11-13: a surface of revolution whose profile ends tangent to its circle folds the mesh at that rim (brep)
 
 - **Repro:** `tessellateSTEP` in `@margoengine/brep` on a cylinder (radius 10 mm, height 20 mm) whose side is written

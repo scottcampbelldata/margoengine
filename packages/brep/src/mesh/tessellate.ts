@@ -9,7 +9,7 @@
 import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import type { STEPBody, STEPColor } from '../step/structure.js';
 import { curveOf, type Curve } from '../geometry/curves.js';
-import { surfaceOf, type Surface } from '../geometry/surfaces.js';
+import { onPole, surfaceOf, type Surface } from '../geometry/surfaces.js';
 import { list, num, point, ref } from '../geometry/read.js';
 import { add, angle as between, cross, distance, dot, nearest, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { interiorEdges, triangulate } from './cdt.js';
@@ -277,7 +277,7 @@ export class Tessellator {
       const raw = b.points.map((p) => {
         const uv = s.parameters(p, hint);
         hint = uv;
-        return { p, u: uv[0], v: uv[1], singular: s.singular(uv[0], uv[1]) };
+        return { p, u: uv[0], v: uv[1], singular: onPole(s, uv[0], uv[1], gap) };
       });
       const regular = raw.filter((r) => !r.singular);
       if (!regular.length) {

@@ -670,6 +670,28 @@ test('a B-spline face collapsed to a point at one u end (v meaningless there) cl
   assert.ok(r.triangles >= 4);
 });
 
+test('a B-spline face whose corner has Su zero there (two control points met) is a corner, not a pole', () => {
+  // The cube's top as S(u, v) = (1 - v) R0(u) + v R1(u), quadratic in u: R0's first two control points meet at the
+  // corner (0, 0, 10), where the top's loop starts, so Su vanishes there and only there, while the line of u through it
+  // still runs away from it. The loop's point there (the corner exactly) was read as a loop over a pole and the body
+  // refused (abc 00000044 has such patches).
+  const top = (w) =>
+      w.add(
+        `B_SPLINE_SURFACE_WITH_KNOTS('',2,1,((${w.point([0, 0, 10])},${w.point([0, 10, 10])}),` +
+          `(${w.point([0, 0, 10])},${w.point([5, 10, 10])}),(${w.point([10, 0, 10])},${w.point([10, 10, 10])})),` +
+          '.UNSPECIFIED.,.F.,.F.,.F.,(3,3),(2,2),(0.,1.),(0.,1.),.UNSPECIFIED.)',
+      ),
+    text = box(10, 10, 10, { surface: { 1: top } });
+  solid(mesh(text), 1000, 600);
+  const { bodies, problems } = model.bodiesFromSTEP(parseSTEP(text));
+  assert.deepEqual(problems, []);
+  assert.equal(bodies.length, 1);
+  assert.deepEqual(model.checkBody(bodies[0]), []);
+  const m = model.massProperties(bodies[0]);
+  assert.ok(Math.abs(m.volume - 1e-6) <= 1e-6 * 1e-9, `volume ${m.volume}`);
+  assert.ok(Math.abs(m.area - 6e-4) <= 6e-4 * 1e-9, `area ${m.area}`);
+});
+
 /**
  * A thread's flank as a sheet: a ruled B-spline from an outer to an inner, raised helix-like quadratic spline, swept
  * `turns` turns, bounded by both splines and its two end rulings.
