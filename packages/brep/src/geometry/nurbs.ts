@@ -16,10 +16,23 @@ export function knotVector(knots: readonly number[], multiplicities: readonly nu
   return out;
 }
 
-/** A2.1: the knot span index of `u` (n = last control point index, p = degree). */
+/**
+ * A2.1: the knot span index of `u` (n = last control point index, p = degree), always a span of non-zero length. At
+ * the domain's ends that is the first span past U[p] and the last before U[n + 1]: a knot vector whose end knot repeats
+ * more than p + 1 times (a writer listing the start value twice, multiplicities 4 and 3 on a cubic) has empty spans
+ * there, whose basis is 0 / 0, and the control points beyond the p + 1 at the end take no part in the curve.
+ */
 export function findSpan(n: number, p: number, u: number, U: readonly number[]): number {
-  if (u >= U[n + 1]) return n;
-  if (u <= U[p]) return p;
+  if (u >= U[n + 1]) {
+    let k = n;
+    while (k > p && !(U[k + 1] > U[k])) k--;
+    return k;
+  }
+  if (u <= U[p]) {
+    let k = p;
+    while (k < n && !(U[k + 1] > U[k])) k++;
+    return k;
+  }
   let low = p,
     high = n + 1,
     mid = (low + high) >> 1;

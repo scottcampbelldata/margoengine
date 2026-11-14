@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-14: a B-spline whose end knot repeats more than degree + 1 times evaluates to NaN at that end (brep)
+
+- **Repro:** abc 00000011 (curve #81932, a cubic whose knot list gives 0.0 twice, multiplicities 4 then 3: seven knots
+  at t = 0) through `bodiesFromSTEP` in `@margoengine/brep`: `curveEvaluator(curve).at(0)` is NaN, and a vertex at the
+  curve's start projects to t = 1, so the vertex lands on the far end of the curve, 2.38 mm from where it is. Small: the
+  hairpin cubics in `packages/brep/tests/spline-end-knots.test.js`.
+- **Cause:** `findSpan` (`packages/brep/src/geometry/nurbs.ts`) returned span p for u at or below U[p] and n at or above
+  U[n + 1]. With more than p + 1 knots at an end, that span has zero length: its basis is 0 / 0. `Spline.nearest` then
+  compares distances with NaN, which is never smaller, and drops the start.
+- **Fix:** at the ends, `findSpan` steps to the first (last) span of non-zero length; ordinary clamped knot vectors get
+  the same span as before.
+- **Regression:** `packages/brep/tests/spline-end-knots.test.js` (a curve with the repeat at one end and at both, and a
+  surface with it at its u start): the ends evaluate to their control points and project to t = 0 and 1. Before the
+  fix `at(0)` is NaN and the start projects to 1.
+
 ### Open 2026-11-14: the body check of abc 00000044 step_007 still runs past the corpus timeout (brep)
 
 - **Repro:** abc 00000044 step_007 (`00000044_c7d977f326364e35bb5b5d27_step_007.step`) through `bodiesFromSTEP` and
