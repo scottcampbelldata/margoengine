@@ -51,6 +51,24 @@ window.check={samples:sceneSamples,
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;
  }};
+// Rain over the sky under TAA: two engines looking up into an empty sky (depth 0, which keeps TAA history), one TAA
+// reading the weather's reactive mask and one not. Without the mask the history averages each streak away into the
+// dark sky; with it the streaks stay as bright as drawn. The features check screenshots both canvases.
+const {TAA}=await import('/packages/taa/dist/index.js');
+async function taaRig(id,reactive){
+ const canvas=Object.assign(document.createElement('canvas'),{id,width:256,height:192});document.body.append(canvas);
+ const e=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,0],target:[0,30,-12],near:0.1,far:800}});e.stop();
+ e.gpu.addEventListener('uncapturederror',x=>errors.push(x.error.message));
+ const w=new Weather({precipitation:'rain',intensity:1,fadeSeconds:0,particles:30000,opacity:0.8,brightness:3,wind:[4,0],reactive});
+ TAA.attach(e,reactive?{reactive:()=>w.reactiveMask}:{});e.use(w);
+ return {engine:e,weather:w};
+}
+const rigs={plainTaa:await taaRig('rain-taa-plain',false),maskedTaa:await taaRig('rain-taa-masked',true)};
+window.taaRain={
+ async frames(n){for(let i=0;i<n;i++)for(const r of Object.values(rigs))r.engine.render({delta:1/60});for(const r of Object.values(rigs))await r.engine.gpu.queue.onSubmittedWorkDone();},
+ masks:()=>Object.fromEntries(Object.entries(rigs).map(([k,r])=>[k,!!r.weather.reactiveMask])),
+ errors:()=>errors.slice(),
+};
 // For looking at it: `?show=rain|snow|storm` leaves that weather running on the canvas.
 const show=new URLSearchParams(location.search).get('show');
 if(show){const w=new Weather({precipitation:show==='snow'?'snow':'rain',intensity:1,fadeSeconds:0,wind:[3,0],lightning:show==='storm'?{}:undefined});engine.use(w);if(show==='storm')w.strike({distance:400,strength:1});for(let i=0;i<4;i++)await shot(1/120);}

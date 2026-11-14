@@ -160,13 +160,17 @@ clouds.options.wind = [15, 0]; // options are read every frame
 ```
 
 Each pixel marches its view ray through the layer (`steps` samples, 64 by default, each starting at its own fraction of
-a step so the steps do not band) and, wherever there is cloud, `lightSteps` samples (6) toward the sun. The shapes come
+a step so the steps do not band; with `temporal` that fraction moves on by the golden ratio each frame, for
+`@margoengine/taa` to average the march's noise on thin cloud) and, wherever there is cloud, `lightSteps` samples (6)
+toward the sun, and as many toward the moon. The shapes come
 from two tiling noise volumes made once on the GPU (Schneider 2015): a 64³ Perlin-Worley and Worley volume for the
 billows and a 32³ Worley volume that erodes their edges, wispy at the base and rounded higher up. A coarse slice of the
 same volume spreads the clouds into groups and clear patches. The light is Beer-Lambert with the powder darkening,
 two Henyey-Greenstein lobes, and multiple scattering as three octaves of weaker extinction and flatter phase (Wrenninge
 et al. 2013), integrated step by step as Hillaire 2016 does, so the sun breaks through gaps in shafts and cloud edges
-glow toward the sun. The layer sits on the planet's curve (radius 6,360 km), so it reaches the horizon, and far cloud
+glow toward the sun. The moon lights the deck the same way, shaded through it, and its first scattering adds the
+droplets' narrow diffraction peak (half the light a droplet removes, van de Hulst 1957), so a thin veil over the moon
+glows round it and a thick deck hides it. The layer sits on the planet's curve (radius 6,360 km), so it reaches the horizon, and far cloud
 thins into the haze as the sky's own layer does (half at 28 km).
 
 With a `sky`, the sun's direction and its colour through the sky's atmosphere (warm and dim when low, nothing once it
@@ -195,7 +199,8 @@ in front of the clouds hides them. Without it the clouds draw only over the empt
 | `scale` | 14,000 | metres one repeat of the shapes spans; the erosion repeats eight times as often |
 | `wind` | [10, 3] | metres per second along X and Z |
 | `evolution` | 3 | metres per second the field rises through itself, so shapes change as they drift |
-| `steps`, `lightSteps` | 64, 6 | samples along the view ray and toward the sun |
+| `steps`, `lightSteps` | 64, 6 | samples along the view ray and toward the sun (and the moon) |
+| `temporal` | false | a new march start each frame, for TAA to average; leave it off without TAA |
 | `maxDistance` | 80,000 | farthest cloud drawn, metres |
 | `sunIntensity` | 1.6 | sun radiance on the clouds in the sky's units, as the sky's own layer |
 | `sunDirection`, `ambient` | [0.3, 0.6, 0.4]; a clear day's | the light without a sky |
@@ -704,10 +709,14 @@ Options are read every frame from `weather.options`; change them live. `intensit
 | `radius`, `height` | 25, 20 | half-width and height in metres of the box that follows the camera |
 | `particles` | 24,000 rain, 16,000 snow | count at intensity 1, up to 500,000; the amount scales it |
 | `color`, `brightness`, `opacity` | pale grey-blue (rain) or white (snow), 1, 0.35 (rain) or 0.8 (snow) | linear RGB, its scale, one particle's alpha |
+| `reactive` | false | also draw the particles' coverage into `weather.reactiveMask` (r8unorm) for TAA's `reactive` |
 | `lightning` | none | storms, below |
 
 Particle colour is a fixed linear RGB, so scale `brightness` with the light of the scene (above, `1 - sky.nightFactor`).
-A flake or streak smaller than a pixel dims instead of sparkling. Rain falls at 9 m/s and snow at 1.2 m/s with a
+A flake or streak smaller than a pixel dims instead of sparkling. Under TAA that keeps the sky's history (volumetric
+clouds), set `reactive: true` and `TAA.attach(engine, {reactive: () => weather.reactiveMask})`: each frame the streaks
+and flakes are drawn, depth tested, into the mask, so TAA takes little history where they are and they stay crisp
+instead of averaging into the sky (the `weather` case of `features-check.mjs` measures it under TAA). Rain falls at 9 m/s and snow at 1.2 m/s with a
 gentle sway.
 
 `precipitation: 'sleet'` draws rain and snow together, `snowShare` (default 0.5) of it as snow and the rest as rain:

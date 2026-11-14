@@ -78,6 +78,12 @@ export interface VolumetricCloudOptions {
    * the cloud round it from inside, dimmed by the cloud in between. Omitted or `intensity` 0: no flash, at no cost.
    */
   flash?: VolumetricCloudFlash;
+  /**
+   * A new start for each pixel's march every frame (default false), so temporal anti-aliasing (`@margoengine/taa`)
+   * averages the march's sampling noise on cloud edges away; off, each pixel keeps one start and the noise stays put.
+   * Turn it on with TAA only: without TAA the noise then crawls from frame to frame.
+   */
+  temporal?: boolean;
 }
 /** {@link VolumetricCloudOptions.flash}: a lightning flash that lights the clouds from inside. */
 export interface VolumetricCloudFlash {
@@ -201,7 +207,8 @@ fn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sam
 // planet scale.
 // Henyey-Greenstein, scaled so isotropic scattering is 1; two lobes, forward 0.8 and back -0.3 (weight 0.3), times k.
 // The stretch of the view ray inside the layer: from below, above or within it.
-// Each pixel starts at its own fraction of a step, so the steps do not band.
+// Each pixel starts at its own fraction of a step, so the steps do not band; with `temporal` that fraction moves on by
+// the golden ratio each frame (flags.y), so every pixel walks a low-discrepancy sequence of starts for TAA to average.
 // Multiple scattering as octaves of weaker extinction and flatter phase (Wrenninge, Kulla and Lundqvist 2013,
 // "Oz: The Great and Volumetric", a = b = c = 0.5), with the powder darkening of Schneider 2015 away from the sun.
 // Energy-conserving step (Hillaire 2016): the light scattered over the step, with single-scattering albedo 1. Far
@@ -212,6 +219,12 @@ fn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sam
 // its core, through the base shape between it and the sample (three samples); the cloud's multiple scattering carries a
 // flash far through thick cloud, so three octaves of weaker extinction (1, 0.3, 0.08) add up the light, after Wrenninge
 // et al. 2013.
+// The moon's first scattering also takes the diffraction peak of cloud droplets: about half the light a droplet much
+// larger than the wavelength removes is diffracted into a cone a few degrees wide (the extinction paradox, extinction
+// efficiency 2; van de Hulst 1957, "Light Scattering by Small Particles", 8.22). It is half the first octave's phase,
+// a Henyey-Greenstein lobe of width `glow` (0.95: half its peak 2.3 degrees out; the 64 x 32 sky map, whose texels
+// span 5.6 degrees, takes 0.8, the same energy spread over its texels), dimmed by the cloud toward the moon: a thin veil
+// over the moon glows round the disc as it does in the night sky, a thick deck does not.
 const march = /* wgsl */ `${hash}${cloudField}
 @group(0) @binding(0) var<uniform> clouds:Clouds;
 @group(0) @binding(1) var shapeNoise:texture_3d<f32>;
@@ -245,7 +258,7 @@ fn cloudSpan(d:vec3f)->vec2f {
  }
  return vec2f(start,min(end,start+clouds.shape.z));
 }
-fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32)->vec4f {
+fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32,glow:f32)->vec4f {
  let bottom=clouds.layer.x;let top=clouds.layer.y;
  let dt=(end-start)/f32(n);let s=clouds.sun.xyz;let nu=dot(d,s);
  let lit=max(clouds.sunColor.r,max(clouds.sunColor.g,clouds.sunColor.b))>0.0;
@@ -262,7 +275,10 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32)->vec4f {
     sun=clouds.sunColor.rgb*clouds.sun.w*cloudScatter(cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,s,u32(clouds.wind.w)),nu);
    }
    var moon=vec3f(0);
-   if(moonLit){moon=clouds.moonColor.rgb*clouds.moon.w*0.15*cloudScatter(cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,m,u32(clouds.wind.w)),nuMoon);}
+   if(moonLit){
+    let od=cloudLightDepth(clouds,shapeNoise,erosionNoise,noiseSampler,p,m,u32(clouds.wind.w));
+    moon=clouds.moonColor.rgb*clouds.moon.w*0.15*(cloudScatter(od,nuMoon)+0.5*(cloudHG(nuMoon,glow)-cloudPhaseK(nuMoon,1.0))*exp(-od));
+   }
    let h=clamp((cloudAltitude(clouds,p)-bottom)/(top-bottom),0.0,1.0);
    var flash=vec3f(0);
    if(clouds.flash.w>0.0){
@@ -289,7 +305,7 @@ ${depthBinding}
  let span=cloudSpan(d);var end=span.y;
  ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
  if(end<=span.x){discard;}
- let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),cloudHash3(vec3u(vec2u(i.position.xy),7u)).x);
+ let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),fract(cloudHash3(vec3u(vec2u(i.position.xy),7u)).x+clouds.flags.y),0.95);
  if(m.a<=0.0){discard;}
  var color=m.rgb*clouds.sunColor.w;
  if(clouds.flags.x>0.5){color=toDisplay(color/m.a)*m.a;}
@@ -309,7 +325,7 @@ const deckShader = /* wgsl */ `${march}
   let phi=(uv.x-0.5)*6.2831853;let theta=uv.y*3.14159265;
   let d=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));
   let span=cloudSpan(d);
-  if(span.y>span.x){sum+=cloudMarch(d,span.x,span.y,32u,(f32(r)+0.5)*0.25);}
+  if(span.y>span.x){sum+=cloudMarch(d,span.x,span.y,32u,(f32(r)+0.5)*0.25,0.8);}
  }
  textureStore(deck,vec2i(id.xy),vec4f(sum.rgb*(0.25*clouds.sunColor.w),sum.a*0.25));
 }
@@ -436,6 +452,7 @@ export class VolumetricClouds implements EnginePlugin {
   private deckGroup?: GPUBindGroup;
   private layered?: VolumetricCloudSky;
   private disposed = false;
+  private frames = 0;
   private readonly values = new Float32Array(64);
   private readonly scratch = new Float64Array(52);
   private readonly color = new Float32Array(3);
@@ -457,6 +474,8 @@ export class VolumetricClouds implements EnginePlugin {
       throw new TypeError(
         'VolumetricClouds sky must be a Sky (with a sun direction); pass the sky that lights the clouds',
       );
+    if (o.temporal !== undefined && typeof o.temporal !== 'boolean')
+      throw new TypeError('VolumetricClouds temporal must be true or false');
     if (o.depth !== undefined && typeof o.depth !== 'function')
       throw new TypeError('VolumetricClouds depth must be a function returning the scene depth texture');
     if (o.sunDirection) finiteVector(o.sunDirection, 3, 'VolumetricClouds sunDirection');
@@ -565,6 +584,8 @@ export class VolumetricClouds implements EnginePlugin {
     v[35] = o.steps ?? defaults.steps;
     v[39] = o.lightSteps ?? defaults.lightSteps;
     v[40] = +!linearHdr(c.format);
+    // The march start's offset this frame (`temporal`): the golden ratio's fraction, f32 exact within 1024 frames.
+    v[41] = o.temporal ? ((this.frames++ % 1024) * 0.6180339887498949) % 1 : 0;
     const moon = sky?.lights?.[1];
     for (let i = 0; i < 4; i++) v[44 + i] = moon ? moon.direction[i] : 0;
     for (let i = 0; i < 3; i++) v[48 + i] = moon ? moon.radiance[i] : 0;

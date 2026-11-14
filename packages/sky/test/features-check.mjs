@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { decodePNG } from '../../../tests/support/png.js';
 const checks = {
   async weather(page, samples) {
     const r = await page.evaluate(() => window.check.run());
@@ -16,7 +17,32 @@ const checks = {
     assert.equal(r.dry, 0, 'intensity 0 draws nothing');
     assert.ok(r.flashGain > 0, `the flash lit the frame: ${JSON.stringify(r)}`);
     assert.equal(r.afterFlash, 0, 'the frame returns to dry after the flash');
-    console.log(`ok weather ${samples}x: rain ${r.rainChanged}, snow ${r.snowChanged}, lightning and dry reset`);
+    // Rain over the sky under TAA (2026-11-13: once the sky kept history for the volumetric clouds, TAA averaged the
+    // streaks over it away): the mean brightness the streaks add over the dark sky, in sRGB levels, with the weather's
+    // reactive mask read by TAA and without it. Without the mask's fix both are the plain one.
+    await page.evaluate(() => window.taaRain.frames(40));
+    assert.deepEqual(await page.evaluate(() => window.taaRain.masks()), { plainTaa: false, maskedTaa: true });
+    const streaks = {};
+    for (const id of ['plain', 'masked']) {
+      const image = await decodePNG(await page.locator(`#rain-taa-${id}`).screenshot());
+      const levels = [];
+      for (let i = 0; i < image.data.length; i += 4)
+        levels.push((image.data[i] + image.data[i + 1] + image.data[i + 2]) / 3);
+      const sky = [...levels].sort((a, b) => a - b)[Math.floor(levels.length * 0.2)];
+      let lift = 0;
+      for (const level of levels) lift += Math.max(0, level - sky - 2);
+      streaks[id] = lift / levels.length;
+    }
+    r.taaStreaks = streaks;
+    assert.deepEqual(await page.evaluate(() => window.taaRain.errors()), []);
+    assert.ok(streaks.masked > 0.3, `the rain shows over the sky under TAA with the mask (${JSON.stringify(streaks)})`);
+    assert.ok(
+      streaks.masked > 2 * streaks.plain,
+      `the mask keeps the streaks TAA averages away (${JSON.stringify(streaks)})`,
+    );
+    console.log(
+      `ok weather ${samples}x: rain ${r.rainChanged}, snow ${r.snowChanged}, lightning and dry reset; TAA streaks ${JSON.stringify(streaks)}`,
+    );
     return r;
   },
   async volumetric(page, samples) {
@@ -58,7 +84,11 @@ const checks = {
     assert.ok(e.opacity > 0.3 && e.changed > 64 * 16 * 0.3, `deck in the map: ${JSON.stringify(e)}`);
     assert.equal(e.lowerChanged, 0, `below the horizon: ${JSON.stringify(e)}`);
     assert.ok(e.upper.flash > e.upper.clouds * 1.2, `flash in the map: ${JSON.stringify(e.upper)}`);
-    assert.notEqual(e.pillar.clouds, e.pillar.clear, `the deck left the scene light alone: ${JSON.stringify(e.pillar)}`);
+    assert.notEqual(
+      e.pillar.clouds,
+      e.pillar.clear,
+      `the deck left the scene light alone: ${JSON.stringify(e.pillar)}`,
+    );
     assert.ok(e.pillar.flash > e.pillar.clouds * 1.05, `flash in the scene light: ${JSON.stringify(e.pillar)}`);
     assert.ok(e.layered, `the clouds gave the sky no layer: ${JSON.stringify(e)}`);
     // Moonlight through the deck (2026-11-13, before the fix the moon lit every sample alike: one ratio for any
@@ -66,6 +96,15 @@ const checks = {
     const m = r.moonlit;
     assert.ok(m.moon[3] > 1 && m.thin.alpha > 0 && m.thick.alpha > m.thin.alpha, `moonlit decks: ${JSON.stringify(m)}`);
     assert.ok(m.thick.ratio < m.thin.ratio * 0.7, `the moon does not shade the deck: ${JSON.stringify(m)}`);
+    // The moon glows through a thin veil (2026-11-13, before the fix a flat disc: the broad 0.8 lobe alone gives the
+    // deck near the moon little more light than 6 to 8 degrees out).
+    const g = r.glow;
+    assert.ok(g.outer > 0 && g.inner > g.outer * 2.5, `no glow round the moon: ${JSON.stringify(g)}`);
+    // Temporal starts (2026-11-13, before the fix the option did nothing): still frames move and their mean is smoother
+    // than one frame; without the option still frames are identical.
+    const t = r.temporal;
+    assert.equal(t.off.moved, 0, `still frames moved without temporal: ${JSON.stringify(t)}`);
+    assert.ok(t.on.moved > 50 && t.on.mean < t.on.one * 0.8, `temporal starts: ${JSON.stringify(t)}`);
     assert.ok(e.composite < 0.002, `map is not sky over deck: ${JSON.stringify(e)}`);
     assert.ok(e.zeroCleared && e.disposedCleared, `layer left behind: ${JSON.stringify(e)}`);
     console.log(
@@ -327,7 +366,9 @@ const checks = {
         `ozone: ${show(r.twilight)} against ${show(r.twilightNoOzone)}`,
       );
     // A nearly closed conservative atmosphere: its multiple scattering table (32 x 32 RGB) and its sky are finite.
-    console.log(`  hillaire ${samples}x closed: sky ${show(r.closed.sky)}; table nonfinite ${r.closed.nonfinite}, largest ${r.closed.largest}; red by altitude row ${r.closed.rows.map((v) => v.toPrecision(3)).join(' ')}`);
+    console.log(
+      `  hillaire ${samples}x closed: sky ${show(r.closed.sky)}; table nonfinite ${r.closed.nonfinite}, largest ${r.closed.largest}; red by altitude row ${r.closed.rows.map((v) => v.toPrecision(3)).join(' ')}`,
+    );
     assert.equal(r.closed.nonfinite, 0, 'nonfinite multiple scattering in a nearly closed atmosphere');
     assert.ok(r.closed.sky.every(Number.isFinite), `closed sky ${show(r.closed.sky)}`);
     // From 1,000 km: the sunlit ground shows, the limb is blue, and space beyond the air is black.
@@ -393,10 +434,7 @@ checks.albedo = async (page, samples) => {
   assert.ok(snowGain > 0.5 && snowGain < 2, `snow horizon gain ${snowGain}`);
   // Nearly linear in the albedo (0.9 / 0.4 = 2.25), a little more because light bounces between the ground and the
   // air again; clear air sends little back down, so less than 20% more. Measured 2.31.
-  assert.ok(
-    snowGain / sandGain > 2.25 && snowGain / sandGain < 2.25 * 1.2,
-    `snow against sand ${snowGain / sandGain}`,
-  );
+  assert.ok(snowGain / sandGain > 2.25 && snowGain / sandGain < 2.25 * 1.2, `snow against sand ${snowGain / sandGain}`);
   // A red ground (0.9, 0.1, 0.1) lifts red as much as snow does and blue less than sand does.
   assert.ok(Math.abs(r.red.horizon[0] - r.snow.horizon[0]) < 1e-3 * r.snow.horizon[0], `red ${show(r.red.horizon)}`);
   assert.ok(r.red.horizon[2] < r.sand.horizon[2], `red ground blue ${show(r.red.horizon)}`);
@@ -446,7 +484,10 @@ const limited = (label, work) => {
   return Promise.race([
     work.finally(() => clearTimeout(timer)),
     new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`sky feature check ${label} passed its ${CASE_LIMIT_MS} ms limit`)), CASE_LIMIT_MS);
+      timer = setTimeout(
+        () => reject(new Error(`sky feature check ${label} passed its ${CASE_LIMIT_MS} ms limit`)),
+        CASE_LIMIT_MS,
+      );
     }),
   ]);
 };
@@ -465,7 +506,9 @@ try {
       report.results[`${name} ${samples}x`] = await limited(
         `${name} ${samples}x`,
         (async () => {
-          await page.goto(`http://127.0.0.1:5213/packages/sky/test/${name}-check.html${samples === 1 ? '?samples=1' : ''}`);
+          await page.goto(
+            `http://127.0.0.1:5213/packages/sky/test/${name}-check.html${samples === 1 ? '?samples=1' : ''}`,
+          );
           await page.waitForFunction(() => window.ready, null, { timeout: CASE_LIMIT_MS });
           assert.equal(await page.evaluate(() => window.check.samples()), samples);
           return checks[name](page, samples);

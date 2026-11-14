@@ -96,6 +96,30 @@ window.check={samples:sceneSamples,
   const perOpacity=async(density)=>{const c=VolumetricClouds.attach(engine,{sky,coverage:0.9,density,depth:()=>post.depthTexture});await frame();await frame();
    const m=await read(sky.environmentLayer);c.dispose();let light=0,alpha=0;for(let p=0;p<64*16*4;p+=4){light+=m[p]+m[p+1]+m[p+2];alpha+=m[p+3];}return {light,alpha,ratio:light/Math.max(alpha,1e-6)};};
   out.moonlit={thin:await perOpacity(0.002),thick:await perOpacity(0.1),moon:Array.from(sky.lights[1].direction)};
+  // The moon through a thin veil (2026-11-13: it showed as a flat disc with no glow round it): looking at the moon, the
+  // light the moon gives the deck (the frame with the moon less the frame without) is far stronger 0.6 to 1.5 degrees
+  // from it than 6 to 8 degrees out, the droplets' diffraction peak. The sky's own moon (its disc and halo, and the
+  // night light) changes too, so the near ring counts the veil's change less the clear sky's whole change (the least
+  // the deck can have added) and the far ring the veil's whole change (the most).
+  const moonDir=Array.from(sky.lights[1].direction).slice(0,3);view([0,2,0],moonDir.map((v,i)=>v*1000+[0,2,0][i]));
+  const W=post.sceneTexture.width,H=post.sceneTexture.height,half=Math.tan(Math.PI/6);
+  const angle=(i)=>{const x=((i%W+0.5)/W*2-1)*half*W/H,y=(1-(Math.floor(i/W)+0.5)/H*2)*half;return Math.atan(Math.hypot(x,y))*180/Math.PI;};
+  const ring=(f,g,lo,hi)=>{let s=0,n=0;for(let p=0;p<f.length;p+=4){const a=angle(p/4);if(a>=lo&&a<hi){s+=f[p]+f[p+1]+f[p+2]-g[p]-g[p+1]-g[p+2];n++;}}return s/Math.max(n,1);};
+  const moonlit=async(intensity)=>{sky.options.lighting={moon:{intensity},ambient:{day:[0,0,0],night:[0,0,0]}};await frame();return frame();};
+  const skyLit=await moonlit(20),skyDark=await moonlit(0);
+  const veil=VolumetricClouds.attach(engine,{sky,coverage:0.9,density:0.002,depth:()=>post.depthTexture});
+  const veilLit=await moonlit(20),veilDark=await moonlit(0);veil.dispose();
+  out.glow={inner:ring(veilLit,veilDark,0.6,1.5)-ring(skyLit,skyDark,0.6,1.5),outer:ring(veilLit,veilDark,6,8),sky:[ring(skyLit,skyDark,0.6,1.5),ring(skyLit,skyDark,6,8)]};
+  // Temporal starts (VolumetricCloudOptions.temporal, 2026-11-13: each pixel's march started at one fixed fraction of a
+  // step, so the edges' sampling noise stood still and TAA could not average it): with it, still frames differ and
+  // their mean is smoother pixel to pixel than any one of them; without it, still frames are identical.
+  sky.options.hours=10;sky.options.lighting={ambient:{day:[0,0,0],night:[0,0,0]}};view(...views.ground);
+  const grain=(f)=>{let s=0;for(let p=0;p<f.length-4;p+=4)if((p/4)%W<W-1)for(let c=0;c<3;c++)s+=Math.abs(f[p+c]-f[p+4+c]);return s;};
+  const still=async(temporal)=>{const c=VolumetricClouds.attach(engine,{sky,coverage:0.6,steps:16,temporal,depth:()=>post.depthTexture});await frame();
+   const frames=[];for(let k=0;k<8;k++)frames.push(await frame());c.dispose();
+   const mean=new Float32Array(frames[0].length);for(const f of frames)for(let p=0;p<f.length;p++)mean[p]+=f[p]/frames.length;
+   return {moved:diff(frames[1],frames[0]).changed,one:grain(frames[0]),mean:grain(mean)};};
+  out.temporal={on:await still(true),off:await still(false)};
   sky.options.hours=10;
   sky.options.lighting=undefined;
   const error=await device.popErrorScope();

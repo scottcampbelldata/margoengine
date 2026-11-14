@@ -198,6 +198,7 @@ test('invalid options name the problem and the fix', () => {
   rejects({ particles: 1e7 }, RangeError, /particles/);
   rejects({ opacity: 2 }, RangeError, /opacity/);
   rejects({ brightness: -1 }, RangeError, /brightness/);
+  rejects({ reactive: 1 }, TypeError, /reactive must be true or false/);
   rejects({ wind: [1] }, TypeError, /\[x, z\]/);
   rejects({ wind: [1, 200] }, RangeError, /wind\[1\]/);
   rejects({ color: [-1, 0, 0] }, RangeError, /non-negative/);

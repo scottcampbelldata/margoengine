@@ -15,6 +15,7 @@ import { fullscreen } from '../../shared/gpu.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type WeatherPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Speed of sound in air at 20 C, metres per second: thunder follows lightning by `distance / speed`. */
@@ -65,6 +66,12 @@ export interface WeatherOptions {
   brightness?: number;
   /** Opacity of one particle, 0..1. Default 0.35 for rain and 0.8 for snow. */
   opacity?: number;
+  /**
+   * Also draw each frame's streak and flake coverage (0 to 1, depth tested like the particles) into an r8unorm mask,
+   * {@link Weather.reactiveMask}, for TAA's `reactive` option: TAA then keeps little history where the particles are,
+   * so they stay crisp over a sky whose history it keeps (volumetric clouds) instead of being averaged away. Default false.
+   */
+  reactive?: boolean;
   /** Storms; omitted means no lightning. */
   lightning?: WeatherLightningOptions;
 }
@@ -209,6 +216,17 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
  else{a*=(1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,i.uv.y);}
  return vec4f(w.colour.rgb*(1.0+w.params.w*6.0),a);
 }`;
+// `reactive`: the same particles' coverage for TAA's mask, by shape alone (not the faint opacity), so a streak's core
+// keeps no history and its fringe a little. Added to the shader only for the mask pipeline.
+const reactiveEntry = `
+@fragment fn reactive(i:Out)->@location(0) vec4f {
+ var a=i.alpha;
+ if(w.params.x>0.5){a*=1.0-smoothstep(0.4,1.0,length(i.uv));}
+ else{a*=(1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,i.uv.y);}
+ return vec4f(min(1.0,a*1.5),0,0,1);
+}`;
+// The mask keeps the largest coverage of the particles over a pixel.
+const maxBlend = { operation: 'max', srcFactor: 'one', dstFactor: 'one' } as const;
 
 const flashShader = `${fullscreen}
 @group(0) @binding(0) var<uniform> flash:vec4f;
@@ -247,6 +265,8 @@ function validate(o: WeatherOptions): void {
   if (o.particles !== undefined) number(o.particles, 'particles', 0, 500000);
   if (o.brightness !== undefined) number(o.brightness, 'brightness', 0, 1e6);
   if (o.opacity !== undefined) number(o.opacity, 'opacity', 0, 1);
+  if (o.reactive !== undefined && typeof o.reactive !== 'boolean')
+    throw new TypeError('Weather reactive must be true or false; pass a boolean');
   if (o.wind !== undefined) {
     if (!Array.isArray(o.wind) || o.wind.length !== 2)
       throw new TypeError('Weather wind needs [x, z] in metres per second; pass an array of two numbers');
@@ -302,6 +322,16 @@ export class Weather implements EnginePlugin {
   private flashPipeline?: GPURenderPipeline;
   private flashBind?: GPUBindGroup;
   private flashKey = '';
+  // `reactive`: the mask TAA reads (single-sampled), the multisampled target it is resolved from, and one pipeline and
+  // bind group per particle draw (rain, and sleet's snow).
+  private mask?: GPUTexture;
+  private maskSamples?: GPUTexture;
+  private maskKey = '';
+  private maskDrawn = false;
+  private readonly maskDraws = new Map<
+    GPUBuffer,
+    { code: string; key: string; pipeline: GPURenderPipeline; bind?: GPUBindGroup; extra?: GPUBindGroupEntry[] }
+  >();
   private readonly values = new Float32Array(44);
   private readonly flashValues = new Float32Array(4);
   private disposed = false;
@@ -328,6 +358,13 @@ export class Weather implements EnginePlugin {
     return effect;
   }
 
+  /**
+   * With `options.reactive`: this frame's particle coverage, an r8unorm texture of the whole frame, for TAA's `reactive`
+   * (`TAA.attach(engine, {reactive: () => weather.reactiveMask})`). Undefined on a frame that drew no particles.
+   */
+  get reactiveMask(): GPUTexture | undefined {
+    return this.maskDrawn ? this.mask : undefined;
+  }
   /** Visible precipitation, 0..1: eases toward `options.intensity` over `options.fadeSeconds`. */
   get amount(): number {
     return this.level;
@@ -539,6 +576,7 @@ export class Weather implements EnginePlugin {
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
         this.listener.set(c.camera.position);
+        this.maskDrawn = false;
         this.drawPrecipitation(c);
       },
     });
@@ -624,8 +662,92 @@ export class Weather implements EnginePlugin {
           { binding: 1, resource: { buffer: cover.buffer } },
           { binding: 2, resource: cover.view },
         ];
-      overlay.draw(c, cover.shader(shader), uniform, v as Float32Array<ArrayBuffer>, count, this.coverEntries);
-    } else overlay.draw(c, shader, uniform, v as Float32Array<ArrayBuffer>, count);
+      const code = cover.shader(shader);
+      overlay.draw(c, code, uniform, v as Float32Array<ArrayBuffer>, count, this.coverEntries);
+      if (o.reactive) this.drawMask(c, code, uniform, count, this.coverEntries);
+    } else {
+      overlay.draw(c, shader, uniform, v as Float32Array<ArrayBuffer>, count);
+      if (o.reactive) this.drawMask(c, shader, uniform, count);
+    }
+  }
+
+  /**
+   * Draws the particles of the draw just made (its uniform already written) into the reactive mask, at the frame's
+   * sample count and against its depth like the particles themselves; the first draw of a frame clears the mask.
+   */
+  private drawMask(
+    c: WeatherPassContext,
+    code: string,
+    uniform: GPUBuffer,
+    count: number,
+    extra?: GPUBindGroupEntry[],
+  ): void {
+    const samples = c.descriptor.multisample?.count ?? 1,
+      depthFormat = c.descriptor.depthStencil?.format,
+      size = c.width + 'x' + c.height + ':' + samples;
+    if (this.maskKey !== size) {
+      this.mask?.destroy();
+      this.maskSamples?.destroy();
+      const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
+      this.mask = c.device.createTexture({ size: [c.width, c.height], format: 'r8unorm', usage });
+      this.maskSamples =
+        samples > 1
+          ? c.device.createTexture({
+              size: [c.width, c.height],
+              format: 'r8unorm',
+              sampleCount: samples,
+              usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            })
+          : undefined;
+      this.maskKey = size;
+    }
+    const key = samples + ':' + depthFormat;
+    let draw = this.maskDraws.get(uniform);
+    if (!draw || draw.code !== code || draw.key !== key) {
+      const module = c.device.createShaderModule({ code: code + reactiveEntry });
+      const pipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: {
+          module,
+          entryPoint: 'reactive',
+          targets: [{ format: 'r8unorm', blend: { color: maxBlend, alpha: maxBlend } }],
+        },
+        multisample: c.descriptor.multisample,
+        depthStencil: depthFormat
+          ? { format: depthFormat, depthCompare: 'greater-equal', depthWriteEnabled: false }
+          : undefined,
+      });
+      draw = { code, key, pipeline };
+      this.maskDraws.set(uniform, draw);
+    }
+    if (!draw.bind || draw.extra !== extra) {
+      draw.bind = c.device.createBindGroup({
+        layout: draw.pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: uniform } }, ...(extra ?? [])],
+      });
+      draw.extra = extra;
+    }
+    const first = !this.maskDrawn,
+      target = this.maskSamples ?? this.mask!;
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: target.createView(),
+          resolveTarget: this.maskSamples ? this.mask!.createView() : undefined,
+          loadOp: first ? 'clear' : 'load',
+          clearValue: [0, 0, 0, 0],
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: depthFormat ? { view: c.depth, depthReadOnly: true, stencilReadOnly: true } : undefined,
+    });
+    applyView(pass, c);
+    pass.setPipeline(draw.pipeline);
+    pass.setBindGroup(0, draw.bind);
+    pass.draw(6, count);
+    pass.end();
+    this.maskDrawn = true;
   }
 
   private drawFlash(c: WeatherPassContext): void {
@@ -676,6 +798,12 @@ export class Weather implements EnginePlugin {
     this.snowUniform = this.coverEntries = undefined;
     this.flashPipeline = this.flashBind = undefined;
     this.flashKey = '';
+    this.mask?.destroy();
+    this.maskSamples?.destroy();
+    this.mask = this.maskSamples = undefined;
+    this.maskKey = '';
+    this.maskDrawn = false;
+    this.maskDraws.clear();
   }
 
   onDeviceRestored(engine: Engine): void {
