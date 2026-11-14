@@ -1,5 +1,5 @@
 {
-  "commit": "a45cc66c3",
+  "commit": "e984dfec8",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -9566,12 +9566,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 55534,
-        "gzip": 18428
+        "raw": 56071,
+        "gzip": 18607
       },
       "./base": {
-        "raw": 19262,
-        "gzip": 7374
+        "raw": 19324,
+        "gzip": 7398
       },
       "./preetham": {
         "raw": 1657,
@@ -9586,20 +9586,20 @@
         "gzip": 2216
       },
       "./night": {
-        "raw": 4942,
-        "gzip": 2422
+        "raw": 5337,
+        "gzip": 2586
       },
       "./fog": {
         "raw": 4609,
         "gzip": 2250
       },
       "./reflection": {
-        "raw": 3636,
-        "gzip": 1292
+        "raw": 3688,
+        "gzip": 1301
       },
       "./lighting": {
-        "raw": 11130,
-        "gzip": 4133
+        "raw": 11182,
+        "gzip": 4143
       },
       "./weather": {
         "raw": 18155,
@@ -9622,8 +9622,8 @@
         "gzip": 6891
       },
       "./hillaire": {
-        "raw": 30641,
-        "gzip": 11090
+        "raw": 31036,
+        "gzip": 11259
       },
       "./shafts": {
         "raw": 18122,
@@ -9916,20 +9916,20 @@
     },
     "@margoengine/taa": {
       ".": {
-        "raw": 50716,
-        "gzip": 15092
+        "raw": 50813,
+        "gzip": 15117
       },
       "./upscale": {
-        "raw": 22870,
-        "gzip": 7923
+        "raw": 23558,
+        "gzip": 8102
       },
       "./sharpen": {
         "raw": 1568,
         "gzip": 767
       },
       "./upscale-velocity": {
-        "raw": 68692,
-        "gzip": 19426
+        "raw": 68789,
+        "gzip": 19450
       }
     },
     "@margoengine/terrain": {
@@ -13026,8 +13026,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 71636,
-        "gzip": 22451
+        "raw": 72693,
+        "gzip": 22861
       },
       "./fft": {
         "raw": 20654,
@@ -15237,9 +15237,9 @@
       "brotli": 6628
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 25216,
-      "gzip": 9848,
-      "brotli": 8811
+      "raw": 25673,
+      "gzip": 10032,
+      "brotli": 9013
     },
     "packages/creative/dist/particles.js": {
       "raw": 45675,
