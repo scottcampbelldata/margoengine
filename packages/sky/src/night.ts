@@ -1,5 +1,11 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
+// The moon lies beyond the air: its disc hides the stars, while the air in front (the gradient and the glow) still
+// shows over it. Its unlit part adds only earthshine, which the Earth gives back most near new moon (half its phase
+// from full to new); a gibbous moon's dark limb is the sky, not a grey second disc beside the bright one. The glow is
+// atmosphere in front of the moon: added last and whole, over the disc as round it (until 2026-11-13 thinned to 40%
+// over the disc, so a gibbous moon's dark limb showed as a grey disc offset from the bright one). These notes sit
+// outside the WGSL, so the shipped shader carries no extra comment text (the night literal ships whole).
 /** Stylized night (`night` option): gradient, twinkling stars and a phased moon with glow. */
 export const night: NonNullable<SkyFeatures['night']> = {
   wgsl: `// Star-cell hash: the PCG hash (M. O'Neill, PCG, 2014; GPU form in Jarzynski and Olano, "Hash Functions for GPU
@@ -29,9 +35,6 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
   }
   color+=vec3f(0.8,0.9,1.0)*stars*energy*params.z*smoothstep(0.258819,0.5,r.y)*(1.0-smoothstep(0.96,1.0,cosine));
  }
- // The moon lies beyond the air: its disc hides the stars, while the air in front (the gradient and the glow) still
- // shows over it. Its unlit part adds only earthshine, which the Earth gives back most near new moon (half its
- // phase from full to new); a gibbous moon's dark limb is the sky, not a grey second disc beside the bright one.
  var cover=0.0;
  if(cosine>0.0){
   var right=normalize(cross(moon.xyz,select(vec3f(0,1,0),vec3f(0,0,1),abs(moon.y)>0.99)));
@@ -46,8 +49,6 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
   let earthshine=0.02*(1.0-params.x);
   color=mix(color,gradient,cover)+frame.nightMoonColor.rgb*(0.8+0.2*limb)*(smoothstep(0.0,0.02,lit)+earthshine)*cover;
  }
- // The glow is atmosphere in front of the moon: added last and whole, over the disc as round it (until 2026-11-13
- // thinned to 40% over the disc, so a gibbous moon's dark limb showed as a grey disc offset from the bright one).
  return color+frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35;
 }
 `,

@@ -1,6 +1,6 @@
 {
-  "commit": "e984dfec8",
-  "dirty": false,
+  "commit": "cff7ab329",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 61333,
@@ -9566,8 +9566,8 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 56071,
-        "gzip": 18607
+        "raw": 55498,
+        "gzip": 18365
       },
       "./base": {
         "raw": 19324,
@@ -9586,8 +9586,8 @@
         "gzip": 2216
       },
       "./night": {
-        "raw": 5337,
-        "gzip": 2586
+        "raw": 4764,
+        "gzip": 2324
       },
       "./fog": {
         "raw": 4609,
@@ -9622,8 +9622,8 @@
         "gzip": 6891
       },
       "./hillaire": {
-        "raw": 31036,
-        "gzip": 11259
+        "raw": 30463,
+        "gzip": 10999
       },
       "./shafts": {
         "raw": 18122,
@@ -15237,9 +15237,9 @@
       "brotli": 6628
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 25673,
-      "gzip": 10032,
-      "brotli": 9013
+      "raw": 25100,
+      "gzip": 9778,
+      "brotli": 8787
     },
     "packages/creative/dist/particles.js": {
       "raw": 45675,
