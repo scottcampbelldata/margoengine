@@ -138,8 +138,69 @@ export function speedBound(curve: CurveDef): number {
   }
 }
 
-/** A bound on |C''(t)|, Infinity for splines (whose knots may be corners). */
-function accelerationBound(curve: CurveDef): number {
+/**
+ * A non-rational B-spline's second derivative bounds: its distinct knots inside the domain, the most |C''| reaches over
+ * each span between them (the largest of the span's second-derivative control points, whose convex hull holds C''
+ * there), and which of the knots are corners (multiplicity at least the degree: C' may jump there).
+ */
+interface Bends {
+  readonly breaks: number[];
+  readonly span: number[];
+  readonly corner: boolean[];
+}
+const bendCache = new WeakMap<CurveDef, Bends>();
+function splineBends(curve: CurveDef & { kind: 'spline' }): Bends {
+  let b = bendCache.get(curve);
+  if (b) return b;
+  const p = curve.degrees[0],
+    U = curve.knots[0].flatMap((k, i) => Array<number>(curve.multiplicities[0][i]).fill(k)),
+    P = curve.points,
+    n = P.length - 1,
+    lo = U[p],
+    hi = U[n + 1];
+  // C'(t) = sum Q_i N_{i,p-1}(t), Q_i = p (P_{i+1} - P_i) / (U[i+p+1] - U[i+1]); C''(t) = sum R_i N_{i,p-2}(t),
+  // R_i = (p - 1) (Q_{i+1} - Q_i) / (U[i+p+1] - U[i+2]). On span [U[j], U[j+1]) the basis N_{i,p-2} of i from j - p to
+  // j - 2 sum to one there and are not negative, so |C''| is at most the largest |R_i| of them.
+  const Q: (XYZ | undefined)[] = [],
+    R: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = U[i + p + 1] - U[i + 1];
+    Q.push(d > 0 ? scale(sub(P[i + 1], P[i]), p / d) : undefined);
+  }
+  for (let i = 0; i + 1 < n; i++) {
+    const d = U[i + p + 1] - U[i + 2];
+    R.push(d > 0 && Q[i] && Q[i + 1] ? ((p - 1) * length(sub(Q[i + 1]!, Q[i]!))) / d : 0);
+  }
+  const breaks: number[] = [],
+    span: number[] = [],
+    corner: boolean[] = [];
+  for (let j = p; j <= n; j++) {
+    if (!(U[j + 1] > U[j])) continue;
+    if (!breaks.length) {
+      breaks.push(U[j]);
+      corner.push(false);
+    }
+    let m = 0;
+    for (let i = Math.max(0, j - p); i <= j - 2 && i < R.length; i++) m = Math.max(m, R[i]);
+    // (A margin of a part in 10^12 over the rounding of the differences.)
+    span.push(p < 2 ? 0 : m * (1 + 1e-12));
+    breaks.push(U[j + 1]);
+    let mult = 0;
+    for (let k = j + 1; k < U.length && U[k] === U[j + 1]; k++) mult++;
+    corner.push(U[j + 1] < hi && mult >= p);
+  }
+  if (!breaks.length) breaks.push(lo), corner.push(false);
+  b = { breaks, span, corner };
+  bendCache.set(curve, b);
+  return b;
+}
+
+/**
+ * A bound on |C''(t)| over [a, b]. A non-rational B-spline's is the largest of its spans' that the interval meets
+ * (Infinity where a corner knot lies inside it, or the interval runs past the domain, where a closed curve wraps and an
+ * open one stops); a rational one has none.
+ */
+function accelerationBound(curve: CurveDef, a: number, b: number): number {
   switch (curve.kind) {
     case 'line':
       return 0;
@@ -147,8 +208,26 @@ function accelerationBound(curve: CurveDef): number {
       return curve.radius;
     case 'ellipse':
       return Math.max(curve.a, curve.b);
-    case 'spline':
-      return Infinity;
+    case 'spline': {
+      if (curve.weights) return Infinity;
+      const { breaks, span, corner } = splineBends(curve),
+        last = breaks.length - 1;
+      if (!(a >= breaks[0] && b <= breaks[last] && a <= b) || !span.length) return Infinity;
+      // The first span the interval meets: the last break at or below a (but not the domain's end).
+      let l = 0,
+        h = last;
+      while (h - l > 1) {
+        const m = (l + h) >> 1;
+        if (breaks[m] <= a) l = m;
+        else h = m;
+      }
+      let bound = span[l];
+      for (let j = l + 1; j < last && breaks[j] < b; j++) {
+        if (corner[j]) return Infinity;
+        bound = Math.max(bound, span[j]);
+      }
+      return bound;
+    }
   }
 }
 
@@ -320,8 +399,7 @@ export function curveSurfaceCrossings(
     }
     return out;
   }
-  const tol = resolution ?? 1e-9 * speed * (t1 - t0),
-    acceleration = accelerationBound(curve);
+  const tol = resolution ?? 1e-9 * speed * (t1 - t0);
   const visit = (a: number, fa: number, b: number, fb: number, depth: number) => {
     const change = negative(fa) !== negative(fb),
       w = b - a;
@@ -335,7 +413,7 @@ export function curveSurfaceCrossings(
       pm = cm.slice(0, 3) as XYZ,
       fm = signedDistance(surface, pm),
       // |f''| <= k on the interval.
-      k = bendBound(surface, pm, (speed * w) / 2) * speed * speed + acceleration,
+      k = bendBound(surface, pm, (speed * w) / 2) * speed * speed + accelerationBound(curve, a, b),
       // f' stays this far from zero across it (f'(m) less what f'' can change it by over half the interval).
       slope = Math.abs(dot(distanceGradient(surface, pm), [cm[3], cm[4], cm[5]])) - (k * w) / 2;
     // Monotonic, by more than the resolution across the interval: one crossing at most.

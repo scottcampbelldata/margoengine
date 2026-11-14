@@ -63,6 +63,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Needed to close:** a local acceleration bound for a non-rational spline over an interval within which it is C1
   (its second-derivative control points over the spans the interval meets), so near-tangent runs prune; then measure
   this file again and take the corpus timeout back to the corpus run.
+- **Progress:** the local acceleration bound is in (`accelerationBound` over an interval, packages/brep/src/model/distance.ts,
+  test `packages/brep/tests/crossing-bend.test.js`); this file is not measured again yet.
 
 ### Fixed 2026-11-14: a B-spline face whose corner has a zero derivative is refused as a loop over a pole, or meshes open (brep)
 

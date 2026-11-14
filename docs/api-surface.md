@@ -19,7 +19,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/behavior | `.` 85, `./steering` 27, `./perception` 22, `./eqs` 18, `./goap` 9, `./smart-objects` 10, `./flowfield` 5, `./htn` 13, `./context` 11, `./subtrees` 8, `./inspect` 3, `./fuzzy` 24, `./text` 4, `./triggers` 12 | 84 | 4 | 8,891 |
 | @margoengine/biomes | `.` 43, `./toolkit` 34, `./presets` 6, `./region` 5, `./hydrology` 11, `./disturbance` 12, `./seasons` 6, `./erosion` 6, `./relief` 7, `./digest` 3, `./koppen` 5, `./zones` 9, `./multinoise` 7, `./view` 21, `./rivers` 11, `./cover` 10, `./far` 3, `./objects` 4, `./editor` 7, `./placement` 7, `./stats` 12, `./io` 10, `./workers` 3, `./gpu` 5, `./splines` 9, `./settlements` 6, `./graph` 5, `./ecosystem` 7, `./erosion-wasm` 5 | 603 |  | 16,585 |
 | @margoengine/blender | `.` 5, `./anim` 4, `./components` 9, `./pbr-ext` 4, `./live` 2, `./curves` 14, `./ktx2` 7, `./objects` 4, `./lightmap` 4, `./meshopt` 6, `./nodes` 5 | 21 |  | 4,397 |
-| @margoengine/brep | `.` 67 | 5 |  | 139,463 |
+| @margoengine/brep | `.` 67 | 5 |  | 141,820 |
 | @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7, `./lines` 6, `./gpu` 14, `./scene` 3, `./points` 5, `./sdf` 6, `./inside` 6, `./gpu-build` 4, `./alpha` 11, `./alpha-triangles` 3, `./parallel` 2 | 164 | 2 | 23,719 |
 | @margoengine/cache | `.` 8, `./manager` 5, `./hashed` 2, `./ranges` 4, `./vary` 3, `./eviction` 1, `./bundles` 7, `./prefetch` 7, `./stream` 1, `./decoded` 3 | 31 |  | 4,597 |
 | @margoengine/cad | `.` 10, `./cad-async` 5, `./stage` 3, `./closed` 1 | 3 |  | 12,777 |
