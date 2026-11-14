@@ -1,5 +1,9 @@
 // A device restore rebuilds an environment asynchronously; a build still running when its owner is disposed destroys its
 // own result, so the check waits for that to finish.
+// check:owners runs one browser leaf per entry: all 19 entries (247 cases) in one leaf took 137 s on the WebGL2 layer of
+// a Radeon 680M with the machine idle, a steady 0.3 to 1.1 s a case and no stalls, and passed the leaf's 180 s limit,
+// which never rises, while other work loaded its CPU. The largest entry, DynamicGI, takes 15 s.
+export const leafPerEntry = true;
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 export async function fixtures(load = (entry) => import(entry)) {

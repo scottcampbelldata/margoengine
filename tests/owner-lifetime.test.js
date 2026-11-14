@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { exerciseLifetime, leafEntries, LifetimeObserver, sameView, viewState } from './support/owner-lifetime.js';
+import { exerciseLifetime, leafEntries, lifecycleCases, LifetimeObserver, sameView, viewState } from './support/owner-lifetime.js';
 import { nodeLifetimeAdapter } from './support/owner-lifetime-node.js';
 import { OWNER_FIXTURES, ownerLeaves, pendingLine, selectOwnerPackages } from '../scripts/support/owner-lifetime-registry.mjs';
 import { runOwners } from '../scripts/check-owner-lifetime.mjs';
@@ -219,11 +219,31 @@ test('a leafPerEntry fixture gives one leaf per entry; others one leaf for all',
   assert.throws(() => leafEntries(entries, 'c'), /OWNER_ENTRY_UNKNOWN: c/);
 });
 
-// culling's 30 entries passed the same limit in one WebGL2 leaf on 2026-11-12.
-for (const [name, count, sample] of [['post', 31, 'PostStack.attach'], ['culling', 30, 'WebGL2Culling.attach']])
+// culling's 30 entries passed the same limit in one WebGL2 leaf on 2026-11-12; environment's 19 (247 cases) took 137 s
+// idle and passed it under load on 2026-11-13.
+for (const [name, count, sample] of [['post', 31, 'PostStack.attach'], ['culling', 30, 'WebGL2Culling.attach'],
+  ['environment', 19, 'LightProbes']])
   test(`${name} runs check:owners one leaf per entry, every entry named once`, async () => {
     const module = await import(new URL('../' + OWNER_FIXTURES[name], import.meta.url).href);
     const leaves = await ownerLeaves(module);
     assert.equal(leaves.length, count);
     assert.ok(leaves.includes(sample));
   });
+
+// A fixture that runs in one leaf runs all its cases inside the leaf's 180 s limit. The largest one-leaf fixtures today,
+// animation and splats, hold 208 cases (animation: 69 s on the WebGL2 layer of a busy workstation); environment's 247
+// took 137 s on an idle Radeon 680M and passed the limit under load, so a larger fixture runs one leaf per entry.
+test('no fixture runs more than 208 owner cases in one browser leaf', async () => {
+  const perEntry = ['default', 'secondary'].flatMap((target) =>
+    lifecycleCases.filter((mode) => !(target === 'default' && mode === 'scene'))).length;
+  assert.equal(perEntry, 13);
+  const over = [];
+  for (const [name, file] of Object.entries(OWNER_FIXTURES)) {
+    const module = await import(new URL('../' + file, import.meta.url).href);
+    for (const leaf of await ownerLeaves(module)) {
+      const cases = leafEntries(await module.fixtures(), leaf).length * perEntry;
+      if (cases > 208) over.push(`${name}${leaf === undefined ? '' : '/' + leaf}: ${cases}`);
+    }
+  }
+  assert.deepEqual(over, []);
+});
