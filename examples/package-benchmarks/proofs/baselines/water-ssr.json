@@ -1,13 +1,13 @@
 {
  "proof": "water-ssr",
- "ref": "ab693c25ad",
- "revision": "ab693c25ad53f1b1e642d795ecac7544603991d8",
- "capturedAt": "86e84e4d5acca1df794b9b97af7032b8e7e96991",
+ "ref": "7ffd4a64ca",
+ "revision": "7ffd4a64caeabba8d815536a3a57d36e59414141",
+ "capturedAt": "6aac7fe6516676846dbe8cf7b7ae30e8bb1d1ea4",
  "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
  "facts": {},
  "outputs": {
-  "{}": "6ab9bd2826c11d9bc50107acb972815f0cb296405a14eb348718d993d4256218",
-  "{\"terrain\":true}": "4ac4beb2ac3ca254171b2e2dc5325a6fb92a5156336fb1689b680f958f91cb66",
-  "{\"reflection\":true,\"shadows\":true}": "d4e8985e182f33c1f3132d38003757f62b7845378a3cf766a9eccea503256e64"
+  "{}": "cf3352fc7f4448d6a94db195d48bf4d072a7a89cc02359451e5a20be3aead370",
+  "{\"terrain\":true}": "5f544e8a3f811af8c5bc1e2e425560c7796cc3be27d5689dc4857455a97c0713",
+  "{\"reflection\":true,\"shadows\":true}": "dca68bad334af2bf0a33a457cfc22fcb092b4d6a26f7e8a266863edc541e9e35"
  }
 }
