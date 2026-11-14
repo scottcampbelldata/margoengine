@@ -2,6 +2,7 @@
 // must be closed (every edge used once each way after joining equal positions), wound outward, as close to the true
 // surface as the deflection asks, and enclose the solid's volume.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { model, parseSTEP, tessellateSTEP, validateSTEP } from '../dist/index.js';
 
@@ -140,14 +141,22 @@ function box(a, b, c, options) {
 const Z = [0, 0, 1],
   X = [1, 0, 0];
 
-/** A cylinder of radius r and height h on z = 0, its side one face closed by a seam line (or two circles, no seam). */
-function cylinder(r, h, { seam = true, revolved = false } = {}) {
+/**
+ * A cylinder of radius r and height h on z = 0, its side one face closed by a seam line (or two circles, no seam).
+ * `extruded` writes the side as its bottom circle swept along z (a surface of linear extrusion).
+ */
+function cylinder(r, h, { seam = true, revolved = false, extruded = false } = {}) {
   const w = new Writer(),
     v0 = w.vertex([r, 0, 0]),
     v1 = w.vertex([r, 0, h]),
-    bottom = w.edge(v0, v0, w.circle([0, 0, 0], Z, X, r)),
+    ring = w.circle([0, 0, 0], Z, X, r),
+    bottom = w.edge(v0, v0, ring),
     top = w.edge(v1, v1, w.circle([0, 0, h], Z, X, r)),
-    side = revolved ? revolvedSide(w, r, h) : w.add(`CYLINDRICAL_SURFACE('',${w.axis([0, 0, 0])},${real(r)})`);
+    side = extruded
+      ? w.add(`SURFACE_OF_LINEAR_EXTRUSION('',${ring},${w.add(`VECTOR('',${w.direction(Z)},1.)`)})`)
+      : revolved
+        ? revolvedSide(w, r, h, revolved === 'tangent')
+        : w.add(`CYLINDRICAL_SURFACE('',${w.axis([0, 0, 0])},${real(r)})`);
   let lateral;
   if (seam) {
     const s = w.edge(v0, v1, w.line([r, 0, 0], Z));
@@ -164,9 +173,10 @@ function cylinder(r, h, { seam = true, revolved = false } = {}) {
  * The side of a cylinder of radius r about z written as a surface of revolution: half an ellipse on it (the cylinder cut
  * by a plane leaning across it, from (-r, 0, -h/2) over +y to (r, 0, 3h/2)) turned about z. The profile lies in no
  * plane with the axis, so a point's (u, v) is not found in one meridian plane, and the seam line x = r, y = 0 is a curve
- * in (u, v); between z = 0 and h the profile is never tangent to the circles it turns on.
+ * in (u, v); between z = 0 and h the profile is never tangent to the circles it turns on. `tangent` leans the plane
+ * through the rims' points (-r, 0, 0) and (r, 0, h) instead: the profile then ends on the rims, tangent to them.
  */
-function revolvedSide(w, r, h) {
+function revolvedSide(w, r, h, tangent = false) {
   const s = Math.SQRT1_2,
     net = [
       [-1, 0, 1],
@@ -175,7 +185,7 @@ function revolvedSide(w, r, h) {
       [1, 1, s],
       [1, 0, 1],
     ],
-    points = net.map(([x, y]) => w.point([r * x, r * y, h / 2 + h * x])),
+    points = net.map(([x, y]) => w.point([r * x, r * y, tangent ? (h / 2) * (1 + x) : h / 2 + h * x])),
     profile = w.add(
       `(BOUNDED_CURVE()B_SPLINE_CURVE(2,(${points.join(',')}),.UNSPECIFIED.,.F.,.F.)` +
         `B_SPLINE_CURVE_WITH_KNOTS((3,2,3),(0.,1.,2.),.UNSPECIFIED.)CURVE()GEOMETRIC_REPRESENTATION_ITEM()` +
@@ -389,6 +399,20 @@ test('a cylinder: its side closed by a seam line, or bounded by two circles with
   }
 });
 
+/**
+ * Whether `area`, a mesh's for a surface of area `exact` curved round circles of radius r, is inscribed: no larger,
+ * and short by no more than chords lying the deflection off those circles lose (1 - sin x / x of it, x half the angle
+ * such a chord spans; a cylinder's own side meshes 3.26e-4 short at deflection r / 1000, against 3.33e-4). The tests
+ * below ask deflections whose reach is within the 2e-4 these sides were held to before (r / 2000 reaches 1.67e-4), so
+ * no bound is looser than it was.
+ */
+function inscribed(area, exact, deflection, r) {
+  const x = Math.acos(1 - deflection / r),
+    reach = 1 - Math.sin(x) / x;
+  assert.ok(reach <= 2e-4, `deflection ${deflection} reaches ${reach}, past 2e-4`);
+  return area <= exact && exact - area <= exact * reach;
+}
+
 /** The area of a mesh's face `index`. */
 function faceArea(m, index) {
   const f = m.faces[index],
@@ -403,26 +427,114 @@ test('a cylinder side written as an ellipse on it turned about its axis: its cir
   // The profile is off every meridian plane: a point was brought into one profile point's meridian plane and v taken
   // from the profile's nearest point there, up to 0.3 mm off on this part, so the domain's bounds lay off the face and
   // 79 triangles folded over (the side's area 1% over).
-  for (const deflection of [0.01, 0.001]) {
+  for (const deflection of [0.005, 0.001]) {
     const m = mesh(cylinder(10, 20, { seam: false, revolved: true }), deflection),
       side = 2 * Math.PI * 10 * 20;
     solid(m, Math.PI * 100 * 20, 2 * Math.PI * 100 + side);
-    // Inscribed: the side's mesh is no larger than the side, and short of it by less than the deflection's reach.
+    // Inscribed: the side's mesh is no larger than the side, and short of it by no more than the deflection's reach.
     const area = faceArea(m, 0);
-    assert.ok(area <= side && side - area <= side * 2e-4, `side area ${area} against ${side}`);
+    assert.ok(inscribed(area, side, deflection, 10), `side area ${area} against ${side}`);
   }
 });
 
 test('a straight seam that is a curve in (u, v) is sampled until its chords there follow it', () => {
   // The same side cut open at the line x = r, y = 0: its two vertices alone made the domain's bound a straight chord
   // in (u, v) across the true seam curve, and the points inside it past the seam folded 14 triangles over the side.
-  for (const deflection of [0.01, 0.001]) {
+  for (const deflection of [0.005, 0.001]) {
     const m = mesh(cylinder(10, 20, { revolved: true }), deflection),
       side = 2 * Math.PI * 10 * 20;
     solid(m, Math.PI * 100 * 20, 2 * Math.PI * 100 + side);
     const area = faceArea(m, 0);
-    assert.ok(area <= side && side - area <= side * 2e-4, `side area ${area} against ${side}`);
+    assert.ok(inscribed(area, side, deflection, 10), `side area ${area} against ${side}`);
   }
+});
+
+test('a surface of revolution whose profile ends tangent to its circles: its rims mesh outward, normals outward', () => {
+  // Su and Sv run parallel all round each rim, so their cross product there was rounding noise: the rims' normals
+  // pointed along the axis, either way, and refinement chasing their turn packed slivers against the bottom rim that
+  // folded 12 triangles over. Laid out in (u, v), the u lines turn flat along each rim, and triangles across them
+  // stood off the side (its mesh 0.08% larger than the side).
+  for (const seam of [false, true])
+    for (const deflection of [0.005, 0.001]) {
+      const m = mesh(cylinder(10, 20, { seam, revolved: 'tangent' }), deflection),
+        side = 2 * Math.PI * 10 * 20;
+      solid(m, Math.PI * 100 * 20, 2 * Math.PI * 100 + side);
+      const area = faceArea(m, 0);
+      assert.ok(inscribed(area, side, deflection, 10), `side area ${area} against ${side}`);
+      const f = m.faces[0];
+      let worst = 1;
+      for (let t = f.first; t < f.first + f.count; t++) {
+        const i = m.indices[t],
+          [x, y] = [m.positions[i * 3], m.positions[i * 3 + 1]],
+          n = [m.normals[i * 3], m.normals[i * 3 + 1], m.normals[i * 3 + 2]];
+        worst = Math.min(worst, (n[0] * x + n[1] * y) / Math.hypot(x, y));
+      }
+      // Normals are stored as 32-bit floats: radial to within their rounding.
+      assert.ok(worst > 1 - 1e-6, `a side normal ${Math.acos(Math.min(1, worst))} rad off the radius`);
+    }
+});
+
+/** A digest of everything a mesh holds: its positions, normals and indices bit for bit, its faces and failures. */
+function meshDigest(m) {
+  const h = createHash('sha256');
+  for (const a of [m.positions, m.normals, m.indices]) h.update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength));
+  h.update(JSON.stringify([m.faces, m.failures]));
+  return h.digest('hex').slice(0, 16);
+}
+
+test('meshes on surfaces other than revolutions are bit for bit as before the twisted layout of revolutions', () => {
+  // Digests recorded from the build before the tangent rim fix (19b9e2060): laying a twisted face out at
+  // (u + twist(v), meridian(v)), and taking Su x Sv as degenerate within rounding of |Su| |Sv|, change nothing for
+  // planes, cylinders, cones, spheres, tori, extrusions and B-splines. A deliberate change to their meshing records
+  // them again, saying why.
+  const parts = {
+      box: () => box(10, 20, 30),
+      cylinder: () => cylinder(10, 20),
+      'cylinder, no seam': () => cylinder(10, 20, { seam: false }),
+      'cylinder, extruded side': () => cylinder(10, 20, { extruded: true }),
+      sphere: () => sphere(10),
+      'sphere, unbounded': () => sphere(10, { bounded: false }),
+      hemisphere: () => hemisphere(10),
+      cone: () => cone(10),
+      'cone sector': () => coneSector(10, 1),
+      torus: () => torus(10, 3),
+      'B-spline cylinder': () => nurbsCylinder(10, 20),
+      'bicubic B-spline block': () => bumpBlock(),
+    },
+    expected = {
+      'box at 0.01': '52db400ee2a571bc',
+      'box at 0.001': '52db400ee2a571bc',
+      'cylinder at 0.01': '4f8135d172813839',
+      'cylinder at 0.001': 'eb246e560815365d',
+      'cylinder, no seam at 0.01': '49b656b9cd56d877',
+      'cylinder, no seam at 0.001': 'b762152e2f307cad',
+      'cylinder, extruded side at 0.01': '40adfcbab4006dbd',
+      'cylinder, extruded side at 0.001': 'f17e875213045b89',
+      'sphere at 0.01': '9b9371d0bbc92654',
+      'sphere at 0.001': 'dceeb57e98a78cb5',
+      'sphere, unbounded at 0.01': 'bbc4dd37ea6c54f6',
+      'sphere, unbounded at 0.001': 'bc2e1acedd8340ba',
+      'hemisphere at 0.01': '3aeec675d7990828',
+      'hemisphere at 0.001': '1970e5f75812ac60',
+      'cone at 0.01': '66ae58c4e9cfc2cb',
+      'cone at 0.001': 'fdfb86e687eca4ad',
+      'cone sector at 0.01': 'b45fcb524e54db68',
+      'cone sector at 0.001': '5a96f72268edde18',
+      'torus at 0.01': '991c7bb9027978fa',
+      'torus at 0.001': 'd55ba361c6ab6829',
+      'B-spline cylinder at 0.01': 'de99f9199d18b05f',
+      'B-spline cylinder at 0.001': 'b9f598c44123e6b1',
+      'bicubic B-spline block at 0.01': '088f1a7eb69144a2',
+      'bicubic B-spline block at 0.001': 'c8437211056cb67b',
+    };
+  const got = {};
+  for (const [name, part] of Object.entries(parts))
+    for (const deflection of [0.01, 0.001]) {
+      const m = mesh(part(), deflection);
+      assert.deepEqual(m.failures, [], `${name} at ${deflection}`);
+      got[`${name} at ${deflection}`] = meshDigest(m);
+    }
+  assert.deepEqual(got, expected);
 });
 
 test('a sphere: one face round a seam meridian between two poles, or a face with no bounds at all', () => {

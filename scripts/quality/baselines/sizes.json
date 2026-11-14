@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15594045,
+  "total": 15601553,
   "history": [
     {
       "date": "2026-10-24",
@@ -8759,6 +8759,12 @@
       "commit": "1d36e2de9",
       "reason": "robot planning returns from the kernel repository as @margoengine/robot-planning: five new entries (robot and sweepRobot, limits, plan, urdf, gpu), each importing kinematics-constraints by package name",
       "grew": 10
+    },
+    {
+      "date": "2026-11-14",
+      "commit": "28481a622",
+      "reason": "@margoengine/brep grows from 137,178 to 137,955 B gzip (+777) and the cad worker that bundles it from 83,502 to 83,586 B (+84): the tangent rim fix, a surface of revolution laid out as it lies for meshing (its profile's turn about the axis and its meridian length, each a sampled table) and a relative test for a degenerate normal",
+      "grew": 2
     }
   ],
   "items": {
@@ -8862,7 +8868,7 @@
     "@margoengine/blender/nodes": 11505,
     "@margoengine/blender/objects": 5201,
     "@margoengine/blender/pbr-ext": 13434,
-    "@margoengine/brep": 137178,
+    "@margoengine/brep": 142094,
     "@margoengine/bvh": 24403,
     "@margoengine/bvh/alpha": 17382,
     "@margoengine/bvh/alpha-triangles": 1381,
@@ -8887,7 +8893,7 @@
     "@margoengine/cache/stream": 5047,
     "@margoengine/cache/vary": 821,
     "@margoengine/cad": 13092,
-    "@margoengine/cad dist/workers/cad-runtime.js": 83502,
+    "@margoengine/cad dist/workers/cad-runtime.js": 86094,
     "@margoengine/cad/cad-async": 2070,
     "@margoengine/cad/closed": 508,
     "@margoengine/cad/stage": 10237,

@@ -768,6 +768,10 @@ interface Surface {
     singular(u: number, v: number): boolean;
     breaks?(): readonly [readonly number[], readonly number[]];
     readonly skewed?: boolean;
+    twist?(v: number): number;
+    twisted?(): boolean;
+    meridian?(v: number): number;
+    meridianParameter?(length: number): number;
 }
 
 type XYZ = [number, number, number];

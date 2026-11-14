@@ -40,16 +40,46 @@ export interface Surface {
    * seam written that way) is a curve in (u, v).
    */
   readonly skewed?: boolean;
+  /**
+   * How far the line of constant u turns about the surface's axis at v, from where it starts: on a profile turned
+   * about an axis it is not in a plane with, the point (u, v) lies at angle u + twist(v) about it. Meshing takes that
+   * turn out, so the domain is laid out as the surface is (a cylinder's side unrolled); otherwise its u lines run as
+   * helices that turn flat along a rim where the profile ends tangent to its circle, and triangles across them tilt
+   * off the surface. 0 everywhere unless `twisted`.
+   */
+  twist?(v: number): number;
+  /** Whether `twist` is not 0 everywhere. */
+  twisted?(): boolean;
+  /**
+   * With `twist`: length along the surface's meridian section (the profile brought into one half plane of its axis)
+   * from the profile's start to v, and `meridianParameter` its inverse. Meshing lays v out by it, so the domain is
+   * spaced as the surface is where the profile's speed varies (down to zero where it ends tangent to its circle).
+   * Where the profile's range is not finite or it is closed, its section's speed at one point times v.
+   */
+  meridian?(v: number): number;
+  meridianParameter?(length: number): number;
 }
 
-/** Su x Sv made unit; at a degenerate point, the normal a little way into the domain. */
-function normalOf(s: Surface, u: number, v: number): XYZ {
+/**
+ * Su x Sv made unit; at a degenerate point, the normal a little way into the domain (`vDomain`, the surface's own by
+ * default). Degenerate is Su x Sv within rounding of zero against |Su| |Sv|, not only exactly zero: along a line where
+ * Su and Sv run parallel (a profile turned about an axis that ends tangent to its circle) their cross product is
+ * rounding noise in any direction.
+ */
+function normalOf(s: Surface, u: number, v: number, vDomain: readonly [number, number] = s.vDomain): XYZ {
   const d = s.at(u, v),
-    n = unit(cross(d.slice(3, 6), d.slice(6, 9)));
-  if (n) return n;
-  const [v0, v1] = s.vDomain,
-    dv = Number.isFinite(v1 - v0) ? (v1 - v0) * 1e-4 : 1e-4,
-    e = s.at(u, v + (v + dv <= v1 ? dv : -dv));
+    su = d.slice(3, 6),
+    sv = d.slice(6, 9),
+    c = cross(su, sv);
+  if (length(c) > 1e-10 * length(su) * length(sv)) return unit(c) ?? [0, 0, 1];
+  const [v0, v1] = vDomain,
+    span = Number.isFinite(v1 - v0) ? (v1 - v0) * 1e-4 : 1e-4,
+    dv = v + span <= v1 ? span : -span,
+    // Stepped across the degenerate line, not along it: Sv's part along Su (a profile's turn about its axis) is taken
+    // back in u, or the normal is the one of a point that far round.
+    suu = dot(su, su),
+    du = suu > 0 ? (-dot(sv, su) / suu) * dv : 0,
+    e = s.at(s.uPeriod ? u + du : Math.min(s.uDomain[1], Math.max(s.uDomain[0], u + du)), v + dv);
   return unit(cross(e.slice(3, 6), e.slice(6, 9))) ?? [0, 0, 1];
 }
 
@@ -320,8 +350,120 @@ class Revolution implements Surface {
       p = add(this.axisPoint, w);
     return [...p, ...cross(this.axis, w), ...this.rotate(c.slice(3), u)];
   }
+  /** Unwrapped profile turn at samples along a finite profile (`twist`); null when the profile does not turn. */
+  private turns?: { e0: XYZ; at: number[]; lo: number; hi: number } | null;
+  /** Angle about the axis from e0 to the profile's point at v, in (-pi, pi]; NaN on the axis. */
+  private turnAt(e0: XYZ, v: number): number {
+    const d = sub(this.profile.at(v), this.axisPoint),
+      w = sub(d, scale(this.axis, dot(d, this.axis)));
+    return length(w) < 1e-12 * Math.max(length(d), 1e-300)
+      ? Number.NaN
+      : Math.atan2(dot(cross(e0, w), this.axis), dot(e0, w));
+  }
+  private turnTable() {
+    if (this.turns === undefined) {
+      const [lo, hi] = this.profile.period ? [0, this.profile.period] : this.profile.domain,
+        span = Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : [-1, 1],
+        n = 64,
+        ts = Array.from({ length: n + 1 }, (_, k) => span[0] + ((span[1] - span[0]) * k) / n),
+        radials = ts.map((t) => {
+          const d = sub(this.profile.at(t), this.axisPoint);
+          return sub(d, scale(this.axis, dot(d, this.axis)));
+        }),
+        e0 = unit(radials[n / 2]) ?? radials.map((w) => unit(w)).find((w) => w);
+      this.turns = null;
+      if (e0) {
+        // Unwrapped along the samples, so a profile turning past half a turn either way stays continuous.
+        const at: number[] = [];
+        for (const t of ts) {
+          const raw = this.turnAt(e0, t),
+            prev = at.length ? at[at.length - 1] : 0;
+          at.push(Number.isNaN(raw) ? prev : raw + TAU * Math.round((prev - raw) / TAU));
+        }
+        // A profile in one plane with the axis does not turn (its points on either side of the axis differ by pi).
+        if (at.some((x) => Math.abs(Math.sin(x)) > 1e-12)) this.turns = { e0, at, lo: span[0], hi: span[1] };
+      }
+    }
+    return this.turns;
+  }
+  twisted(): boolean {
+    return this.turnTable() !== null;
+  }
+  twist(v: number): number {
+    const t = this.turnTable();
+    if (!t) return 0;
+    const n = t.at.length - 1,
+      x = Math.max(0, Math.min(n, ((v - t.lo) / (t.hi - t.lo)) * n)),
+      k = Math.min(n - 1, Math.floor(x)),
+      near = t.at[k] + (t.at[k + 1] - t.at[k]) * (x - k),
+      raw = this.turnAt(t.e0, v);
+    return Number.isNaN(raw) ? near : raw + TAU * Math.round((near - raw) / TAU);
+  }
+  /** Meridian lengths at samples along a finite, open profile (`meridian`); else the section's speed at one point. */
+  private arc?: { lo: number; hi: number; at: number[] } | { speed: number };
+  private meridianTable() {
+    if (this.arc === undefined) {
+      const [lo, hi] = this.profile.domain,
+        c = this.profile.at(Number.isFinite(lo) ? lo : 0),
+        d = sub(c, this.axisPoint),
+        t = c.slice(3, 6),
+        dh = dot(t, this.axis),
+        w = sub(d, scale(this.axis, dot(d, this.axis)));
+      this.arc = {
+        speed: Math.hypot(dh, length(w) ? dot(w, t) / length(w) : length(sub(t, scale(this.axis, dh)))) || 1,
+      };
+      if (!this.profile.period && Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) {
+        const n = 1024,
+          section = (t: number) => {
+            const d = sub(this.profile.at(t), this.axisPoint),
+              h = dot(d, this.axis);
+            return [h, length(sub(d, scale(this.axis, h)))];
+          },
+          at = [0];
+        let [h0, r0] = section(lo);
+        for (let k = 1; k <= n; k++) {
+          // Each step's chord in the section, from four pieces: close to its arc where the profile turns there.
+          let piece = 0;
+          for (let j = 1; j <= 4; j++) {
+            const [h1, r1] = section(lo + ((hi - lo) * (k - 1 + j / 4)) / n);
+            piece += Math.hypot(h1 - h0, r1 - r0);
+            [h0, r0] = [h1, r1];
+          }
+          at.push(at[k - 1] + piece);
+        }
+        if (at[n] > 0) this.arc = { lo, hi, at };
+      }
+    }
+    return this.arc;
+  }
+  meridian(v: number): number {
+    const t = this.meridianTable();
+    if ('speed' in t) return v * t.speed;
+    const n = t.at.length - 1,
+      x = ((v - t.lo) / (t.hi - t.lo)) * n,
+      k = Math.max(0, Math.min(n - 1, Math.floor(x)));
+    return t.at[k] + (t.at[k + 1] - t.at[k]) * (x - k);
+  }
+  meridianParameter(length: number): number {
+    const t = this.meridianTable();
+    if ('speed' in t) return length / t.speed;
+    const n = t.at.length - 1;
+    // The last sample at or before `length` (ties go to the first, so a flat stretch maps to its start).
+    let a = 0,
+      b = n;
+    while (b - a > 1) {
+      const m = (a + b) >> 1;
+      if (t.at[m] <= length) a = m;
+      else b = m;
+    }
+    const k = length < t.at[0] ? 0 : Math.min(a, n - 1),
+      step = t.at[k + 1] - t.at[k],
+      x = k + (step > 0 ? (length - t.at[k]) / step : 0);
+    return t.lo + ((t.hi - t.lo) * x) / n;
+  }
   normal(u: number, v: number) {
-    return normalOf(this, u, v);
+    // Stepping off a degenerate line stays on the profile: its own domain, unless it is closed.
+    return normalOf(this, u, v, this.profile.period ? this.vDomain : this.profile.domain);
   }
   parameters(p: readonly number[], hint?: readonly number[]): [number, number] {
     // Each profile point turns on a circle about the axis, at its height h along it and distance r from it; p lies on

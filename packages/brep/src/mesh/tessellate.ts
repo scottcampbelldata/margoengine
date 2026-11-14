@@ -571,7 +571,17 @@ export class Tessellator {
       mid = at((all[0] + all[1]) / 2, (all[2] + all[3]) / 2),
       // (u, v) scaled to rough lengths, so the triangulation is Delaunay on the surface rather than in parameters.
       su = Math.hypot(mid[3], mid[4], mid[5]) || 1,
-      sv = Math.hypot(mid[6], mid[7], mid[8]) || 1;
+      // A surface whose u lines turn about its axis (Surface.twist) is laid out as it lies, at (u + twist(v), its
+      // meridian length at v): (u, v) shears it ever harder, and squeezes it, towards a rim the profile ends tangent to.
+      // Its v steps scale by the speed across the u lines there, Sv less its part along Su.
+      lay = layoutOf(s),
+      twisted = lay !== undefined,
+      turn = (v: number) => (lay ? lay.turn(v) : 0),
+      across = (d: readonly number[]) => {
+        const a = (d[3] * d[6] + d[4] * d[7] + d[5] * d[8]) / (d[3] * d[3] + d[4] * d[4] + d[5] * d[5] || 1);
+        return Math.hypot(d[6] - a * d[3], d[7] - a * d[4], d[8] - a * d[5]);
+      },
+      sv = (twisted ? across(mid) : Math.hypot(mid[6], mid[7], mid[8])) || 1;
     let [du, dv] = s.steps(all, tol.interior, tol.interiorAngle);
     // A face straight one way (a cylinder along its axis) needs no points inside when it is a plain band or patch; with
     // a hole or a notch (boundary points away from its edges in both directions) triangles would span round it as
@@ -598,6 +608,32 @@ export class Tessellator {
         ku = (dv * sv) / (du * su);
       }
     }
+    // Points laid out for the triangulation, and the (u, v) whose layout is the mean of some points' layouts.
+    const along = (v: number) => (lay ? lay.along(v) : v),
+      layout = (list: readonly number[]) => {
+        if (!twisted) return scaled(list, su * ku, sv * kv);
+        const out: number[] = [];
+        for (let i = 0; i < list.length; i += 2)
+          out.push((list[i] + turn(list[i + 1])) * su * ku, along(list[i + 1]) * kv);
+        return out;
+      },
+      middle = (ids: readonly number[]): [number, number] => {
+        let u = 0,
+          v = 0;
+        if (!twisted) {
+          for (const i of ids) {
+            u += uv[i * 2];
+            v += uv[i * 2 + 1];
+          }
+          return [u / ids.length, v / ids.length];
+        }
+        for (const i of ids) {
+          u += uv[i * 2] + turn(uv[i * 2 + 1]);
+          v += along(uv[i * 2 + 1]);
+        }
+        const mv = lay ? lay.at(v / ids.length) : v / ids.length;
+        return [u / ids.length - turn(mv), mv];
+      };
     const uv: number[] = [],
       xyz: XYZ[] = [],
       loopIndices: number[][] = [],
@@ -672,20 +708,25 @@ export class Tessellator {
         dv *= 1.5;
       }
       const near = boundaryFilter(
-        scaled(uv, su * ku, sv * kv),
+        layout(uv),
         loopIndices,
-        0.3 * Math.min(du * su * ku, dv * sv * kv),
+        0.3 * Math.min(du * su * ku, twisted ? ((along(all[3]) - along(all[2])) * dv * kv) / h : dv * sv * kv),
       );
+      // A twisted face's rows lie evenly along its meridian, as many as evenly in v.
+      const [y0, y1] = twisted ? [along(all[2]), along(all[3])] : [all[2], all[3]],
+        dy = twisted ? ((y1 - y0) * dv) / h : dv,
+        rowV = (y: number) => (lay ? lay.at(y) : y);
       for (let u = all[0] + du / 2; u < all[1]; u += du)
-        for (let v = all[2] + dv / 2; v < all[3]; v += dv) {
-          if (near(u * su * ku, v * sv * kv)) continue;
+        for (let y = y0 + dy / 2; y < y1; y += dy) {
+          const v = rowV(y);
+          if (twisted ? near((u + turn(v)) * su * ku, y * kv) : near(u * su * ku, v * sv * kv)) continue;
           uv.push(u, v);
           xyz.push(spot(u, v));
         }
     }
 
     // --- triangulation and refinement -----------------------------------------------------------------------------------
-    let triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
+    let triangles = triangulate(layout(uv), loopIndices);
     for (let pass = 0; pass < 6 && uv.length / 2 < this.maxFaceVertices; pass++) {
       const added: number[] = [],
         seen = new Set<string>(),
@@ -694,8 +735,7 @@ export class Tessellator {
         const a = edges[e],
           b = edges[e + 1];
         if (distance(xyz[a], xyz[b]) < tol.minSize * 2) continue;
-        const mu = (uv[a * 2] + uv[b * 2]) / 2,
-          mv = (uv[a * 2 + 1] + uv[b * 2 + 1]) / 2,
+        const [mu, mv] = middle([a, b]),
           far =
             distance(at(mu, mv), scale(add(xyz[a], xyz[b]), 0.5)) > tol.interior ||
             between(normalAt(uv[a * 2], uv[a * 2 + 1]), normalAt(uv[b * 2], uv[b * 2 + 1])) > tol.interiorAngle;
@@ -713,8 +753,7 @@ export class Tessellator {
           bc = distance(xyz[b], xyz[c]),
           ca = distance(xyz[c], xyz[a]);
         if (Math.min(ab, bc, ca) <= gap || Math.max(ab, bc, ca) < tol.minSize * 2) continue;
-        const mu = (uv[a * 2] + uv[b * 2] + uv[c * 2]) / 3,
-          mv = (uv[a * 2 + 1] + uv[b * 2 + 1] + uv[c * 2 + 1]) / 3,
+        const [mu, mv] = middle([a, b, c]),
           centre = scale(add(add(xyz[a], xyz[b]), xyz[c]), 1 / 3);
         if (distance(at(mu, mv), centre) <= tol.interior) continue;
         const key = `${mu},${mv}`;
@@ -727,7 +766,7 @@ export class Tessellator {
         uv.push(added[i], added[i + 1]);
         xyz.push(spot(added[i], added[i + 1]));
       }
-      triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
+      triangles = triangulate(layout(uv), loopIndices);
     }
 
     // --- slivers along an edge, mirrored by the face across it --------------------------------------------------------
@@ -758,7 +797,7 @@ export class Tessellator {
         uv.push(added[i], added[i + 1]);
         xyz.push(spot(added[i], added[i + 1]));
       }
-      triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
+      triangles = triangulate(layout(uv), loopIndices);
     }
     for (let t = 0; t < triangles.length; t += 3) {
       const key = rimKey(t);
@@ -1044,6 +1083,8 @@ export class Tessellator {
  */
 function followChords(c: Curve, s: Surface, samples: number[], deflection: number): void {
   const wrap = (x: number, lo: number, period: number) => (period ? lo + ((((x - lo) % period) + period) % period) : x),
+    // Chords are straight where the face is laid out (`layoutOf`).
+    lay = layoutOf(s),
     point = (t: number) => c.at(t).slice(0, 3) as XYZ,
     uv = [s.parameters(point(samples[0]))],
     span = Math.abs(samples[samples.length - 1] - samples[0]);
@@ -1057,10 +1098,14 @@ function followChords(c: Curve, s: Surface, samples: number[], deflection: numbe
         bv = nearest(b[1], a[1], s.vPeriod),
         // A quarter, half and three quarters of the way: a chord can cross its edge half way (an S bend).
         strays = [0.25, 0.5, 0.75].some((f) => {
-          const chord = s.at(
-            wrap(a[0] + (bu - a[0]) * f, s.uDomain[0], s.uPeriod),
-            wrap(a[1] + (bv - a[1]) * f, s.vDomain[0], s.vPeriod),
-          );
+          let [u, v] = [a[0] + (bu - a[0]) * f, a[1] + (bv - a[1]) * f];
+          if (lay) {
+            const [ta, tb] = [a[0] + lay.turn(a[1]), bu + lay.turn(bv)],
+              [ya, yb] = [lay.along(a[1]), lay.along(bv)];
+            v = lay.at(ya + (yb - ya) * f);
+            u = ta + (tb - ta) * f - lay.turn(v);
+          }
+          const chord = s.at(wrap(u, s.uDomain[0], s.uPeriod), wrap(v, s.vDomain[0], s.vPeriod));
           return distance(chord.slice(0, 3) as XYZ, point(t0 + (t1 - t0) * f)) > deflection;
         });
       if (strays) {
@@ -1071,6 +1116,25 @@ function followChords(c: Curve, s: Surface, samples: number[], deflection: numbe
     }
     i++;
   }
+}
+
+/**
+ * How a face on `s` is laid out for its triangulation when not in (u, v) scaled: on a surface whose u lines turn about
+ * its axis (`Surface.twisted`), at (u + twist(v), meridian(v)), as the surface lies; `at` takes a meridian length back
+ * to v.
+ */
+function layoutOf(
+  s: Surface,
+): { turn(v: number): number; along(v: number): number; at(length: number): number } | undefined {
+  const { twist, meridian, meridianParameter } = s;
+  if (!s.twisted?.() || !twist || !meridian || !meridianParameter) return undefined;
+  const wrapV = (v: number) =>
+    s.vPeriod ? s.vDomain[0] + ((((v - s.vDomain[0]) % s.vPeriod) + s.vPeriod) % s.vPeriod) : v;
+  return {
+    turn: (v) => twist.call(s, wrapV(v)),
+    along: (v) => meridian.call(s, v),
+    at: (length) => meridianParameter.call(s, length),
+  };
 }
 
 function planeOf(points: readonly XYZ[]): Surface {
