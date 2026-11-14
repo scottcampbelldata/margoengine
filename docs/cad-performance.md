@@ -224,7 +224,9 @@ CAD-specific; `@margoengine/lines` draws one `Line` per draw call with its own m
 draws and 50,000 uniform writes here.
 
 Measured in the 11:53 session, before the merged core fast paths and before `803aa19` changed the edges pass's section
+clipping:
 
+| Edges | 10k | 50k | max (90k) |
 | --- | --- | --- | --- |
 | Segments of visible parts (before the size test) | 0.66 M | 3.28 M | 5.89 M |
 | Edge pass GPU | 2.23 ms | 4.65 ms | 5.83 ms |
