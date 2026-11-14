@@ -61,7 +61,7 @@ test('atomic claims are once-only, namespaces isolate, expiry removes dead proce
   assert.equal((await presence.processes()).length, 0);
 });
 
-test('requests abort without replay, time out, report remote errors and clean up records', async () => {
+test('requests abort without replay, time out and clean up records', async () => {
   const store = new MemoryPresenceStore();
   using presence = new StorePresence(store, { requestTimeout: 20, pollInterval: 1 });
   const abort = new AbortController();
@@ -71,17 +71,34 @@ test('requests abort without replay, time out, report remote errors and clean up
   await assert.rejects(presence.request('absent', 'room', {}, 100), { name: 'TimeoutError' });
   assert.deepEqual(await store.keys('margo-netcode/request/'), []);
   assert.deepEqual(await store.keys('margo-netcode/reply/'), []);
+});
+
+// Regression: this case shared the 20 ms request timeout of the timeout case above, so it passed only when the serve
+// loop's poll, the handler and the reply all fit in 20 ms of wall time. On a loaded machine the request timed out first
+// (TimeoutError where /no seat/ was expected), and the serve loop it left running then hit the disposed store. Here the
+// handler refuses only after 50 ms, longer than that old timeout, so the case cannot pass or fail on the race; the
+// timeout is not what it checks, and the serve loop always ends before the store closes.
+test('a remote refusal reaches the requester with its message, however long the handler takes', async () => {
+  const store = new MemoryPresenceStore();
+  using presence = new StorePresence(store, { requestTimeout: 60_000, pollInterval: 1 });
   const stop = new AbortController();
   const serving = presence.serve(
     'a',
-    () => {
+    async () => {
+      // fixed-wait: the refusal comes after 50 ms on purpose, longer than the old 20 ms request timeout
+      await new Promise((done) => setTimeout(done, 50));
       throw new RangeError('no seat');
     },
     stop.signal,
   );
-  await assert.rejects(presence.request('a', 'room', {}, 100), /no seat/);
-  stop.abort();
-  await serving;
+  try {
+    await assert.rejects(presence.request('a', 'room', {}, 100), /no seat/);
+  } finally {
+    stop.abort();
+    await serving;
+  }
+  assert.deepEqual(await store.keys('margo-netcode/request/'), []);
+  assert.deepEqual(await store.keys('margo-netcode/reply/'), []);
 });
 
 test('a failed heartbeat cancels IPC and withdraws only after its in-flight tasks stop', async () => {
