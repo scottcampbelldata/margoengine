@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15609312,
+  "total": 15611318,
   "history": [
     {
       "date": "2026-10-24",
@@ -8771,6 +8771,12 @@
       "commit": "444fb5776",
       "reason": "IFC returns as public @margoengine/ifc (Scott, 2026-11-13: no private packages): the root and /worker entries and the dist/workers/ifc.js worker, built by build-optional",
       "grew": 3
+    },
+    {
+      "date": "2026-11-14",
+      "commit": "f408f3715",
+      "reason": "Storm Light fixes: sky/weather gains the TAA reactive mask (reactive option, r8unorm, MSAA-resolved), sky/compat-clouds the moon glow lobe and per-frame march start, water the wall-impact spray",
+      "grew": 3
     }
   ],
   "items": {
@@ -9786,7 +9792,7 @@
     "@margoengine/sky/bruneton": 3258,
     "@margoengine/sky/cloud-shadows": 3448,
     "@margoengine/sky/clouds": 2338,
-    "@margoengine/sky/compat-clouds": 16914,
+    "@margoengine/sky/compat-clouds": 17573,
     "@margoengine/sky/fog": 2295,
     "@margoengine/sky/hillaire": 11147,
     "@margoengine/sky/lighting": 4389,
@@ -9798,7 +9804,7 @@
     "@margoengine/sky/shafts": 7139,
     "@margoengine/sky/sun": 2379,
     "@margoengine/sky/volumetric-clouds": 8533,
-    "@margoengine/sky/weather": 6189,
+    "@margoengine/sky/weather": 6857,
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 33200,
     "@margoengine/splats/animate": 20786,
@@ -10079,7 +10085,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/voxel/wind": 3073,
-    "@margoengine/water": 22446,
+    "@margoengine/water": 23125,
     "@margoengine/water/bodies": 4419,
     "@margoengine/water/caustics": 9230,
     "@margoengine/water/fft": 7858,
