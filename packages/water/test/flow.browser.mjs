@@ -230,6 +230,65 @@ try {
     }
     results.push({ shoreDirections: ['east', 'west', 'south', 'north'], peakDepths, lowDepths });
     island.dispose();
+    // Spray where swell hits a sea stack (2026-11-13: spray was born only on shallow breakers, so a wall in deep water
+    // threw none): a 4 m square stack standing 6 m out of water 4 m deep, swell from the west. Crests throw clumps
+    // (velocity.w 2 to 3) up and off the stack's faces; with the swell stilled, none.
+    for (let z = 0; z < 32; z++)
+      for (let x = 0; x < 32; x++) ground[z * 32 + x] = x >= 14 && x < 18 && z >= 14 && z < 18 ? 6 : -4;
+    device.queue.writeTexture({ texture }, ground, { bytesPerRow: 128 }, [32, 32]);
+    const stack = Water.attach(engine, {
+      size: [32, 32],
+      segments: 32,
+      spray: true,
+      terrain: { heightmap: () => texture, origin: [-16, -16], size: [32, 32] },
+      waves: [{ direction: [1, 0], amplitude: 0.8, wavelength: 20, steepness: 0.2 }],
+    });
+    const clumps = async () => {
+      const copy = device.createBuffer({
+          size: stack.spray.buffer.size,
+          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        }),
+        encoder = device.createCommandEncoder();
+      encoder.copyBufferToBuffer(stack.spray.buffer, 0, copy, 0, copy.size);
+      device.queue.submit([encoder.finish()]);
+      await copy.mapAsync(GPUMapMode.READ);
+      const d = new Float32Array(copy.getMappedRange());
+      let count = 0,
+        near = 0,
+        top = -Infinity,
+        droplets = 0;
+      for (let i = 0; i < d.length; i += 8)
+        if (d[i + 3] > 0) {
+          if (d[i + 7] < 2) {
+            droplets++;
+            continue;
+          }
+          count++;
+          if (Math.max(Math.abs(d[i]), Math.abs(d[i + 2])) < 6) near++;
+          top = Math.max(top, d[i + 1]);
+        }
+      copy.unmap();
+      copy.destroy();
+      return { count, near, top, droplets };
+    };
+    engine.render({ delta: 0 });
+    let hits = { count: 0, near: 0, top: -Infinity, droplets: 0 };
+    // Snapshots every 5 frames over 4 s, so a clump is seen near the top of its arc.
+    for (let k = 0; k < 48; k++) {
+      await advance(5);
+      const now = await clumps();
+      hits = {
+        count: Math.max(hits.count, now.count),
+        near: Math.max(hits.near, now.near),
+        top: Math.max(hits.top, now.top),
+        droplets: Math.max(hits.droplets, now.droplets),
+      };
+    }
+    stack.setWaveHeight(0);
+    await advance(240);
+    const calm = await clumps();
+    results.push({ stackSpray: hits, calmSpray: calm });
+    stack.dispose();
     const standalone = Water.attach(engine, { size: [32, 32], segments: 8 });
     engine.render({ delta: 0.1 });
     await device.queue.onSubmittedWorkDone();
@@ -259,6 +318,15 @@ try {
     assert.equal(result.maxDryDepth, 0, 'Water crossed high ground');
     assert.ok(result.minimumDepth >= 0, 'Negative water depth');
   }
+  // Spray at a sea stack in deep water: crests throw clumps that rise metres up its faces; a still sea throws none.
+  const { stackSpray, calmSpray } = basins[3];
+  assert.ok(
+    stackSpray.count > 20 && stackSpray.near > stackSpray.count * 0.9,
+    `No impact spray at the stack: ${JSON.stringify(basins[3])}`,
+  );
+  assert.ok(stackSpray.top > 1.5, `Impact spray did not rise up the stack: ${JSON.stringify(basins[3])}`);
+  assert.equal(stackSpray.droplets, 0, `Deep water threw breaker droplets: ${JSON.stringify(basins[3])}`);
+  assert.equal(calmSpray.count, 0, `A still sea threw impact spray: ${JSON.stringify(basins[3])}`);
   for (let i = 0; i < 4; i++) {
     assert.ok(basins[2].peakDepths[i] > 0.015, `Surf never washed onto the ${basins[2].shoreDirections[i]} beach`);
     assert.ok(

@@ -149,9 +149,11 @@ helper lanes until their screen derivatives are complete, then discard dry cells
 The solver runs three GPU substeps per frame and caps elapsed simulation time at
 1/15 second after a stall. Fast shallow flow generates breaker foam, which advects
 and decays with the water. Set `spray: true` with terrain coupling to enable a fixed
-2,048-slot GPU droplet pool, with gravity, water/terrain collision and soft depth
-fading. It approximates breaking surf; it does not solve overturning wave volumes
-or erosion. Use heightmap cells of roughly 0.5 metres or larger for this preset;
+4,096-slot GPU droplet pool, with gravity, water/terrain collision and soft depth
+fading. Droplets fly from the breakers, and clumps of spray burst up cliffs and sea
+stacks in open water where a swell crest drives its water into them (the swell's
+orbital velocity into the wall). It approximates breaking surf and wall impact; it
+does not solve overturning wave volumes or erosion. Use heightmap cells of roughly 0.5 metres or larger for this preset;
 very small cells require more substeps.
 
 `water.setWaveHeight(meters)` scales the existing spectrum to that largest configured train
