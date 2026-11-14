@@ -1,5 +1,5 @@
 {
-  "commit": "ba3848be9",
+  "commit": "6da481b83",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1210,12 +1210,12 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 98056,
-        "gzip": 31871
+        "raw": 98156,
+        "gzip": 31920
       },
       "./probes": {
-        "raw": 51375,
-        "gzip": 18232
+        "raw": 51475,
+        "gzip": 18274
       },
       "./volumetric": {
         "raw": 28197,
@@ -1250,8 +1250,8 @@
         "gzip": 5261
       },
       "./gi": {
-        "raw": 51888,
-        "gzip": 18371
+        "raw": 51988,
+        "gzip": 18413
       },
       "./fog-volumes": {
         "raw": 2704,
@@ -5690,8 +5690,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 206729,
-        "gzip": 64453
+        "raw": 206894,
+        "gzip": 64526
       },
       "./atlas": {
         "raw": 4025,
@@ -5702,8 +5702,8 @@
         "gzip": 8417
       },
       "./batched": {
-        "raw": 124025,
-        "gzip": 38479
+        "raw": 124190,
+        "gzip": 38540
       },
       "./mips": {
         "raw": 34651,
@@ -9992,40 +9992,40 @@
     },
     "@margoengine/text": {
       ".": {
-        "raw": 46086,
-        "gzip": 17756
+        "raw": 46169,
+        "gzip": 17777
       },
       "./rich": {
-        "raw": 29384,
-        "gzip": 11873
+        "raw": 29467,
+        "gzip": 11895
       },
       "./msdf": {
-        "raw": 9926,
-        "gzip": 4316
+        "raw": 10009,
+        "gzip": 4337
       },
       "./animate": {
-        "raw": 33762,
-        "gzip": 12452
+        "raw": 33845,
+        "gzip": 12473
       },
       "./extrude": {
         "raw": 41385,
         "gzip": 15235
       },
       "./fit": {
-        "raw": 27683,
-        "gzip": 11110
+        "raw": 27784,
+        "gzip": 11134
       },
       "./selection": {
         "raw": 1355,
         "gzip": 702
       },
       "./curve": {
-        "raw": 28418,
-        "gzip": 11247
+        "raw": 28501,
+        "gzip": 11267
       },
       "./vector": {
-        "raw": 81632,
-        "gzip": 30995
+        "raw": 81715,
+        "gzip": 31014
       }
     },
     "@margoengine/tilemap": {
@@ -15252,9 +15252,9 @@
       "brotli": 6487
     },
     "packages/environment/dist/index.js": {
-      "raw": 98056,
-      "gzip": 31871,
-      "brotli": 27966
+      "raw": 98156,
+      "gzip": 31920,
+      "brotli": 28116
     },
     "packages/shadows/dist/index.js": {
       "raw": 60822,
