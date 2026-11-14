@@ -2910,7 +2910,10 @@
       "snapFeature",
       "vertexAnchor",
       "worldAnchor"
-    ]
+    ],
+    "example": "./examples/machinery.html",
+    "exampleTitle": "Drive a bounded joint",
+    "exampleNote": "Animate a revolute joint with Kinematics. CAD files in STEP, IGES, STL and OBJ load through @margoengine/cad; see its guide for formats and CAD asset loading."
   },
   {
     "id": "bvh",
