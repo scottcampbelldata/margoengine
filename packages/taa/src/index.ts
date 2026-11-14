@@ -894,7 +894,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       before =
         displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
     if ((opacity || animation || displacement || clip) && p.stride !== 80)
-      throw new TypeError('Invalid TAA opacity map, UV animation, displacement or clip; use it on a primitive with stride 80.');
+      throw new TypeError(
+        'Invalid TAA opacity map, UV animation, displacement or clip; use it on a primitive with stride 80.',
+      );
     const pbr = p.stride === 80,
       solid = pbr && p.vertexAlpha === false,
       key =

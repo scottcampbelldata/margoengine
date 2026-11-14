@@ -582,7 +582,11 @@ test('with a night set the moon disc is drawn once, by the night, in the sky and
     ['reflection', reflection],
   ]) {
     assert.ok(code.includes('fn stylizedNight('), `the ${name} draws the night`);
-    assert.equal(code.split('*moonRadiance(').length - 1, code.split(gated).length - 1, `every ${name} lighting disc yields to the night`);
+    assert.equal(
+      code.split('*moonRadiance(').length - 1,
+      code.split(gated).length - 1,
+      `every ${name} lighting disc yields to the night`,
+    );
     assert.ok(code.includes(gated), `the ${name} draws the lighting disc only without a night`);
   }
 });

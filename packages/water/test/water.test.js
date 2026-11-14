@@ -619,7 +619,11 @@ test('whitecaps and chop upload 0-1 from the options and their setters and rejec
 // (1 - smoothstep(0.25, 1, r^2) for droplets, (1 - r^2)^2 for clumps) on a square quad facing the camera.
 test('spray draws as broken mist and fine drops streaked along their motion, not round discs', () => {
   const h = optionalGPU(),
-    terrain = h.engine.gpu.createTexture({ size: [16, 16], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
+    terrain = h.engine.gpu.createTexture({
+      size: [16, 16],
+      format: 'r32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING,
+    }),
     effect = new Water({
       segments: 4,
       spray: true,

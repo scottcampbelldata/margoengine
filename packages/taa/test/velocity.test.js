@@ -49,7 +49,10 @@ test('4x sky motion stays apart from every depth when the WebGL2 layer averages 
   r.gpu.device.createShaderModule = (d) => (codes.push(d.code), create(d));
   r.frame();
   assert.ok(codes.includes(multisampledCameraVelocity), '4x draws the sky sample');
-  assert.ok(codes.some((c) => c.includes(`if(o.depth==${skySample}){o.depth=0;}`)), 'an all-sky pixel resolves to 0');
+  assert.ok(
+    codes.some((c) => c.includes(`if(o.depth==${skySample}){o.depth=0;}`)),
+    'an all-sky pixel resolves to 0',
+  );
   const one = [],
     single = rig({}, 1),
     make = single.gpu.device.createShaderModule;
