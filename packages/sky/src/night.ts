@@ -9,7 +9,7 @@ fn nightPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u)
 fn hash21(p:vec2f)->f32 {let c=bitcast<vec2u>(vec2i(p));return f32(nightPcg(c.x+nightPcg(c.y))>>8u)*5.9604645e-8;}
 fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
  let haze=frame.nightHorizon.w;let moon=frame.nightMoon;let params=frame.nightParams;
- var color=mix(frame.nightZenith.rgb,frame.nightHorizon.rgb,pow(1.0-clamp(r.y,0.0,1.0),2.5/max(haze,0.01))*min(haze,1.0));
+ let gradient=mix(frame.nightZenith.rgb,frame.nightHorizon.rgb,pow(1.0-clamp(r.y,0.0,1.0),2.5/max(haze,0.01))*min(haze,1.0));var color=gradient;
  // Fog asks with a zero footprint for the gradient alone: stars and the moon belong to the sky, not to the haze.
  if(footprint<=0.0){return color;}
  let cosine=clamp(dot(r,moon.xyz),-1.0,1.0);
@@ -29,7 +29,9 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
   }
   color+=vec3f(0.8,0.9,1.0)*stars*energy*params.z*smoothstep(0.258819,0.5,r.y)*(1.0-smoothstep(0.96,1.0,cosine));
  }
- // The disc goes down first, lit and dark parts alike; earthshine keeps the dark part a dim moon rather than a hole.
+ // The moon lies beyond the air: its disc hides the stars, while the air in front (the gradient and the glow) still
+ // shows over it. Its unlit part adds only earthshine, which the Earth gives back most near new moon (half its
+ // phase from full to new); a gibbous moon's dark limb is the sky, not a grey second disc beside the bright one.
  var cover=0.0;
  if(cosine>0.0){
   var right=normalize(cross(moon.xyz,select(vec3f(0,1,0),vec3f(0,0,1),abs(moon.y)>0.99)));
@@ -41,10 +43,12 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
   // The rim is filtered over half a footprint each side; a sample wider than the disc spreads its energy (celestialProfile).
   let edge=max(0.01,0.5*footprint/frame.nightMoonColor.w);
   cover=(1.0-smoothstep(1.0-edge,1.0+edge,sqrt(radius)))*min(1.0,1.0/(edge*edge));
-  color=mix(color,frame.nightMoonColor.rgb*(0.8+0.2*limb)*(smoothstep(0.0,0.02,lit)+0.04),cover);
+  let earthshine=0.02*(1.0-params.x);
+  color=mix(color,gradient,cover)+frame.nightMoonColor.rgb*(0.8+0.2*limb)*(smoothstep(0.0,0.02,lit)+earthshine)*cover;
  }
- // The glow is atmosphere in front of the moon: added last, thinned to 40% over the disc so its dark side reads against it.
- return color+frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35*(1.0-0.6*cover);
+ // The glow is atmosphere in front of the moon: added last and whole, over the disc as round it (until 2026-11-13
+ // thinned to 40% over the disc, so a gibbous moon's dark limb showed as a grey disc offset from the bright one).
+ return color+frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35;
 }
 `,
   validate(n) {

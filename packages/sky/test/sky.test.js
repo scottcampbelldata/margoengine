@@ -572,13 +572,33 @@ test('stars keep a 0.7 px minimum radius and their energy on square stereographi
   assert.match(night, /smoothstep\(0\.0,2\.0\*size,length\(cell-id-0\.5\)\)/);
 });
 
-test('the moon disc goes down before its glow, so the dark side reads as a dim moon inside the halo', () => {
+// Regression (2026-11-13, Storm Light): with a night set, the sky and the environment also drew the lighting moon's
+// celestial disc (0.018 rad) where the night's moon is, so a smaller disc sat inside the night's moon.
+test('with a night set the moon disc is drawn once, by the night, in the sky and in what it reflects', () => {
+  const { sky, reflection } = nightShaders(),
+    gated = 'moonRadiance(w,frame.moon.xyz,footprint)*f32(frame.sunlight.w<0.5)';
+  for (const [name, code] of [
+    ['sky', sky],
+    ['reflection', reflection],
+  ]) {
+    assert.ok(code.includes('fn stylizedNight('), `the ${name} draws the night`);
+    assert.equal(code.split('*moonRadiance(').length - 1, code.split(gated).length - 1, `every ${name} lighting disc yields to the night`);
+    assert.ok(code.includes(gated), `the ${name} draws the lighting disc only without a night`);
+  }
+});
+
+// Regression (2026-11-13, Storm Light): at phase 0.7 the moon showed a bright disc with a grey disc offset beside it.
+// The dark part replaced the sky and its glow was thinned to 40% over the disc, so the unlit limb read as a second
+// moon inside the halo. Now the air in front shows whole over the disc and the dark part adds only earthshine.
+test('the moon disc hides the stars, not the air in front: a gibbous dark limb is the sky plus faint earthshine', () => {
   const { night } = nightShaders(),
-    disc = night.indexOf('color=mix(color,frame.nightMoonColor.rgb'),
+    disc = night.indexOf('color=mix(color,gradient,cover)'),
     glow = night.indexOf('pow(max(cosine,0.0),32.0)');
-  assert.ok(disc > 0 && glow > disc, 'The glow is added after the disc');
-  assert.match(night, /\(smoothstep\(0\.0,0\.02,lit\)\+0\.04\)/, 'Earthshine on the unlit part');
-  assert.match(night, /0\.35\*\(1\.0-0\.6\*cover\)/, 'The glow is thinned, not removed, over the disc');
+  assert.ok(disc > 0 && glow > disc, 'The disc goes down over the gradient, before the glow');
+  assert.match(night, /let earthshine=0\.02\*\(1\.0-params\.x\)/, 'Earthshine falls from 0.04 at new to 0 at full');
+  assert.match(night, /\(smoothstep\(0\.0,0\.02,lit\)\+earthshine\)\*cover/, 'The unlit part adds only earthshine');
+  assert.match(night, /params\.y\*0\.35;\n/, 'The glow is whole over the disc');
+  assert.doesNotMatch(night, /1\.0-0\.6\*cover/, 'The glow is not thinned over the disc');
   assert.match(
     night,
     /let edge=max\(0\.01,0\.5\*footprint\/frame\.nightMoonColor\.w\)/,

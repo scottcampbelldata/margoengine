@@ -293,7 +293,7 @@ ${ditherShader}
  let footprint=max(length(dpdx(w)),length(dpdy(w)));let sky=skyRadiance(w,footprint);var color=sky;
  let sun=celestialProfile(w,s,SUN_RADIUS,footprint);
  color+=(sun.x*60.0+sun.y*0.8)*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*(1.0-frame.sun.w);
- color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint);
+ color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint)*f32(frame.sunlight.w<0.5);
  color=cloudSky(color,sky,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);color+=dither(i.position.xy)*min(vec3f(1.0/255.0),min(color,1.0-color));}return vec4f(color,1);
 }`,
   ];
@@ -581,7 +581,9 @@ export class Sky implements EnginePlugin {
     if (night < 1 && !this.features.preetham && !this.features.bruneton)
       throw new RangeError('Daylight needs a day model: preetham or bruneton from @margoengine/sky');
     // The lighting moon follows the stylized night's moon when one is placed, so the disc, the glints and the light
-    // agree; otherwise it keeps its fixed default.
+    // agree; otherwise it keeps its fixed default. With a night set, its disc is drawn once, by the night (the sky
+    // and skyEnvironment add moonRadiance only while frame.sunlight.w is 0): until 2026-11-13 both drew one, so a
+    // 0.018 rad lighting disc sat inside the night's own and the moon read as two discs.
     const placed = this.options.night?.moonDirection,
       to = placed ?? DEFAULT_MOON,
       span = Math.hypot(to[0], to[1], to[2]);
