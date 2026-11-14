@@ -71,6 +71,7 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
       throw new RangeError('Moon size must be between 0 and PI / 2');
   },
   write(v, n, time) {
+    // The default must equal base.ts NIGHT_MOON_DIRECTION, which the lighting moon takes (pinned in sky.test.js).
     const d = n.moonDirection ?? [0.4, 0.7, 0.5],
       length = Math.hypot(d[0], d[1], d[2]),
       size = n.moonSize ?? 0.038;

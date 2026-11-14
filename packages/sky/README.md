@@ -104,8 +104,10 @@ holds `direction` (XYZ plus intensity) and RGB `radiance`. Pass these to
 `Water.attach(engine, {lights: sky.lights})` for separate reflection paths during
 dusk. The engine's single light (sun or moon) still drives scene lighting and shadows.
 With no `lighting` options, both direct reflection intensities are zero.
-The moon record, the moon disc and the engine's night light follow `night.moonDirection` when it is
-set (so `AstroSky` lights the scene from its real moon); without it the moon keeps its fixed default direction.
+The moon record, the moon disc, its glow, the cloud lighting and the engine's night light follow
+`night.moonDirection` when it is set (so `AstroSky` lights the scene from its real moon). A night without one
+lights from the night's own default moon ([0.4, 0.7, 0.5]), the one it draws; with no night set the lighting moon
+keeps its fixed default direction ([-0.3, 0.22, -1]).
 
 The sun's colour and strength come from the atmosphere's own transmittance: `color`
 and `intensity` hold for the sun overhead, and lower down the light passes through

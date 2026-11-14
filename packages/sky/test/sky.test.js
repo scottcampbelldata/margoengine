@@ -44,7 +44,9 @@ test('retained reflection lights track actual sun and moon directions through du
   assert.ok(unlit.lights.every((l) => l.direction[3] === 0));
 });
 
-test('the lighting moon follows the stylized night moon direction and falls back to its default', () => {
+// Regression (2026-11-13, Storm Light): a night set without moonDirection drew its moon at its own default but lit
+// the clouds and the scene from the sky's fixed default, so a second, unseen moon threw a bright glow elsewhere.
+test('the lighting moon is the night moon, placed or at the night default, and keeps its own default without a night', () => {
   const h = optionalGPU();
   h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
   const sky = new Sky({
@@ -55,17 +57,22 @@ test('the lighting moon follows the stylized night moon direction and falls back
   });
   h.engine.use(sky);
   const fallback = [-0.3, 0.22, -1].map((v) => Math.fround(v / Math.hypot(0.3, 0.22, 1)));
+  const nightDefault = [0.4, 0.7, 0.5].map((v) => Math.fround(v / Math.hypot(0.4, 0.7, 0.5)));
   for (const [placed, expected] of [
     [[3, 4, 0], [0.6, 0.8, 0].map(Math.fround)],
     [[0, 1, -1], [0, Math.SQRT1_2, -Math.SQRT1_2].map(Math.fround)],
-    [undefined, fallback],
+    [undefined, nightDefault],
+    ['no night', fallback],
   ]) {
-    sky.options.night.moonDirection = placed;
+    if (placed === 'no night') sky.options.night = undefined;
+    else sky.options.night.moonDirection = placed;
     h.frame();
     assert.deepEqual([...sky.moon], expected, 'The moon the sky lights with is the one the night draws');
     assert.deepEqual([...sky.lights[1].direction.slice(0, 3)], expected, 'Water glints use the same moon');
     const values = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 256).data);
     assert.deepEqual([...values.slice(28, 31)], expected, 'The lighting moon disc sits where the night moon is');
+    if (sky.options.night)
+      assert.deepEqual([...values.slice(48, 51)], expected, 'The night draws its disc and glow where the light is');
     assert.deepEqual(
       [...h.engine.lighting.direction.slice(0, 3)],
       expected,

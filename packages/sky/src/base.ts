@@ -138,8 +138,10 @@ export interface SkyOptions {
    */
   environment?: boolean;
 }
-// The lighting moon's direction when the stylized night does not place one (Margo choice).
+// The lighting moon's direction when no stylized night is set (Margo choice).
 const DEFAULT_MOON: Vec3 = [-0.3, 0.22, -1];
+// Where the stylized night draws its moon when it does not place one: the default in night.ts write (Margo choice).
+const NIGHT_MOON_DIRECTION: Vec3 = [0.4, 0.7, 0.5];
 /** Least diffuse light (linear RGB) the `environment` fallback gives any side, by day and by night. */
 export const skyEnvironmentFloor: { readonly day: Vec3; readonly night: Vec3 } = {
   day: [0.04, 0.04, 0.04],
@@ -580,12 +582,14 @@ export class Sky implements EnginePlugin {
       night = 1 - t * t * (3 - 2 * t);
     if (night < 1 && !this.features.preetham && !this.features.bruneton)
       throw new RangeError('Daylight needs a day model: preetham or bruneton from @margoengine/sky');
-    // The lighting moon follows the stylized night's moon when one is placed, so the disc, the glints and the light
-    // agree; otherwise it keeps its fixed default. With a night set, its disc is drawn once, by the night (the sky
-    // and skyEnvironment add moonRadiance only while frame.sunlight.w is 0): until 2026-11-13 both drew one, so a
-    // 0.018 rad lighting disc sat inside the night's own and the moon read as two discs.
+    // With a night set, the lighting moon is the night's moon, placed or at the night's default, so the disc, its
+    // glow, the cloud lighting, the glints and the scene light agree; without one it keeps its own default. Until
+    // 2026-11-13 a night without moonDirection drew its moon at NIGHT_MOON_DIRECTION but lit from DEFAULT_MOON, so a
+    // second, unseen moon lit the clouds and threw a bright glow elsewhere in the sky. With a night set, its disc is
+    // drawn once, by the night (the sky and skyEnvironment add moonRadiance only while frame.sunlight.w is 0): until
+    // 2026-11-13 both drew one, so a 0.018 rad lighting disc sat inside the night's own and the moon read as two discs.
     const placed = this.options.night?.moonDirection,
-      to = placed ?? DEFAULT_MOON,
+      to = placed ?? (this.options.night ? NIGHT_MOON_DIRECTION : DEFAULT_MOON),
       span = Math.hypot(to[0], to[1], to[2]);
     for (let i = 0; i < 3; i++) this.moon[i] = to[i] / span;
     const moonT = Math.max(0, Math.min(1, -this.sun[1] / 0.12)),
