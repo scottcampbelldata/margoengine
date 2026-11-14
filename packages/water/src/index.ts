@@ -139,9 +139,11 @@ export interface WaterOptions {
 // Snell's window, so it never reaches the eye (total internal reflection).
 // Whitecaps (frame.grid.z, 0 draws none; whitecap()): a crest breaks where its components' summed slope a*k*sin, read a
 // little ahead of the crest where spilling foam runs down the face, passes a threshold that falls as the amount rises;
-// gradient noise breaks it into patches with a crisp edge, white through on the breaking crest and holed into bubbly foam
-// by two finer octaves (until 2026-11-13 soft-edged and at most 0.6 of foam at a distance, so caps read as grey
-// blotches), and toward a gale long streaks lie down-wind (Beaufort 8 and up). Thresholds and noise scales are
+// gradient noise breaks it into patches, densest and whitest where the crest stands furthest past the threshold and
+// thinning softly into the water away from it, broken by down-wind streaks (long along the wind, thin across) and holed
+// into bubbly foam by two finer octaves (until 2026-11-13 a 0.04 edge and white through, so near the camera caps drew
+// as flat grey patches with hard edges; before that soft-edged and at most 0.6 of foam at a distance, so they read as
+// grey blotches), and toward a gale long streaks lie down-wind (Beaufort 8 and up). Thresholds and noise scales are
 // Margo tuning. Foam lines that the backwash carries out from the shore, wider than the shoreline band, follow
 // landNearby(): how much land lies round a point of the coastal grid, ground at or above the sea in 18 taps on three
 // rings of 1.2, 2.4 and 3.6 foam distances, nearer rings weighing more (0 in open water, about 0.5 beside a straight
@@ -149,8 +151,8 @@ export interface WaterOptions {
 // With whitecaps on, foam also takes the light of the sky above it: a Lambert surface under a sky of radiance L returns
 // about the cosine-weighted mean of L over the sky (irradiance over pi). foamSky() takes that mean over the whole upper
 // sky in eight directions: two rings of four, 30 and 60 degrees up, turned 45 degrees from each other (cosine-weighted
-// quadrature with equal weights: the sines of the elevations are the square roots of 1/4 and 3/4). The zenith alone,
-// or the sky behind the viewer, misses the bright horizon band of an overcast deck lit from one side and leaves foam
+// quadrature with equal weights: the sines of the elevations are the square roots of 1/4 and 3/4). The zenith alone, or
+// the sky behind the viewer, misses the bright horizon band of an overcast deck lit from one side and leaves foam
 // darker than the water that reflects it.
 const shader =
   waterFrame +
@@ -273,9 +275,11 @@ fn whitecap(xz:vec2f,footprint:f32)->f32 {
  let detail=1.0-smoothstep(0.3,1.5,footprint);
  let patches=noise(q*vec2f(0.32,0.7)+vec2f(-t*0.35,0)).x+noise(q*vec2f(1.3,2.9)+vec2f(-t*0.8,5.1)).x*0.5*detail;
  let threshold=mix(0.42,0.16,amount);
- let mask=smoothstep(threshold,threshold+0.04,crest+patches*0.08);
+ let over=crest+patches*0.08-threshold;let core=smoothstep(-0.02,0.07,over);
  let bubbles=noise(q*vec2f(0.75,1.3)+vec2f(-t*0.6,2.3)).x+noise(q*vec2f(2.1,2.7)+vec2f(-t*0.9,7.7)).x*0.5;
- let caps=mask*mix(0.9,smoothstep(-0.2,0.2,bubbles+mask*0.5),detail);
+ let streak=noise(q*vec2f(0.16,2.2)+vec2f(-t*0.45,3.7)).x;
+ let broken=smoothstep(-0.55,0.3,bubbles*0.8+streak*0.7+core*0.8-0.3);
+ let caps=core*mix(0.85+0.15*core,broken*(0.55+0.45*core),detail);
  let streaks=amount*amount*smoothstep(0.25,0.55,noise(q*vec2f(0.06,1.4)+vec2f(-t*0.5,0)).x)*0.25*detail;
  return clamp(caps+streaks,0.0,1.0);
 }

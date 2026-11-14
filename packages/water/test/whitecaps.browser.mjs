@@ -73,6 +73,19 @@ const crispness = (a, b) => {
   const top = lifts[Math.floor(lifts.length * 0.95)];
   return lifts.filter((lift) => lift >= top * 0.75).length / lifts.length;
 };
+// How soft the foam's edges are: the share of whitened pixels lifted to between a fifth and three fifths of the
+// brightest foam. Flat patches with hard edges jump from water to full white and leave few pixels between.
+const softness = (a, b) => {
+  const lifts = [];
+  for (let y = SEA; y < HEIGHT; y++)
+    for (let x = 0; x < WIDTH; x++) {
+      const lift = b[y * WIDTH + x] - a[y * WIDTH + x];
+      if (lift > 25) lifts.push(lift);
+    }
+  lifts.sort((p, q) => p - q);
+  const top = lifts[Math.floor(lifts.length * 0.95)];
+  return lifts.filter((lift) => lift >= top * 0.2 && lift < top * 0.6).length / lifts.length;
+};
 // Fine detail: RMS of luma minus its 3x3 mean over the sea.
 const texture = (l) => {
   let sum = 0,
@@ -122,6 +135,14 @@ try {
   assert.ok(
     crisp > 0.3,
     `whitecaps read as grey blotches: only ${(crisp * 100).toFixed(1)}% of the foam is near its brightest`,
+  );
+  const soft = softness(calm, full);
+  console.log(`whitecaps: ${(soft * 100).toFixed(1)}% of the foam between a fifth and three fifths of its brightest`);
+  // Soft-edged, streaky caps (2026-11-13; Radeon 680M: 40.4%, crisp 31.1%); the flat hard-edged patches before scored
+  // 34.2% (crisp 38.1%), and the first soft attempt lost its white crests (crisp 12.4%).
+  assert.ok(
+    soft > 0.37,
+    `whitecaps have hard edges: only ${(soft * 100).toFixed(1)}% of the foam fades between water and white`,
   );
   const t0 = texture(calm),
     t1 = texture(choppy);
