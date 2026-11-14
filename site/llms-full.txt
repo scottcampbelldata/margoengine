@@ -10522,14 +10522,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   front left, well in front of the focus and lit by the window, shows hard steps about 8 px tall along its outer edge
   and round its engraved ticks instead of a smooth blur. The same steps show with TAAUpscale disposed; with
   `orrery.dof.enabled = false` the ring is clean.
-- **Cause:** not isolated yet. Two parts of the near gather in `packages/dof/src/shaders.ts` (`bokehShader`) switch
-  per pixel or per tile and line up with the steps: a near tap counts as in front only within 1% of the centre's depth
-  (`nearCoC.y<=center.y+max(0.001,center.y*0.01)`), so a surface seen at a grazing angle splits into in-front and
-  behind bands along lines of equal depth; and the tap count comes from the 8x8 workgroup's `nearMax`.
+- **Cause (isolated 2026-11-13 on a CPU model of the gather):** the near and far gathers read a fixed spiral of 64 taps
+  from the sharp scene, so a wide disk is a sparse kernel: over a 32 px `maxRadius` the taps stand about 7 px apart,
+  and a sharp edge blurred through it carries the kernel's staircase along the edge. A CPU copy of `cocShader` and the
+  full-resolution `bokehShader` on a bright plane receding in front of focus, with a slanted edge, gives the blurred
+  edge's position per row second differences up to 7 px (mean 1.2); the same model with 4,096 taps gives at most 1
+  (mean 0.58). Ruled out: the 8x8 workgroup's `nearMax` tap count (all 64 taps at every pixel give the same image, as
+  the shader comment argues) and, mostly, the 1% depth band (no band: max 5, mean 1.0). Taps read from a copy of the
+  scene pre-blurred by half the tap spacing give max 3 (mean 0.66).
 - **Done here:** the Orrery focuses on its mechanism at f/4, where the ring's blur stays small; nothing in the dof
   package changed.
-- **Needed to close:** a GPU repro in `packages/dof` (a bright plane receding in front of focus) that measures the
-  steps, then a near-field classification that does not switch on a fixed depth ratio, with that check as its test.
+- **Needed to close:** a prefiltered tap source (a depth-aware downsampled scene whose texel matches the tap spacing,
+  read at the level of the disk) for the near and far gathers, with a GPU check in `packages/dof` that measures this
+  staircase (largest second difference of the blurred edge per row) on a receding plane. It changes every wide-disk
+  DOF picture, so the dof proofs advance and DOF picture baselines are re-recorded.
 
 ### Open 2026-11-12: margoengine.com does not serve the pages the packages and docs link to (lane D1)
 
@@ -10606,22 +10612,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   mirror and rough floors; probes-live-gpu passes. No stored picture baseline holds a probe-lit surface, so none was
   re-recorded and none is owed by the dev PC.
 
-### Open: Environment IBL and the materials envMap blend prefiltered mips linearly in roughness (KB-A3e, found 2026-11-12)
+### Fixed 2026-11-13 in `97bd9b4818`: Environment IBL and the materials envMap blended prefiltered mips linearly in roughness (KB-A3e)
 
 - **What:** the KB-A3c over-blur, in the other prefiltered-mip lookups. `iblPrefiltered` in
-  `packages/environment/src/ibl.ts` samples `textureSampleLevel(..., roughness * (mips - 1))` with mip m prefiltered
-  at roughness m / (mips - 1), so hardware trilinear mixes the two mips linearly in roughness: with 6 mips, 0.045
-  takes 22.5 % of the 0.2 mip. It also feeds LightProbes' environment fallback and post's SSR replacement.
-  `packages/materials/src/env-map.ts` uploads `levels - 1` for the same `roughness * (levels - 1)` lookup (materials
-  README, Standard shading). `packages/sky/src/lighting.ts` reads `rough * 3.0`; its levels need the same check.
-- **Repro:** `tests/probes-level-blend.test.js`'s CPU mirror floor with the linear blend gives p95 above 3/255; a
-  0.045 metal under a high-contrast Environment shows the 0.2 mip's blur the same way.
+  `packages/environment/src/ibl.ts` sampled `textureSampleLevel(..., roughness * (mips - 1))` with mip m prefiltered
+  at roughness m / (mips - 1), so hardware trilinear mixed the two mips linearly in roughness: with 6 mips, 0.045
+  took 22.5 % of the 0.2 mip. It also feeds LightProbes' environment fallback, EnvironmentLighting's clearcoat and
+  post's SSR replacement. `packages/materials/src/env-map.ts` read the same `roughness * (levels - 1)` lookup for
+  standard shading and the clearcoat.
 - **Cause:** blending in roughness instead of GGX alpha (see KB-A3c).
-- **Fix to build:** `lod = k + (x^2 - k^2) / (2k + 1)`, `x = roughness * (mips - 1)`, `k = min(floor(x), mips - 2)`,
-  in `iblPrefiltered`, materials' env map and every copy (core's WebGL2 twin in webgl2-compat preview if it has one),
-  with a test per site. It moves every Environment-lit pixel between mip roughnesses: the proofs that compose
-  `IBL_WGSL` advance, and picture baselines with IBL-lit low-roughness surfaces are re-recorded on their recording
-  machine (dev PC).
+- **Fix (`97bd9b4818`):** both lookups read `lod = k + (x^2 - k^2) / (2k + 1)`, `x = roughness * (mips - 1)`,
+  `k = min(floor(x), max(mips - 2, 0))` (`iblPrefiltered`, materials' `margoEnvLod`), so the trilinear mix of the two
+  mips equals the material's alpha; 0.045 now takes 5.06 % of the 0.2 mip. The mips, their prefilter and every saved
+  environment are unchanged. The WebGL2 layer runs the same WGSL (no GLSL twin). Regression:
+  `packages/environment/tests/ibl-level-blend.test.js` and `packages/materials/test/env-map.test.js` ("reads its mips
+  by GGX alpha"), which pin the WGSL and check that each mip is read alone at its own roughness and the mixed alpha
+  equals roughness squared. Picture baselines holding Environment-lit low-roughness surfaces move with it and are owed
+  on their recording machine.
+- **Sky, checked and left:** `packages/sky/src/lighting.ts` reads its 64 x 32 light map at `rough * 3.0`, but its levels
+  are box downsamples of one render, not GGX prefilters at roughness m / 3, so the alpha blend has no prefilter
+  roughness to match. How well its level widths follow GGX lobe widths is not measured.
+
 ### Open in core only: direct diffuse weighted by the metal-mixed Fresnel outside gltf-pro (KB3240b, found 2026-11-12)
 
 - **What:** glTF 2.0 Appendix B defines material = mix(dielectric_brdf, metal_brdf, metallic); only the dielectric has a
@@ -11055,6 +11066,8 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   twice, once beside two Draco encodes that each held 2.5 to 3.8 GB, and natively once; all 23 checks passed each
   time. Ruled out: a check that navigates (none does, and the watch now records any main-frame navigation). Still
   open: a repeat will name whether the renderer exited, with its status, or the page was closed or replaced.
+- **2026-11-13, Radeon 680M (ANGLE Direct3D 11):** `MARGO_COMPAT=1` all 23 checks pass, renderer JS heap 11.8 MB
+  after the first check; no page loss.
 
 ### Path tracer analytic furnace read low twice on the WebGL2 layer under a concurrent GPU load page (2026-11-10, open, not reproduced)
 
@@ -11116,6 +11129,8 @@ Repro: GPU-locked `node scripts/reference-rendering/environment.mjs --decompose`
   before the round trip and one after it are identical (509 calls, uniforms and uploads included, object identities
   checked, no deleted object used again). The same flow under `--use-angle=vulkan` is exact at every step. So the
   GPU work Margo submits is unchanged and its result drifts with time on D3D11 only.
+- **2026-11-13, Radeon 680M (ANGLE Direct3D 11):** `MARGO_COMPAT=1 node packages/post/test/ssgi-bounce-browser.mjs`
+  passes twice in a row, so the drift is not on every D3D11 adapter.
 - **Next idea:** a D3D11 repro outside Margo (the trace shader alone, identical draws timed apart) to report upstream;
   the test and its exact assertion stay unchanged.
 
