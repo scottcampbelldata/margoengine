@@ -107,6 +107,8 @@ export class Tessellator {
   private rim = new Set<string>();
   /** Curve parameters an edge must be sampled at: where it passes through a pole of a surface it bounds. */
   private readonly through = new Map<number, number[]>();
+  /** Surfaces an edge bounds faces of whose (u, v) chords may stray from it (`Surface.skewed`). */
+  private readonly skewedOn = new Map<number, Surface[]>();
   private readonly turn: number;
   private readonly maxFaceVertices: number;
 
@@ -197,6 +199,7 @@ export class Tessellator {
             if (at > 0 && Math.abs(samples[at] - t) > near && Math.abs(samples[at - 1] - t) > near)
               samples.splice(at, 0, t);
           }
+        for (const s of this.skewedOn.get(id) ?? []) followChords(c, s, samples, deflection);
         out = samples.map((t) => c.at(t).slice(0, 3) as XYZ);
         out[0] = p1;
         out[out.length - 1] = p2;
@@ -858,6 +861,7 @@ export class Tessellator {
   /**
    * Before a body is meshed: an edge whose curve runs through a pole of a surface it bounds (a great circle over a
    * sphere's poles) is sampled at the pole, so the face whose bound crosses the pole and its neighbour share that point.
+   * An edge on a skewed surface (`Surface.skewed`) is noted, to be sampled until its (u, v) chords there follow it.
    */
   private findPoleCrossings(body: STEPBody, tolerance: number): void {
     for (const face of body.faces) {
@@ -874,7 +878,7 @@ export class Tessellator {
         const v = s.pole(side);
         if (v !== undefined) poles.push(s.at(s.uDomain[0], v).slice(0, 3) as XYZ);
       }
-      if (!poles.length) continue;
+      if (!poles.length && !s.skewed) continue;
       for (const b of list(this.file.get(face).args[1])) {
         const loop = ref(this.file.get(ref(b) ?? -1).args[1]);
         if (loop === undefined || this.file.get(loop).type !== 'EDGE_LOOP') continue;
@@ -882,6 +886,9 @@ export class Tessellator {
           const edge = ref(this.file.args(ref(oriented) ?? -1, 'ORIENTED_EDGE')[3]),
             curve = edge === undefined ? undefined : ref(this.file.args(edge, 'EDGE_CURVE')[3]);
           if (edge === undefined || curve === undefined || this.edges.has(edge)) continue;
+          if (s.skewed && !this.skewedOn.get(edge)?.includes(s))
+            this.skewedOn.set(edge, [...(this.skewedOn.get(edge) ?? []), s]);
+          if (!poles.length) continue;
           let c: Curve;
           try {
             c = this.curve(curve);
@@ -1027,6 +1034,45 @@ export class Tessellator {
 }
 
 /** The plane through a polygon (Newell's normal), for a face the file gives no surface. */
+/**
+ * Adds samples (curve parameters, in order) to an edge on a skewed surface until the surface point at the middle of
+ * each (u, v) chord between samples, a quarter, half and three quarters along, lies within the deflection of the
+ * edge's point as far along. A face's
+ * domain is bounded by those chords: where one strays from the edge, points inside the domain lie past the edge, and
+ * their triangles fold over the face beyond it (a cylinder's seam line on a profile turned about its axis off a
+ * meridian plane: a curve in (u, v) between its two vertices).
+ */
+function followChords(c: Curve, s: Surface, samples: number[], deflection: number): void {
+  const wrap = (x: number, lo: number, period: number) => (period ? lo + ((((x - lo) % period) + period) % period) : x),
+    point = (t: number) => c.at(t).slice(0, 3) as XYZ,
+    uv = [s.parameters(point(samples[0]))],
+    span = Math.abs(samples[samples.length - 1] - samples[0]);
+  for (let i = 1; i < samples.length; i++) uv.push(s.parameters(point(samples[i]), uv[i - 1]));
+  for (let i = 0; i + 1 < samples.length && samples.length < 4096; ) {
+    const [a, b] = [uv[i], uv[i + 1]],
+      [t0, t1] = [samples[i], samples[i + 1]],
+      t = (t0 + t1) / 2;
+    if (Math.abs(t1 - t0) > span * 1e-9 && !s.singular(a[0], a[1]) && !s.singular(b[0], b[1])) {
+      const bu = nearest(b[0], a[0], s.uPeriod),
+        bv = nearest(b[1], a[1], s.vPeriod),
+        // A quarter, half and three quarters of the way: a chord can cross its edge half way (an S bend).
+        strays = [0.25, 0.5, 0.75].some((f) => {
+          const chord = s.at(
+            wrap(a[0] + (bu - a[0]) * f, s.uDomain[0], s.uPeriod),
+            wrap(a[1] + (bv - a[1]) * f, s.vDomain[0], s.vPeriod),
+          );
+          return distance(chord.slice(0, 3) as XYZ, point(t0 + (t1 - t0) * f)) > deflection;
+        });
+      if (strays) {
+        samples.splice(i + 1, 0, t);
+        uv.splice(i + 1, 0, s.parameters(point(t), a));
+        continue;
+      }
+    }
+    i++;
+  }
+}
+
 function planeOf(points: readonly XYZ[]): Surface {
   let n: XYZ = [0, 0, 0];
   for (let i = 0; i < points.length; i++) {

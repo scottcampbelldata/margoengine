@@ -34,6 +34,12 @@ export interface Surface {
   singular(u: number, v: number): boolean;
   /** A spline's knots in u and in v where its derivatives may jump, ascending, ends included (integrals split there). */
   breaks?(): readonly [readonly number[], readonly number[]];
+  /**
+   * Whether an edge's straight (u, v) chord between two of its samples can stray from it further than the samples'
+   * own deflection: on a profile turned about an axis it does not lie in a plane with, a straight line (a cylinder's
+   * seam written that way) is a curve in (u, v).
+   */
+  readonly skewed?: boolean;
 }
 
 /** Su x Sv made unit; at a degenerate point, the normal a little way into the domain. */
@@ -291,6 +297,7 @@ function curveStep(curve: Curve, a: number, b: number, deflection: number, turn:
 class Revolution implements Surface {
   readonly uPeriod = TAU;
   readonly vPeriod: number;
+  readonly skewed = true;
   readonly uDomain = [0, TAU] as const;
   readonly vDomain = [-Infinity, Infinity] as const;
   constructor(

@@ -413,6 +413,18 @@ test('a cylinder side written as an ellipse on it turned about its axis: its cir
   }
 });
 
+test('a straight seam that is a curve in (u, v) is sampled until its chords there follow it', () => {
+  // The same side cut open at the line x = r, y = 0: its two vertices alone made the domain's bound a straight chord
+  // in (u, v) across the true seam curve, and the points inside it past the seam folded 14 triangles over the side.
+  for (const deflection of [0.01, 0.001]) {
+    const m = mesh(cylinder(10, 20, { revolved: true }), deflection),
+      side = 2 * Math.PI * 10 * 20;
+    solid(m, Math.PI * 100 * 20, 2 * Math.PI * 100 + side);
+    const area = faceArea(m, 0);
+    assert.ok(area <= side && side - area <= side * 2e-4, `side area ${area} against ${side}`);
+  }
+});
+
 test('a sphere: one face round a seam meridian between two poles, or a face with no bounds at all', () => {
   for (const bounded of [true, false]) {
     const R = 10,

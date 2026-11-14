@@ -6,6 +6,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-13: a surface of revolution whose profile ends tangent to its circle folds the mesh at that rim (brep)
+
+- **Repro:** `tessellateSTEP` in `@margoengine/brep` on a cylinder (radius 10 mm, height 20 mm) whose side is written
+  as `SURFACE_OF_REVOLUTION` of half an ellipse on it running from (-r, 0, 0) over +y to (r, 0, h), the cylinder cut by
+  the plane through its two rim points (the fixture `revolvedSide` in `packages/brep/tests/step-tessellate.test.js`
+  with its points at height `h / 2 * (1 + x)` instead of `h / 2 + h * x`), deflection 0.01 mm: 12 triangles along the
+  bottom rim wind backwards, and about 195 rim vertices take a normal along the axis instead of outward.
+- **Cause:** at each end the profile runs along the circle it turns on, so Su and Sv are parallel all round that rim
+  (a singular line of the parametrization that is not a pole). `normalOf` (`packages/brep/src/geometry/surfaces.ts`)
+  steps off only when Su x Sv is exactly zero, so a rounding-sized cross product gives an arbitrary normal; and the
+  map from (u, v) is far from linear at a triangle's scale beside the rim (height grows as v squared while the angle
+  shifts with v), so thin triangles the domain's triangulation makes there turn over in space.
+- **Fix needed:** treat a near-zero Su x Sv relative to |Su| |Sv| as singular and step into the profile's own domain
+  for the normal, and grade the domain's points towards such a rim (as `FaceUV.graded` does towards poles), with a
+  test on this fixture: closed, outward, every normal outward.
+
 ### Fixed 2026-11-13: the volumetric cloud deck is missing from the sky's reflection map and scene light (sky, lane S1g)
 
 - **Repro:** `examples/storm-light` before 2026-11-13 S1g (night zenith `[0.004, 0.007, 0.016]`, night ambient

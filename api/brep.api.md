@@ -767,6 +767,7 @@ interface Surface {
     uPole?(side: 1 | -1): number | undefined;
     singular(u: number, v: number): boolean;
     breaks?(): readonly [readonly number[], readonly number[]];
+    readonly skewed?: boolean;
 }
 
 type XYZ = [number, number, number];
