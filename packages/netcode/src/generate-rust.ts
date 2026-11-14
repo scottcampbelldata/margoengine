@@ -188,7 +188,8 @@ export function generateRust(
     let expr: string;
     switch (f.type) {
       case 'struct':
-        expr = `return Msg${f.name}::__from(v);`;
+        // The body's value, with no fallback after it: a trailing Err would be unreachable (a rustc warning).
+        expr = `Msg${f.name}::__from(v)`;
         break;
       case 'array':
         expr = `if let margo_wire::V::A(v)=v{return v.into_iter().map(${fromValue(f.of)}).collect();}`;
@@ -218,7 +219,7 @@ export function generateRust(
       }
     }
     helpers[at] =
-      `fn ${fn}(v:margo_wire::V)->margo_wire::Result<${native(f)}>{${expr}Err(margo_wire::Error("decoded field shape differs"))}`;
+      `fn ${fn}(v:margo_wire::V)->margo_wire::Result<${native(f)}>{${expr}${f.type === 'struct' ? '' : 'Err(margo_wire::Error("decoded field shape differs"))'}}`;
     return fn;
   };
   const out = [

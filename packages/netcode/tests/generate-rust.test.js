@@ -126,6 +126,36 @@ for line in io::stdin().lock().lines(){let line=line.unwrap();let p=line.split('
   }
 });
 
+// Regression: every nested-struct decoder ended `{return MsgX::__from(v);Err(...)}`, so each one gave rustc's
+// "unreachable expression" warning in the user's build (four for the `every` schema). A type check needs no linker, so
+// this runs wherever rustc is, also on a machine without the MSVC linker the tests above need.
+test('generated Rust type-checks with warnings denied', { timeout: 120000 }, () => {
+  const folder = resolve('test-results/batch256', `rust-check-${crypto.randomUUID()}`);
+  mkdirSync(folder, { recursive: true });
+  try {
+    writeFileSync(resolve(folder, 'protocol.rs'), generateRust(JSON.parse(JSON.stringify(every.json))));
+    const checked = spawnSync(
+      'rustc',
+      [
+        '--edition=2021',
+        '--crate-type=lib',
+        '--emit=metadata',
+        '-D',
+        'warnings',
+        '-o',
+        resolve(folder, 'protocol.rmeta'),
+        resolve(folder, 'protocol.rs'),
+      ],
+      { encoding: 'utf8', timeout: 90000, maxBuffer: 16 << 20 },
+    );
+    if (checked.error) throw checked.error;
+    assert.equal(checked.status, 0, checked.stdout + checked.stderr);
+    assert.equal(checked.stderr, '');
+  } finally {
+    rmSync(folder, { recursive: true });
+  }
+});
+
 test('Rust generator validates JSON, preserves hash and safely prefixes Rust keyword names', () => {
   assert.throws(() => generateRust({}), /schema.json/);
   const schema = defineSchema({ types: { Self: { self: 'u8', type: 'bool' } } });
