@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15611318,
+  "total": 15612552,
   "history": [
     {
       "date": "2026-10-24",
@@ -8777,6 +8777,12 @@
       "commit": "f408f3715",
       "reason": "Storm Light fixes: sky/weather gains the TAA reactive mask (reactive option, r8unorm, MSAA-resolved), sky/compat-clouds the moon glow lobe and per-frame march start, water the wall-impact spray",
       "grew": 3
+    },
+    {
+      "date": "2026-11-14",
+      "commit": "c3499c522",
+      "reason": "Storm Light moon fixes: sky/night draws one moon disc (dark limb is the sky plus earthshine, the glow added whole; d9c0bc686), sky/hillaire takes night.js, taa maps an all-sky 4x pixel to sky history (skySample -4 in the camera pass and motion resolve; 0efe724f3)",
+      "grew": 3
     }
   ],
   "items": {
@@ -9794,9 +9800,9 @@
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/compat-clouds": 17573,
     "@margoengine/sky/fog": 2295,
-    "@margoengine/sky/hillaire": 11147,
+    "@margoengine/sky/hillaire": 11597,
     "@margoengine/sky/lighting": 4389,
-    "@margoengine/sky/night": 2523,
+    "@margoengine/sky/night": 2842,
     "@margoengine/sky/planet": 4943,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/presets": 1832,
@@ -9869,7 +9875,7 @@
     "@margoengine/stats/panels": 10192,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
-    "@margoengine/taa": 15106,
+    "@margoengine/taa": 15571,
     "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 8179,
     "@margoengine/taa/upscale-velocity": 19611,
