@@ -1,12 +1,12 @@
-// margo-convert-cad (tools/margo-convert-cad): converts STEP and IGES files through Margo's own B-rep kernel, validates
-// every GLB with the Khronos glTF-Validator when it is installed, loads it with gltf-pro and the light glTF loader, and
-// checks triangles and part names against loadCAD of the same file (the same kernel and default tessellation, run in
-// Node through a stand-in Worker that executes the built CAD worker in-process) and bounds against the shapes' closed
-// forms.
+// margo-convert-cad (tools/margo-convert-cad): converts STEP and IGES files through Margo's own B-rep kernel,
+// validates every GLB with the Khronos glTF-Validator (a root dev dependency: npm ci), loads it with gltf-pro and the
+// light glTF loader, and checks triangles and part names against loadCAD of the same file (the same kernel and
+// default tessellation, run in Node through a stand-in Worker that executes the built CAD worker in-process) and
+// bounds against the shapes' closed forms.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -32,7 +32,7 @@ const encode = (text) => new TextEncoder().encode(text);
 const boxStep = () => encode(brep.bodiesToSTEP([brep.box('box', [0.01, 0.02, 0.03])]));
 /** A cylinder of radius 5 mm and height 8 mm, as STEP. */
 const cylinderStep = () => encode(brep.bodiesToSTEP([brep.cylinder('cyl', 0.005, 0.008)]));
-const validator = existsSync(join(root, 'node_modules/gltf-validator')) ? require('gltf-validator') : null;
+const validator = require('gltf-validator');
 
 function readGLB(glb) {
   const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength),
@@ -51,7 +51,6 @@ function accessor({ json, bin }, index) {
       : new Uint32Array(bin.buffer.slice(at, at + size * 4));
 }
 async function validate(glb) {
-  if (!validator) return null;
   const report = await validator.validateBytes(glb, { maxIssues: 0 });
   assert.equal(
     report.issues.numErrors,
@@ -136,7 +135,7 @@ for (const [name, bytes, file, bounds] of [
       cad.triangles,
     );
     console.log(
-      `${file}: ${data.length} B -> ${glb.length} B, ${stats.parts} parts, ${stats.meshes} meshes, ${stats.triangles} triangles, validator ${issues ? `${issues.numErrors} errors / ${issues.numWarnings} warnings / ${issues.numInfos} infos` : 'not installed'}`,
+      `${file}: ${data.length} B -> ${glb.length} B, ${stats.parts} parts, ${stats.meshes} meshes, ${stats.triangles} triangles, validator ${issues.numErrors} errors / ${issues.numWarnings} warnings / ${issues.numInfos} infos`,
     );
   });
 
