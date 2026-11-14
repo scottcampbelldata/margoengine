@@ -52,6 +52,7 @@ backend can run it.
 | [storm-light/](storm-light/index.html) | A lighthouse on a headland at night in a building storm: beam shafts in fog, rain, lightning and a heaving sea ([details](storm-light/README.md)) |
 | [molten-words/](molten-words/index.html) | Any typed word as dripping liquid chrome |
 | [cathedral-light/](cathedral-light/index.html) | Sun through stained glass into a dusty hall, with a time-of-day slider |
+| [cad-viewer/](cad-viewer/index.html) | A STEP part in a CAD viewer: orbit and view cube, sections, dimensions and measurements ([details](cad-viewer/README.md)) |
 | [biomes/](biomes/index.html) | A 4 km landscape from a biome map: climate controls, a Koppen and layer map, biome painting and height and mask exports |
 
 The same server also serves the loader examples:

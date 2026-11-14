@@ -15,6 +15,7 @@
     "biomes/*.ts",
     "blender-loader/*.ts",
     "boulder/*.ts",
+    "cad-viewer/*.ts",
     "cathedral-light/*.ts",
     "gallery/*.ts",
     "molten-words/*.ts",

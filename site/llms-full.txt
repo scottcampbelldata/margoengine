@@ -25631,6 +25631,7 @@ This first scene needs no model or texture files. For a reader moving from anoth
 - `examples/storm-light/index.html`: A lighthouse on a headland at night in a building storm: beam shafts in fog, rain, lightning and a heaving sea
 - `examples/molten-words/index.html`: Any typed word as dripping liquid chrome
 - `examples/cathedral-light/index.html`: Sun through stained glass into a dusty hall, with a time-of-day slider
+- `examples/cad-viewer/index.html`: A STEP part in a CAD viewer: orbit and view cube, sections, dimensions and measurements
 - `examples/biomes/index.html`: A 4 km landscape from a biome map: climate controls, a Koppen and layer map, biome painting and height and mask exports
 - `examples/blender-loader/`: Loading a `.margo` file exported from Blender
 - `examples/usdz-loader/`: Loading USDZ and USDA files
