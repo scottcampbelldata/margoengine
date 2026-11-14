@@ -47,6 +47,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   reach), every side normal radial, with and without a seam, at 0.005 and 0.001 mm. Before the fix it fails (12
   triangles wound backwards; with the normals alone fixed, the side's area over).
 
+### Fixed 2026-11-13: Storm Light's sky, rain, moon, beam and sea for the video (sky, taa, environment, water, lane S1m)
+
+- **TAA kept no history over the sky (taa).** Repro: `VolumetricClouds` with `temporal` under TAA at a still camera:
+  the deck's march grain stands unaveraged over the sky. Cause: `cameraVelocity` gave depth 0 (the reversed-Z far
+  plane) a history depth of -1 and the resolve took history only above 0. Fix: the sky keeps depth 0 and history from
+  sky alone. Regression: `packages/taa/test/rejection-browser.mjs` (settled stripes at depth 0 change 17.0 levels a
+  frame, as on a surface; 24.7 before).
+- **TAA then averaged the rain over the sky away (sky).** Repro: Storm Light with the sky's history: the streaks over
+  the sky vanish. Cause: rain draws no motion vectors, and the dark sky's history pulled each streak down. Fix:
+  `Weather` `reactive: true` draws the particles' coverage into `reactiveMask`, which Storm Light hands TAA as
+  `reactive`. Regression: the `weather` case of `packages/sky/test/features-check.mjs` (streaks over the sky under
+  TAA 2.30 levels with the mask, 0.87 without, at 4x; WebGPU and the WebGL2 layer).
+- **Local lights lit froxel fog undimmed by the fog on their path (environment).** Repro: Storm Light tour view t2
+  (`view=10,34,26,-6,30,-4&beam=2.5`): 5.9% of the right sky at 255 along the beam. Cause: `localLight` in
+  `volumetric.ts` left out the transmittance from the light to the sample. Fix: exp(-extinction x distance) with the
+  sample's extinction. Regression: `npm run test:fog-beam:browser` (its reference now dims the light along the path;
+  L1 0.014, 0.575 without the fix). Storm Light's fog round the tower was also three times heavy rain's extinction;
+  with both fixed, t2 clips only at the lens.
+- **Whitecaps read as grey blotches (water).** Cause: a soft 0.12 edge and at most 0.6 foam away from the crest core.
+  Fix: a 0.04 edge, 0.9 foam through the cap with bubble holes. Regression: `packages/water/test/whitecaps.browser.mjs`
+  (38.1% of the foam within a quarter of its brightest; 16.1% before).
+- **No spray where swell hits a cliff or stack in deep water (water).** Cause: spray was born only on shallow
+  breakers. Fix: `impact()` throws soft, small clumps up a wall where the swell's orbital velocity drives into it.
+  Regression: the stack case of `packages/water/test/flow.browser.mjs` (1,461 clumps rising 1.88 m; none before).
+- **The moon was a flat grey disc with no glow through the deck (sky).** Cause: the clouds took no forward
+  diffraction lobe of the moon, and Storm Light's disc was dimmer than its own cloud. Fix: a 0.5 x HG lobe in the
+  moon's first octave; the disc as bright over the night sky as the moon is. Regression: the `volumetric` case of
+  `features-check.mjs` (glow inner 38.6 against outer 11.9; 1.13 before).
+
 ### Fixed 2026-11-13: the volumetric cloud deck is missing from the sky's reflection map and scene light (sky, lane S1g)
 
 - **Repro:** `examples/storm-light` before 2026-11-13 S1g (night zenith `[0.004, 0.007, 0.016]`, night ambient

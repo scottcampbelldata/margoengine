@@ -70,7 +70,10 @@ paceEngine(engine);
 const bloom = new Bloom({ strength: 0.18, threshold: 1.4, radius: 0.85 }),
   tonemap = new Tonemap({ curve: 'agx', exposure: 0, contrast: 1.1 }),
   stack = PostStack.attach(engine, [bloom, tonemap]);
-TAA.attach(engine, { depth: () => stack.depthTexture });
+// The rain's streaks are drawn into a reactive mask (the Weather below): TAA keeps the sky's history, which averages the
+// cloud deck's march, but takes little where a streak is, so the rain over the sky stays crisp.
+const rain: { weather?: Weather } = {};
+TAA.attach(engine, { depth: () => stack.depthTexture, reactive: () => rain.weather?.reactiveMask });
 
 // The least night sky light on anything: the moonlit deck itself lights the scene and shows in the sea (the volumetric
 // clouds lay it over the sky's reflection map and scene light), so the floor only keeps the darkest gaps from black.
@@ -83,15 +86,17 @@ const sky = Sky.attach(
     hours: 20.2,
     timeScale: 0,
     turbidity: 6,
-    exposure: -0.6,
+    // Dark enough that the moonlit edges of the deck stand out from the sky behind it, not dark masses on a pale sky.
+    exposure: -0.9,
     night: {
       zenithColor: [0.004, 0.007, 0.016],
       horizonColor: [0.03, 0.04, 0.06],
       hazeDensity: 1.4,
-      // The night's moon sits where the lighting moon is (it lights the scene and casts the shadows): a dim disc whose
-      // glow shows through the thinner cloud and matches its path on the sea.
+      // The night's moon sits where the lighting moon is (it lights the scene and casts the shadows). The disc is far
+      // brighter than anything else in the night sky, as the moon is: bright in the clear gaps, where it blooms into a
+      // soft halo, and still glowing through the thinner cloud that dims it; its path on the sea matches it.
       moonDirection: [-0.3, 0.22, -1],
-      moonColor: [0.16, 0.19, 0.24],
+      moonColor: [6.4, 7.6, 9.6],
       moonSize: 0.03,
       moonPhase: 0.7,
       glowIntensity: 1.2,
@@ -121,6 +126,8 @@ const deck = VolumetricClouds.attach(engine, {
   // edges of the rifts there grainy.
   steps: tier === 'phone' ? 32 : 96,
   lightSteps: 4,
+  // A new march start each frame, which the TAA above averages: the rifts' edges stay smooth instead of grainy.
+  temporal: true,
   maxDistance: 25000,
   depth: () => stack.depthTexture,
 });
@@ -187,7 +194,11 @@ water = Water.attach(engine, {
     { direction: [-0.55, -0.83], amplitude: 0.55, wavelength: 41, steepness: 0.5, phase: 2.1 },
     // The wind sea: short and steep enough that its crests break into foam as the storm rises (gentle crests never
     // reach the water's whitecap steepness), with a low crest sharpness so a full storm still does not fold it.
-    { direction: [-0.95, -0.2], amplitude: 0.82, wavelength: 12, steepness: 0.3, phase: 4.3 },
+    { direction: [-0.95, -0.2], amplitude: 0.82, wavelength: 12, steepness: 0.2, phase: 4.3 },
+    // Short, low chop across it, so the big swells are broken up and stormy rather than smooth: each train stays under
+    // the fold limit (sharpness x amplitude x wavenumber at most a fifth with five trains) up to the full storm's 2.2 m.
+    { direction: [-0.55, -0.84], amplitude: 0.12, wavelength: 7.5, steepness: 0.4, phase: 1.3 },
+    { direction: [-0.98, 0.18], amplitude: 0.06, wavelength: 4.5, steepness: 0.4, phase: 5.2 },
   ],
 });
 
@@ -230,7 +241,9 @@ const weather = Weather.attach(engine, {
   brightness: 0.3,
   opacity: 0.18,
   lightning: { rate: 6, threshold: 0.55, minDistance: 900, maxDistance: 7000, strength: 0.35, seed: 7 },
+  reactive: true,
 });
+rain.weather = weather;
 WaterRain.attach(engine, {
   surface: water,
   weather: {
@@ -519,11 +532,14 @@ function setStorm(value: number) {
   // No flashes for anyone who asks for reduced motion.
   weather.options.lightning!.rate = still ? 0 : 2 + 10 * ramp(0.5, 1, value);
   water?.setWaveHeight(0.25 + 1.95 * value ** 1.4);
-  // Thin enough near the sea that a level ray keeps about a fifth of its light across the fog's 480 m: the fog covers
-  // the far sea and the sky behind it alike (both get its full range), so any thicker and the horizon is lost.
-  fog.options.density = 0.001 + 0.0035 * ramp(0.1, 1, value);
-  stormAir.volumes[0].density = 0.001 + 0.008 * ramp(0.1, 1, value);
-  water?.setWhitecaps(ramp(0.2, 0.95, value)).setChop(0.25 + 0.75 * ramp(0, 1, value));
+  // Heavy rain, not fog: at most about 0.004 per metre round the tower, a visibility of about a kilometre (Koschmieder,
+  // 3.9 over the extinction). Fog three times as thick, lit by the beam along hundreds of metres, blew out the sky
+  // wherever the camera looked along a beam.
+  fog.options.density = 0.0004 + 0.0014 * ramp(0.1, 1, value);
+  stormAir.volumes[0].density = 0.0004 + 0.0032 * ramp(0.1, 1, value);
+  // Whitecaps on the steepest crests only: the chop's slopes add to the swell's, so at full strength they foamed over
+  // much of the sea.
+  water?.setWhitecaps(0.6 * ramp(0.2, 0.95, value)).setChop(0.25 + 0.75 * ramp(0, 1, value));
   fog.options.noise = 0.3 + 0.5 * value;
   fog.options.wind = [wind[0] * 0.6, 0, wind[1] * 0.6];
 }

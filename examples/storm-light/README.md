@@ -10,17 +10,19 @@ to full gale. Everything moves live in WebGPU.
   light the froxel fog of `@margoengine/environment/volumetric`, and `LocalShadows` from `@margoengine/clustered` lets
   the lantern's astragals and the gallery rail cut them. A small additive sprite is the lens as the eye sees it, flaring
   when a beam swings toward the camera.
-- **The sea.** `@margoengine/water`: three Gerstner swell trains from the south-west, Fresnel reflection of the sky,
-  moon glints, refraction of the rocks below the surface, and the headland's height map coupling the sea to the shore
-  for run-up, breakers, foam and spray. The water's `whitecaps` break the steep crests into foam and streaks, ring
-  the cliff foot and the stacks with foam lines and throw spray off the breakers, and its `chop` roughens the swell;
-  the Storm slider raises both. The sea fog stays thin enough that the sea meets the sky in a soft horizon line.
+- **The sea.** `@margoengine/water`: three Gerstner swell trains from the south-west with two short, low chop trains
+  across them, Fresnel reflection of the sky, moon glints, refraction of the rocks below the surface, and the
+  headland's height map coupling the sea to the shore for run-up, breakers, foam and spray. The water's `whitecaps`
+  break the steep crests into foam and streaks, ring the cliff foot and the stacks with foam lines and throw spray off
+  the breakers and up the cliffs and stacks, and its `chop` roughens the swell; the Storm slider raises both. The sea
+  fog stays thin enough that the sea meets the sky in a soft horizon line.
 - **The sky.** `@margoengine/sky`: a stylized night with the moon behind a broken deck of real 3D cloud
-  (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. A flash lights the deck from inside
-  (the clouds' `flash`, above the strike), and the bolt's light from behind the headland and the moon flare with it
-  for a moment. The deck is in the sky's reflection map and scene light, so the sea mirrors the moonlit clouds and a
-  flash lights the rock and the sea through them. Every visit opens with one strike behind the headland 1.6 s in. Click the sky to strike
-  lightning toward where you clicked.
+  (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. The deck takes a new march start each
+  frame and TAA averages it, while the rain's reactive mask keeps the streaks over the sky crisp. A flash lights the
+  deck from inside (the clouds' `flash`, above the strike), and the bolt's light from behind the headland and the moon
+  flare with it for a moment. The deck is in the sky's reflection map and scene light, so the sea mirrors the moonlit
+  clouds and a flash lights the rock and the sea through them. Every visit opens with one strike behind the headland
+  1.6 s in. Click the sky to strike lightning toward where you clicked.
 - **The light.** Moonlight casts shadows through `@margoengine/shadows`; the cottage windows, the lamp post, the boat's
   mast and cabin are small clustered lights, and two cool fills, from the open sea and from the moonlit deck over the
   camera's shoulder, keep the rock faces and their strata in the dark. A soft sphere of thicker storm air round the
