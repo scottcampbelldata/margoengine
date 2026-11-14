@@ -1,5 +1,5 @@
 {
-  "commit": "02b2ceabc",
+  "commit": "86e84e4d5",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1218,8 +1218,8 @@
         "gzip": 18060
       },
       "./volumetric": {
-        "raw": 28078,
-        "gzip": 10199
+        "raw": 28161,
+        "gzip": 10228
       },
       "./reflector": {
         "raw": 31219,
@@ -9602,16 +9602,16 @@
         "gzip": 4133
       },
       "./weather": {
-        "raw": 15798,
-        "gzip": 6027
+        "raw": 18155,
+        "gzip": 6601
       },
       "./sun": {
         "raw": 5386,
         "gzip": 2123
       },
       "./volumetric-clouds": {
-        "raw": 22662,
-        "gzip": 8277
+        "raw": 23249,
+        "gzip": 8455
       },
       "./cloud-shadows": {
         "raw": 7569,
@@ -9646,8 +9646,8 @@
         "gzip": 4842
       },
       "./compat-clouds": {
-        "raw": 49749,
-        "gzip": 16421
+        "raw": 52697,
+        "gzip": 17061
       }
     },
     "@margoengine/splats": {
@@ -9917,7 +9917,7 @@
     "@margoengine/taa": {
       ".": {
         "raw": 50716,
-        "gzip": 15089
+        "gzip": 15092
       },
       "./upscale": {
         "raw": 22870,
@@ -9929,7 +9929,7 @@
       },
       "./upscale-velocity": {
         "raw": 68692,
-        "gzip": 19424
+        "gzip": 19426
       }
     },
     "@margoengine/terrain": {
@@ -13026,8 +13026,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 68901,
-        "gzip": 21792
+        "raw": 71636,
+        "gzip": 22451
       },
       "./fft": {
         "raw": 20654,
