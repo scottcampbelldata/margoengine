@@ -317,20 +317,74 @@ class Revolution implements Surface {
     return normalOf(this, u, v);
   }
   parameters(p: readonly number[], hint?: readonly number[]): [number, number] {
-    // Bring p into the profile's meridian plane (same height along the axis, same distance from it), find v there, then
-    // u as the angle from the profile point to p about the axis.
+    // Each profile point turns on a circle about the axis, at its height h along it and distance r from it; p lies on
+    // (or nearest) the circle whose (h, r) is nearest its own, at u the angle from the profile point to p about the
+    // axis. So v is found in the half plane of (h, r), where the profile is its meridian section. Bringing p into the
+    // meridian plane of one profile point instead, and taking the profile's nearest point to it there, holds only
+    // where the profile lies in that plane: a profile off it (a B-spline across meridians, an ellipse on a cylinder)
+    // left v, and the point, up to 0.27 mm off on a 30 mm part.
     const a = this.axis,
+      radial = (q: readonly number[]) => {
+        const d = sub(q, this.axisPoint);
+        return sub(d, scale(a, dot(d, a)));
+      },
       d = sub(p, this.axisPoint),
       h = dot(d, a),
       radialPart = sub(d, scale(a, h)),
+      r = length(radialPart),
+      // The section's miss at v (height and radius) and its rates there.
+      section = (v: number) => {
+        const c = this.profile.at(v),
+          w = radial(c),
+          rc = length(w),
+          t = c.slice(3, 6),
+          dh = dot(t, a),
+          dr = rc ? dot(w, t) / rc : length(sub(t, scale(a, dh)));
+        return { eh: dot(sub(c, this.axisPoint), a) - h, er: rc - r, dh, dr };
+      },
       seed = this.profile.at(hint?.[1] ?? 0),
-      seedRadial = sub(sub(seed, this.axisPoint), scale(a, dot(sub(seed, this.axisPoint), a))),
-      e0 = unit(seedRadial) ?? unit(radialPart) ?? [1, 0, 0],
-      meridian = add(add(this.axisPoint, scale(a, h)), scale(e0, length(radialPart))),
-      v = this.profile.parameter(meridian, hint?.[1]),
-      c = this.profile.at(v),
-      from = sub(sub(c, this.axisPoint), scale(a, dot(sub(c, this.axisPoint), a)));
-    if (length(radialPart) < 1e-12 || length(from) < 1e-12) return [hint?.[0] ?? 0, v];
+      e0 = unit(radial(seed)) ?? unit(radialPart) ?? [1, 0, 0],
+      meridian = add(add(this.axisPoint, scale(a, h)), scale(e0, r));
+    // Gauss-Newton on the section's miss from v, a step that misses more halved until it does not.
+    const [lo, hi] = this.profile.period ? [-Infinity, Infinity] : this.profile.domain,
+      solve = (start: number) => {
+        let v = Math.min(hi, Math.max(lo, start)),
+          at = section(v),
+          miss = Math.hypot(at.eh, at.er);
+        for (let i = 0; i < 60 && miss > 0; i++) {
+          const rate = at.dh * at.dh + at.dr * at.dr;
+          if (!(rate > 0)) break;
+          let step = -(at.eh * at.dh + at.er * at.dr) / rate,
+            moved = false;
+          for (let k = 0; k < 30 && !moved; k++, step /= 2) {
+            const next = Math.min(hi, Math.max(lo, v + step)),
+              then = section(next),
+              nextMiss = Math.hypot(then.eh, then.er);
+            if (nextMiss < miss) [v, at, miss, moved] = [next, then, nextMiss, true];
+          }
+          if (!moved) break;
+        }
+        return { v, miss };
+      };
+    // From the profile's point nearest p brought into one profile point's meridian plane (exact for a profile in it).
+    // Where that misses (a profile across meridians, whose height there may turn back), from the nearest of samples
+    // along its range too.
+    let best = solve(this.profile.parameter(meridian, hint?.[1]));
+    const span = this.profile.period ? [0, this.profile.period] : [lo, hi];
+    if (best.miss > 1e-9 * Math.max(length(d), 1e-9) && Number.isFinite(span[0]) && Number.isFinite(span[1])) {
+      const n = 64,
+        tries = Array.from({ length: n + 1 }, (_, k) => span[0] + ((span[1] - span[0]) * k) / n)
+          .map((t) => ({ t, miss: Math.hypot(section(t).eh, section(t).er) }))
+          .sort((x, y) => x.miss - y.miss)
+          .slice(0, 3);
+      for (const { t } of tries) {
+        const r = solve(t);
+        if (r.miss < best.miss) best = r;
+      }
+    }
+    const v = best.v;
+    const from = radial(this.profile.at(v));
+    if (r < 1e-12 || length(from) < 1e-12) return [hint?.[0] ?? 0, v];
     const u = Math.atan2(dot(cross(from, radialPart), a), dot(from, radialPart));
     return [wrap(u), v];
   }

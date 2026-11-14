@@ -141,13 +141,13 @@ const Z = [0, 0, 1],
   X = [1, 0, 0];
 
 /** A cylinder of radius r and height h on z = 0, its side one face closed by a seam line (or two circles, no seam). */
-function cylinder(r, h, { seam = true } = {}) {
+function cylinder(r, h, { seam = true, revolved = false } = {}) {
   const w = new Writer(),
     v0 = w.vertex([r, 0, 0]),
     v1 = w.vertex([r, 0, h]),
     bottom = w.edge(v0, v0, w.circle([0, 0, 0], Z, X, r)),
     top = w.edge(v1, v1, w.circle([0, 0, h], Z, X, r)),
-    side = w.add(`CYLINDRICAL_SURFACE('',${w.axis([0, 0, 0])},${real(r)})`);
+    side = revolved ? revolvedSide(w, r, h) : w.add(`CYLINDRICAL_SURFACE('',${w.axis([0, 0, 0])},${real(r)})`);
   let lateral;
   if (seam) {
     const s = w.edge(v0, v1, w.line([r, 0, 0], Z));
@@ -158,6 +158,32 @@ function cylinder(r, h, { seam = true } = {}) {
     w.face([w.loop([bottom, false])], w.add(`PLANE('',${w.axis([0, 0, 0])})`), false),
     w.face([w.loop([top, true])], w.add(`PLANE('',${w.axis([0, 0, h])})`)),
   ]);
+}
+
+/**
+ * The side of a cylinder of radius r about z written as a surface of revolution: half an ellipse on it (the cylinder cut
+ * by a plane leaning across it, from (-r, 0, -h/2) over +y to (r, 0, 3h/2)) turned about z. The profile lies in no
+ * plane with the axis, so a point's (u, v) is not found in one meridian plane, and the seam line x = r, y = 0 is a curve
+ * in (u, v); between z = 0 and h the profile is never tangent to the circles it turns on.
+ */
+function revolvedSide(w, r, h) {
+  const s = Math.SQRT1_2,
+    net = [
+      [-1, 0, 1],
+      [-1, 1, s],
+      [0, 1, 1],
+      [1, 1, s],
+      [1, 0, 1],
+    ],
+    points = net.map(([x, y]) => w.point([r * x, r * y, h / 2 + h * x])),
+    profile = w.add(
+      `(BOUNDED_CURVE()B_SPLINE_CURVE(2,(${points.join(',')}),.UNSPECIFIED.,.F.,.F.)` +
+        `B_SPLINE_CURVE_WITH_KNOTS((3,2,3),(0.,1.,2.),.UNSPECIFIED.)CURVE()GEOMETRIC_REPRESENTATION_ITEM()` +
+        `RATIONAL_B_SPLINE_CURVE((${net.map((q) => real(q[2])).join(',')}))REPRESENTATION_ITEM(''))`,
+    );
+  return w.add(
+    `SURFACE_OF_REVOLUTION('',${profile},${w.add(`AXIS1_PLACEMENT('',${w.point([0, 0, 0])},${w.direction(Z)})`)})`,
+  );
 }
 
 /** A sphere of radius R at the origin: one face bounded by a seam meridian walked both ways, or with no bounds. */
@@ -360,6 +386,30 @@ test('a cylinder: its side closed by a seam line, or bounded by two circles with
       const [x, y, z] = [m.positions[i], m.positions[i + 1], m.positions[i + 2]];
       assert.ok(Math.abs(Math.hypot(x, y) - 10) < 1e-4 || Math.abs(z) < 1e-4 || Math.abs(z - 20) < 1e-4);
     }
+  }
+});
+
+/** The area of a mesh's face `index`. */
+function faceArea(m, index) {
+  const f = m.faces[index],
+    at = (k) => [0, 1, 2].map((j) => m.positions[m.indices[k] * 3 + j]);
+  let area = 0;
+  for (let t = f.first; t < f.first + f.count; t += 3)
+    area += len(cross(sub(at(t + 1), at(t)), sub(at(t + 2), at(t)))) / 2;
+  return area;
+}
+
+test('a cylinder side written as an ellipse on it turned about its axis: its circles land at their own (u, v)', () => {
+  // The profile is off every meridian plane: a point was brought into one profile point's meridian plane and v taken
+  // from the profile's nearest point there, up to 0.3 mm off on this part, so the domain's bounds lay off the face and
+  // 79 triangles folded over (the side's area 1% over).
+  for (const deflection of [0.01, 0.001]) {
+    const m = mesh(cylinder(10, 20, { seam: false, revolved: true }), deflection),
+      side = 2 * Math.PI * 10 * 20;
+    solid(m, Math.PI * 100 * 20, 2 * Math.PI * 100 + side);
+    // Inscribed: the side's mesh is no larger than the side, and short of it by less than the deflection's reach.
+    const area = faceArea(m, 0);
+    assert.ok(area <= side && side - area <= side * 2e-4, `side area ${area} against ${side}`);
   }
 });
 
