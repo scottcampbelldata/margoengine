@@ -42,7 +42,9 @@ const shoot = async (name, extra) => {
     });
   }, extra);
   const png = await decodePNG(
-    await page.locator('canvas').screenshot({ path: `test-results/water-whitecaps-${hardware.webgpu.vendor}-${name}.png` }),
+    await page
+      .locator('canvas')
+      .screenshot({ path: `test-results/water-whitecaps-${hardware.webgpu.vendor}-${name}.png` }),
   );
   const luma = new Float64Array(WIDTH * HEIGHT);
   for (let i = 0; i < luma.length; i++)
@@ -57,6 +59,19 @@ const whiter = (a, b) => {
   for (let y = SEA; y < HEIGHT; y++)
     for (let x = 0; x < WIDTH; x++, total++) if (b[y * WIDTH + x] - a[y * WIDTH + x] > 25) n++;
   return n / total;
+};
+// How crisp the foam is: of the sea pixels the whitecaps whiten, the share lifted to at least three quarters of the
+// brightest foam (the 95th percentile of the lift). Soft, half-covered patches read as grey blotches and score low.
+const crispness = (a, b) => {
+  const lifts = [];
+  for (let y = SEA; y < HEIGHT; y++)
+    for (let x = 0; x < WIDTH; x++) {
+      const lift = b[y * WIDTH + x] - a[y * WIDTH + x];
+      if (lift > 25) lifts.push(lift);
+    }
+  lifts.sort((p, q) => p - q);
+  const top = lifts[Math.floor(lifts.length * 0.95)];
+  return lifts.filter((lift) => lift >= top * 0.75).length / lifts.length;
 };
 // Fine detail: RMS of luma minus its 3x3 mean over the sea.
 const texture = (l) => {
@@ -101,6 +116,13 @@ try {
   console.log(`whitecaps: ${(h * 100).toFixed(1)}% of the sea whiter at 0.5, ${(f * 100).toFixed(1)}% at 1`);
   assert.ok(f > 0.06, `whitecaps 1 whitens only ${(f * 100).toFixed(2)}% of the sea`);
   assert.ok(h > 0.005 && h < f * 0.8, `whitecaps do not grow with the amount: ${h} at 0.5, ${f} at 1`);
+  const crisp = crispness(calm, full);
+  console.log(`whitecaps: ${(crisp * 100).toFixed(1)}% of the foam within a quarter of its brightest`);
+  // Crisp white caps (2026-11-13; Radeon 680M: 38.1%); the former soft, partly covered patches scored 16.1%.
+  assert.ok(
+    crisp > 0.3,
+    `whitecaps read as grey blotches: only ${(crisp * 100).toFixed(1)}% of the foam is near its brightest`,
+  );
   const t0 = texture(calm),
     t1 = texture(choppy);
   console.log(`chop: fine texture ${t0.toFixed(2)} -> ${t1.toFixed(2)}`);

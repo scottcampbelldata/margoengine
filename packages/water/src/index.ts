@@ -139,8 +139,9 @@ export interface WaterOptions {
 // Snell's window, so it never reaches the eye (total internal reflection).
 // Whitecaps (frame.grid.z, 0 draws none; whitecap()): a crest breaks where its components' summed slope a*k*sin, read a
 // little ahead of the crest where spilling foam runs down the face, passes a threshold that falls as the amount rises;
-// gradient noise breaks it into patches, soft-edged (denser toward the breaking crest, broken into bubbly foam by two
-// finer octaves), and toward a gale long streaks lie down-wind (Beaufort 8 and up). Thresholds and noise scales are
+// gradient noise breaks it into patches with a crisp edge, white through on the breaking crest and holed into bubbly foam
+// by two finer octaves (until 2026-11-13 soft-edged and at most 0.6 of foam at a distance, so caps read as grey
+// blotches), and toward a gale long streaks lie down-wind (Beaufort 8 and up). Thresholds and noise scales are
 // Margo tuning. Foam lines that the backwash carries out from the shore, wider than the shoreline band, follow
 // landNearby(): how much land lies round a point of the coastal grid, ground at or above the sea in 18 taps on three
 // rings of 1.2, 2.4 and 3.6 foam distances, nearer rings weighing more (0 in open water, about 0.5 beside a straight
@@ -272,9 +273,9 @@ fn whitecap(xz:vec2f,footprint:f32)->f32 {
  let detail=1.0-smoothstep(0.3,1.5,footprint);
  let patches=noise(q*vec2f(0.32,0.7)+vec2f(-t*0.35,0)).x+noise(q*vec2f(1.3,2.9)+vec2f(-t*0.8,5.1)).x*0.5*detail;
  let threshold=mix(0.42,0.16,amount);
- let mask=smoothstep(threshold,threshold+0.12,crest+patches*0.08);
+ let mask=smoothstep(threshold,threshold+0.04,crest+patches*0.08);
  let bubbles=noise(q*vec2f(0.75,1.3)+vec2f(-t*0.6,2.3)).x+noise(q*vec2f(2.1,2.7)+vec2f(-t*0.9,7.7)).x*0.5;
- let caps=mask*mix(0.6,smoothstep(0.0,0.5,bubbles+mask*0.45),detail);
+ let caps=mask*mix(0.9,smoothstep(-0.2,0.2,bubbles+mask*0.5),detail);
  let streaks=amount*amount*smoothstep(0.25,0.55,noise(q*vec2f(0.06,1.4)+vec2f(-t*0.5,0)).x)*0.25*detail;
  return clamp(caps+streaks,0.0,1.0);
 }
@@ -1230,7 +1231,14 @@ export class Water implements EnginePlugin {
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
     pass.end();
-    this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!, reflection, this.skySampler!, fog ? this.fogBuffer : undefined);
+    this.spray?.draw(
+      c,
+      this.surfaceDepth!,
+      this.surfaceView!,
+      reflection,
+      this.skySampler!,
+      fog ? this.fogBuffer : undefined,
+    );
   }
   /**
    * Lets a capture hook (`@margoengine/post` SSR: `ssr.add(water)`) draw the water surface with `draw(c, 'capture', ...)`
