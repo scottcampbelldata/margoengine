@@ -58,3 +58,10 @@ test('empty fitted blocks have stable caret and hit testing', () => {
   assert.equal(hitTest(l, 0, 0), 0);
   assert.deepEqual(caretRect(l, 1), { x: 0, top: 0, bottom: 0, line: 0 });
 });
+test('batch 132b: white space trimmed before the ellipsis is truncated, and the marker owns no source text', () => {
+  const l = fitText('abc def ghi', { maxLines: 1, maxWidth: 2.2 }, measure);
+  assert.equal(l.displayText, 'abc…');
+  assert.equal(l.visibleEnd, 3);
+  const marker = l.glyphs.find(g => g.cluster === '…');
+  assert.deepEqual([marker.index, marker.length], [3, 0]);
+});

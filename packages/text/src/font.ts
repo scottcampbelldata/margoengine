@@ -89,8 +89,13 @@ export class Font implements TextMeasurer {
       options.weight ?? (face && face.weight !== 'normal' && !/\s/.test(face.weight) ? face.weight : 'normal'),
     );
     this.style = options.style ?? (face?.style === 'italic' || face?.style === 'oblique' ? face.style : 'normal');
-    if (!/^(normal|bold|bolder|lighter|[1-9]00|\d{1,4}(\.\d+)?)$/.test(this.weight))
-      throw new TypeError('Invalid font weight; use normal, bold, bolder, lighter or a number such as 400.');
+    // CSS Fonts 4 section 2.2: a numeric weight is valid only from 1 to 1000. The canvas ignores a font shorthand it
+    // cannot parse (HTML canvas font setter), so an out-of-range weight would measure in the default 10px font.
+    if (
+      !/^(normal|bold|bolder|lighter)$/.test(this.weight) &&
+      !(/^\d{1,4}(\.\d+)?$/.test(this.weight) && Number(this.weight) >= 1 && Number(this.weight) <= 1000)
+    )
+      throw new TypeError('Invalid font weight; use normal, bold, bolder, lighter or a number from 1 to 1000 such as 400.');
     if (!['normal', 'italic', 'oblique'].includes(this.style))
       throw new TypeError('Invalid font style; use normal, italic or oblique.');
   }

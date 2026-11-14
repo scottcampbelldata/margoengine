@@ -84,8 +84,11 @@ export function fitText(text: string, options: FitOptions, measurer: TextMeasure
     let candidate: TextLayout | undefined;
     // Measure each candidate: kerning and shaping can change at the new boundary.
     for (let i = boundaries.length - 1; i >= 0; i--) {
-      end = boundaries[i];
-      display = text.slice(0, end).replace(/\s+$/u, '') + suffix;
+      // Trailing white space is dropped before the marker, so it is truncated too: the visible source ends at the
+      // trimmed prefix and the marker maps to that offset with no source length.
+      const prefix = text.slice(0, boundaries[i]).replace(/\s+$/u, '');
+      end = prefix.length;
+      display = prefix + suffix;
       candidate = measure(display, size);
       if (candidate.lines.length <= count && candidate.bounds.right - candidate.bounds.left <= width) break;
     }

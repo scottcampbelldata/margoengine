@@ -876,3 +876,10 @@ test('KB4990b: release drops one bitmap slot and frees its page once the page ho
   const c = atlas.place(bitmap(2));
   assert.deepEqual([c.page, c.x, c.y], [0, 0, 0]);
 });
+
+test('batch 132b: a numeric font weight outside CSS 1..1000 is refused', () => {
+  // CSS Fonts 4 section 2.2 allows <number [1,1000]>; the canvas ignores a font shorthand it cannot parse, so
+  // weight 0 or 1001 would have measured every glyph in the default 10px font.
+  for (const weight of [0, '0', 1001, '1001', 9999, '0.5']) assert.throws(() => new Font({ weight }), TypeError);
+  for (const weight of [1, 1000, 350.5, '100', 'bold']) assert.equal(new Font({ weight }).weight, String(weight));
+});
