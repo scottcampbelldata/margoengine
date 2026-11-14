@@ -1,7 +1,7 @@
 // `npm run publish:rehearsal`: everything a first npm release does, except the release. It never publishes. No npm
 // command here writes to a registry, and the stand-in registry below refuses every write (a write fails the run).
 //
-//   1. Packs every published package (packages/*, tools/margo-convert, tools/create-margo) into a temp folder.
+//   1. Packs every published package (packages/*, tools/margo-convert, tools/margo-convert-cad, tools/create-margo) into a temp folder.
 //   2. Audits each tarball: manifest, exports, bin and types files present, LICENSE, NOTICE and README shipped, no test
 //      or private files, no install script, no local dependency spec, no maintainer path or email, every bare import
 //      in the shipped code declared, every internal dependency served at a version its range accepts.
@@ -339,7 +339,7 @@ async function rehearse(options) {
         seconds: 300,
       });
     }
-    for (const tool of ['tools/margo-convert', 'tools/create-margo'])
+    for (const tool of ['tools/margo-convert', 'tools/margo-convert-cad', 'tools/create-margo'])
       await run('npm', ['pack', `./${tool}`, '--ignore-scripts', '--pack-destination', tarballs], {
         cwd: root,
         env: process.env,

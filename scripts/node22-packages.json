@@ -26,6 +26,12 @@
         "tests/margo-convert-thumbnail.test.js"
       ]
     },
+    "@margoengine/margo-convert-cad": {
+      "reason": "bin margo-convert-cad: offline STEP, IGES, SAT, XT and JT to GLB through the B-rep kernel",
+      "tests": [
+        "tests/margo-convert-cad.test.js"
+      ]
+    },
     "create-margo": {
       "reason": "bin create-margo: the project generator",
       "tests": [

@@ -3,14 +3,14 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 109 published packages (107 in `packages/`
-plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
+assets the site and examples use. It covers all 110 published packages (107 in `packages/`
+plus `create-margo`, `margo-convert` and `margo-convert-cad`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-94 of 109 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+95 of 110 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -192,6 +192,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/xr` | none | none | LICENSE, NOTICE |
 | `create-margo` | none | none | LICENSE, NOTICE |
 | `margo-convert` | none | none | LICENSE, NOTICE |
+| `@margoengine/margo-convert-cad` | none | none | LICENSE, NOTICE |
 
 ## Assets used by the site, demos and examples (not in any npm tarball)
 

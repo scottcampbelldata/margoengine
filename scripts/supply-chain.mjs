@@ -514,7 +514,7 @@ const ASSETS = [
 export function publishedPackages() {
   const dirs = readdirSync(join(root, 'packages'))
     .map((dir) => `packages/${dir}`)
-    .concat(['tools/create-margo', 'tools/margo-convert'])
+    .concat(['tools/create-margo', 'tools/margo-convert', 'tools/margo-convert-cad'])
     .filter((dir) => existsSync(join(root, dir, 'package.json')))
     .sort();
   return dirs.map((dir) => ({ dir, manifest: json(`${dir}/package.json`) }));
@@ -654,8 +654,8 @@ export function render({ rows, deps, scripts, deprecated, tally, total }, addend
 
 Margo Engine's own code is licensed under the Apache License 2.0 (\`LICENSE\` and \`NOTICE\`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all ${rows.length} published packages (${rows.length - 2} in \`packages/\`
-plus \`create-margo\` and \`margo-convert\`). \`node scripts/supply-chain.mjs --check\` (in \`npm run verify\`, through
+assets the site and examples use. It covers all ${rows.length} published packages (${rows.length - 3} in \`packages/\`
+plus \`create-margo\`, \`margo-convert\` and \`margo-convert-cad\`). \`node scripts/supply-chain.mjs --check\` (in \`npm run verify\`, through
 \`tests/supply-chain.test.js\`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 

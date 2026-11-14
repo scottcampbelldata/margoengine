@@ -1,0 +1,53 @@
+{
+  "name": "@margoengine/margo-convert-cad",
+  "version": "1.0.0",
+  "description": "Offline STEP, IGES, ACIS SAT, Parasolid XT and JT to GLB conversion through Margo's own B-rep kernel.",
+  "keywords": [
+    "cad",
+    "cli",
+    "converter",
+    "gltf",
+    "iges",
+    "margoengine",
+    "step",
+    "3d"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "tools/margo-convert-cad"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "bin": {
+    "margo-convert-cad": "cad-cli.js"
+  },
+  "exports": {
+    ".": "./convert.js"
+  },
+  "sideEffects": false,
+  "files": [
+    "cad-cli.js",
+    "convert.js",
+    "pipeline",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "peerDependencies": {
+    "@margoengine/brep": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/exporters": "^1.0.0",
+    "@margoengine/machinery": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

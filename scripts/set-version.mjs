@@ -1,4 +1,4 @@
-// Sets every published package (packages/*, tools/create-margo, tools/margo-convert and the create-margo template's
+// Sets every published package (packages/*, tools/create-margo, tools/margo-convert, tools/margo-convert-cad and the create-margo template's
 // dependencies) to one version, with every internal range `^<version>`. All packages ship in lockstep, so an app never
 // mixes versions; tests/versions.test.js fails if they drift. Usage: node scripts/set-version.mjs 1.0.0
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
