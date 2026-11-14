@@ -115,7 +115,8 @@ window.check={samples:sceneSamples,
   // their mean is smoother pixel to pixel than any one of them; without it, still frames are identical.
   sky.options.hours=10;sky.options.lighting={ambient:{day:[0,0,0],night:[0,0,0]}};view(...views.ground);
   const grain=(f)=>{let s=0;for(let p=0;p<f.length-4;p+=4)if((p/4)%W<W-1)for(let c=0;c<3;c++)s+=Math.abs(f[p+c]-f[p+4+c]);return s;};
-  const still=async(temporal)=>{const c=VolumetricClouds.attach(engine,{sky,coverage:0.6,steps:16,temporal,depth:()=>post.depthTexture});await frame();
+  const still=async(temporal)=>{const c=VolumetricClouds.attach(engine,{sky,coverage:0.6,steps:16,temporal,depth:()=>post.depthTexture});await waitForPipelines(frame);
+   // fixed-wait: eight still frames are the samples the mean averages, taken once the pipelines are in place
    const frames=[];for(let k=0;k<8;k++)frames.push(await frame());c.dispose();
    const mean=new Float32Array(frames[0].length);for(const f of frames)for(let p=0;p<f.length;p++)mean[p]+=f[p]/frames.length;
    return {moved:diff(frames[1],frames[0]).changed,one:grain(frames[0]),mean:grain(mean)};};
