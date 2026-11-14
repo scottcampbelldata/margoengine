@@ -32,12 +32,18 @@ const git = (args, no) => {
 const object = (name) => git(['rev-parse', '--verify', '--quiet', '--end-of-options', name], 1)?.trim();
 const proof = () => basename(process.argv[1] ?? 'proof').replace(/\.proof\.js$|\.m?js$/, '');
 
-/** True while a --current proof reads golden outputs (golden.js): then a missing revision is an error, not HISTORICAL. */
-export const strict = { value: false };
+/** value: a --current proof reads golden outputs (golden.js); capture: it captures them (capture.mjs). Either way a
+ * missing revision is an error, not HISTORICAL: a capture that exited 0 as HISTORICAL stored an empty baseline over the
+ * real one. */
+export const strict = { value: false, capture: false };
 
 /** A revision this clone does not hold: HISTORICAL and exit 0 for a pinned claim, an error in golden mode. */
 export function historical(ref) {
   const message = `${ref}, a commit only in the pre-rewrite history (this clone does not hold it)`;
+  if (strict.capture)
+    throw new Error(
+      `${proof()} capture needs ${message}; nothing was stored: capture it on a checkout that has the commit.`,
+    );
   if (strict.value)
     throw new Error(
       `${proof()} --current asked Git for ${ref}; a --current run reads its baseline from baselines/ only (golden.js), so a fresh clone runs it too.`,

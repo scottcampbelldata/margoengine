@@ -261,8 +261,10 @@ export function deterministicMath() {
 export function begin(ref, env = process.env) {
   state.proof = basename(process.argv[1] ?? '').replace(/\.proof\.js$/, '');
   state.ref = ref;
-  if (env.PROOFS_GOLDEN_CAPTURE === '1') state.mode = 'capture';
-  else if (env.PROOFS_GOLDEN === '1' || !holds(ref)) state.mode = 'read';
+  if (env.PROOFS_GOLDEN_CAPTURE === '1') {
+    state.mode = 'capture';
+    strict.capture = true;
+  } else if (env.PROOFS_GOLDEN === '1' || !holds(ref)) state.mode = 'read';
   else state.mode = 'check';
   if (state.mode === 'read') {
     strict.value = true;

@@ -149,6 +149,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   test against an analytic bicubic with cross terms (for example x = s, y = t, z = s^2 t^3 over two patches each way),
   comparing sampled points and the meshed area with the exact values, in place of the refusal test.
 
+### Fixed 2026-11-14: a golden capture on a clone without the pre-rewrite history emptied the stored baselines (lane BB3)
+
+- **Repro:** on a clone that lacks the pre-rewrite commits, `node examples/package-benchmarks/proofs/capture.mjs
+  --only=color-output,post-stack` printed FAIL and "nothing was stored", yet both `baselines/*.json` (and `.gz`)
+  now held the new ref with no outputs and no facts.
+- **Cause:** color-output's `ignoreAgx` fact asks Git for eaddd64 and post-stack builds creative at 5b1fe66^; for a
+  commit the clone lacks, `history.js` printed HISTORICAL and exited 0, and `golden.js`'s exit hook, seeing exit 0 in
+  capture mode, stored what had been captured by then: nothing.
+- **Fix:** while capturing (`strict.capture`, set by `golden.js` `begin`), a missing commit throws, so the run fails
+  and the stored baseline stays byte for byte. Regression: `tests/proofs-golden.test.js`, "a capture that needs a
+  commit this clone lacks fails and leaves the stored baseline as it was". Those two proofs still capture only on a
+  checkout that holds the pre-rewrite history.
+
 ### Open 2026-11-13: DOF near field draws stepped blocks along a bright surface far in front of focus (lane S2)
 
 - **Repro:** `examples/orrery/index.html` on the Radeon 680M (WebGPU, 1920x1080), camera

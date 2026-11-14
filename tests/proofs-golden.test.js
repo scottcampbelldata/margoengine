@@ -129,6 +129,34 @@ test('capture stores, read mode replays from the store alone, and a changed func
   }
 });
 
+// Bug (2026-11-14, lane BB3): a capture whose proof asked Git for a commit this clone lacks exited 0 as HISTORICAL, and
+// the exit hook stored what it had captured by then, nothing, over the proof's real baseline (capture.mjs still said
+// "nothing was stored"). Now such a capture fails and the stored baseline stays byte for byte.
+test('a capture that needs a commit this clone lacks fails and leaves the stored baseline as it was', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
+  try {
+    assert.equal(proof(dir, tiny(good), { PROOFS_GOLDEN_CAPTURE: '1' }).status, 0);
+    const before = readFileSync(join(dir, 'baselines/tiny.json'));
+    const missing = proof(
+      dir,
+      `import { revision } from ${JSON.stringify(url('history.js'))};
+begin('HEAD');
+await golden('calls', () => 1);
+revision('0000000000000000000000000000000000000001');`,
+      { PROOFS_GOLDEN_CAPTURE: '1' },
+    );
+    assert.notEqual(missing.status, 0, missing.out);
+    assert.match(
+      missing.out,
+      /tiny capture needs 0000000000000000000000000000000000000001, a commit only in the pre-rewrite/,
+    );
+    assert.doesNotMatch(missing.out, /^HISTORICAL/m);
+    assert.deepEqual(readFileSync(join(dir, 'baselines/tiny.json')), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the store is checked against its SHA-256 and read mode never asks Git', () => {
   const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
   try {
