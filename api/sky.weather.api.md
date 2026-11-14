@@ -32,6 +32,7 @@ export class Weather implements EnginePlugin {
     occlusion?: WeatherOcclusion;
     constructor(options?: WeatherOptions);
     static attach(engine: EngineKernel, options?: WeatherOptions): Weather;
+    get reactiveMask(): GPUTexture | undefined;
     get amount(): number;
     get flash(): number;
     get wetness(): number;
@@ -77,6 +78,7 @@ export interface WeatherOptions {
     color?: Vec3;
     brightness?: number;
     opacity?: number;
+    reactive?: boolean;
     lightning?: WeatherLightningOptions;
 }
 

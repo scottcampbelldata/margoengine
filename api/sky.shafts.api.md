@@ -75,6 +75,7 @@ interface VolumetricCloudOptions {
     ambient?: readonly [Vec3, Vec3];
     depth?: () => GPUTexture | undefined;
     flash?: VolumetricCloudFlash;
+    temporal?: boolean;
 }
 
 interface VolumetricCloudSky {
