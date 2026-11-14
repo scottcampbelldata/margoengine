@@ -25,6 +25,10 @@ fn random(value:u32)->f32 {var x=value;x=(x^(x>>16u))*2246822519u;x=(x^(x>>13u))
 // Review of Fluid Mechanics 35) and back off it; clumps are 0.15 to 0.4 m across and grow as they rise and thin, many of
 // them, each a soft puff that fades from its centre, so a burst reads as a cloud of spray and no clump as a white ball.
 // Rates, thresholds and clump sizes are Margo tuning.
+// impact() returns the wall's direction from open water at the pixel (xy, unit) and the swell's drive into it in m/s (z),
+// z 0 when there is no wall. A droplet's velocity.w of 2 to 3 marks an impact clump (and sets its size); a breaker
+// droplet keeps 0 to 1. In the render shader an impact clump's alpha carries 2 more, which the fragment reads as the
+// soft puff's mark.
 const simulate =
   waterFrame +
   oceanWaves +
@@ -34,7 +38,6 @@ const simulate =
 @group(0) @binding(2) var flux:texture_2d<f32>;
 @group(0) @binding(3) var<storage,read_write> droplets:array<Particle>;
 @group(0) @binding(4) var<storage,read> connected:array<u32>;
-// The wall's direction from open water at pixel (xy, unit) and the swell's drive into it in m/s (z); z 0 when no wall.
 fn impact(pixel:vec2i,size:vec2i,water:vec4f)->vec3f {
  if(water.x<0.5||connected[u32(pixel.y*size.x+pixel.x)+1u]!=0u){return vec3f(0);}
  var n=vec2f(0);
@@ -74,7 +77,6 @@ fn impact(pixel:vec2i,size:vec2i,water:vec4f)->vec3f {
     let xz=frame.coast.xy+(vec2f(pixel)+0.5+hit.xy*0.4+side)*cell;
     p.position=vec4f(xz.x,water.x+water.y+0.1,xz.y,0.8+random(key+5u)*0.9);
     let up=min(16.0,hit.z*(4.0+3.0*random(key+7u))+1.0);let back=-hit.xy*(0.5+random(key+6u)*1.5)+vec2f(-hit.y,hit.x)*(random(key+8u)-0.5)*1.5;
-    // velocity.w 2 to 3 marks an impact clump (and sets its size); a breaker droplet keeps 0 to 1.
     p.velocity=vec4f(back.x,up,back.y,2.0+random(key+9u));break;
    }
   }
@@ -103,7 +105,6 @@ fn spraySky()->vec3f {
  let corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));let uv=corners[v];
  let right=normalize(vec3f(frame.camera[0].x,frame.camera[1].x,frame.camera[2].x));let up=normalize(vec3f(frame.camera[0].y,frame.camera[1].y,frame.camera[2].y));
  var size=(0.018+p.velocity.w*0.025)*(1.0+p.position.w*0.2)*(1.0+2.5*frame.grid.z);var alpha=min(1.0,p.position.w*5.0);
- // An impact clump: its alpha carries 2 more, which the fragment reads as the soft puff's mark.
  if(p.velocity.w>=2.0){size=(0.15+0.25*(p.velocity.w-2.0))*(1.0+frame.grid.z)*(1.8-0.6*min(1.0,p.position.w));alpha=2.0+min(1.0,p.position.w*2.0)*0.4;}
  let world=p.position.xyz+(right*uv.x+up*uv.y)*size;
  return Output(frame.camera*vec4f(world,1),uv,alpha,spraySky());
