@@ -3,6 +3,7 @@ import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { capsAsSolid } from './closed.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { cachedBindGroup } from '../../shared/draw-cache.js';
+import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -104,7 +105,7 @@ export class PartPacks {
     // The same frame values core writes into its own uniform at binding 0.
     data.set(c.camera.matrix);
     data.set(c.camera.position, 16);
-    data.set(lighting.direction, 20);
+    unitLight(data, 20, lighting.direction);
     data.set(lighting.radiance, 24);
     data.fill(1, 28, 31);
     if (lighting.ambient) data.set(lighting.ambient, 28);
