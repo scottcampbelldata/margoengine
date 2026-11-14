@@ -6,6 +6,33 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-14: a RECTANGULAR_TRIMMED_SURFACE with usense or vsense false is read with its normal unturned (brep)
+
+- **Repro:** none in the corpus yet (no file there writes a .F. sense on one). A STEP face on
+  `RECTANGULAR_TRIMMED_SURFACE(..., .F., .T.)` through `bodiesFromSTEP` in `@margoengine/brep`.
+- **Cause:** ISO 10303-42 turns the trimmed surface's normal when exactly one of usense and vsense is false;
+  `packages/brep/src/model/import.ts` reads the basis surface and ignores both senses, so such a face would come out
+  inside out, as swept surfaces did before the entry below.
+- **Needed to close:** mark the trimmed surface as against STEP's normal (`Importer.inverted`) when usense differs from
+  vsense, with a fixture written here.
+
+### Fixed 2026-11-14: faces on swept surfaces read as analytic ones came out silently inside out (brep)
+
+- **Repro:** a STEP cylinder whose side is a `SURFACE_OF_REVOLUTION` of a line running down the axis, or a
+  `SURFACE_OF_LINEAR_EXTRUSION` of a circle swept against its turn, through `bodiesFromSTEP` in `@margoengine/brep`:
+  the side face's sense is turned, so its mesh is wound inward and encloses -V / 3. `massProperties` and `checkBody`
+  integrate the surface as it is and give V and no problem. The same for a plane from a line turned running out from
+  its axis, cones, and spheres and tori from a circle turning the other way; an `OFFSET_SURFACE` of one moved its
+  distance the wrong way (a cylinder of radius r + 2d).
+- **Cause:** `packages/brep/src/model/import.ts` read these surfaces as the modeler's analytic ones, whose normals
+  point out, and took the face's same_sense (and the offset's distance) against that normal. STEP gives both against
+  its own normal, Su x Sv of the swept surface's parameters, which points in for these cases.
+- **Fix:** the importer marks a surface whose normal is against STEP's (`Importer.inverted`, `against`): the face's
+  sense and an offset's distance are turned for it; a plane gets its frame's z turned instead.
+- **Regression:** `packages/brep/tests/import-sense.test.js`: the faces' normals, the offsets' radii, and `a solid with
+  a side swept against STEP normal meshes to its own volume, not a negative one` (mesh volume positive and within
+  1e-3 of V). Before the fix the mesh volume is negative.
+
 ### Fixed 2026-11-14: a B-spline whose end knot repeats more than degree + 1 times evaluates to NaN at that end (brep)
 
 - **Repro:** abc 00000011 (curve #81932, a cubic whose knot list gives 0.0 twice, multiplicities 4 then 3: seven knots

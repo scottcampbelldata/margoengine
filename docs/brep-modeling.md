@@ -123,7 +123,8 @@ Freeform NURBS intersections, advanced blends and healing are the areas still be
 - `model.revolve`: lines and arcs round an axis (planes, cylinders, cones, tori, spheres).
 - `model.bodiesFromSTEP`: a parsed STEP file's solids and sheets as modeler bodies (SAT, Parasolid and JT B-reps
   arrive as STEP), so every operation works on imported parts: planes, cylinders, cones, spheres, tori and B-splines as
-  they are; revolved and extruded lines and circles and offsets of analytic surfaces as the analytic surfaces they are;
+  they are; revolved and extruded lines and circles and offsets of analytic surfaces as the analytic surfaces they are
+  (a face's sense, and an offset's distance, turned where STEP's normal, Su x Sv, points the other way from theirs);
   seams through a pole, and loops of seams only, left out as the modeler's own closed faces have them. Round trips of a
   box, cylinder, sphere, torus, holed block and rounded box come back valid with volume and area within 1e-9; an imported
   plate takes a drilled hole and rounded edges.

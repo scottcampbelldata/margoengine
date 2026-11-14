@@ -4,7 +4,8 @@
 // (reversed when its orientation is false), oriented edge (its direction in the loop), edge (shared by its two uses)
 // and vertex. Geometry becomes the modeler's plain definitions, in metres: planes, cylinders, cones, spheres, tori and
 // B-splines as they are; surfaces of revolution and extrusion of lines and circles, and offsets of analytic surfaces,
-// as the analytic surfaces they are. A face on anything else makes its body fail, with the reason.
+// as the analytic surfaces they are (a face's sense turned where their normal is against STEP's). A face on anything
+// else makes its body fail, with the reason.
 import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { direction, frame, list, num, point, ref, vector } from '../geometry/read.js';
 import { add, cross, distance, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
@@ -116,6 +117,13 @@ class Importer {
   private readonly vertices = new Map<number, Vertex>();
   private readonly edges = new Map<number, Edge>();
   private readonly polyEdges = new Map<string, Edge>();
+  /**
+   * Surfaces taken for a STEP surface whose normal (ISO 10303-42's, Su x Sv of its own parameters) is the other way
+   * from theirs: a line turned round an axis or a circle swept along it, read as the cylinder, cone, sphere or torus
+   * it makes (whose normals point out), and an offset of one. A face's sense and an offset's distance are given
+   * against STEP's normal, so each is turned for them.
+   */
+  private readonly inverted = new WeakSet<SurfaceDef>();
   private name = '';
 
   constructor(
@@ -281,8 +289,13 @@ class Importer {
         return this.revolution(id, ref(args[1]) ?? -1, ref(args[2]), reach);
       case 'SURFACE_OF_LINEAR_EXTRUSION':
         return this.extrusion(id, ref(args[1]) ?? -1, vector(this.file, ref(args[2])), reach);
-      case 'OFFSET_SURFACE':
-        return this.offset(id, this.surface(ref(args[1]) ?? -1, reach), num(args[2]) * u);
+      case 'OFFSET_SURFACE': {
+        const basis = this.surface(ref(args[1]) ?? -1, reach),
+          against = this.inverted.has(basis),
+          s = this.offset(id, basis, (against ? -1 : 1) * num(args[2]) * u);
+        if (against) this.inverted.add(s);
+        return s;
+      }
       default:
         return this.fail(id, 'surface');
     }
@@ -349,7 +362,12 @@ class Importer {
         far = polar(c.origin)[1] > tiny ? c.origin : add(c.origin, c.direction),
         [h, r] = polar(far),
         radial = sub(sub(far, o), scale(z, h));
-      if (Math.abs(along) < 1e-12) return { kind: 'plane', frame: frameOf(add(o, scale(z, h)), z) };
+      // STEP's normal, Su x Sv with u the turn and v along the line (ISO 10303-42's surface of revolution), is the
+      // line's rate along the axis times the way out from it, less its rate out from the axis times the axis.
+      if (Math.abs(along) < 1e-12) {
+        const out = r > tiny ? dot(c.direction, radial) : 0;
+        return { kind: 'plane', frame: frameOf(add(o, scale(z, h)), out > 0 ? scale(z, -1) : z) };
+      }
       if (r <= tiny) return this.fail(id, 'surface (a line along its own axis)');
       const towards = unit(radial)!;
       // Coplanar with the axis (else it sweeps a hyperboloid of one sheet, as a B-spline).
@@ -363,9 +381,15 @@ class Importer {
           : this.fail(id, 'surface (a line turned round a skew axis, with no edges to bound it)');
       }
       const lean = dot(c.direction, towards) / along;
-      if (Math.abs(lean) < 1e-12) return { kind: 'cylinder', frame: frameOf(o, z, towards), radius: r };
+      // A cylinder's and a cone's normal point out, STEP's where the line runs up the axis.
+      if (Math.abs(lean) < 1e-12) return this.against(along < 0, { kind: 'cylinder', frame: frameOf(o, z, towards), radius: r });
       // Radius r at height h, growing by `lean` per unit along the axis.
-      return { kind: 'cone', frame: frameOf(add(o, scale(z, h)), z, towards), radius: r, angle: Math.atan(lean) };
+      return this.against(along < 0, {
+        kind: 'cone',
+        frame: frameOf(add(o, scale(z, h)), z, towards),
+        radius: r,
+        angle: Math.atan(lean),
+      });
     }
     if (c.kind === 'circle') {
       const f = c.frame,
@@ -374,9 +398,18 @@ class Importer {
       // The circle's plane must hold the axis: its normal square to the axis and to the way out to its centre.
       if (Math.abs(dot(f.z, z)) > 1e-9 || (radial && Math.abs(dot(f.z, radial)) > 1e-9))
         return revolvedSurface(splineOf(c), o, z);
-      const centre = add(o, scale(z, hc));
-      if (!radial) return { kind: 'sphere', frame: frameOf(centre, z), radius: c.radius };
-      return { kind: 'torus', frame: frameOf(centre, z, radial), major: rc, minor: c.radius };
+      const centre = add(o, scale(z, hc)),
+        // STEP's normal points out of the tube where the circle runs against the turn about its plane's normal (seen
+        // from a point of it off the axis: the turn's way there is z x out), into it where with it. On a sphere, the
+        // circle's two halves either side of the axis turn opposite ways: the face's edges tell which half it is.
+        side = (out: XYZ | undefined) => !!out && dot(f.z, cross(z, out)) > 0;
+      if (!radial) {
+        const off = (p: XYZ) => sub(sub(p, o), scale(z, dot(sub(p, o), z))),
+          points = [...reach(), add(f.origin, scale(f.x, c.radius)), add(f.origin, scale(f.y, c.radius))],
+          far = points.reduce((a, p) => (length(off(p)) > length(off(a)) ? p : a), points[0]);
+        return this.against(side(unit(off(far))), { kind: 'sphere', frame: frameOf(centre, z), radius: c.radius });
+      }
+      return this.against(side(radial), { kind: 'torus', frame: frameOf(centre, z, radial), major: rc, minor: c.radius });
     }
     return revolvedSurface(splineOf(c), o, z);
   }
@@ -394,8 +427,13 @@ class Importer {
       const n = unit(cross(c.direction, d));
       return n ? { kind: 'plane', frame: frameOf(c.origin, n, c.direction) } : this.fail(id, 'surface');
     }
+    // (STEP's normal, C' x d, points out where the circle turns about d, in where against it.)
     if (c.kind === 'circle' && Math.abs(Math.abs(dot(c.frame.z, d)) - 1) < 1e-9)
-      return { kind: 'cylinder', frame: frameOf(c.frame.origin, c.frame.z, c.frame.x), radius: c.radius };
+      return this.against(dot(c.frame.z, d) < 0, {
+        kind: 'cylinder',
+        frame: frameOf(c.frame.origin, c.frame.z, c.frame.x),
+        radius: c.radius,
+      });
     // A point of the face is C(u) + v d, so v = p.d - C(u).d, and C(u).d lies within its control points' (weights > 0).
     const spline = splineOf(c),
       along = spline.points.map((q) => dot(q, d)),
@@ -404,6 +442,12 @@ class Importer {
       return this.fail(id, 'surface (a curve swept along a vector, with no edges to bound it)');
     const [v0, v1] = spread([Math.min(...at) - Math.max(...along), Math.max(...at) - Math.min(...along)]);
     return extrudedSurface(spline, d, v0, v1);
+  }
+
+  /** `s`, marked as standing for a STEP surface whose normal is the other way, when `reversed`. */
+  private against(reversed: boolean, s: SurfaceDef): SurfaceDef {
+    if (reversed) this.inverted.add(s);
+    return s;
   }
 
   /** An analytic surface moved `d` along its normal, as the analytic surface it is. */
@@ -494,7 +538,7 @@ class Importer {
       bounds = list(args[1]).map((b) => ref(b) ?? -1),
       surface = geometry !== undefined ? this.surface(geometry, () => this.reach(bounds)) : this.planeOf(id, bounds);
     // A face its shell turns inside out faces the other way, and its loops run the other way with it.
-    const face = new Face(`${this.name}/face:#${id}`, surface, sameSense !== flipped);
+    const face = new Face(`${this.name}/face:#${id}`, surface, sameSense !== flipped !== this.inverted.has(surface));
     for (const b of bounds) {
       const [, loopRef, orientation] = this.file.get(b).args,
         loopId = ref(loopRef) ?? -1,
