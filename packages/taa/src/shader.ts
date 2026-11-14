@@ -29,7 +29,7 @@ export const cameraVelocity =
 // drives the mean below 0 for every depth up to 1 (one of four: (-4 + 3) / 4), so that pixel rejects history as it did before
 // 2026-11-13. The value is a power of two, so the mean of four equal samples is exact. WebGPU picks the nearest sample.
 export const skySample = -4;
-export const multisampledCameraVelocity = cameraVelocity.replace(
+export const multisampledCameraVelocity = /* @__PURE__ */ cameraVelocity.replace(
   'if(d==0){o.depth=0;}',
   `if(d==0){o.depth=${skySample};}`,
 );
