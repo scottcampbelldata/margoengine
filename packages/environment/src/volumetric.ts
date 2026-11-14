@@ -209,8 +209,7 @@ ${/* @__PURE__ */ clusterCell('p')}
         : ''
     }
     light+=volume.sunColor.rgb*phase(dot(-volume.sun.xyz,v),volume.scatter.w)*lit;${ms ? 'sun=volume.sunColor.rgb*lit;' : ''}
-  }${ms ? multiple : ''}
-  ${medium ? 'let local=fogMedium(p);' : ''}
+  }${ms ? multiple : ''}${medium && lights ? '\n  let local=fogMedium(p);' : ''}
   ${
     lights
       ? // Four stratified samples along the froxel's depth, as for the sun: a narrow cone (a lighthouse beam) crossing
@@ -224,7 +223,7 @@ ${/* @__PURE__ */ clusterCell('p')}
   for(var k=0u;k<4u;k++){light+=0.25*localLight(pixel,n+d*(sliceDepth(f32(id.z)+(f32(k)+0.5+volume.jitter.z)*0.25)/dot(d,volume.plane.xyz)),v,volume.scatter.w,spread,sigma${medium ? '+local.a' : ''});}`
       : ''
   }
-  ${medium ? 'var value=vec4f((sigma*volume.scatter.rgb+local.rgb)*light,sigma+local.a);' : 'var value=vec4f(sigma*volume.scatter.rgb*light,sigma);'}
+  ${medium ? (lights ? '' : 'let local=fogMedium(p);') + 'var value=vec4f((sigma*volume.scatter.rgb+local.rgb)*light,sigma+local.a);' : 'var value=vec4f(sigma*volume.scatter.rgb*light,sigma);'}
   if(volume.grid.w>0.0){
     // Reproject the froxel's centre, not the jittered sample: a still camera reads its own texel unfiltered (no drift).
     let uc=(vec2f(id.xy)+0.5)/volume.grid.xy;let nc=unproject(vec3f(uc.x*2-1,1-uc.y*2,1));let dc=unproject(vec3f(uc.x*2-1,1-uc.y*2,0.5))-nc;
