@@ -22,8 +22,9 @@ fn random(value:u32)->f32 {var x=value;x=(x^(x>>16u))*2246822519u;x=(x^(x>>13u))
 // omega = sqrt(g k) (linear wave theory: the surface water moves with the crest at a omega); n points from the water to
 // the wall. Above 0.4 m/s a crest throws clumps of spray, launched up the wall at 4 to 7 times the drive (the jet up
 // a wall runs several times faster than the water hitting it: Peregrine 2003, "Water-wave impact on walls", Annual
-// Review of Fluid Mechanics 35) and back off it; clumps are 0.15 to 0.4 m across and grow as they rise and thin, many of
-// them, each a soft puff that fades from its centre, so a burst reads as a cloud of spray and no clump as a white ball.
+// Review of Fluid Mechanics 35) and back off it; clumps are 0.08 to 0.35 m across and grow as they rise and thin, many of
+// them, each a thin mist holding a speckle of fine drops, so a burst reads as a cloud of spray and no clump as a white
+// ball.
 // Rates, thresholds and clump sizes are Margo tuning.
 // impact() returns the wall's direction from open water at the pixel (xy, unit) and the swell's drive into it in m/s (z),
 // z 0 when there is no wall. A droplet's velocity.w of 2 to 3 marks an impact clump (and sets its size); a breaker
@@ -90,7 +91,13 @@ const render =
 @group(0) @binding(2) var surface:texture_depth_2d;
 @group(0) @binding(3) var environment:texture_2d<f32>;
 @group(0) @binding(4) var skySampler:sampler;
-struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32,@location(2) sky:vec3f}
+struct Output {@builtin(position) clip:vec4f,@location(0) uv:vec4f,@location(1) alpha:f32,@location(2) sky:vec3f}
+fn sprayNoise(p:vec2f)->f32 {
+ let c=floor(p);let f=fract(p);let u=f*f*(3.0-2.0*f);let k=bitcast<vec2u>(vec2i(c));
+ let a=k.x*73856093u;let b=a+73856093u;let c0=k.y*19349663u;let c1=c0+19349663u;
+ let h=vec4f(random(a^c0),random(b^c0),random(a^c1),random(b^c1));
+ return mix(mix(h.x,h.y,u.x),mix(h.z,h.w,u.x),u.y);
+}
 fn spraySky()->vec3f {
  var sum=vec3f(0);
  for(var k=0u;k<8u;k++){
@@ -101,20 +108,26 @@ fn spraySky()->vec3f {
  return sum*0.125;
 }
 @vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) index:u32)->Output {
- let p=droplets[index];if(p.position.w<=0){return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0));}
- let corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));let uv=corners[v];
+ let p=droplets[index];if(p.position.w<=0){return Output(vec4f(-2,-2,0,1),vec4f(0,0,0,1),0,vec3f(0));}
+ let corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));let corner=corners[v];
  let right=normalize(vec3f(frame.camera[0].x,frame.camera[1].x,frame.camera[2].x));let up=normalize(vec3f(frame.camera[0].y,frame.camera[1].y,frame.camera[2].y));
  var size=(0.018+p.velocity.w*0.025)*(1.0+p.position.w*0.2)*(1.0+2.5*frame.grid.z);var alpha=min(1.0,p.position.w*5.0);
- if(p.velocity.w>=2.0){size=(0.15+0.25*(p.velocity.w-2.0))*(1.0+frame.grid.z)*(1.8-0.6*min(1.0,p.position.w));alpha=2.0+min(1.0,p.position.w*2.0)*0.4;}
- let world=p.position.xyz+(right*uv.x+up*uv.y)*size;
+ if(p.velocity.w>=2.0){size=(0.08+0.14*(p.velocity.w-2.0))*(1.0+frame.grid.z)*(1.6-0.5*min(1.0,p.position.w));alpha=2.0+min(1.0,p.position.w*2.0)*0.4;}
+ let motion=vec2f(dot(p.velocity.xyz,right),dot(p.velocity.xyz,up));let speed=length(motion);
+ let along=select(vec2f(0,1),motion/max(speed,1e-4),speed>1e-3);let stretch=min(4.0,1.0+speed*0.033/size);
+ let world=p.position.xyz+((right*along.x+up*along.y)*corner.y*stretch+(up*along.x-right*along.y)*corner.x)*size;
+ let uv=vec4f(corner,fract(f32(index)*0.6180340),stretch);
  return Output(frame.camera*vec4f(world,1),uv,alpha,spraySky());
 }
 fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
 @fragment fn fragment(i:Output)->@location(0) vec4f {
- let radius=dot(i.uv,i.uv);if(radius>1){discard;}
+ let radius=dot(i.uv.xy,i.uv.xy);if(radius>1){discard;}
  let gap=max(0.0,linear(textureLoad(surface,vec2i(i.clip.xy),0))-linear(i.clip.z));
- let clump=i.alpha>=2.0;let shape=select(1.0-smoothstep(0.25,1.0,radius),(1.0-radius)*(1.0-radius),clump);
- let alpha=shape*select(i.alpha,i.alpha-2.0,clump)*min(1.0,gap*12.0)*0.65;
+ let clump=i.alpha>=2.0;let falloff=(1.0-radius)*(1.0-radius);
+ let p=i.uv.xy*1.7+vec2f(i.uv.z*37.0,i.uv.z*91.0);let n=sprayNoise(p)*0.6+sprayNoise(p*2.9+3.1)*0.4;
+ let specks=smoothstep(0.78,0.92,sprayNoise(i.uv.xy*6.0+vec2f(i.uv.z*53.0,i.uv.z*17.0)));
+ let shape=falloff*select(smoothstep(0.3,0.7,n),0.3*smoothstep(0.35,0.8,n)+0.7*specks,clump);
+ let alpha=shape*select(i.alpha,i.alpha-2.0,clump)*min(1.0,gap*12.0)*0.65/sqrt(i.uv.w);
  let color=vec3f(0.78,0.84,0.85)*(frame.eye.w+i.sky+frame.radiance.rgb*min(1.0,frame.sun.w));
  return vec4f(color*alpha,alpha);
 }`;
@@ -123,8 +136,8 @@ fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.camera
 const fogEdits: Array<[string, string]> = [
   ['@location(2) sky:vec3f}', '@location(2) sky:vec3f,@location(3) world:vec3f}'],
   [
-    'return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0));',
-    'return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0),vec3f(0));',
+    'return Output(vec4f(-2,-2,0,1),vec4f(0,0,0,1),0,vec3f(0));',
+    'return Output(vec4f(-2,-2,0,1),vec4f(0,0,0,1),0,vec3f(0),vec3f(0));',
   ],
   [
     'return Output(frame.camera*vec4f(world,1),uv,alpha,spraySky());',

@@ -614,3 +614,29 @@ test('whitecaps and chop upload 0-1 from the options and their setters and rejec
   assert.equal(new Water().options.whitecaps, undefined);
   effect.dispose();
 });
+
+// Regression (2026-11-13, Storm Light): spray clumps drew as round white bubbles, each a disc fading from its centre
+// (1 - smoothstep(0.25, 1, r^2) for droplets, (1 - r^2)^2 for clumps) on a square quad facing the camera.
+test('spray draws as broken mist and fine drops streaked along their motion, not round discs', () => {
+  const h = optionalGPU(),
+    terrain = h.engine.gpu.createTexture({ size: [16, 16], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
+    effect = new Water({
+      segments: 4,
+      spray: true,
+      terrain: { heightmap: () => terrain, origin: [-8, -8], size: [16, 16] },
+    });
+  h.engine.use(effect);
+  h.frame();
+  const render = h.pipelines.find((p) => p.vertex?.module.code?.includes('fn spraySky'));
+  assert.ok(render, 'the spray render pipeline');
+  const code = render.vertex.module.code;
+  const has = (text, message) => assert.ok(code.includes(text), message);
+  assert.ok(!code.includes('select(1.0-smoothstep(0.25,1.0,radius)'), 'no droplet disc');
+  has('fn sprayNoise(', 'value noise breaks every sprite');
+  has('smoothstep(0.3,0.7,n)', 'a droplet is a broken speck, not a disc');
+  has('0.3*smoothstep(0.35,0.8,n)+0.7*specks', 'a clump is thin mist holding fine drops');
+  has('let stretch=min(4.0,1.0+speed*0.033/size)', 'quads streak along on-screen motion');
+  has('/sqrt(i.uv.w)', 'a streak spreads the same spray over its length');
+  has('size=(0.08+0.14*(p.velocity.w-2.0))', 'clumps 0.08 to 0.35 m, not 0.15 to 0.4');
+  effect.dispose();
+});
