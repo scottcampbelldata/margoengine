@@ -4,8 +4,9 @@
 // (reversed when its orientation is false), oriented edge (its direction in the loop), edge (shared by its two uses)
 // and vertex. Geometry becomes the modeler's plain definitions, in metres: planes, cylinders, cones, spheres, tori and
 // B-splines as they are; surfaces of revolution and extrusion of lines and circles, and offsets of analytic surfaces,
-// as the analytic surfaces they are (a face's sense turned where their normal is against STEP's). A face on anything
-// else makes its body fail, with the reason.
+// as the analytic surfaces they are (a face's sense turned where their normal is against STEP's); an offset of a
+// B-spline as a bicubic B-spline fitted within 1e-7 m of it (noted, with its error). A face on anything else makes its
+// body fail, with the reason.
 import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { direction, frame, list, num, point, ref, vector } from '../geometry/read.js';
 import { add, cross, distance, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
@@ -21,6 +22,7 @@ import {
   type SurfaceDef,
 } from './geometry.js';
 import { enclosedVolume } from './mass.js';
+import { type FittedOffset, offsetSpline } from './offset-surface.js';
 import { Body, Edge, Face, type Shell, Vertex } from './topology.js';
 import { edgeParameters, measureTolerances, validateBody } from './validate.js';
 
@@ -32,7 +34,15 @@ export interface ImportedBodies {
    * `<name>: <problem>`): its index in `step.bodies` and the reason.
    */
   readonly problems: readonly { readonly body: number; readonly problem: string }[];
+  /**
+   * What was approximated in a body that was imported (an offset of a B-spline surface, fitted as a B-spline, and how
+   * closely), as `#<entity id>: <note>`: its index in `step.bodies` and the note.
+   */
+  readonly notes: readonly { readonly body: number; readonly note: string }[];
 }
+
+/** How near (metres) a B-spline fitted to an offset of a B-spline must lie to it everywhere it is measured. */
+const OFFSET_FIT = 1e-7;
 
 const isTrue = (v: STEPValue | undefined) => !(v instanceof Enum && v.name === 'F');
 
@@ -74,7 +84,8 @@ function polesOf(s: SurfaceDef): XYZ[] {
  * imported body is validated (validateBody), and what is wrong with it is in `problems` too; checkBody checks it fully.
  */
 export function bodiesFromSTEP(step: STEPModel): ImportedBodies {
-  const problems: { body: number; problem: string }[] = [];
+  const problems: { body: number; problem: string }[] = [],
+    notes: { body: number; note: string }[] = [];
   const bodies = step.bodies.map((b, index) => {
     if (b.kind !== 'solid' && b.kind !== 'shell') return undefined;
     // Never a body less what the file lost: an empty solid, or one short of the faces a missing instance held.
@@ -88,12 +99,9 @@ export function bodiesFromSTEP(step: STEPModel): ImportedBodies {
       return undefined;
     }
     try {
-      const body = new Importer(step.file, b.unit, b.angleUnit).body(
-        b.name || `#${b.id}`,
-        b.kind,
-        b.faces,
-        b.reversed ?? [],
-      );
+      const importer = new Importer(step.file, b.unit, b.angleUnit),
+        body = importer.body(b.name || `#${b.id}`, b.kind, b.faces, b.reversed ?? []);
+      for (const note of importer.notes) notes.push({ body: index, note });
       // Edges a writer left a little off their faces keep that gap as their tolerance (up to 10 micrometres, or 1e-4 of
       // the body's size when larger).
       const points = body.vertices.map((v) => v.point),
@@ -110,7 +118,7 @@ export function bodiesFromSTEP(step: STEPModel): ImportedBodies {
       return undefined;
     }
   });
-  return { bodies, problems };
+  return { bodies, problems, notes };
 }
 
 class Importer {
@@ -124,6 +132,8 @@ class Importer {
    * against STEP's normal, so each is turned for them.
    */
   private readonly inverted = new WeakSet<SurfaceDef>();
+  /** What was approximated in the body being read (an offset of a B-spline fitted, and how closely). */
+  readonly notes: string[] = [];
   private name = '';
 
   constructor(
@@ -450,9 +460,24 @@ class Importer {
     return s;
   }
 
-  /** An analytic surface moved `d` along its normal, as the analytic surface it is. */
+  /**
+   * A surface moved `d` along its normal: an analytic one as the analytic surface it is, a B-spline as a bicubic one
+   * fitted to it within OFFSET_FIT (refused where it comes no closer, or turns inside out), noted with its error.
+   */
   private offset(id: number, s: SurfaceDef, d: number): SurfaceDef {
     switch (s.kind) {
+      case 'spline': {
+        let fit: FittedOffset;
+        try {
+          fit = offsetSpline(s, d, OFFSET_FIT);
+        } catch (e) {
+          return this.fail(id, `surface (an offset of a B-spline the fit refused: ${e instanceof Error ? e.message : e})`);
+        }
+        if (!(fit.error <= OFFSET_FIT))
+          return this.fail(id, `surface (an offset of a B-spline fitted no closer than ${fit.error.toPrecision(3)} m)`);
+        this.notes.push(`#${id}: an offset of a B-spline by ${d} m, fitted within ${fit.error.toPrecision(3)} m`);
+        return fit.surface;
+      }
       case 'plane':
         return { kind: 'plane', frame: { ...s.frame, origin: add(s.frame.origin, scale(s.frame.z, d)) } };
       case 'cylinder':

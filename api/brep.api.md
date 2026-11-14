@@ -473,6 +473,10 @@ export namespace model {
             readonly body: number;
             readonly problem: string;
         }[];
+        readonly notes: readonly {
+            readonly body: number;
+            readonly note: string;
+        }[];
     }
 
     export class Loop {
