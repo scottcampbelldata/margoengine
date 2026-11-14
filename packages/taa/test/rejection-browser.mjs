@@ -44,6 +44,8 @@ try {
       variance: await rig('variance', { pattern: 'dots', alpha: 1, taa: { rejection: 'variance' } }),
       lineClamp: await rig('lineClamp', { pattern: 'line' }),
       lineLocks: await rig('lineLocks', { pattern: 'line', taa: { locks: true } }),
+      surface: await rig('surface', { pattern: 'sine', alpha: 0 }),
+      sky: await rig('sky', { pattern: 'sine', alpha: 0, sky: true }),
     };
     window.t = {
       gpuErrors: () => Object.values(rigs).flatMap((r) => r.gpuErrors),
@@ -115,6 +117,25 @@ try {
   assert.ok(flicker.lineClamp.brightest > 60 && flicker.lineLocks.brightest > 60, 'the line shows in both');
   assert.ok(flicker.lineClamp.dimmest < 15, `the clamped line vanishes on some frames (${flicker.lineClamp.dimmest})`);
   assert.ok(flicker.lineLocks.dimmest > 30, `the locked line never does (${flicker.lineLocks.dimmest})`);
+
+  // History over the sky (2026-11-13: pixels at depth 0, the reversed-Z far plane, had none, so the march noise of
+  // volumetric clouds over the sky stood unaveraged): the same stripes, once on a surface and once at depth 0, change
+  // from frame to frame by the same amount once settled (Radeon 680M, Vulkan: 17.0 and 17.0 levels); without sky
+  // history the sky's changed by the whole jitter (24.7 against 17.0).
+  const backdrops = ['surface', 'sky'];
+  await page.evaluate((names) => window.t.frames(names, 30), backdrops);
+  const change = {};
+  for (const mode of backdrops) {
+    const a = await shot(mode);
+    await page.evaluate((name) => window.t.frames([name], 1), mode);
+    const b = await shot(mode);
+    let sum = 0;
+    for (let i = 0; i < a.data.length; i += 4) sum += Math.abs(a.data[i] - b.data[i]);
+    change[mode] = sum / (a.data.length / 4);
+  }
+  console.log('frame-to-frame change of settled stripes in sRGB levels', change);
+  assert.ok(change.surface > 0.05, `the jitter moves the stripes at all (${change.surface})`);
+  assert.ok(change.sky < change.surface * 1.15, `the sky keeps history as a surface does (${JSON.stringify(change)})`);
   assert.deepEqual(await page.evaluate(() => window.t.gpuErrors()), []);
   assert.deepEqual(errors, []);
   console.log('history rejection check passed');

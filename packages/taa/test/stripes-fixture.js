@@ -5,6 +5,7 @@
 //   pattern 'sine': stripes 8 px across, 0.4 + 0.38 sin, which hold the 3x3 neighbourhood wide open;
 //   pattern 'dots': a dark plane with a bright dot 1 px across every 4 px, one outlier in a 3x3 neighbourhood;
 //   pattern 'line': a dark plane with one bright vertical line 0.4 px wide at the view's centre.
+//   sky: the plane writes depth 0, the reversed-Z far plane, as a sky backdrop or what is drawn over it does.
 const { Engine } = await import('/packages/core/dist/index.js'),
   { engineRuntime } = await import('/packages/core/dist/extension.js'),
   { TAA } = await import('/packages/taa/dist/index.js');
@@ -15,7 +16,7 @@ export const WIDTH = 320,
 // Pixels per world unit on the plane z = 0, camera at z = 9 with the default 60 degree field of view.
 const PIXELS = HEIGHT / 2 / Math.tan(Math.PI / 6) / 9;
 
-export async function rig(id, { taa = {}, mask = false, pattern = 'sine', alpha = 0.5 } = {}) {
+export async function rig(id, { taa = {}, mask = false, pattern = 'sine', alpha = 0.5, sky = false } = {}) {
   const canvas = Object.assign(document.createElement('canvas'), { id, width: WIDTH, height: HEIGHT });
   canvas.style.cssText = `display:inline-block;width:${WIDTH}px;height:${HEIGHT}px`;
   document.body.append(canvas);
@@ -46,7 +47,12 @@ struct Out {@builtin(position) clip:vec4f,@location(0) x:f32,@location(1) y:f32}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {
   let corner=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1))[i]*20.0;
   var o:Out;o.clip=camera*vec4f(corner,0,1);o.x=corner.x;o.y=corner.y;return o;}
-@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(vec3f(${shade}),1);}`;
+${
+  sky
+    ? `struct Sky {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
+@fragment fn fragment(i:Out)->Sky {return Sky(vec4f(vec3f(${shade}),1),0.0);}`
+    : `@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(vec3f(${shade}),1);}`
+}`;
   let pipelines;
   const make = (c) => {
     const multisample = c.descriptor.multisample,
@@ -118,13 +124,17 @@ struct Out {@builtin(position) clip:vec4f,@location(0) x:f32,@location(1) y:f32}
         order: 6,
         execute(c) {
           device.queue.writeBuffer(square, 0, new Float32Array([x, (HEIGHT - SIZE) / 2, shown ? SIZE : 0, SIZE]));
-          const pass = c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] });
+          const pass = c.encoder.beginRenderPass({
+            colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+          });
           pass.setPipeline(pipelines.particle);
           pass.setBindGroup(0, pipelines.particleGroup);
           pass.draw(6);
           pass.end();
           const masked = c.encoder.beginRenderPass({
-            colorAttachments: [{ view: coverage.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 0], storeOp: 'store' }],
+            colorAttachments: [
+              { view: coverage.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 0], storeOp: 'store' },
+            ],
           });
           masked.setPipeline(pipelines.covered);
           masked.setBindGroup(0, pipelines.coverageGroup);
