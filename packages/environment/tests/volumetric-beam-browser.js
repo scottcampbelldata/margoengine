@@ -25,7 +25,8 @@ function sample(i, j, k) {
   return [camera.position[0] + x * t * along, camera.position[1] + y * t * along, camera.position[2] - along];
 }
 // The light one froxel sample takes from `light` at p: clustered's legacy terms (packages/shared/light-terms.js),
-// with the isotropic phase 1 / 4 pi (anisotropy 0).
+// with the isotropic phase 1 / 4 pi (anisotropy 0), dimmed by the fog it crosses on its way from the light to p
+// (2026-11-13: the froxel pass left that out, so a beam lit thick fog as brightly far out as at the lens).
 function lightAt(light, p) {
   const dx = light.position[0] - p[0],
     dy = light.position[1] - p[1],
@@ -42,7 +43,9 @@ function lightAt(light, p) {
       ramp = Math.min(Math.max((along - lo) / Math.max(hi - lo, 1e-6), 0), 1);
     cone = ramp * ramp * (3 - 2 * ramp);
   }
-  return (light.intensity * ((fade * fade) / Math.max(d * d, 2 ** -12)) * cone) / (4 * Math.PI);
+  return (
+    (light.intensity * ((fade * fade) / Math.max(d * d, 2 ** -12)) * cone * Math.exp(-density * d)) / (4 * Math.PI)
+  );
 }
 // The light reaching the camera along the ray through ndc (x, y), out to `range` metres beyond the near plane.
 function column(light, direction, x, y) {
@@ -55,7 +58,11 @@ function column(light, direction, x, y) {
   for (let k = 0; k < steps; k++) {
     const s = (k + 0.5) * dt,
       along = camera.near + s,
-      p = [camera.position[0] + dir[0] * along, camera.position[1] + dir[1] * along, camera.position[2] + dir[2] * along];
+      p = [
+        camera.position[0] + dir[0] * along,
+        camera.position[1] + dir[1] * along,
+        camera.position[2] + dir[2] * along,
+      ];
     sum += density * lightAt({ ...light, direction }, p) * Math.exp(-density * stretch * s) * stretch * dt;
   }
   return sum;
@@ -154,12 +161,21 @@ window.runTests = async () => {
   }
   const { beam } = report.cases;
   assert(beam.total > 0.05, `the beam scatters light (${beam.total})`);
-  assert(beam.error < 0.05, `the beam's columns match the fog it lights within L1 ${beam.error.toFixed(3)} (limit 0.05)`);
+  assert(
+    beam.error < 0.05,
+    `the beam's columns match the fog it lights within L1 ${beam.error.toFixed(3)} (limit 0.05)`,
+  );
   report.checks.push(`a narrow spot beam crossing the view: per-column L1 error ${beam.error.toFixed(3)}`);
   for (const name of ['bulb']) {
     const bulb = report.cases[name];
-    assert(bulb.error < 0.1, `${name}: the columns match the fog it lights within L1 ${bulb.error.toFixed(3)} (limit 0.1)`);
-    assert(bulb.peak < 2 * bulb.wantPeak, `${name}: the brightest column ${bulb.peak} stays within twice ${bulb.wantPeak}`);
+    assert(
+      bulb.error < 0.1,
+      `${name}: the columns match the fog it lights within L1 ${bulb.error.toFixed(3)} (limit 0.1)`,
+    );
+    assert(
+      bulb.peak < 2 * bulb.wantPeak,
+      `${name}: the brightest column ${bulb.peak} stays within twice ${bulb.wantPeak}`,
+    );
     report.checks.push(
       `a bulb on a froxel sample (${name}): per-column L1 error ${bulb.error.toFixed(3)}, brightest column ${bulb.peak.toFixed(3)} against ${bulb.wantPeak.toFixed(3)}`,
     );
