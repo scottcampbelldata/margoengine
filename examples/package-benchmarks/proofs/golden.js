@@ -102,6 +102,17 @@ export function decode(value) {
 /** The SHA-256 of a stored (encoded) value. */
 export const digest = (encoded) => createHash('sha256').update(JSON.stringify(encoded)).digest('hex');
 
+/** The commits a stored baseline (`<proof>.json`) names that capturing it again asks Git for: its reference and each
+ * commit its facts name (a word of 7 to 40 hex digits holding a digit, with any ^ or ~n after it). `capturedAt` only
+ * records where it was captured. tests/proofs-golden.test.js requires each to resolve on a clone with main's history. */
+export function commitsOf(entry) {
+  const names = new Set([entry.ref]);
+  for (const name of Object.keys(entry.facts ?? {}))
+    for (const [word] of name.matchAll(/(?<![\w^~])(?=[0-9a-f]*\d)[0-9a-f]{7,40}(?:\^+|~\d+)*(?![\w^~])/g))
+      names.add(word);
+  return [...names];
+}
+
 // Per proof: baselines/<proof>.json (readable: the ref, its full commit id, the commit it was captured at, facts and
 // each value's SHA-256) and baselines/<proof>.json.gz (the values).
 const metaOf = (proof) => resolve(store, `${proof}.json`),

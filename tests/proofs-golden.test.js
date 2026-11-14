@@ -6,12 +6,19 @@
 // fix for geometry.proof.js failing at random on NaN bit patterns.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { canonicalNaN, decode, digest, encode, exactMath } from '../examples/package-benchmarks/proofs/golden.js';
+import {
+  canonicalNaN,
+  commitsOf,
+  decode,
+  digest,
+  encode,
+  exactMath,
+} from '../examples/package-benchmarks/proofs/golden.js';
 
 const proofs = resolve(import.meta.dirname, '../examples/package-benchmarks/proofs');
 const url = (file) => pathToFileURL(join(proofs, file)).href;
@@ -155,6 +162,72 @@ revision('0000000000000000000000000000000000000001');`,
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/** Stored baselines in `store` naming a commit that Git at `cwd` cannot resolve, as "<proof>: <commit>" (golden.js
+ * commitsOf: the reference and the commits the facts name, which capturing again asks Git for). */
+function unresolved(store, cwd) {
+  const missing = [];
+  for (const file of readdirSync(store).filter((name) => name.endsWith('.json'))) {
+    const entry = JSON.parse(readFileSync(join(store, file), 'utf8'));
+    for (const commit of commitsOf(entry)) {
+      const found = spawnSync('git', ['rev-parse', '--verify', '--quiet', '--end-of-options', `${commit}^{commit}`], {
+        cwd,
+        stdio: 'ignore',
+      });
+      if (found.status !== 0) missing.push(`${entry.proof}: ${commit}`);
+    }
+  }
+  return missing;
+}
+
+test('every commit a stored baseline names resolves, so capturing it again never needs history the clone lacks', () => {
+  // A DOF fix was stranded (lane BB3, 2026-11-14): color-output and post-stack named eaddd64, 5b1fe66^ and 3319317,
+  // commits only one checkout's pre-rewrite history held, so no clone could capture them again at the fix.
+  assert.deepEqual(
+    commitsOf({
+      ref: '0123abc',
+      facts: {
+        '0123abc descends from 4567def': true,
+        'creative 1x: 89abcde^ -> 1234567~2 identical calls': 3,
+        'deadbeefed x': 1,
+      },
+    }),
+    ['0123abc', '4567def', '89abcde^', '1234567~2'],
+  );
+  const dir = mkdtempSync(join(tmpdir(), 'proofs-commits-')),
+    store = join(dir, 'baselines');
+  try {
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], {
+        cwd: dir,
+        encoding: 'utf8',
+      }).trim();
+    git('init', '-q');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    git('add', 'a.txt');
+    git('commit', '-q', '-m', 'one');
+    const head = git('rev-parse', '--short=9', 'HEAD');
+    mkdirSync(store);
+    const meta = (proof, facts) =>
+      writeFileSync(join(store, `${proof}.json`), JSON.stringify({ proof, ref: head, facts }));
+    meta('kept', { [`${head} descends from ${head}`]: true });
+    meta('stranded', { [`${head} descends from eaddd64`]: false });
+    assert.deepEqual(unresolved(store, dir), ['stranded: eaddd64']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  // This repository's own baselines. check:fresh-clone's clone (and any depth-1 clone) holds one commit and no history,
+  // so there no named commit can resolve and the check belongs to a clone with main's history.
+  const repo = resolve(proofs, '../../..'),
+    shallow = execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: repo, encoding: 'utf8' }).trim(),
+    count = execFileSync('git', ['rev-list', '--count', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  if (shallow === 'true' || count === '1') return;
+  assert.deepEqual(
+    unresolved(join(proofs, 'baselines'), repo),
+    [],
+    'move each named commit to one on main and capture again',
+  );
 });
 
 test('the store is checked against its SHA-256 and read mode never asks Git', () => {

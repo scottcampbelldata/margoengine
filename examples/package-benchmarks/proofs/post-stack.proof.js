@@ -2,22 +2,26 @@
 // creative PostProcessing) makes exactly the GPU calls it made before, over a story of resizes, option edits, format
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref] [pin] [--current]
-// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: 57250a49 against the
+// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: f3d25c892 against the
 // working tree, including the approved multilevel Bloom, PBR Neutral display and Tonemap default (claims.md).
-// creative's PostProcessing is always 5b1fe66^ against 3319317: it lost bloom and the sky backdrop after 3319317.
+// creative's PostProcessing is always 00f9ebc193 (before PostStack) against 216781aff4 (the last commit before it lost
+// bloom and the sky backdrop): main's 5b1fe66^, and a commit with 3319317's creative and shared sources (between
+// b8029b39f, PostStack's commit, and 7a2b86da8, which removed that bloom, neither changes).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, golden, fact, readOnly, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', '379431fcb8'),
+  { ref, pin } = refs(before, '5b1fe66', 'f3d25c892'),
+  creativeBefore = '00f9ebc193',
+  creativeAfter = '216781aff4',
   { wgsl } = await coreAt(pin);
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
   tonemap = await versions('tonemap', ref, undefined, pin);
-// creative's pair is historical in every mode (5b1fe66^ -> 3319317); a --current run reading golden outputs has neither
+// creative's pair is historical in every mode (creativeBefore -> creativeAfter); a --current run reading golden outputs has neither
 // commit, so it reads the pair's stored result, a fact about those two commits.
-const creative = readOnly() ? {} : await versions('creative', before, 'src/post.ts', '3319317');
+const creative = readOnly() ? {} : await versions('creative', creativeBefore, 'src/post.ts', creativeAfter);
 
 /** Runs `effects` (made by `make(gpu)`) with the core main pass for 24 frames, applying `edit(frame, effects, state)` first. */
 function story(make, samples, edit) {
@@ -108,7 +112,7 @@ const cases = {
 let calls = 0;
 for (const [label, [make, edit, module]] of Object.entries(cases))
   for (const samples of [1, 4]) {
-    const base = module === creative ? before : ref;
+    const base = module === creative ? creativeBefore : ref;
     const compare = (expected, actual) => {
       assert.ok(
         expected.length > 300 && expected.some((entry) => entry[0] === 'throw'),
@@ -118,7 +122,7 @@ for (const [label, [make, edit, module]] of Object.entries(cases))
       return expected.length;
     };
     if (module === creative) {
-      calls += fact(`${label} ${samples}x: ${before} -> 3319317 identical calls`, () =>
+      calls += fact(`${label} ${samples}x: ${creativeBefore} -> ${creativeAfter} identical calls`, () =>
         compare(
           ignoreAgx(
             story(() => make(module.baseline), samples, edit),
@@ -168,5 +172,5 @@ for (const samples of [1, 4]) {
   calls += expected.length;
 }
 console.log(
-  `Single-effect GPU sequences match the historical tape, ${ref} -> ${pin ?? 'working tree'} (creative: ${before} -> 3319317): ${calls} control calls across 12 stories.`,
+  `Single-effect GPU sequences match the historical tape, ${ref} -> ${pin ?? 'working tree'} (creative: ${creativeBefore} -> ${creativeAfter}): ${calls} control calls across 12 stories.`,
 );

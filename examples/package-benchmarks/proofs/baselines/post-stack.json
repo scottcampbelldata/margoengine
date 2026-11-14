@@ -1,25 +1,25 @@
 {
  "proof": "post-stack",
- "ref": "379431fcb8",
- "revision": "379431fcb8d0867558b694d282ca1272bf9996e9",
- "capturedAt": "b0efe42d12657818cc319fe0782e0cf2a1f209fa",
- "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
+ "ref": "f3d25c892",
+ "revision": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
+ "capturedAt": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
+ "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
  "facts": {
-  "379431fcb8 descends from eaddd64": false,
-  "5b1fe66^ descends from eaddd64": false,
-  "creative PostProcessing 1x: 5b1fe66^ -> 3319317 identical calls": 1813,
-  "creative PostProcessing 4x: 5b1fe66^ -> 3319317 identical calls": 1840
+  "f3d25c892 descends from e80acecc2": true,
+  "00f9ebc193 descends from e80acecc2": false,
+  "creative PostProcessing 1x: 00f9ebc193 -> 216781aff4 identical calls": 1813,
+  "creative PostProcessing 4x: 00f9ebc193 -> 216781aff4 identical calls": 1840
  },
  "outputs": {
-  "post Bloom 1x": "eb1e222179460f916f2f9adf70d6dfba6c62722dc72d1af61364bac23aee0c09",
-  "post Bloom 4x": "09b369dec65ede29303ebdf081d31dcb6f33aa1ef87b2625fcc74e5d7bdf4df7",
-  "post SSAO 1x": "5c7353eff6c2f998f4d104c8be68029161a0b2f3dcad71ff3c540f3e86f65569",
-  "post SSAO 4x": "865113bc788fd242f3db172ffe21e6569ce40dff5908b0352f4d5cc5067d5b37",
-  "dof DOF 1x": "21d543fd38854982209a6d832dc8b1ef0f72a834db05a5dcf99e04ccf1f52742",
-  "dof DOF 4x": "dcc825a62b4f421347472b85f6600f21e236acb0dd2392944863dbd86d3ce995",
-  "tonemap Tonemap 1x": "524ce455c6c496385ae77a399ba83840c5b39b01fa348df07e5f44efbc14a42d",
-  "tonemap Tonemap 4x": "b47444f3cd8f50ce9c45c3878bb3871f2a05c2f089a8e77d86e0fb773b55274a",
-  "DOF -> Tonemap 1x": "db24f320248658f7bafeb7abd57b8ba704ff9825636cc8825ee0f6c2bc1d19ec",
-  "DOF -> Tonemap 4x": "c458878138241293b05af516fcd4113721887cd13caae42157e2f7e5d113d68f"
+  "post Bloom 1x": "75583faf7f14ac7a8d64e585085bac837080fc952697458bd249e14d6208e994",
+  "post Bloom 4x": "8c312f5dcd2930f810b45afacc566490cf1aff3f398263cd76c2f15e5947d828",
+  "post SSAO 1x": "67dd09c6582e8a20ddb79cf68e1b0bc8c1859024c3dfc789636810218606b399",
+  "post SSAO 4x": "bbb5cf033ccea73480bff2454e5889fefab7bc4b7e07062d48507c035e341349",
+  "dof DOF 1x": "b46ae6420bd28efd3e6a0cb62c13aee94ab369b558b5e29815a4b532a49441cb",
+  "dof DOF 4x": "84c23dc62e2563fc331feba85ea4a0d38d2dcca434de9eb35d67f55b5cf2db09",
+  "tonemap Tonemap 1x": "7e9fbb872bd430cc87f80dc6978e80b79c1e7acc934b17ad5a99c290cadeaefd",
+  "tonemap Tonemap 4x": "ca79ae0dc5e66663029d8cd309d1fa85e9e2f9f73e43c5113958e3341689198b",
+  "DOF -> Tonemap 1x": "ad1572afb48ec5c49550ef554b25d460c9f43687aff8e17c4c79df5ef98d7aff",
+  "DOF -> Tonemap 4x": "e6a97cccbff0b3fd407eccf4df3d9e73a26b17a8d7b48d77ded5808e4875ef08"
  }
 }

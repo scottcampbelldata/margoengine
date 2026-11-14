@@ -4,13 +4,14 @@
 // matches the package at `ref`, byte for byte, at 1x and 4x MSAA, with `xray` absent, false and deleted mid-story.
 // The same story with x-ray on must differ (so the comparison can see the feature).
 // Run: node examples/package-benchmarks/proofs/selection-xray-off.proof.js [ref] [pin] [--current]
-// Pinned: 46f9484 against 80d4cfb, the commit that made this claim. --current: b3ed8ac against the working tree;
+// Pinned: 46f9484 against 80d4cfb, the commit that made this claim. --current: f3d25c892 against the working tree (b3ed8ac, a pre-rewrite id, until
+// 2026-11-14);
 // 6a57389 added the approved ambient uniform and 95b4eae added back-side-only model culling (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('46f9484', '80d4cfb', 'b3ed8ac'),
+const { ref, pin } = refs('46f9484', '80d4cfb', 'f3d25c892'),
   { baseline, candidate } = await versions('selection', ref, undefined, pin);
 
 function story(module, samples, xray) {

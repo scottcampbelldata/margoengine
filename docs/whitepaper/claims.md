@@ -1518,9 +1518,11 @@ Three proofs needed more than "store the baseline's value":
   argument afterwards (NaN payloads aside, below); the SHA-256 over all 24 tapes' effects is stored. A current run
   replays the stand-ins and must reproduce every digest. Its text comparisons between old copies are facts about
   `2484971` alone and are stored as such. The digests hold only exactly specified results (host-rounded maths, below).
-- **post-stack**'s creative pair is historical in every mode (`5b1fe66^` -> `3319317`, both old); a current run reads
-  its stored result (identical calls, with the count) instead of rebuilding both commits.
-- **ignoreAgx**'s question "does the reference descend from `eaddd64`" is stored as a fact of the reference.
+- **post-stack**'s creative pair is historical in every mode (`00f9ebc193` -> `216781aff4`, main's ids of the
+  pre-rewrite `5b1fe66^` -> `3319317`); a current run reads its stored result (identical calls, with the count) instead
+  of rebuilding both commits.
+- **ignoreAgx**'s question "does the reference descend from `e80acecc2`" (main's id of the pre-rewrite `eaddd64`) is
+  stored as a fact of the reference.
 
 When a deliberate change alters what a current proof's feature-off path emits, advance its reference as before and
 run `node examples/package-benchmarks/proofs/capture.mjs --only=<proof>` on a checkout with that commit; it stores the
@@ -1623,19 +1625,19 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `6a958e532` |
 | materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `de20fb3c`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `9f9845a0f5` (KB5588c selection masks: binding 7 in every style layout and bind group, a zeroed 16-byte stand-in for lines without a mask; before that `f1854aa04`, the root's 96-byte Frame and base shaders again, tile code only in `lines/tiles`; earlier: per-line clipping planes at `86063c47` grew the style uniform from 128 to 224 bytes and added a world-position varying and a zero-count plane loop, and `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose each time) |
-| math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
-| post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `6a958e532` |
-| selection-xray-off | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
+| math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `8c3c049935` (main's id of `2484971`) |
+| post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `00f9ebc193` -> `216781aff4`) | `f3d25c892` |
+| selection-xray-off | `46f9484` -> `80d4cfb`: 10,586 calls | `f3d25c892` |
 | clustered-local-shadows | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `6a958e532` |
 | clustered-area-lights | `67e0172` -> `dab9633`: 482 calls | `57250a49` |
 | clustered-light-hooks | `6c20076d` -> `b4700864`: 482 calls without the directional, IES and projector entries and with each attached but empty | `57250a49` |
 | environment-hemisphere | `6c20076d` -> `b4700864`: 53 shader texts (IBL, Fog, LightProbes on six core variants, gltf-pro's four shader kinds) and 23 calls without a HemisphereLight | `57250a49` |
-| color-output | `7dcc958` -> `225b1d6`: 6,174 calls | `57250a49` |
+| color-output | `7dcc958` -> `225b1d6`: 6,174 calls | `f3d25c892` |
 | deformed-shadows | `38d448e` -> `282e751` | `667d1a26` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
 | oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `de20fb3c`: 2,392 calls |
-| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `6a958e532`: 12,431 calls (AgX normalised for older refs, see below) |
-| post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
+| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `379431fcb8` |
+| post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `379431fcb8` |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `96136151cd` |
@@ -1644,7 +1646,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
 | procedural-deps | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, since removed from the lockfile, so the runner reports it instead of failing | - |
 
-The only normalisation is `ignoreAgx(calls, ref)`: it blanks the `agx()` body only when the baseline predates `eaddd64`
+The only normalisation is `ignoreAgx(calls, ref)`: it blanks the `agx()` body only when the baseline predates `e80acecc2` (`eaddd64` before the rewrite)
 (AgX re-derived on purpose). Re-running the current checks at the start of this work found one real bug, fixed:
 `loopSubdivide` threw a bare TypeError on an index past the vertices (geometry.proof.js's degenerate case; now a named
 RangeError). Every other difference was an intended later change (exporters' lazy chunks, SSAO's `a281ad2`/`9702e57`/
@@ -1837,6 +1839,8 @@ difference in each story is the uniform's size and the new buffer.
 **clustered-area-lights, clustered-light-hooks, clustered-local-shadows, deformed-shadows, gltf-pro-lighting-hooks and quality-presets, advanced to `1fdb559080` on 2026-11-12 (dielectric diffuse weight, KB3240b):** the shared `clusterBrdf` text weights the Lambert lobe by 1 minus the dielectric Fresnel (glTF 2.0 Appendix B's metal/dielectric mix) instead of 1 minus the Fresnel at the metal-mixed F0, and animation's VAT shaders do the same. Only shader module text differs in these stories; the call count and every pipeline, binding, buffer write, byte count and draw are as before. `packages/clustered/test/metal-mix.test.js` shows the value change (capture.mjs, 6 of 6 pass).
 
 **environment-hemisphere and gltf-pro-lighting-hooks, advanced to `97bd9b4818` on 2026-11-13 (Environment IBL mip blend, KB-A3e):** `IBL_WGSL`'s `iblPrefiltered` reads the specular mips at lod k + (x^2 - k^2) / (2k + 1) (the two mips around a roughness mixed by GGX alpha) instead of roughness * (mips - 1), so only the shader texts that compose `IBL_WGSL` differ, by that function and its two new lines, and the GPU call records differ only in the shader module code that carries them; bindings, uploads and every other call are as before. Both goldens were re-recorded at the new reference (texts and calls hashes move with the reference text). `packages/environment/tests/ibl-level-blend.test.js` shows the value change (capture.mjs, 2 of 2 pass).
+
+**Every proof reference resolves on main (2026-11-14, lanes BB3 and BB4):** a DOF fix could not re-record color-output and post-stack, because capturing them asked Git for `eaddd64` (ignoreAgx), `5b1fe66^` and `3319317` (post-stack's creative pair), ids from before the history rewrite that no clone holds; math-consolidation (`2484971`) and selection-xray-off (`b3ed8ac`) named such ids as their current reference. Each now names a commit on main: ignoreAgx asks for `e80acecc2` (the AgX re-derivation), the creative pair is `00f9ebc193` -> `216781aff4` (the commit before PostStack, b8029b39f, and the last before 7a2b86da8 removed creative's own bloom; only b8029b39f touches creative or packages/shared between them), math-consolidation's current reference is `8c3c049935` (the commit before "Math consolidation 1/n"), and color-output, post-stack and selection-xray-off moved to `f3d25c892`. Re-captured: selection-xray-off's four call logs and math-consolidation's 24 tape digests and eight textual facts are byte for byte as stored; the creative pair still makes 1,813 and 1,840 identical calls. color-output, post-stack, post-ssr and post-ssr-models (the last two keep `379431fcb8`) hold the same calls with one difference in the stored form: an argument a call leaves out (`createView()` without a descriptor, the last of a `writeTexture`) is now stored as undefined where it was null. No ref had counted as descending from `eaddd64`, so `ignoreAgx` ran its JSON round trip on both sides, which turns undefined into null (the `agx()` body it blanks is no longer in these logs); against `e80acecc2` it returns the calls unchanged, so the comparison now also tells undefined from null. `tests/proofs-golden.test.js` fails when a stored baseline's reference or a commit its facts name does not resolve on a clone with main's history (golden.js `commitsOf`).
 
 **environment-hemisphere, advanced to `f0004d6c8e` on 2026-11-12 (reflection probe level blend, KB-A3c):** LightProbes' `probeRadiance` blends the two octahedral levels around a roughness by GGX alpha (roughness squared) instead of by roughness, so only the LightProbes shader texts this story composes differ, by that function and its comment; the levels, bindings, uploads and every other call are as before. `tests/probes-level-blend.test.js` shows the value change (capture.mjs, 1 of 1 pass).
 

@@ -274,11 +274,13 @@ export async function record(name, ref, cases, notes = '', pin) {
 
 const agxRederived = new Map(),
   descends = (ancestor, ref) => fact(`${ref} descends from ${ancestor}`, () => isAncestor(ancestor, ref));
-/** Recorded GPU calls with the `agx()` WGSL body blanked: eaddd64 re-derived AgX from primary sources (same constants to
+/** Recorded GPU calls with the `agx()` WGSL body blanked: e80acecc2 re-derived AgX from primary sources (same constants to
  * 1.2e-8, full-precision Rec.709/Rec.2020 matrices), an intended change that proofs against older refs must not flag.
- * Only when the baseline `ref` predates eaddd64; against a later ref the calls are returned unchanged. */
+ * Only when the baseline `ref` predates e80acecc2; against a later ref the calls are returned unchanged. The question
+ * named eaddd64 until 2026-11-14, that commit's id before the history rewrite: no clone holds it, so no proof that
+ * asked could be captured again, and a ref on main never counted as descending from it (lane BB4). */
 export const ignoreAgx = (calls, ref) => {
-  if (!agxRederived.has(ref)) agxRederived.set(ref, descends('eaddd64', ref));
+  if (!agxRederived.has(ref)) agxRederived.set(ref, descends('e80acecc2', ref));
   return agxRederived.get(ref)
     ? calls
     : JSON.parse(JSON.stringify(calls).replace(/fn agx\(v:vec3f\)->vec3f \{.*?\\n\}/g, 'fn agx(v:vec3f)->vec3f {}'));

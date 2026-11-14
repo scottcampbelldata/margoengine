@@ -159,8 +159,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   capture mode, stored what had been captured by then: nothing.
 - **Fix:** while capturing (`strict.capture`, set by `golden.js` `begin`), a missing commit throws, so the run fails
   and the stored baseline stays byte for byte. Regression: `tests/proofs-golden.test.js`, "a capture that needs a
-  commit this clone lacks fails and leaves the stored baseline as it was". Those two proofs still capture only on a
-  checkout that holds the pre-rewrite history.
+  commit this clone lacks fails and leaves the stored baseline as it was". Lane BB4 then moved every commit those proofs
+  (and math-consolidation and selection-xray-off) asked for to its id on main, so every clone can capture them; a test
+  in the same file fails when a stored baseline names a commit that does not resolve (claims.md, 2026-11-14).
 
 ### Open 2026-11-13: DOF near field draws stepped blocks along a bright surface far in front of focus (lane S2)
 
