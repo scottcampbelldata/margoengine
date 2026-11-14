@@ -114,7 +114,7 @@ export function meetDirection(a: SurfaceDef, b: SurfaceDef, p: XYZ): XYZ | undef
 }
 
 /** A bound on the curve's speed |C'(t)|, so on the signed distance's rate of change along it (distances change no faster than the point moves). */
-function speedBound(curve: CurveDef): number {
+export function speedBound(curve: CurveDef): number {
   switch (curve.kind) {
     case 'line':
       return length(curve.direction);

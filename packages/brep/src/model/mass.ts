@@ -129,10 +129,9 @@ const vAngular = (s: Surface) => s.vPeriod > 0 || (Number.isFinite(s.vDomain[0])
 const vPieces = (face: Face, s: Surface, span: number) =>
   face.surface.kind === 'spline' ? 16 : piecesOf(span, vAngular(s));
 
-/** The face's integrals of the K components, about the point c. */
-function faceIntegrals(face: Face, c: XYZ): Float64Array {
-  const fuv = new FaceUV(face),
-    s = fuv.surface,
+/** The face's integrals of the K components, about the point c (`fuv`: the face's FaceUV, when the caller has one). */
+function faceIntegrals(face: Face, c: XYZ, fuv = new FaceUV(face)): Float64Array {
+  const s = fuv.surface,
     flip = fuv.flip,
     sign = fuv.sense ? 1 : -1,
     out = new Float64Array(K),
@@ -802,11 +801,14 @@ function centreOf(faces: readonly Face[]): XYZ {
   ) as XYZ;
 }
 
-/** The volume some faces enclose, signed: positive when they face out of it (a solid's shell), negative for a cavity's. */
-export function enclosedVolume(faces: readonly Face[]): number {
+/**
+ * The volume some faces enclose, signed: positive when they face out of it (a solid's shell), negative for a cavity's.
+ * `uv` may hold the faces' FaceUVs, so that a caller which has them does not trace each face's loops again.
+ */
+export function enclosedVolume(faces: readonly Face[], uv?: ReadonlyMap<Face, FaceUV>): number {
   const c = centreOf(faces);
   let volume = 0;
-  for (const f of faces) volume += faceIntegrals(f, c)[1];
+  for (const f of faces) volume += faceIntegrals(f, c, uv?.get(f))[1];
   return volume;
 }
 

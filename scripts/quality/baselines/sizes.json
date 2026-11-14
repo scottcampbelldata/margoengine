@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 15612552,
+  "total": 15611957,
   "history": [
     {
       "date": "2026-10-24",
@@ -9791,7 +9791,7 @@
     "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 16664,
     "@margoengine/shadows/vsm": 2046,
-    "@margoengine/sky": 18981,
+    "@margoengine/sky": 18916,
     "@margoengine/sky/aerial": 7124,
     "@margoengine/sky/astro": 9780,
     "@margoengine/sky/base": 7630,
@@ -9800,9 +9800,9 @@
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/compat-clouds": 17573,
     "@margoengine/sky/fog": 2295,
-    "@margoengine/sky/hillaire": 11597,
+    "@margoengine/sky/hillaire": 11329,
     "@margoengine/sky/lighting": 4389,
-    "@margoengine/sky/night": 2842,
+    "@margoengine/sky/night": 2580,
     "@margoengine/sky/planet": 4943,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/presets": 1832,

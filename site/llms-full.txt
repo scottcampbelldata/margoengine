@@ -10371,6 +10371,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-14: the body check of abc 00000044 step_007 still runs past the corpus timeout (brep)
+
+- **Repro:** abc 00000044 step_007 (`00000044_c7d977f326364e35bb5b5d27_step_007.step`) through `bodiesFromSTEP` and
+  `checkBody` in `@margoengine/brep`: about 280 s on the mini PC (the corpus allows 180 s for the whole file), with
+  no problem found. The culling of faces an edge does not come near (perf(brep), lane G9) took 00000217 step_004 from
+  307 s to about 105 s but left this file about where it was.
+- **Cause:** two costs left. Half is `curveSurfaceCrossings` (packages/brep/src/model/distance.ts) on spline edges that
+  run nearly tangent along a cylinder they do not bound, from a vertex on it to about 1 um off (body "t_X2_00E9_X0_
+  inf_X2_00E9_X0_rieur", edges #217587 and #217588 against faces #18445, #12685 and #18783, up to 4 s a pair):
+  `accelerationBound` is Infinity for every spline, so neither the slope test nor the chord test prunes, and only the
+  speed test does, which needs intervals shorter than the distance over the speed. The other part is the shells'
+  enclosed volumes (16-point Gauss, 16 pieces an inner integral), which only the sign of is needed for.
+- **Needed to close:** a local acceleration bound for a non-rational spline over an interval within which it is C1
+  (its second-derivative control points over the spans the interval meets), so near-tangent runs prune; then measure
+  this file again and take the corpus timeout back to the corpus run.
+
 ### Fixed 2026-11-14: a B-spline face whose corner has a zero derivative is refused as a loop over a pole, or meshes open (brep)
 
 - **Repro:** abc 00000044 step_007 (validity check: "a loop over a pole between its vertices is not supported yet" on

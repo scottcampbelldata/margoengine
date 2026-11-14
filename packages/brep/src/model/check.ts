@@ -3,9 +3,10 @@
 // through, or lying inside, a face it does not bound. It integrates each shell's volume and tests every edge against the faces near it, so it costs
 // more than validateBody; files read into the modeler and tests run it. Two faces crossing in a closed curve that meets
 // no edge of either are not found (an edge of one or the other crosses in every other case).
+import { knotVector } from '../geometry/nurbs.js';
 import { distance, type XYZ } from '../geometry/vec.js';
 import { faceBox, overlap } from './boolean.js';
-import { curveSurfaceCrossings } from './distance.js';
+import { curveSurfaceCrossings, speedBound } from './distance.js';
 import { edgeSamples, FaceUV, type UV } from './faces.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Box3 } from './march.js';
@@ -25,10 +26,14 @@ export function checkBody(body: Body): ValidityProblem[] {
   const report = (name: string, problem: string) => {
     if (problems.length < 100) problems.push({ name, problem });
   };
+  const faces = body.faces,
+    uv = new Map(faces.map((f) => [f, new FaceUV(f)])),
+    boxes = new Map(faces.map((f) => [f, faceBox(uv.get(f)!, 1e-9)])),
+    cells = new Map<Face, Cells | undefined>();
   if (body.kind === 'solid')
     for (const shell of body.shells) {
       if (!shell.faces.length) continue;
-      const v = enclosedVolume(shell.faces);
+      const v = enclosedVolume(shell.faces, uv);
       if (shell.outer ? v > 0 : v < 0)
         report(
           shell.faces[0].name,
@@ -38,9 +43,6 @@ export function checkBody(body: Body): ValidityProblem[] {
         );
     }
 
-  const faces = body.faces,
-    uv = new Map(faces.map((f) => [f, new FaceUV(f)])),
-    boxes = new Map(faces.map((f) => [f, faceBox(uv.get(f)!, 1e-9)]));
   for (const f of faces) {
     const crossing = loopCrossing(f, uv.get(f)!);
     if (crossing) report(f.name, crossing);
@@ -52,8 +54,18 @@ export function checkBody(body: Body): ValidityProblem[] {
       c = curveEvaluator(e.curve),
       [t0, t1] = edgeParameters(e, 1),
       [lo, hi] = [Math.min(t0, t1), Math.max(t0, t1)];
+    let track: Box3[] | undefined;
     for (const f of faces) {
-      if (own.has(f) || !overlap(box, boxes.get(f)!)) continue;
+      const fbox = boxes.get(f)!;
+      if (own.has(f) || !overlap(box, fbox)) continue;
+      // Every report below is of a point of the edge within `touch` of a point of the face, so in the face's box and,
+      // on a spline face, in a box of one of its knot spans' control points: a face no piece of the edge comes near is
+      // passed over, and the crossing search samples only the pieces that do.
+      track ??= pieceBoxes(e, lo, hi, touch);
+      if (!cells.has(f)) cells.set(f, splineCells(uv.get(f)!));
+      const tree = cells.get(f),
+        near = track.map((b) => !!overlap(b, fbox) && (!tree || hits(tree, b)));
+      if (!near.includes(true)) continue;
       const s = surfaceEvaluator(f.surface),
         gap = (t: number) => {
           const p = c.at(t).slice(0, 3) as XYZ,
@@ -67,7 +79,7 @@ export function checkBody(body: Body): ValidityProblem[] {
         if (inside(mid)) report(e.name, `lies inside ${f.name}, which it does not bound`);
         continue;
       }
-      for (const t of crossings(e, f, lo, hi)) {
+      for (const t of crossings(e, f, lo, hi, near)) {
         const p = c.at(t).slice(0, 3) as XYZ;
         if (gap(t) > touch || distance(p, e.start.point) <= touch || distance(p, e.end.point) <= touch) continue;
         if (inside(p)) {
@@ -97,16 +109,69 @@ function loopCrossing(f: Face, fuv: FaceUV): string | undefined {
         pieces.push({ a, b, co, lo: Math.min(a[0], b[0]), hi: Math.max(a[0], b[0]) });
       }
   });
-  // On a closed surface, each piece is also met a period to either side.
+  // On a closed surface, each piece is also met a period to either side. The pairs are tried in the order a sweep along
+  // u' meets them (each shift in turn; by rank in u' of the one piece, then of the other), each pair whose u' ranges
+  // meet: found through a grid of cells over (u', v), as two pieces that cross share a cell (pieces lying along v, as
+  // a seam's do, all meet in u' and are mostly far apart in v).
   const shifts = fuv.period ? [-fuv.period, 0, fuv.period] : [0],
-    order = [...pieces.keys()].sort((i, j) => pieces[i].lo - pieces[j].lo);
+    order = [...pieces.keys()].sort((i, j) => pieces[i].lo - pieces[j].lo),
+    n = order.length,
+    rank = new Int32Array(n);
+  order.forEach((i, r) => {
+    rank[i] = r;
+  });
+  let u0 = Infinity,
+    u1 = -Infinity,
+    v0 = Infinity,
+    v1 = -Infinity;
+  // (A piece with a coordinate not finite crosses nothing: properCrossing's orientations are not numbers.)
+  const finite = (p: (typeof pieces)[number]) => [p.a[0], p.a[1], p.b[0], p.b[1]].every(Number.isFinite);
+  for (const p of pieces) {
+    if (!finite(p)) continue;
+    u0 = Math.min(u0, p.lo);
+    u1 = Math.max(u1, p.hi);
+    v0 = Math.min(v0, p.a[1], p.b[1]);
+    v1 = Math.max(v1, p.a[1], p.b[1]);
+  }
+  if (!n || ![u0, u1, v0, v1].every(Number.isFinite)) return undefined;
+  const side = Math.max(1, Math.min(256, Math.ceil(Math.sqrt(n)))),
+    du = (u1 - u0) / side,
+    dv = (v1 - v0) / side,
+    // A margin past each range: a crossing found by rounding just past a range still shares a cell.
+    margin = 1e-9 * (u1 - u0 + (v1 - v0)) + 1e-300,
+    cell = (x: number, x0: number, d: number) => (d > 0 ? Math.max(0, Math.min(side - 1, Math.floor((x - x0) / d))) : 0),
+    cells: number[][] = Array.from({ length: side * side }, () => []),
+    range = (lo: number, hi: number, vlo: number, vhi: number, visit: (k: number) => void) => {
+      if (hi < u0 - margin || lo > u1 + margin) return;
+      const i0 = cell(lo - margin, u0, du),
+        i1 = cell(hi + margin, u0, du),
+        j0 = cell(vlo - margin, v0, dv),
+        j1 = cell(vhi + margin, v0, dv);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) visit(i * side + j);
+    };
+  pieces.forEach((p, k) => {
+    if (finite(p))
+      range(p.lo, p.hi, Math.min(p.a[1], p.b[1]), Math.max(p.a[1], p.b[1]), (c) => {
+        cells[c].push(k);
+      });
+  });
+  const seen = new Int32Array(n).fill(-1);
+  let stamp = 0;
   for (const shift of shifts)
-    for (let x = 0; x < order.length; x++) {
-      const p = pieces[order[x]];
-      for (let y = shift ? 0 : x + 1; y < order.length; y++) {
+    for (let x = 0; x < n; x++, stamp++) {
+      const p = pieces[order[x]],
+        ys: number[] = [];
+      if (!finite(p)) continue;
+      range(p.lo - shift, p.hi - shift, Math.min(p.a[1], p.b[1]), Math.max(p.a[1], p.b[1]), (c) => {
+        for (const k of cells[c])
+          if (seen[k] !== stamp) {
+            seen[k] = stamp;
+            if (shift || rank[k] > x) ys.push(rank[k]);
+          }
+      });
+      for (const y of ys.sort((a, b) => a - b)) {
         const q = pieces[order[y]];
-        if (q.lo + shift > p.hi) break;
-        if (q.co.edge === p.co.edge || q.hi + shift < p.lo) continue;
+        if (q.lo + shift > p.hi || q.co.edge === p.co.edge || q.hi + shift < p.lo) continue;
         const qa: UV = [q.a[0] + shift, q.a[1]],
           qb: UV = [q.b[0] + shift, q.b[1]];
         if (!properCrossing(p.a, p.b, qa, qb)) continue;
@@ -177,12 +242,128 @@ function edgeBox(e: Edge): Box3 {
   return { min: [min[0] - pad, min[1] - pad, min[2] - pad], max: [max[0] + pad, max[1] + pad, max[2] + pad] };
 }
 
+/** A tree of boxes over a spline face's knot spans: each leaf the box of one span's control points. */
+interface Cells {
+  box: Box3;
+  kids?: [Cells, Cells];
+}
+
 /**
- * Curve parameters in [lo, hi] where the edge crosses the face's surface: exactly on the analytic surfaces; on a
- * spline surface, sign changes of the distance along its normal between 64 samples, then bisection.
+ * The knot spans of a spline face's surface that its loops' (u, v) range meets (every span along a closed direction or
+ * one with a pole), each as the box of its control points: a span's patch lies in their convex hull (its weights all
+ * positive), so every point of the face lies in one of these boxes. Undefined for other surfaces, where a weight is
+ * not positive, and where u and v are swapped (FaceUV.swapped).
  */
-function crossings(e: Edge, f: Face, lo: number, hi: number): number[] {
-  if (f.surface.kind !== 'spline') return curveSurfaceCrossings(e.curve, f.surface, lo, hi);
+function splineCells(fuv: FaceUV): Cells | undefined {
+  const def = fuv.face.surface,
+    s = fuv.surface;
+  if (def.kind !== 'spline' || fuv.swapped || def.weights?.some((w) => !(w > 0))) return undefined;
+  const [p, q] = def.degrees,
+    [nu, nv] = def.counts,
+    U = knotVector(def.knots[0], def.multiplicities[0]),
+    V = knotVector(def.knots[1], def.multiplicities[1]);
+  let [u0, u1, v0, v1] = fuv.box;
+  if (fuv.flip) [u0, u1] = [-u1, -u0];
+  const uAll = s.uPeriod > 0 || s.uPole?.(1) !== undefined || s.uPole?.(-1) !== undefined || !(u0 <= u1),
+    vAll = s.vPeriod > 0 || s.pole(1) !== undefined || s.pole(-1) !== undefined || !(v0 <= v1),
+    spans = (K: readonly number[], degree: number, n: number, all: boolean, lo: number, hi: number) => {
+      const out: number[] = [];
+      for (let i = degree; i < n; i++) if (K[i] < K[i + 1] && (all || (K[i + 1] >= lo && K[i] <= hi))) out.push(i);
+      // A range wholly past the domain (the evaluator holds a parameter at the domain's end): the end's span.
+      if (!out.length) out.push(lo > K[n] ? n - 1 : degree);
+      return out;
+    },
+    us = spans(U, p, nu, uAll, u0, u1),
+    vs = spans(V, q, nv, vAll, v0, v1);
+  const leaf = (i: number, j: number): Cells => {
+    const min: XYZ = [Infinity, Infinity, Infinity],
+      max: XYZ = [-Infinity, -Infinity, -Infinity];
+    for (let a = i - p; a <= i; a++)
+      for (let b = j - q; b <= j; b++) {
+        const c = def.points[b * nu + a];
+        for (let k = 0; k < 3; k++) {
+          min[k] = Math.min(min[k], c[k]);
+          max[k] = Math.max(max[k], c[k]);
+        }
+      }
+    return { box: { min, max } };
+  };
+  // Halving the longer run of spans at each level.
+  const build = (a0: number, a1: number, b0: number, b1: number): Cells => {
+    if (a1 - a0 === 1 && b1 - b0 === 1) return leaf(us[a0], vs[b0]);
+    const am = (a0 + a1) >> 1,
+      bm = (b0 + b1) >> 1,
+      kids: [Cells, Cells] =
+        a1 - a0 >= b1 - b0 ? [build(a0, am, b0, b1), build(am, a1, b0, b1)] : [build(a0, a1, b0, bm), build(a0, a1, bm, b1)],
+      [x, y] = [kids[0].box, kids[1].box],
+      min: XYZ = [Math.min(x.min[0], y.min[0]), Math.min(x.min[1], y.min[1]), Math.min(x.min[2], y.min[2])],
+      max: XYZ = [Math.max(x.max[0], y.max[0]), Math.max(x.max[1], y.max[1]), Math.max(x.max[2], y.max[2])];
+    return { box: { min, max }, kids };
+  };
+  return build(0, us.length, 0, vs.length);
+}
+
+/** Whether a box meets a leaf of the tree. */
+function hits(c: Cells, b: Box3): boolean {
+  if (!overlap(c.box, b)) return false;
+  return !c.kids || hits(c.kids[0], b) || hits(c.kids[1], b);
+}
+
+/** Pieces the crossing search splits an edge's span into (`crossings`, `pieceBoxes`). */
+const PIECES = 64;
+
+/**
+ * A box round each of the PIECES equal pieces of an edge's span [lo, hi]: its ends and three points between, padded by
+ * the longest step between those points (a piece's curve lies within half its own length of one of them, and a
+ * piece a 256th of the edge long bends little) and by `touch`. A line's piece is its segment, padded by `touch` alone.
+ */
+function pieceBoxes(e: Edge, lo: number, hi: number, touch: number): Box3[] {
+  const c = curveEvaluator(e.curve),
+    sub = e.curve.kind === 'line' ? 1 : 4,
+    at = (k: number) => c.at(lo + ((hi - lo) * k) / (PIECES * sub)),
+    out: Box3[] = [];
+  let prev = at(0);
+  for (let k = 0; k < PIECES; k++) {
+    const min: XYZ = [prev[0], prev[1], prev[2]],
+      max: XYZ = [prev[0], prev[1], prev[2]];
+    let step = 0;
+    for (let j = 1; j <= sub; j++) {
+      const p = at(k * sub + j);
+      step = Math.max(step, distance(p, prev));
+      for (let i = 0; i < 3; i++) {
+        min[i] = Math.min(min[i], p[i]);
+        max[i] = Math.max(max[i], p[i]);
+      }
+      prev = p;
+    }
+    const pad = (sub > 1 ? step : 0) + touch;
+    out.push({ min: [min[0] - pad, min[1] - pad, min[2] - pad], max: [max[0] + pad, max[1] + pad, max[2] + pad] });
+  }
+  return out;
+}
+
+/**
+ * Curve parameters in [lo, hi] where the edge crosses the face's surface, on the pieces `near` marks (those whose box
+ * meets the face's; past the others the edge meets no point of the face): exactly on the analytic surfaces; on a
+ * spline surface, sign changes of the distance along its normal between PIECES + 1 samples, then bisection.
+ */
+function crossings(e: Edge, f: Face, lo: number, hi: number, near: readonly boolean[]): number[] {
+  const n = PIECES,
+    ts = Array.from({ length: n + 1 }, (_, k) => (k ? lo + ((hi - lo) * k) / n : lo));
+  if (f.surface.kind !== 'spline') {
+    // Over each run of near pieces, to the resolution the whole span would take (a billionth of its length).
+    if (near.every(Boolean)) return curveSurfaceCrossings(e.curve, f.surface, lo, hi);
+    const out: number[] = [],
+      resolution = 1e-9 * speedBound(e.curve) * (hi - lo);
+    for (let k = 0; k < n; k++) {
+      if (!near[k]) continue;
+      let end = k + 1;
+      while (end < n && near[end]) end++;
+      out.push(...curveSurfaceCrossings(e.curve, f.surface, ts[k], ts[end], resolution));
+      k = end;
+    }
+    return out;
+  }
   const c = curveEvaluator(e.curve),
     s = surfaceEvaluator(f.surface);
   let hint: [number, number] | undefined;
@@ -195,12 +376,14 @@ function crossings(e: Edge, f: Face, lo: number, hi: number): number[] {
     return (p[0] - d[0]) * n[0] + (p[1] - d[1]) * n[1] + (p[2] - d[2]) * n[2];
   };
   const out: number[] = [],
-    n = 64;
-  let a = lo,
-    fa = side(a);
+    values = new Float64Array(n + 1).fill(Number.NaN),
+    value = (k: number) => (Number.isNaN(values[k]) ? (values[k] = side(ts[k])) : values[k]);
   for (let k = 1; k <= n; k++) {
-    const b = lo + ((hi - lo) * k) / n,
-      fb = side(b);
+    if (!near[k - 1]) continue;
+    const a = ts[k - 1],
+      fa = value(k - 1),
+      b = ts[k],
+      fb = value(k);
     if (fa < 0 !== fb < 0) {
       let x = a,
         y = b,
@@ -213,8 +396,6 @@ function crossings(e: Edge, f: Face, lo: number, hi: number): number[] {
       }
       out.push((x + y) / 2);
     }
-    a = b;
-    fa = fb;
   }
   return out;
 }

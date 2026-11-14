@@ -1,5 +1,5 @@
 {
-  "commit": "6aac7fe65",
+  "commit": "ba3848be9",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -422,8 +422,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 394310,
-        "gzip": 138054
+        "raw": 397888,
+        "gzip": 139463
       }
     },
     "@margoengine/bvh": {
@@ -540,8 +540,8 @@
         "gzip": 266
       },
       "dist/workers/cad-runtime.js": {
-        "raw": 235789,
-        "gzip": 83682
+        "raw": 236231,
+        "gzip": 83855
       }
     },
     "@margoengine/cameras": {
@@ -15422,9 +15422,9 @@
       "brotli": 15920
     },
     "packages/cad/dist/workers/cad-runtime.js": {
-      "raw": 233817,
-      "gzip": 83517,
-      "brotli": 71818
+      "raw": 234227,
+      "gzip": 83690,
+      "brotli": 71950
     },
     "packages/fbx/dist/workers/fbx.js": {
       "raw": 336364,

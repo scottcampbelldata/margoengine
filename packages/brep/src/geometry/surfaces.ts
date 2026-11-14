@@ -666,9 +666,11 @@ class SplinePatch implements Surface {
       }
     this.size = Math.max(hi - lo, 1e-12);
   }
-  private fit(t: number, [lo, hi]: readonly [number, number], period: number) {
+  private fit(t: number, domain: readonly [number, number], period: number) {
+    // (Indexed, not destructured: this runs for every evaluation, and destructuring went through the iterator.)
+    const lo = domain[0];
     if (period) return lo + ((((t - lo) % period) + period) % period);
-    return Math.min(hi, Math.max(lo, t));
+    return Math.min(domain[1], Math.max(lo, t));
   }
   at(u: number, v: number) {
     const l = this.last;

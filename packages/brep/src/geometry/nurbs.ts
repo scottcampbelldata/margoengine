@@ -93,11 +93,9 @@ export function basisDerivatives(span: number, u: number, p: number, U: readonly
   return [values, derivatives];
 }
 
-// Per-direction outputs of basisInto for curve and surface evaluation.
+// Outputs of basisInto for curve evaluation (a surface keeps its own, basisAt).
 const N0 = new Float64Array(MAX_DEGREE + 1),
-  D0 = new Float64Array(MAX_DEGREE + 1),
-  N1 = new Float64Array(MAX_DEGREE + 1),
-  D1 = new Float64Array(MAX_DEGREE + 1);
+  D0 = new Float64Array(MAX_DEGREE + 1);
 
 /** A B-spline curve: degree, homogeneous control points (4 per point), knot vector. */
 export interface SplineCurve {
@@ -141,18 +139,64 @@ export interface SplineSurface {
   readonly vKnots: readonly number[];
 }
 
+/**
+ * One direction's span and basis at the last parameter a surface was evaluated at, kept: an integral along the other
+ * direction (a mass integral's inner one, at one u for hundreds of v) evaluates at the same parameter again and again,
+ * and the same knots, degree and parameter give the same basis. Its own arrays (curveAt's scratch is apart).
+ */
+interface BasisCache {
+  knots: readonly number[] | undefined;
+  count: number;
+  degree: number;
+  t: number;
+  span: number;
+  values: Float64Array;
+  derivatives: Float64Array;
+}
+const uBasis: BasisCache = {
+    knots: undefined,
+    count: 0,
+    degree: -1,
+    t: Number.NaN,
+    span: 0,
+    values: new Float64Array(MAX_DEGREE + 1),
+    derivatives: new Float64Array(MAX_DEGREE + 1),
+  },
+  vBasis: BasisCache = { ...uBasis, values: new Float64Array(MAX_DEGREE + 1), derivatives: new Float64Array(MAX_DEGREE + 1) };
+
+/** The span and basis of `n` control points of degree p at t over knots U: from `cache` when it holds them. */
+function basisAt(cache: BasisCache, n: number, p: number, t: number, U: readonly number[]): BasisCache {
+  if (p > MAX_DEGREE) {
+    const span = findSpan(n - 1, p, t, U),
+      values = new Float64Array(p + 1),
+      derivatives = new Float64Array(p + 1);
+    basisInto(span, t, p, U, values, derivatives);
+    return { knots: U, count: n, degree: p, t, span, values, derivatives };
+  }
+  if (Object.is(t, cache.t) && U === cache.knots && n === cache.count && p === cache.degree) return cache;
+  // Marked stale first: a throw part way leaves no half-filled basis behind.
+  cache.knots = undefined;
+  cache.span = findSpan(n - 1, p, t, U);
+  basisInto(cache.span, t, p, U, cache.values, cache.derivatives);
+  cache.knots = U;
+  cache.count = n;
+  cache.degree = p;
+  cache.t = t;
+  return cache;
+}
+
 /** Point and first partial derivatives of a (rational) B-spline surface: [x, y, z, du(3), dv(3)]. */
 export function surfaceAt(s: SplineSurface, u: number, v: number): number[] {
   const p = s.uDegree,
     q = s.vDegree,
-    uspan = findSpan(s.nu - 1, p, u, s.uKnots),
-    vspan = findSpan(s.nv - 1, q, v, s.vKnots),
-    Nu = p > MAX_DEGREE ? new Float64Array(p + 1) : N0,
-    dNu = p > MAX_DEGREE ? new Float64Array(p + 1) : D0,
-    Nv = q > MAX_DEGREE ? new Float64Array(q + 1) : N1,
-    dNv = q > MAX_DEGREE ? new Float64Array(q + 1) : D1;
-  basisInto(uspan, u, p, s.uKnots, Nu, dNu);
-  basisInto(vspan, v, q, s.vKnots, Nv, dNv);
+    U = basisAt(uBasis, s.nu, p, u, s.uKnots),
+    V = basisAt(vBasis, s.nv, q, v, s.vKnots),
+    uspan = U.span,
+    vspan = V.span,
+    Nu = U.values,
+    dNu = U.derivatives,
+    Nv = V.values,
+    dNv = V.derivatives;
   // Sums in plain locals: x, y, z, w of the point and of both partial derivatives.
   let ax = 0,
     ay = 0,

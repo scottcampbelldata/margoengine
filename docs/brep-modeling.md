@@ -135,7 +135,12 @@ Freeform NURBS intersections, advanced blends and healing are the areas still be
   costlier geometric checks, for files read and for tests: each shell facing out of its material (a cavity's into it,
   by its enclosed volume), no two edges of a face crossing, and no edge passing through or lying inside a face it does
   not bound. Not found: two faces crossing in a closed curve that meets no edge of either. `extrude` and `revolve`
-  refuse a profile that crosses or touches itself.
+  refuse a profile that crosses or touches itself. The edge tests take each edge in 64 pieces and pass over the faces
+  no piece comes near (a piece's box against the face's box and, on a spline face, against the boxes of its knot spans'
+  control points, in whose hull the face lies), sampling only the pieces that do; two edges of a face crossing are
+  sought through a grid over its (u, v). The verdicts are those of sampling every piece against every face near the
+  edge (all 1426 bodies of the 318 corpus STEP files checked within 30 s, problem for problem), and abc 00000217
+  step_004's check fell from 307 s to about 105 s.
 - `model.massProperties`: exact volume, area, centroid and inertia from the faces (divergence theorem, Green's
   theorem over each trimmed face, Gauss-Legendre), not a mesh: box, cylinder, sphere, torus, a cone ring, a
   hemisphere over its pole, a holed block and the rounded box match their closed forms to 1e-9 (1e-8 for the hemisphere).
