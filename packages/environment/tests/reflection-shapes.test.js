@@ -63,9 +63,11 @@ const MAIN_SHADING = {
   // gives 7dac762f30886648606a951f80b2d3f0bc5f7798b279626c2a0407705cac9bd4 (plain) and
   // 9d7b8332c161cfd0bb9bbacb518a8dffc9e6af1297a5e8a7d11044dcf4b3bae3 (environment), the hashes pinned before. That
   // environment text was bef64ee0a's with IBL_WGSL's nine comment lines gone (KB-RM1); the old IBL_WGSL gave
-  // 3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea.
+  // 3d3107edd1c91e6866425ee516fea34f3ed9c055367fd6d36fc198ca7d56eeea. IBL_WGSL's iblPrefiltered then moved to the GGX
+  // alpha mip blend (KB-A3e): its old one-line roughness-linear lookup back in gives
+  // 48a522e352451c7779df65b6d492169404b572406f0ecc4efe520257dd513aa4 (environment), the hash pinned before.
   plain: 'a1169cea65852ccb4621169a86537239a78a6120baad6f5bd9eeef91451ff258',
-  environment: '48a522e352451c7779df65b6d492169404b572406f0ecc4efe520257dd513aa4',
+  environment: '33856f29e650cc7d018543695418d193c8f6fe9bbe6e8250654446703c9751be',
 };
 const sha = (text) => createHash('sha256').update(text).digest('hex');
 function declarations(environment, options) {

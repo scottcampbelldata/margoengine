@@ -3,6 +3,7 @@
 // bindings. scripts/mat-more-gpu-check.js checks the reflected pixels on a real adapter.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
@@ -193,4 +194,15 @@ test('Lambert, Phong and basic envMap combine the reflection with their colour',
   lambert.destroy();
   basic.destroy();
   s.engine.dispose();
+});
+
+// KB-A3e: an Environment's mip m is prefiltered at roughness m / (levels - 1), so the lookup mixes the two mips around a
+// roughness by GGX alpha; a lod linear in roughness gave 0.045 22.5% of the 0.2 mip of a 6-mip Environment.
+test('standard envMap reads its mips by GGX alpha: lod k + (x^2 - k^2) / (2k + 1)', () => {
+  const source = readFileSync(new URL('../src/env-map.ts', import.meta.url), 'utf8');
+  assert.ok(source.includes('fn margoEnvLod(roughness:f32)->f32 {'));
+  assert.ok(source.includes('let x=clamp(roughness,0.0,1.0)*margoEnv.params.z; let k=min(floor(x),max(margoEnv.params.z-1.0,0.0)); return k+(x*x-k*k)/(2.0*k+1.0);'));
+  assert.ok(source.includes('margoEnvRadiance(margoEnvRay(s.n,v),margoEnvLod(s.roughness))'));
+  assert.ok(source.includes('margoEnvRadiance(reflect(-v,s.cn),margoEnvLod(s.cr))'));
+  assert.ok(!source.includes('*margoEnv.params.z)'), 'no lookup is linear in roughness');
 });

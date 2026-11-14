@@ -52,7 +52,10 @@ export function packEnv(
   if (sh) for (let k = 0; k < 9; k++) out.set([sh[k * 3], sh[k * 3 + 1], sh[k * 3 + 2]], 12 + k * 4);
   return out;
 }
-// Roughness to mip: lod = roughness x top mip (linear; Margo's choice). Ambient = radiance x (F0 A + B) + diffuse
+// Roughness to mip (margoEnvLod): x = roughness x top mip, lower mip k, lod k + (x^2 - k^2) / (2k + 1). An Environment's
+// mip m is prefiltered at roughness m / top, so the trilinear mix of the two mips around x weights them by GGX alpha
+// (roughness squared, the lobe width), not by roughness, which gave 0.045 22.5% of the 0.2 mip of a 6-mip Environment
+// (KB-A3e). A CubeTexture's box-filtered mips use the same map. Ambient = radiance x (F0 A + B) + diffuse
 // irradiance: Karis 2013 split sum ("Real Shading in Unreal Engine 4"); SH basis: Ramamoorthi and Hanrahan 2001.
 const declarations = (
   group: number,
@@ -64,6 +67,9 @@ const declarations = (
 @group(${group}) @binding(190) var<uniform> margoEnv:MargoEnv;
 var<private> margoEnvEye:vec3f;
 fn margoEnvRotate(d:vec3f)->vec3f {let p=margoEnv.params; return vec3f(p.x*d.x-p.y*d.z,d.y,p.y*d.x+p.x*d.z);}
+fn margoEnvLod(roughness:f32)->f32 {
+  let x=clamp(roughness,0.0,1.0)*margoEnv.params.z; let k=min(floor(x),max(margoEnv.params.z-1.0,0.0)); return k+(x*x-k*k)/(2.0*k+1.0);
+}
 fn margoEnvRadiance(d:vec3f,lod:f32)->vec3f {return textureSampleLevel(margoEnvMap,margoEnvSampler,margoEnvRotate(d),lod).rgb*margoEnv.params.w;}
 fn margoEnvIrradiance(n:vec3f)->vec3f {
   if(margoEnv.mode.x<0.5){return margoEnvRadiance(n,margoEnv.mode.y);}
@@ -82,7 +88,7 @@ fn margoEnvBrdf(nv:f32,roughness:f32)->vec2f {
 }
 fn margoEnvAmbient(s:Surface,v:vec3f)->vec3f {
   let nv=clamp(dot(s.n,v),0.0001,1.0); let f0=mix(${f0},s.base.rgb,s.metal); let ab=margoEnvBrdf(nv,s.roughness);
-  let spec=f0*ab.x+ab.y; let radiance=margoEnvRadiance(margoEnvRay(s.n,v),s.roughness*margoEnv.params.z);
+  let spec=f0*ab.x+ab.y; let radiance=margoEnvRadiance(margoEnvRay(s.n,v),margoEnvLod(s.roughness));
   return (radiance*spec+(1-spec)*(1-s.metal)*${kd}*s.base.rgb*margoEnvIrradiance(s.n))*s.occlusion;
 }
 fn margoEnvCombine(c:vec3f,n:vec3f,v:vec3f)->vec3f {
@@ -130,7 +136,7 @@ export function envMapShader(code: string, group: number, shading: 'standard' | 
       out = edit(
         out,
         /fn margoCoatAmbient\(s:Surface,v:vec3f\)->vec3f \{return [^;]*;\}/,
-        'fn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return margoEnvRadiance(reflect(-v,s.cn),s.cr*margoEnv.params.z)*s.occlusion;}',
+        'fn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return margoEnvRadiance(reflect(-v,s.cn),margoEnvLod(s.cr))*s.occlusion;}',
       );
     if (out.includes('fn margoSheenAmbient('))
       out = edit(

@@ -28,9 +28,15 @@ fn iblRotate(d: vec3f, params: vec4f) -> vec3f {
     + sh[8].rgb * (0.546274215 * (n.x * n.x - n.y * n.y)), vec3f(0.0));
 }
 ` +
-  // Prefiltered radiance for perceptual roughness (0..1) along a world direction (rotation applied here).
+  // Prefiltered radiance for perceptual roughness (0..1) along a world direction (rotation applied here). Mip m is
+  // prefiltered at roughness m / (mips - 1); a roughness between two mips reads both, weighted by GGX alpha (roughness
+  // squared, the lobe width): in mip units x, lod k + (x^2 - k^2) / (2k + 1) with k the lower mip, so the trilinear mix
+  // of the two equals the material's alpha. A lod linear in roughness gave 0.045 (alpha 0.002) 22.5% of the 0.2 mip
+  // (alpha 0.04) with 6 mips, a lobe about 20 times too wide (KB-A3e, as LightProbes' probeRadiance, KB-A3c).
   `fn iblPrefiltered(specular: texture_cube<f32>, s: sampler, params: vec4f, r: vec3f, roughness: f32) -> vec3f {
-  return textureSampleLevel(specular, s, iblRotate(r, params), clamp(roughness, 0.0, 1.0) * params.z).rgb;
+  let x = clamp(roughness, 0.0, 1.0) * params.z;
+  let k = min(floor(x), max(params.z - 1.0, 0.0));
+  return textureSampleLevel(specular, s, iblRotate(r, params), k + (x * x - k * k) / (2.0 * k + 1.0)).rgb;
 }
 ` +
   // Split-sum scale and bias for F0: specular = prefiltered * (F0 * x + y). Bilinear, clamp to edge, like sampling the

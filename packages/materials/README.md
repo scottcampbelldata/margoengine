@@ -1258,7 +1258,8 @@ rotation) and `envMapMode: 'refraction'` with `refractionRatio` (default 1/1.5, 
 instead of the mirrored one.
 
 - **Standard shading** lights itself with the map in place of its ambient light: specular radiance from the mip level
-  of its roughness (`roughness * (levels - 1)`) weighted by an analytic split-sum environment BRDF (Karis 2014), plus
+  of its roughness (`x = roughness * (levels - 1)`, lower level `k`, lod `k + (x^2 - k^2) / (2k + 1)`: the two levels
+  around it mixed by GGX alpha, as an Environment's levels are prefiltered) weighted by an analytic split-sum environment BRDF (Karis 2014), plus
   diffuse irradiance from the Environment's spherical harmonics or, for other cubes, a level about four texels across.
   It overrides the built-in hemisphere and an attached scene IBL for this material (their bindings stay). Physical
   clearcoat, sheen, thin film and anisotropy read it too.
