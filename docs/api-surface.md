@@ -22,7 +22,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/brep | `.` 67 | 5 |  | 141,820 |
 | @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7, `./lines` 6, `./gpu` 14, `./scene` 3, `./points` 5, `./sdf` 6, `./inside` 6, `./gpu-build` 4, `./alpha` 11, `./alpha-triangles` 3, `./parallel` 2 | 164 | 2 | 23,719 |
 | @margoengine/cache | `.` 8, `./manager` 5, `./hashed` 2, `./ranges` 4, `./vary` 3, `./eviction` 1, `./bundles` 7, `./prefetch` 7, `./stream` 1, `./decoded` 3 | 31 |  | 4,597 |
-| @margoengine/cad | `.` 10, `./cad-async` 5, `./stage` 3, `./closed` 1 | 3 |  | 12,777 |
+| @margoengine/cad | `.` 10, `./cad-async` 5, `./stage` 3, `./closed` 1 | 3 |  | 12,821 |
 | @margoengine/cameras | `.` 9, `./origin` 3, `./layers` 8, `./offaxis` 7, `./physical` 5, `./panini` 4, `./wide-cube` 5, `./panorama` 6, `./stereo` 5 | 1 |  | 2,955 |
 | @margoengine/cinematic | `.` 3, `./brain` 13, `./composer` 3, `./dolly` 3, `./group` 4, `./noise` 7, `./confine` 4, `./lens` 5, `./physical-lens` 3, `./ortho` 7 | 21 |  | 2,015 |
 | @margoengine/clustered | `.` 22, `./shadows` 5, `./area` 8, `./directional` 6, `./ies` 7, `./projector` 7, `./physical-lobes` 1, `./units` 12, `./flicker` 5, `./budget` 2, `./shapes` 9, `./stochastic` 3, `./area-shapes` 2, `./shadow-atlas` 5, `./cube-projector` 5, `./area-texture` 9, `./layers` 3, `./contact` 3 | 293 |  | 15,032 |
@@ -94,7 +94,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/stage | `.` 24, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./lights` 4, `./scene` 4, `./viewer-extras` 7 | 33 |  | 3,232 |
 | @margoengine/staging | `.` 4, `./accumulate` 2, `./pathtrace` 2, `./ground` 3, `./pathtrace-materials` 3, `./accumulate-ambient` 3, `./caustics` 3, `./backdrop` 8 | 34 |  | 9,066 |
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6, `./geometry` 3, `./gl` 4, `./panels` 4 | 22 |  | 4,984 |
-| @margoengine/taa | `.` 10, `./upscale` 2, `./sharpen` 2, `./upscale-velocity` 2 | 14 |  | 15,117 |
+| @margoengine/taa | `.` 10, `./upscale` 2, `./sharpen` 2, `./upscale-velocity` 2 | 14 |  | 15,120 |
 | @margoengine/terrain | `.` 15, `./query` 6, `./layers-pbr` 4, `./stream` 4, `./sculpt` 7, `./holes` 2, `./rvt` 6, `./displace` 3, `./deform` 4, `./blend` 2, `./planet-recipes` 13, `./planet` 8, `./imagery` 12, `./overlays` 6 | 103 |  | 14,040 |
 | @margoengine/text | `.` 36, `./rich` 8, `./msdf` 4, `./animate` 8, `./extrude` 16, `./fit` 6, `./selection` 2, `./curve` 7, `./vector` 19 | 106 |  | 17,777 |
 | @margoengine/tilemap | `.` 44, `./autotile` 18, `./ldtk` 8, `./tiled` 6, `./iso` 13, `./hex` 17, `./path` 9, `./fov` 11, `./objects` 5, `./plane` 2 | 174 |  | 7,440 |

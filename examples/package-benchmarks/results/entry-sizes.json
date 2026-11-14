@@ -1,10 +1,10 @@
 {
-  "commit": "3e680328b",
+  "commit": "3511f7ed3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 61333,
-    "gzip": 24843,
+    "raw": 61347,
+    "gzip": 24844,
     "limit": 25000
   },
   "packages": {
@@ -524,8 +524,8 @@
     },
     "@margoengine/cad": {
       ".": {
-        "raw": 33666,
-        "gzip": 12777
+        "raw": 33769,
+        "gzip": 12821
       },
       "./cad-async": {
         "raw": 3936,
@@ -848,11 +848,11 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53470,
+        "raw": 53484,
         "gzip": 22225
       },
       "./extension": {
-        "raw": 53651,
+        "raw": 53665,
         "gzip": 22289
       }
     },
@@ -6176,8 +6176,8 @@
         "gzip": 6219
       },
       "./generate-rust": {
-        "raw": 29717,
-        "gzip": 9827
+        "raw": 29735,
+        "gzip": 9832
       },
       "./migrate": {
         "raw": 26219,
@@ -9916,20 +9916,20 @@
     },
     "@margoengine/taa": {
       ".": {
-        "raw": 50813,
-        "gzip": 15117
+        "raw": 50829,
+        "gzip": 15120
       },
       "./upscale": {
-        "raw": 23558,
-        "gzip": 8102
+        "raw": 22870,
+        "gzip": 7923
       },
       "./sharpen": {
         "raw": 1568,
         "gzip": 767
       },
       "./upscale-velocity": {
-        "raw": 68789,
-        "gzip": 19450
+        "raw": 68805,
+        "gzip": 19451
       }
     },
     "@margoengine/terrain": {
