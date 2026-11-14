@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { TAA, halton } from '../dist/index.js';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { wgsl } from '../../core/src/shaders.ts';
-import { objectVelocity } from '../src/shader.ts';
+import { cameraVelocity, multisampledCameraVelocity, objectVelocity, skySample } from '../src/shader.ts';
 
 /** One TAA on the recording mock, a frame driver, and every pass context it saw. */
 function rig(options, samples = 4) {
@@ -36,6 +36,27 @@ function rig(options, samples = 4) {
 }
 // jitterProjection's NDC offset of frame f, in uv.
 const offset = (f, w, h) => [(halton((f % 8) + 1, 2) - 0.5) / w, (halton((f % 8) + 1, 3) - 0.5) / h];
+
+test('4x sky motion stays apart from every depth when the WebGL2 layer averages the samples', () => {
+  // The layer's motion resolve reads the mean of a 4x pixel. With the sky at 0 a silhouette's mean was a false depth
+  // between box and sky (upscale-velocity-browser.mjs --compat); one sky sample of four must pull it below 0.
+  assert.ok((skySample + 3 * 1) / 4 < 0, 'one sky sample and three at the nearest depth still reject');
+  assert.equal(Math.log2(-skySample) % 1, 0, 'a power of two: the mean of four sky samples is exact');
+  assert.equal(multisampledCameraVelocity, cameraVelocity.replace('o.depth=0;}return', `o.depth=${skySample};}return`));
+  const codes = [],
+    r = rig({}, 4),
+    create = r.gpu.device.createShaderModule;
+  r.gpu.device.createShaderModule = (d) => (codes.push(d.code), create(d));
+  r.frame();
+  assert.ok(codes.includes(multisampledCameraVelocity), '4x draws the sky sample');
+  assert.ok(codes.some((c) => c.includes(`if(o.depth==${skySample}){o.depth=0;}`)), 'an all-sky pixel resolves to 0');
+  const one = [],
+    single = rig({}, 1),
+    make = single.gpu.device.createShaderModule;
+  single.gpu.device.createShaderModule = (d) => (one.push(d.code), make(d));
+  single.frame();
+  assert.ok(one.includes(cameraVelocity) && !one.includes(multisampledCameraVelocity), '1x writes the sky as 0');
+});
 
 test('object velocity cuts with the opacity map and leaves vertex alpha out on request', () => {
   const plain = objectVelocity(true, true);

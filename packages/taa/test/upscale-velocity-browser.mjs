@@ -144,6 +144,8 @@ try {
     // A translating thin surface must supply object motion, then only jitter when it stops.
     spinner.setGeometry(box(0.06, 2, 0.05)).setRotation([0, 0, 0]);
     const motionEye = eye('thin-motion', 0);
+    // Every kept sample's expected depth, so a silhouette that mixes the box with the sky can be told from the box.
+    const kept = [];
     const frame = async (x) => {
       spinner.setPosition([x, 0, 0]);
       engine.render({ views: [motionEye], delta: 1 / 60 });
@@ -159,7 +161,11 @@ try {
         return (n & 32768 ? -1 : 1) * (e ? (1 + m / 1024) * 2 ** (e - 15) : m * 2 ** -24);
       };
       const xs = [];
-      for (let i = 0; i < bytes.length; i += 4) if (d.getFloat32(i, true) > 0) xs.push(half(v.getUint16(i, true)));
+      for (let i = 0; i < bytes.length; i += 4)
+        if (d.getFloat32(i, true) > 0) {
+          xs.push(half(v.getUint16(i, true)));
+          kept.push(d.getFloat32(i, true));
+        }
       return xs;
     };
     await frame(-0.2);
@@ -179,6 +185,7 @@ try {
       stoppedSamples: stopped.length,
       movingMin,
       stationaryMax,
+      depthSpread: Math.min(...kept) / Math.max(...kept),
       leftAlone: diff(left, alone),
       rightAlone: diff(right, aloneRight),
       eyes: diff(left, right),
@@ -193,6 +200,9 @@ try {
   assert.equal(result.offsetLeftDiff, 0, 'offset left viewport equals its isolated view');
   assert.equal(result.offsetRightDiff, 0, 'offset right viewport equals its isolated view');
   assert.ok(result.movingSamples > 0 && result.stoppedSamples > 0, 'thin surface supplies motion samples');
+  // The box is flat at one distance, so a kept depth well under the rest is a silhouette mixing box and sky samples
+  // (the WebGL2 layer reads the mean of a 4x pixel): 0.25 of the box depth there before the sky sample (shader.ts).
+  assert.ok(result.depthSpread > 0.9, `kept expected depths come from the box alone (${result.depthSpread})`);
   assert.ok(result.movingMin > 0.02, 'translation survives subtraction of jitter');
   assert.ok(result.stationaryMax < 0.00002, 'a stopped surface contains only projection jitter');
   assert.deepEqual(result.gpuErrors, []);

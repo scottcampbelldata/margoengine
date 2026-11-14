@@ -16,6 +16,8 @@ import { halton, jitterProjection } from './jitter.js';
 import {
   fullscreen,
   cameraVelocity,
+  multisampledCameraVelocity,
+  skySample,
   objectVelocity,
   snapshot,
   resolve,
@@ -599,7 +601,9 @@ export class TAA implements EnginePlugin {
     this.motionResolve = undefined;
     this.motionGroup = undefined;
     this.motionDepth = undefined;
-    const cameraModule = c.device.createShaderModule({ code: cameraVelocity });
+    const cameraModule = c.device.createShaderModule({
+      code: samples === 4 ? multisampledCameraVelocity : cameraVelocity,
+    });
     this.cameraPipeline = c.device.createRenderPipeline({
       layout: 'auto',
       vertex: { module: cameraModule, entryPoint: 'vertex' },
@@ -631,7 +635,7 @@ export class TAA implements EnginePlugin {
 struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
 @fragment fn fragment(i:Fullscreen)->Motion {let p=vec2i(i.clip.xy);var sample=0;var nearest=textureLoad(depth,p,0);
  for(var n=1;n<4;n++){let d=textureLoad(depth,p,n);if(d>nearest){nearest=d;sample=n;}}
- var o:Motion;o.velocity=textureLoad(velocity,p,sample).xy;o.depth=textureLoad(expected,p,sample).r;return o;}`,
+ var o:Motion;o.velocity=textureLoad(velocity,p,sample).xy;o.depth=textureLoad(expected,p,sample).r;if(o.depth==${skySample}){o.depth=0;}return o;}`,
       });
       this.motionResolve = c.device.createRenderPipeline({
         layout: 'auto',

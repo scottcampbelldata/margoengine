@@ -22,6 +22,14 @@ export const cameraVelocity =
 @fragment fn fragment(i:Fullscreen)->Motion {let size=vec2f(textureDimensions(depth));let uv=i.clip.xy/size;let d=textureLoad(depth,vec2i(i.clip.xy),0);
   let world=temporal.inverse*vec4f(uv*vec2f(2,-2)+vec2f(-1,1),d,1);var o=motion(uv,temporal.previous*world);
   if(d==0){o.depth=0;}return o;}`;
+// At 4x MSAA the sky writes skySample instead, outside every depth's 0..1, and the motion resolve turns a pixel whose
+// four samples all hold it into 0. The WebGL2 layer cannot read single samples: its motion resolve reads the mean of
+// the four. A silhouette pixel there mixes object and sky samples, and with the sky at 0 the mean was a false depth
+// between them with motion diluted toward the camera's (upscale-velocity-browser.mjs --compat). Any sky share now
+// drives the mean below 0 for every depth up to 1 (one of four: (-4 + 3) / 4), so that pixel rejects history as it did before
+// 2026-11-13. The value is a power of two, so the mean of four equal samples is exact. WebGPU picks the nearest sample.
+export const skySample = -4;
+export const multisampledCameraVelocity = cameraVelocity.replace('if(d==0){o.depth=0;}', `if(d==0){o.depth=${skySample};}`);
 export function objectVelocity(
   pbr: boolean,
   transformed = false,
