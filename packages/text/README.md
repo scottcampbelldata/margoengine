@@ -308,7 +308,7 @@ Rotated 17 degrees: 0.0029. Zoomed 40 times: 0.0001. The largest single-pixel er
 - Exact vector text from the font's curves is available via `@margoengine/text/vector` (its own limits are in Vector text above).
 - Extruded 3D glyph geometry is available via `@margoengine/text/extrude` (reads TrueType and PostScript OpenType font binaries directly).
 - A FontFace that is still loading delays its text; text drawn with a CSS web font before it loads uses the fallback, so call `await font.load(sample)` first.
-- `fitText` and `FittedText` drop trailing white space before the ellipsis; `visibleEnd` is the end of the shown text, and the ellipsis glyph maps to it with length 0 (changed 2026-11-14 in batch 132b: before, the dropped space counted as visible and the ellipsis owned it).
+- `fitText` and `FittedText` drop trailing white space before the ellipsis; `visibleEnd` is the end of the shown text, and the ellipsis glyph maps to it with length 0 (changed 2026-11-14: before, the dropped space counted as visible and the ellipsis owned it).
 - Atlas eviction: once `maxPages` is reached, pages no longer referenced by any active visible `Text` block are evicted and reused. If all pages contain active glyphs, `place` throws.
 
 ## Tests
