@@ -680,6 +680,90 @@ try {
       );
     }
     console.log(JSON.stringify({ penumbraSteps: steps }));
+    // Fire plan step 9: the integrated maps (ClusteredOptions.shadows) honour shadow.radius with the point PCSS kernel
+    // LocalShadows uses (shared/point-pcss.js), on their own standard-depth map. Same light, same 1024 map, same strip:
+    // each strip mean follows the exact disc-light penumbra within half a tap (1/48), so the two kernels' means, each
+    // within half a tap of the same curve, differ by at most one tap (1/24) wherever their fitted bias shifts agree.
+    // With radius 0 the integrated map keeps its 3x3 filter: radiance and lit shader text identical to no radius.
+    const integratedSteps = {};
+    for (const [label, R, extra] of [
+      ['point radius 0.4 at height 3', 0.4, {}],
+      ['point radius 0.2 at height 3', 0.2, {}],
+      ['spot radius 0.4 at height 3', 0.4, { direction: [0, -1, 0], outerAngle: 1.1 }],
+    ]) {
+      const xs = [];
+      for (let x = 1 - R - 0.03; x <= 1 + R + 0.03 + 1e-9; x += pixel) xs.push(+x.toFixed(5));
+      const points = xs.flatMap((x) => strip.map((z) => [x, 0, z, 0, 1, 0])),
+        light = { position: [0, 3, 0], range: 20, intensity: 5, ...extra },
+        means = async (config) => {
+          const { values } = await visibility({ meshes: ['floor', 'bar'], ...config }, points);
+          return xs.map((_, i) => strip.reduce((sum, _z, k) => sum + values[i * strip.length + k], 0) / strip.length);
+        },
+        seg = (u) => (u >= 1 ? 0 : u <= -1 ? 1 : (Math.acos(u) - u * Math.sqrt(1 - u * u)) / Math.PI),
+        fitOf = (mean) => {
+          let fit = { distance: Infinity };
+          for (let shift = -0.02; shift <= 0.02 + 1e-9; shift += 0.0005) {
+            let distance = 0;
+            mean.forEach((v, i) => (distance = Math.max(distance, Math.abs(v - (1 - seg((xs[i] - 1 - shift) / R))))));
+            if (distance < fit.distance) fit = { distance, shift: +shift.toFixed(4) };
+          }
+          return fit;
+        },
+        local = await means({
+          local: { resolution: 1024 },
+          points: [{ ...light, castShadow: true, shadow: { radius: R, far: 20 } }],
+        }),
+        integrated = await means({
+          local: false,
+          integrated: { resolution: 1024, maxLights: 1 },
+          points: [{ ...light, shadow: { radius: R, far: 20 } }],
+        });
+      let apart = 0;
+      integrated.forEach((v, i) => (apart = Math.max(apart, Math.abs(v - local[i]))));
+      const fit = fitOf(integrated),
+        localFit = fitOf(local);
+      integratedSteps[label] = { fit, localFit, largestDifference: apart };
+      check(
+        `integrated ${label}: the strip mean follows the exact disc-light penumbra within half a tap (1/48)`,
+        fit.distance <= 1 / 48,
+        { ...fit, bound: 1 / 48 },
+      );
+      check(
+        `integrated ${label}: within one tap (1/24) of LocalShadows' strip mean for the same light`,
+        apart <= 1 / 24,
+        { largestDifference: apart, bound: 1 / 24, fit, localFit },
+      );
+      const compiled = await call('compile');
+      check(
+        `integrated ${label}: WGSL compiles without errors or warnings`,
+        !compiled.core.length && !compiled.probe.length,
+        compiled,
+      );
+    }
+    console.log(JSON.stringify({ integratedPenumbra: integratedSteps }));
+    {
+      const ramp = line(0, 0, [0, 1, 0], 0, 2.4, 0.05),
+        hard = { position: [0, 3, 0], range: 20, intensity: 5, shadow: { far: 20 } },
+        run = async (light) => {
+          await call('scene', { meshes: ['floor', 'bar'], local: false, integrated: { resolution: 1024, maxLights: 1 }, points: [light] });
+          const { shader } = await call('render', 2);
+          return { shader: hash(shader), probe: await call('probe', ramp) };
+        },
+        plain = await run(hard),
+        zero = await run({ ...hard, shadow: { far: 20, radius: 0 } }),
+        zeroSized = await run({ ...hard, radius: 0 });
+      for (const [name, other] of [
+        ['shadow.radius 0', zero],
+        ['radius 0', zeroSized],
+      ]) {
+        let max = 0;
+        other.probe.forEach((rgb, i) => rgb.forEach((v, c) => (max = Math.max(max, Math.abs(v - plain.probe[i][c])))));
+        check(`integrated ${name}: lit shader text and radiance identical to no radius`, other.shader === plain.shader && max === 0, {
+          maxDifference: max,
+          shader: other.shader === plain.shader,
+        });
+      }
+    }
     await call('camera', [0, 8, 8]);
     // twoSided: the back face shadows the ceiling (y 6) through a bar at y 4.5, as the front face shadows the floor.
     const twoSided = {

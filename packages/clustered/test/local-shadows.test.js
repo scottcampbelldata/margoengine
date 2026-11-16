@@ -925,3 +925,75 @@ test('a smaller per-light map renders into its layer corner with a guard band an
     assertDisposed(h);
   }
 });
+
+// Fire plan step 9: the integrated maps honour a shadow radius with the point PCSS kernel LocalShadows uses
+// (shared/point-pcss.js), compiled in only while some light has a radius; radius 0 uploads and compiles what it did.
+test('integrated maps: a shadow radius turns on the shared PCSS kernel; radius 0 uploads and compiles what plain lights do', async () => {
+  const h = harness(),
+    effect = new Clustered({ grid: [1, 1, 1], shadows: { resolution: 64, maxLights: 2 } }),
+    faces = () => effect.bindings().find((entry) => entry.binding === 28).resource.buffer,
+    packed = () => new Uint8Array(faces().data).slice();
+  try {
+    effect.setLights([point(), spot()]);
+    h.engine.use(effect);
+    h.frame();
+    const plain = packed(),
+      plainShader = h.context.shader,
+      plainBuffer = faces();
+    assert.ok(!plainShader.includes('clusterMapSoftShadow'));
+    assert.match(plainShader, /struct ClusterShadowFace \{matrix:mat4x4f,settings:vec4f\}/);
+    for (const radius of [-1, Infinity, Number.NaN, '1', 1e40])
+      assert.throws(() => effect.setLights([point({ radius })]), RangeError, `radius ${String(radius)}`);
+    effect.setLights([point({ radius: 0 }), { ...spot({ radius: 0 }), radius: 0 }]);
+    h.frame();
+    assert.deepEqual(packed(), plain, 'radius 0 is the 3x3 filter, byte for byte');
+    assert.equal(h.context.shader, plainShader);
+    assert.equal(faces(), plainBuffer, 'and the same face buffer');
+    // An integrated light needs no castShadow for a radius; a light's own radius is its default shadow radius.
+    effect.setLights([point({ radius: 0.5, near: 0.1 }), { ...spot(), radius: 0.2 }]);
+    h.frame();
+    const shader = h.context.shader,
+      v = new Float32Array(faces().data);
+    assert.match(shader, /struct ClusterShadowFace \{matrix:mat4x4f,settings:vec4f,soft:vec4f\}/);
+    assert.match(shader, /if\(face\.settings\.w>0\.0\)\{return clusterMapSoftShadow\(face\.matrix,receiver,/);
+    assert.match(shader, /fn clusterShadowTurn\(position:vec3f\)->vec3f \{/);
+    const kernel = shader.slice(shader.indexOf('fn clusterMapSoftShadow('));
+    // The kernel's text is LocalShadows' clusterSoftShadow, on this map's standard depth with the face's bias.
+    assert.match(kernel, /let r=z-face\.settings\.x;/);
+    assert.match(kernel, /if\(stored<r\+dot\(slope,o\)\)\{blockers\+=1\.0;depth\+=d\.x\*d\.y\/\(d\.y-stored\*\(d\.y-d\.x\)\);\}/);
+    assert.match(
+      kernel,
+      /direction=turn\.xy;\n {2}for\(var i=0u;i<24u;i\+\+\)\{let o=direction\*sqrt\(\(f32\(i\)\+turn\.z\)\/24\.0\)\*radius;direction=clusterShadowGolden\*direction;lit\+=textureSampleCompareLevel\(clusterShadowMap,clusterShadowSampler,uv\+o,layer,r\+dot\(slope,o\)\);\}/,
+    );
+    assert.equal(faces().size, 2 * 6 * 96, 'the face record grows from 80 to 96 bytes');
+    assert.ok(!plainBuffer.destroyed, 'the old face buffer lives until the submitted work is done');
+    await new Promise(setImmediate);
+    assert.ok(plainBuffer.destroyed, 'the old face buffer is destroyed once the work using it is done');
+    const close = (a, b, name) => assert.ok(Math.abs(a - b) < 1e-5, `${name}: ${a} vs ${b}`),
+      guard = 0.1 - 1.5 / 64,
+      tanSpot = Math.tan(Math.PI / 4) * 1.25;
+    close(v[19], guard, 'point guard band');
+    close(v[20], 0.5 / 2.5, 'point UV per unit at unit depth: R / (2 tan), tan 1.25');
+    close(v[21], 0.5 / 2.5, 'point y');
+    close(v[22], 0.1, 'near');
+    close(v[23], 6, 'far: the range');
+    // The first cube face's matrix: x row 1 / tan with tan 1.25 (a 45-degree face plus the guard band).
+    close(Math.hypot(v[0], v[4], v[8]), 1 / 1.25, 'face tangent 1.25');
+    const s = 6 * 24;
+    close(v[s + 19], guard, 'spot guard band');
+    close(v[s + 20], 0.2 / (2 * tanSpot), 'spot UV per unit at unit depth');
+    close(Math.hypot(v[s], v[s + 4], v[s + 8]), 1 / tanSpot, 'spot cone plus the guard band');
+    // A radius 0 light among soft ones keeps the 3x3 filter: no guard band, no PCSS data.
+    effect.setLights([point(), { ...spot(), radius: 0.2 }]);
+    h.frame();
+    assert.deepEqual([...new Float32Array(faces().data).subarray(16, 24)], [...new Float32Array(plain.buffer).subarray(16, 20), 0, 0, 0, 0]);
+    // Back to no radius: the original shader, buffer size and bytes.
+    effect.setLights([point(), spot()]);
+    h.frame();
+    assert.equal(h.context.shader, plainShader, 'back to radius 0: the original shader');
+    assert.deepEqual(packed(), plain, 'and the original faces');
+  } finally {
+    effect.dispose();
+    assertDisposed(h);
+  }
+});

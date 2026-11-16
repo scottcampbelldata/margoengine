@@ -243,6 +243,10 @@ export class Clustered implements EnginePlugin {
   readonly maxLights: number;
   /** Some light has a `radius`: each record also holds its `size` vec4f, and the shaders a sphere light's specular. */
   private sized = false;
+  /** Some light's integrated map has a shadow radius: the shaders carry the point PCSS kernel for it. */
+  private softMaps = false;
+  /** The integrated maps' entries joined into {@link entries}; a new face buffer brings new ones. */
+  private shadowEntries?: GPUBindGroupEntry[];
   /** Floats per light record: 16, or 20 while {@link sized}. */
   private stride = 16;
   /** The light record layout the GPU light buffer, culling pipeline and bindings were made for. */
@@ -449,16 +453,19 @@ export class Clustered implements EnginePlugin {
           );
         shadowCamera(settings, light.range);
       }
+      // A shadow radius softens a castShadow light's LocalShadows map, or this light's integrated map.
       if (
         settings?.radius !== undefined &&
         !(
-          light.castShadow &&
+          (light.castShadow || this.localShadows) &&
           typeof settings.radius === 'number' &&
           Number.isFinite(Math.fround(settings.radius)) &&
           settings.radius >= 0
         )
       )
-        throw new RangeError('Light shadow radius: give a castShadow light a finite radius of 0 or more (world units)');
+        throw new RangeError(
+          'Light shadow radius: give a castShadow light, or a light with an integrated map (ClusteredOptions.shadows), a finite radius of 0 or more (world units)',
+        );
       if (
         light.radius !== undefined &&
         !(typeof light.radius === 'number' && Number.isFinite(Math.fround(light.radius)) && light.radius >= 0)
@@ -489,13 +496,18 @@ export class Clustered implements EnginePlugin {
     const fresh = (light: PointLight | SpotLight) =>
       light.decay !== undefined || (light as SpotLight).angle !== undefined;
     // Local shadow maps read the outer cone; an angle is that cone.
-    if (this.localShadows)
+    if (this.localShadows) {
       this.localShadows.configure(
         lights.map((light) =>
           (light as SpotLight).angle === undefined ? light : { ...light, outerAngle: (light as SpotLight).angle },
         ),
       );
-    else if (
+      // The first integrated map with a radius (or the last one gone) changes the lit shaders' shadow text.
+      if (this.localShadows.soft !== this.softMaps) {
+        this.softMaps = this.localShadows.soft;
+        this.reset();
+      }
+    } else if (
       lights.some(
         (light) =>
           light.shadow !== undefined &&
@@ -611,6 +623,8 @@ export class Clustered implements EnginePlugin {
   bindings(shadows = true): GPUBindGroupEntry[] {
     if (!this.uniform || this.disposed)
       throw new MargoError('state', 'Clustered lighting is not attached; attach it to an engine first');
+    if (this.localShadows && this.localShadows.bindings() !== this.shadowEntries)
+      this.entries = [...this.lightEntries, ...(this.shadowEntries = this.localShadows.bindings())];
     const own = shadows ? this.entries : this.lightEntries,
       parts = this.parts;
     parts[0] = own;
@@ -656,6 +670,7 @@ export class Clustered implements EnginePlugin {
       shapes: this.shapesHook,
       bounce: this.bounceHook,
       ...(this.sized ? { sized: true } : {}),
+      ...(this.softMaps ? { softMaps: true } : {}),
     };
     return shadows
       ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay, receive, {
@@ -724,7 +739,7 @@ export class Clustered implements EnginePlugin {
     this.dirty = true;
     if (this.localShadows) {
       this.localShadows.setup(engine);
-      this.entries = [...this.entries, ...this.localShadows.bindings()];
+      this.entries = [...this.entries, ...(this.shadowEntries = this.localShadows.bindings())];
     }
   }
   /** The culling pipeline for the current light record layout. */
@@ -760,7 +775,7 @@ export class Clustered implements EnginePlugin {
     this.lights = this.lightBuffer();
     this.pipeline = this.culling();
     this.bind();
-    if (this.localShadows) this.entries = [...this.entries, ...this.localShadows.bindings()];
+    if (this.localShadows) this.entries = [...this.entries, ...(this.shadowEntries = this.localShadows.bindings())];
     this.dirty = true;
   }
   registerPasses(graph: FrameGraph): void {

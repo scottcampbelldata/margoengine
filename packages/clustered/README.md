@@ -97,7 +97,7 @@ engine.start();
   the sphere terms; a light of radius 0 in that list still shades bit for bit as before (GPU-checked). Cost: one
   reflection, two normalisations and two selects per light and pixel, plus an acos, an atan2 and three square roots
   where the sphere crosses the horizon, only while some light has a radius.
-- Limits: the integrated maps (`ClusteredOptions.shadows`) keep their 3x3 filter and ignore the radius; `ShapeLights`
+- Limits: `ShapeLights`
   sphere lights are a separate, LTC-shaded kind without shadows. Toon materials and the physical lobes (clearcoat,
   sheen) keep their own terms, lit from the centre by inverse square. Inside the sphere the cap is taken as the
   hemisphere it is at the sphere's surface (continuous there), not the full sphere of directions a point inside a
@@ -1015,8 +1015,15 @@ engine.start();
   on an RTX A6000 through the GPU check below. TAA smooths the noise.
 - Limits, as the area lights': the filter stops at the guard band, so very wide penumbrae are clipped; blockers nearer
   the light than a quarter of the receiver's depth can fall outside the search; without a temporal filter the noise
-  shows on very wide penumbrae. Each lookup costs 40 texture reads instead of 9 (not timed yet). The integrated maps
-  (`ClusteredOptions.shadows`) keep the 3x3 filter and ignore `radius`.
+  shows on very wide penumbrae. Each lookup costs 40 texture reads instead of 9 (not timed yet).
+- The integrated maps (`ClusteredOptions.shadows`) honour the radius too, with the same kernel (one WGSL text,
+  `packages/shared/point-pcss.js`) on their own map (depth near 0, far 1) and their face's depth bias: a light with
+  `shadow: {radius}` (or a `radius` of its own) and no `castShadow` gets the same penumbra under them. Only lights
+  with a radius above 0 widen their faces by the guard band and read the kernel; the others keep the 3x3 filter.
+  Proof (`scripts/clustered-shadow-gpu-check.js`, RTX A6000, WebGPU and the WebGL2 layer): for point lights of radius
+  0.4 and 0.2 and a spot of radius 0.4, 3 above the floor, the strip mean follows the exact disc-light penumbra within
+  0.012 (bound 1/48) and LocalShadows' within 0.025 (bound one tap, 1/24); `shadow.radius: 0` and `radius: 0` keep
+  the lit shader text and radiance identical to no radius.
 - Off is exact: while no shadowed light has a radius above 0, the shaders, frame buffer and uploads are byte for
   byte the plain ones (unit-tested; images and probe radiance compared on a real GPU). The radius is read when
   `setLights` runs; a changed radius re-renders that light's maps.

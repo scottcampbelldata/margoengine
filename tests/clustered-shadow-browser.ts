@@ -33,6 +33,8 @@ type Config = {
   local?:
     | { resolution?: number; bias?: number; normalBias?: number; receiverPlane?: boolean; slopeBias?: number }
     | false;
+  /** ClusteredOptions.shadows: the integrated maps, every mesh in config.meshes a caster (use with local: false). */
+  integrated?: { resolution?: number; maxLights?: number };
   points?: Light[];
   suns?: Light[];
   areas?: Light[];
@@ -224,8 +226,13 @@ async function scene(config: Config) {
   shapes = undefined;
   terrain = areas = suns = local = undefined;
   for (const [name, m] of Object.entries(meshes)) m.visible = config.meshes.includes(name);
-  lights = Clustered.attach(engine, { grid: [4, 4, 4], maxLights: config.maxLights });
+  lights = Clustered.attach(engine, {
+    grid: [4, 4, 4],
+    maxLights: config.maxLights,
+    ...(config.integrated ? { shadows: config.integrated } : {}),
+  });
   lights.setLights((config.points ?? []) as never);
+  if (config.integrated) for (const name of config.meshes) lights.addShadowCaster(meshes[name]);
   if (config.local !== false) {
     local = config.atlas
       ? ShadowAtlas.attach(engine, {

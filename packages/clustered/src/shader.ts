@@ -1,3 +1,4 @@
+import { pcssTurn, pointPcss } from '../../shared/point-pcss.js';
 import {
   clusterBrdf,
   clusterCell,
@@ -150,6 +151,11 @@ export interface ClusteredSamplingHooks {
   sized?: boolean;
   /** `LightBounce` (`@margoengine/clustered/bounce`): WGSL defining `clusterBounceLighting`, added to the result. */
   bounce?: { declarations(group: number): string };
+  /**
+   * Some light with an integrated map (`ClusteredOptions.shadows`) has a shadow radius: each face record also holds its
+   * PCSS data, and such a light's shadow is the shared point PCSS kernel's. Omitted, the text is the 3x3 filter's.
+   */
+  softMaps?: boolean;
 }
 // BRDF: GGX D (Walter et al. 2007 eq. 33) and height-correlated Smith-GGX G2 (Heitz 2014, JCGT 3(2), eq. 99; KB6016), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
 // (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
@@ -179,7 +185,7 @@ export function clusteredSampling(
   integratedShadows = false,
   decay = false,
   receive = false,
-  { directional, terms = [], shapes, stochastic, contact, sized = false, bounce }: ClusteredSamplingHooks = {},
+  { directional, terms = [], shapes, stochastic, contact, sized = false, bounce, softMaps = false }: ClusteredSamplingHooks = {},
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
@@ -233,14 +239,17 @@ ${
 }${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
   return ${area || shapes || bounce ? `(result${area ? '+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${shapes ? '+clusterShapeLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${bounce ? '+clusterBounceLighting(position,n,base,metal)' : ''})` : 'result'}*clusterFrame.intensity.x;
 }`;
-  return shadows ? localShadowSampling(group) + code : code;
+  return shadows ? localShadowSampling(group, softMaps) + code : code;
 }
 
-// Integrated point/spot shadow maps: 3x3 PCF (Reeves, Salesin & Cook 1987) with normal offset (Holbert 2011).
+// Integrated point/spot shadow maps: 3x3 PCF (Reeves, Salesin & Cook 1987) with normal offset (Holbert 2011). While some
+// light has a shadow radius (`soft`), each face also holds its radius' UV extent per unit depth (x, y), near and far, and
+// settings.w its guard band; a face whose guard band is above 0 is filtered by the point PCSS kernel LocalShadows uses
+// (pcss.ts), on this map's standard depth (near 0, far 1) with the face's depth bias, and the others keep the 3x3 filter.
 /** Bindings 8/9 are already used by optional camera, sky and terrain effects. */
-function localShadowSampling(group: number): string {
+function localShadowSampling(group: number, soft = false): string {
   return /* wgsl */ `
-struct ClusterShadowFace {matrix:mat4x4f,settings:vec4f}
+struct ClusterShadowFace {matrix:mat4x4f,settings:vec4f${soft ? ',soft:vec4f' : ''}}
 @group(${group}) @binding(28) var<storage,read> clusterShadowFaces:array<ClusterShadowFace>;
 @group(${group}) @binding(29) var clusterShadowMap:texture_depth_2d_array;
 @group(${group}) @binding(30) var clusterShadowSampler:sampler_comparison;
@@ -263,7 +272,7 @@ fn clusterShadowVisibility(light:ClusterLight,position:vec3f,normal:vec3f)->f32 
   let uv=projected.xy*vec2f(0.5,-0.5)+0.5;
   let reference=projected.z-face.settings.x;
   if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0.0||reference>=1.0){return 1.0;}
-  let dimensions=vec2f(textureDimensions(clusterShadowMap));let texel=1.0/dimensions;
+${soft ? '  if(face.settings.w>0.0){return clusterMapSoftShadow(face.matrix,receiver,normal/max(length(normal),0.000001),clip.w,uv,projected.z,i32(layer),length(receiver-light.positionRange.xyz));}\n' : ''}  let dimensions=vec2f(textureDimensions(clusterShadowMap));let texel=1.0/dimensions;
   var visibility=0.0;
   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
     let sampleUV=clamp(uv+vec2f(f32(x),f32(y))*texel,texel*0.5,vec2f(1)-texel*0.5);
@@ -271,5 +280,17 @@ fn clusterShadowVisibility(light:ClusterLight,position:vec3f,normal:vec3f)->f32 
   }}
   return visibility/9.0;
 }
-`;
+` + (soft ? softMapShadow : '');
 }
+const softMapShadow =
+  pcssTurn('clusterShadowGolden', 'clusterShadowTurn') +
+  pointPcss({
+    head: 'fn clusterMapSoftShadow(m:mat4x4f,p:vec3f,n:vec3f,w:f32,uv:vec2f,z:f32,layer:i32,distance:f32)->f32',
+    data: 'let face=clusterShadowFaces[u32(layer)];let s=vec3f(face.soft.xy,face.settings.w);let d=face.soft.zw;let smallest=1.5/f32(textureDimensions(clusterShadowMap).x);let r=z-face.settings.x;',
+    map: 'clusterShadowMap',
+    sampler: 'clusterShadowSampler',
+    turn: 'clusterShadowTurn',
+    golden: 'clusterShadowGolden',
+    reversed: false,
+    reference: 'r',
+  });

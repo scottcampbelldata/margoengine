@@ -6,6 +6,7 @@ import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hemisphere, localShadowMatrix, viewportMatrix } from './local-shadow-math.js';
+import { AREA_FACE_TAN } from './light-shadow-math.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import {
   casterPipeline,
@@ -68,10 +69,11 @@ export interface LocalLightShadow {
    */
   resolution?: number | readonly [number, number];
   /**
-   * `LocalShadows` only (a `castShadow` point or spot light): the light's radius in world units, 0 or more (default 0,
-   * the 3x3 filter). Above 0 the shadow is PCSS: the penumbra widens with the receiver's distance behind its blocker,
-   * `radius * (receiver - blocker) / blocker` (depths from the light), up to the map's guard band. Such a light's map
-   * covers its cone plus a 0.1 UV guard band, as an area light's faces.
+   * The light's radius in world units, 0 or more (default the light's own `radius`, else 0: the 3x3 filter), for
+   * `LocalShadows` (a `castShadow` light) and the integrated maps alike. Above 0 the shadow is PCSS, one kernel for
+   * both: the penumbra widens with the receiver's distance behind its blocker, `radius * (receiver - blocker) /
+   * blocker` (depths from the light), up to the map's guard band. Such a light's map covers its cone plus a 0.1 UV
+   * guard band, as an area light's faces, so its texels are 25% wider than a radius 0 light's.
    */
   radius?: number;
 }
@@ -142,6 +144,7 @@ interface ShadowLight {
   direction?: ArrayLike<number>;
   outerAngle?: number;
   shadow?: boolean | LocalLightShadow;
+  radius?: number;
 }
 interface Source {
   source: Mesh | LocalShadowSource;
@@ -194,13 +197,18 @@ export class LocalShadowMaps {
   private white?: GPUTexture;
   private whiteView?: GPUTextureView;
   private uniform?: GPUBuffer;
+  /** Face buffers replaced by {@link fit}, destroyed once submitted work is done (or at release). */
+  private readonly spent = new Set<GPUBuffer>();
   private alphaSampler?: GPUSampler;
   private views: GPUTextureView[] = [];
   private entries: GPUBindGroupEntry[] = [];
   private pipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
   private sources: Source[] = [];
-  private readonly values: Float32Array;
+  /** Per layer: the sampling matrix and settings (20 floats), and while {@link soft} the PCSS data (24). */
+  private values: Float32Array;
+  /** Some shadowed light has a radius: the faces carry PCSS data and the lit shaders the PCSS kernel. */
+  soft = false;
   private indices: number[] = [];
   private activeLayers: number[] = [];
   /** Depth-pass matrices per layer; `values` holds the sampling ones (the same unless the light's map is smaller). */
@@ -237,7 +245,15 @@ export class LocalShadowMaps {
     // Clustered.setLights checks its own maxLights first.
     if (this.disposed || !Array.isArray(lights) || lights.length > 65536)
       throw new RangeError('Expected at most 65,536 lights');
-    const values = new Float32Array(this.values.length),
+    // The PCSS data rides along only while some shadowed light has a radius, so radius 0 uploads what it did.
+    const radii = lights.map((light) => {
+        const option = light?.shadow;
+        if (!option || typeof option !== 'object' || Array.isArray(option)) return option === true ? (light.radius ?? 0) : 0;
+        return option.radius ?? light.radius ?? 0;
+      }),
+      soft = radii.some((radius) => radius > 0),
+      stride = soft ? 24 : 20,
+      values = new Float32Array(this.maxLights * 6 * stride),
       cameras = new Float32Array(this.cameras.length),
       viewports = new Uint32Array(this.maxLights * 12),
       indices: number[] = [],
@@ -312,10 +328,13 @@ export class LocalShadowMaps {
           );
       }
       // One perspective map for a spot cone; a point light or a hemisphere spot gets the six cube faces.
-      const cone = spot && !hemisphere(Math.cos(light.outerAngle!));
+      const cone = spot && !hemisphere(Math.cos(light.outerAngle!)),
+        radius = radii[i],
+        // A light with a radius covers its cone plus an area light's guard band (AREA_FACE_TAN), as LocalShadows' do.
+        widen = radius > 0 ? AREA_FACE_TAN : 1;
       for (let face = 0; face < (cone ? 1 : 6); face++) {
         const layer = slot * 6 + face,
-          offset = layer * 20,
+          offset = layer * stride,
           direction = cone ? light.direction! : directions[face],
           up = cone
             ? Math.abs(direction[1]) / Math.hypot(direction[0], direction[1], direction[2]) > 0.99
@@ -330,7 +349,7 @@ export class LocalShadowMaps {
           up,
           near,
           far,
-          cone ? light.outerAngle! * 2 : Math.PI / 2,
+          radius > 0 ? 2 * Math.atan(widen * (cone ? Math.tan(light.outerAngle!) : 1)) : cone ? light.outerAngle! * 2 : Math.PI / 2,
         );
         if (scaled) {
           viewportMatrix(cameras, layer * 16, values, offset, width, height, this.resolution);
@@ -341,11 +360,25 @@ export class LocalShadowMaps {
         values[offset + 17] = normalBias;
         // settings.z: a hemisphere spot picks its cube face like a point light.
         if (spot && !cone) values[offset + 18] = 1;
+        if (radius > 0) {
+          // settings.w: the guard band (largest filter radius, UV); soft: the radius' UV extent per unit depth along each
+          // axis (a smaller map's corner, less its two-texel margins), near and far. The same values as LocalShadows'.
+          const small = Math.min(width, height),
+            tan = widen * (cone ? Math.tan(light.outerAngle!) : 1),
+            inner = scaled ? (small - 4) / small : 1,
+            smallest = 1.5 / this.resolution;
+          values[offset + 19] = Math.max(((0.5 - (0.5 * inner) / AREA_FACE_TAN) * small) / this.resolution - smallest, smallest);
+          values[offset + 20] = (radius * (scaled ? (width - 4) / this.resolution : 1)) / (2 * tan);
+          values[offset + 21] = (radius * (scaled ? (height - 4) / this.resolution : 1)) / (2 * tan);
+          values[offset + 22] = near;
+          values[offset + 23] = far;
+        }
         layers.push(layer);
       }
       indices.push(++slot);
     }
-    this.values.set(values);
+    this.values = values;
+    this.soft = soft;
     this.cameras.set(cameras);
     this.viewports = viewports;
     this.indices = indices;
@@ -469,13 +502,38 @@ export class LocalShadowMaps {
   bindings(): GPUBindGroupEntry[] {
     if (!this.device || this.disposed)
       throw new MargoError('state', 'Local shadows are not attached; attach the Clustered effect first');
+    this.fit();
     return this.entries;
+  }
+  /**
+   * The face buffer at the layout's size: the first light with a radius (or the last one gone) changes the record from
+   * 80 to 96 bytes, so a new buffer and new entries replace the old (destroyed once the work using it is done).
+   */
+  private fit(): void {
+    const old = this.uniform!,
+      bytes = this.values.byteLength;
+    if (old.size === bytes) return;
+    const limits = this.device!.limits;
+    if (bytes > limits.maxStorageBufferBindingSize || bytes > limits.maxBufferSize)
+      throw new RangeError('Local shadow maps exceed device limits; lower resolution or maxLights');
+    this.uniform = this.device!.createBuffer({
+      label: 'clustered local shadow matrices',
+      size: bytes,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.entries = [{ binding: 28, resource: { buffer: this.uniform } }, ...this.entries.slice(1)];
+    this.dirty = true;
+    this.spent.add(old);
+    this.device!.queue.onSubmittedWorkDone().then(() => {
+      if (this.spent.delete(old)) old.destroy();
+    });
   }
   render(context: Context): void {
     if (!this.device || this.disposed)
       throw new MargoError('state', 'Local shadows are not attached; attach the Clustered effect first');
     this.stats.passes = this.stats.draws = 0;
     this.epoch++;
+    this.fit();
     for (let i = this.sources.length - 1; i >= 0; i--) {
       const source = this.sources[i].source;
       if (
@@ -709,6 +767,8 @@ export class LocalShadowMaps {
     this.depth?.destroy();
     this.white?.destroy();
     this.uniform?.destroy();
+    for (const buffer of this.spent) buffer.destroy();
+    this.spent.clear();
     this.depth = this.white = undefined;
     this.whiteView = undefined;
     this.uniform = undefined;
