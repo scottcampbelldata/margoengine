@@ -803,6 +803,10 @@ export const WRIGHT_FLIGHTS_1903: readonly WrightFlight[] = Object.freeze([
   { n: 4, pilot: 'Wilbur', distance: 852 * FT, seconds: 59, height: 4 },
 ] as WrightFlight[]);
 
+/** Seconds the Flyer takes to ease up from the rail to its level band, and down to the sand at the end of a flight. */
+const FLIGHT_RISE = 4;
+const FLIGHT_FALL = 2.5;
+
 /** The rail: 60 ft of 2 by 4s; the Flyer left it after a run of about 40 ft. */
 export const WRIGHT_RAIL = Object.freeze({ length: 60 * FT, run: 40 * FT });
 
@@ -837,10 +841,13 @@ export interface WrightFlightPose {
 
 /**
  * The pose of the Flyer at time `t` seconds of flight `n` (1 to 4). The rail run accelerates uniformly over the
- * 40 ft run to the ground speed of the flight; in the air the skids follow a rise and fall over the flight with a
- * pitching undulation of about 3 s (the pilot over-controlling the sensitive elevator, the "up and down" course of the
- * diaries), damped on the long fourth flight; the pitch is a 4 degree angle of attack plus the climb angle through
- * the air (vertical speed over the airspeed: ground speed plus the headwind); the flight ends where the sources put it.
+ * 40 ft run to the ground speed of the flight. In the air the flight is nearly level, as the 1903 photograph and the
+ * diaries show it: the skids ease up from the rail over the first 4 s (no vertical speed at lift-off) to a band just
+ * under the flight's height (about 10 ft), undulate gently in it with a period of about 3 s (the pilot
+ * over-controlling the sensitive elevator, the "up and down" course of the diaries; damped on the long fourth
+ * flight), and ease down to the sand over the last 2.5 s. The pitch is a 4 degree angle of attack plus the climb
+ * angle through the air (vertical speed over the airspeed: ground speed plus the headwind), so it stays under about
+ * 9 degrees, and the wings stay level within about 1.5 degrees; the flight ends where the sources put it.
  */
 export function wrightFlightPose(n: number, t: number, options: WrightFlightOptions = {}): WrightFlightPose {
   const flight = WRIGHT_FLIGHTS_1903.find((f) => f.n === n);
@@ -859,11 +866,19 @@ export function wrightFlightPose(n: number, t: number, options: WrightFlightOpti
   const tSlide = (2 * slide) / vg;
   const duration = tRail + flight.seconds + tSlide;
   const propeller = (2 * Math.PI * rpm * (Math.max(t, -warmup) + warmup)) / 60;
-  const height = (u: number, ta: number) => {
-    const env = Math.sin(Math.PI * Math.min(1, Math.max(0, u))) ** 0.5;
-    const decay = n === 4 ? 0.15 + 0.85 * Math.exp(-ta / 14) : 1;
-    const und = 1 + 0.45 * decay * Math.sin((2 * Math.PI * ta) / 3.1 - 0.4);
-    return (flight.height - railTop) * env * (und / 1.45);
+  // Nearly level: a smoothstep rise from the rail top over RISE s and fall to the sand over FALL s (each with no
+  // vertical speed at its ends), and between them a band of 8 % of the height under the flight's height.
+  const smooth = (x: number) => {
+    const c = Math.min(1, Math.max(0, x));
+    return c * c * (3 - 2 * c);
+  };
+  const band = 0.08 * flight.height;
+  const height = (ta: number) => {
+    const rise = smooth(ta / FLIGHT_RISE);
+    const fall = smooth((flight.seconds - ta) / FLIGHT_FALL);
+    const decay = n === 4 ? 0.4 + 0.6 * Math.exp(-ta / 14) : 1;
+    const level = flight.height - band + band * decay * Math.sin((2 * Math.PI * ta) / 3.1 - Math.PI / 2);
+    return (railTop * (1 - rise) + level * rise) * fall;
   };
   if (t <= tRail) {
     const tc = Math.max(0, t);
@@ -872,18 +887,14 @@ export function wrightFlightPose(n: number, t: number, options: WrightFlightOpti
   }
   const ta = t - tRail;
   if (ta <= flight.seconds) {
-    const u = ta / flight.seconds;
-    const h = height(u, ta);
+    const y = height(ta);
     const dt = 0.02;
-    const vz = (height((ta + dt) / flight.seconds, ta + dt) - height((ta - dt) / flight.seconds, ta - dt)) / (2 * dt);
-    const az =
-      (height((ta + dt) / flight.seconds, ta + dt) - 2 * h + height((ta - dt) / flight.seconds, ta - dt)) / (dt * dt);
-    // Lift off from the rail top, blending its height into the climb over the first second.
-    const blend = Math.min(1, ta / 1);
-    const y = railTop * (1 - blend) + h + railTop * blend * (1 - u);
+    const vz = (height(ta + dt) - height(ta - dt)) / (2 * dt);
+    const az = (height(ta + dt) - 2 * y + height(ta - dt)) / (dt * dt);
     const gamma = Math.atan2(vz, vAir);
     const pitch = Math.max(-0.35, Math.min(0.35, (4 * Math.PI) / 180 + gamma));
-    const roll = 0.035 * Math.sin((2 * Math.PI * ta) / 4.3 + 1.1) * (n === 4 ? 1 : 0.7);
+    // Wing warping held the wings level: a slight rock of at most 0.02 rad (1.1 degrees), never a bank.
+    const roll = 0.02 * Math.sin((2 * Math.PI * ta) / 4.3 + 1.1) * (n === 4 ? 1 : 0.8);
     const elevator = Math.max(-0.3, Math.min(0.3, -0.04 * az));
     return { position: [0, Math.max(0, y), run + vg * ta], pitch, roll, elevator, propeller, phase: 'air', duration };
   }

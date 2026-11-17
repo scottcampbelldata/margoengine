@@ -1382,9 +1382,12 @@ y = 0, so the prone pilot's right is -X. The engine sits at -X, right of the pil
 (where a prone pilot lies) and the left propeller (`propellers[0]`) are at +X.
 
 `wrightFlightPose(n, t, options?)` is the pose of flight `n` (1 to 4) at `t` seconds after release: the run of about
-40 ft on the 60 ft rail, uniformly accelerated to the flight's groundspeed; in the air a rise and fall with a pitching
-undulation of about 3 s (the "up and down" course of the diaries; damped on the long fourth flight), pitch as a 4
-degree angle of attack plus the climb angle through the air; then a short slide. It returns `{position, pitch, roll,
+40 ft on the 60 ft rail, uniformly accelerated to the flight's groundspeed; in the air a nearly level flight, as the
+1903 photograph shows it: the skids ease up off the rail over 4 s to a band just under the flight's height (about
+10 ft), undulate gently in it every 3 s or so (the "up and down" course of the diaries; damped on the long fourth
+flight) and ease down to the sand over the last 2.5 s; pitch is a 4 degree angle of attack plus the climb angle
+through the air (at most about 9 degrees, no hard nose-high climb) and the wings rock at most 1.1 degrees (no bank);
+then a short slide. It returns `{position, pitch, roll,
 elevator, propeller, phase, duration}`; `position` is `[0, height of the skids, distance from the rail's start]`.
 `WRIGHT_FLIGHTS_1903` holds the flights (120 ft in 12 s, 175 ft in 12 s, 200 ft in 15 s, 852 ft in 59 s) and
 `WRIGHT_RAIL` the rail.
@@ -1435,7 +1438,9 @@ the wind, the rail, the distances and times and the first flight's groundspeed a
 *Visions of a Flying Machine: The Wright Brothers and the Process of Invention* (Smithsonian Institution Press), chord,
 gap, camber, droop and the propellers; Hobbs, L. S. 1971, *The Wright Brothers' Engines and Their Design*
 (Smithsonian Annals of Flight 5), the engine's layout; McFarland, M. W. (ed.) 1953, *The Papers of Wilbur and Orville Wright*
-(McGraw-Hill), Orville's diary of 17 December 1903.
+(McGraw-Hill), Orville's diary of 17 December 1903; Daniels, J. T. 1903, *First flight, 120 feet in 12 seconds, 10:35
+a.m.; Kitty Hawk, North Carolina* (Library of Congress, LC-DIG-ppprs-00626, https://www.loc.gov/pictures/item/00652085/),
+the nearly level attitude a few feet over the sand at lift-off.
 
 ## Rectangular building shape grammar
 

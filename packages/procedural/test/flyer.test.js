@@ -116,6 +116,33 @@ test('wrightFlightPose: every flight leaves the rail after the 40 ft run and lan
   }
 });
 
+test('wrightFlightPose: every flight is nearly level about 10 ft up, with no hard nose-high climb and no bank (KB-FLYER-LEVEL1)', () => {
+  // The 1903 photograph and the diaries: an undulating, nearly level flight about 10 ft over the sand. The old path rose
+  // as the square root of a sine, so the pitch hit its 0.35 rad clamp at lift-off, and it fell to a third of the height
+  // between undulations; the fourth flight banked 2 degrees.
+  for (const f of WRIGHT_FLIGHTS_1903) {
+    const tRail = (2 * WRIGHT_RAIL.run) / (f.distance / f.seconds);
+    let maxPitch = 0,
+      maxRoll = 0,
+      lowMiddle = Infinity,
+      top = 0;
+    for (let ta = 0; ta <= f.seconds; ta += 1 / 60) {
+      const p = wrightFlightPose(f.n, tRail + ta + 1e-9);
+      maxPitch = Math.max(maxPitch, Math.abs(p.pitch));
+      maxRoll = Math.max(maxRoll, Math.abs(p.roll));
+      top = Math.max(top, p.position[1]);
+      if (ta >= 4 && ta <= f.seconds - 2.5) lowMiddle = Math.min(lowMiddle, p.position[1]);
+    }
+    assert.ok(maxPitch <= (9 * Math.PI) / 180, `flight ${f.n} pitch ${((maxPitch * 180) / Math.PI).toFixed(1)} degrees`);
+    assert.ok(maxRoll <= (1.5 * Math.PI) / 180, `flight ${f.n} roll ${((maxRoll * 180) / Math.PI).toFixed(2)} degrees`);
+    assert.ok(lowMiddle >= 0.8 * f.height && top <= f.height, `flight ${f.n} band ${lowMiddle.toFixed(2)}..${top.toFixed(2)} m`);
+    // Lift-off eases off the rail top: no jump and no vertical speed in the first frame.
+    const a = wrightFlightPose(f.n, tRail + 1e-9),
+      b = wrightFlightPose(f.n, tRail + 1 / 30);
+    assert.ok(Math.abs(a.position[1] - 0.2) < 1e-6 && b.position[1] - a.position[1] < 0.005, `flight ${f.n} lift-off ${a.position[1]} ${b.position[1]}`);
+  }
+});
+
 test('wrightFlightPose: the first flight makes 6.8 mph over the ground and 34 mph through the air in the 27 mph wind', () => {
   // The air time ends 12 s after the 40 ft run; sample its middle.
   const tAir = (2 * WRIGHT_RAIL.run) / ((120 * FT) / 12) + 10;
