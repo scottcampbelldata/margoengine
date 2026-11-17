@@ -69,6 +69,9 @@ const cover = grassCover({grass: 0.5});
 console.log(cover(-40, 0).toFixed(2), cover(-40, 430), cover(900, 0)); // the flat, the bare dune crest, the wet beach
 ```
 
+The camp yard is bare, trodden sand: no grass grows inside the hangar and the shed or within a metre of them
+(x -98 to -60.5, z 26 to 34), also when `camp: false` leaves the buildings to a film's own models at the same place.
+
 The grass follows the ecology of American beachgrass (Ammophila breviligulata): it grows where blown sand buries it
 and spreads in clumps, and the sand it traps builds the hummocks, so hummock tops carry the most and the hollows the
 least (Hesp 2002, "Foredunes and blowouts: initiation, geomorphology and dynamics", Geomorphology 48; Maun 2009, *The

@@ -327,6 +327,8 @@ function sampled(height: (x: number, z: number) => number, cells: number): (x: n
  * dynamics", Geomorphology 48; Maun 2009, "The Biology of Coastal Sand Dunes", ch. 9). None below 1.2 m (the beach and
  * the wet band) and none on the upper dunes above about 9 m, which were bare, moving sand in 1903 (LC-W86-120,
  * LC-W85-110). Clumps stand in patches 3 to 10 m across, in larger groups; `grass` sets the share of ground in patches.
+ * The camp yard is bare, trodden sand: the hangar, the shed and a metre round them (x -98 to -60.5, z 26 to 34, eased
+ * over 1.5 m), whether the scene builds the camp or a film stands its own buildings there, so no grass grows indoors.
  */
 function coverOf(s: DuneCoastScene['settings'], height: (x: number, z: number) => number) {
   const noise = new Noise(s.seed + 7),
@@ -343,7 +345,8 @@ function coverOf(s: DuneCoastScene['settings'], height: (x: number, z: number) =
         0.3 * noise.simplex2(x / 2.5 - 9, z / 2.5 + 4) +
         0.5 * noise.simplex2(x / 30 + 31, z / 30 - 17);
     // Patches 3 to 10 m across in groups, a lone clump here and there between them.
-    return habitat * Math.max(0.03, 0.95 * smooth(edge, edge + 0.15, field));
+    const yard = smooth(-98, -96.5, x) * (1 - smooth(-62, -60.5, x)) * smooth(26, 27.5, z) * (1 - smooth(32.5, 34, z));
+    return habitat * Math.max(0.03, 0.95 * smooth(edge, edge + 0.15, field)) * (1 - yard);
   };
 }
 

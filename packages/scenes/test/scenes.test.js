@@ -177,3 +177,18 @@ test('dune-coast loads the blown sand on demand, never by a static import', asyn
   assert.doesNotMatch(source, /^\s*export\s[^;]*?from\s*['"]@margoengine\/vfx\/blown-sand['"]/m);
   assert.match(source, /import\(\s*['"]@margoengine\/vfx\/blown-sand['"]\s*\)/);
 });
+
+// KB-SCENES-CAMPGRASS1: dune grass grew through the hangar and shed floors (the Kitty Hawk film's shot from inside the
+// hangar showed clumps indoors); the camp yard is bare sand, also at full grass and with the camp left to a film.
+test('no dune grass grows in the camp yard, inside the hangar and the shed', () => {
+  for (const settings of [{}, { grass: 1 }, { grass: 1, camp: false }]) {
+    const cover = grassCover(settings);
+    for (let x = -96; x <= -62.5; x += 0.5)
+      for (let z = 27.5; z <= 32.5; z += 0.5) assert.equal(cover(x, z), 0, `${JSON.stringify(settings)} at ${x}, ${z}`);
+  }
+  // Grass still grows round the yard.
+  const cover = grassCover({ grass: 1 });
+  let outside = 0;
+  for (let x = -110; x <= -50; x += 1) outside += cover(x, 45) + cover(x, 15);
+  assert.ok(outside > 5, `grass round the camp ${outside}`);
+});
