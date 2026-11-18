@@ -399,6 +399,30 @@ test('the townsman wears a four-in-hand: the knot at the collar front, the blade
 // A V neckline folds a column's rows above its cut onto one point. The yoke rows read their weights at the body under
 // them and the collar rows above read the lattice, so in a turn and lean the folded points parted (0.12 mm) into
 // slivers whose normals point anywhere, and the tie under the coat's V measured 20 mm through it.
+// The four-in-hand read as a plain block in dressed6 (2026-11-18): a smooth wedge, its middle rising 1.7 mm from 20 to
+// 60 percent up the knot and 0.8 mm from 10 to 30. A four-in-hand's face is the band the last pass wraps across the
+// front, proud above its lower edge, with the blade dropping through it into a dimple (Fink and Mao 1999).
+test('the four-in-hand shows its wrapped band and a dimple under it', () => {
+  for (const body of [T, A]) {
+    const tie = F.fitOutfit(body, 'townsman-1910').garments.find((x) => x.spec.name === 'tie'),
+      P = tie.positions,
+      pts = [];
+    let top = -Infinity,
+      low = Infinity;
+    for (let v = 0; v < P.length / 3; v++) top = Math.max(top, P[v * 3 + 1]);
+    for (let v = 0; v < P.length / 3; v++) if (P[v * 3 + 1] > top - 0.04) pts.push([P[v * 3], P[v * 3 + 1], P[v * 3 + 2]]);
+    for (const p of pts) low = Math.min(low, p[1]);
+    /** How far forward the knot's middle reaches on its row nearest a share of its height. */
+    const middle = (f) => {
+      const want = low + (top - low) * f;
+      let y = Infinity;
+      for (const p of pts) if (Math.abs(p[1] - want) < Math.abs(y - want)) y = p[1];
+      return Math.max(...pts.filter((p) => Math.abs(p[1] - y) < 1e-4 && Math.abs(p[0]) < 0.004).map((p) => p[2]));
+    };
+    assert.ok(middle(0.6) - middle(0.2) >= 0.0035, `the band stands ${(middle(0.6) - middle(0.2)).toFixed(4)} m over the knot's lower middle`);
+    assert.ok(middle(0.3) - middle(0.1) >= 0.0018, `the dimple dips ${(middle(0.3) - middle(0.1)).toFixed(4)} m under the band`);
+  }
+});
 test('the rows folded onto a V neckline cut stay one point when the body moves', () => {
   const fit = F.fitOutfit(T, 'townsman-1910'),
     skin = poseSkin(T, posesFor('T')['turn and lean']);

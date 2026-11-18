@@ -474,6 +474,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   model's characteristic ratio within 1 1/ft, bulk density within 0.005 lb/ft^3, packing ratio within 0.01, the four wind
   factors within 0.5 percent; the old FM7 fails at 1,561.9 against 1,552) and "fuel models hold the values" (FM7's live
   1,500). The Anderson, chart 7 and chart 13 tests keep their bounds, with FM7 at INT-30's input.
+### Fixed 2026-11-18: the townsman's four-in-hand read as a plain block (KB-HUMANS-KNOT1, humans)
+
+- **Repro:** `fitOutfit` of `townsman-1910`, the tie at a medium shot (dressed6 in the asset library): the knot a smooth
+  tapered wedge with no band or dimple. On the test body its middle rose 1.7 mm from 20 to 60 percent up the knot and
+  0.8 mm from 10 to 30.
+- **Cause:** the knot was lofted from uniform rounded sections; nothing shaped the face a four-in-hand shows.
+- **Fix:** the knot's front face carries the band the last pass wraps across the front (Ro Li of Li Ro Li Co T, Fink and
+  Mao 1999), 1.8 mm proud above a lower edge sloping across the knot, and a 2.5 mm dimple under it where the blade
+  drops through (`TIE.band`, `edge`, `slope`, `dimple` in fit.ts, estimates read from the LOC photographs);
+  17 rows up the knot in place of 8. After it: 4.9 mm and 2.7 mm.
+- **Regression:** packages/humans/test/fit.test.js "the four-in-hand shows its wrapped band and a dimple under it".
+
 ### Fixed 2026-11-18: dressed Wilbur's coat swelled into a barrel with the arms down, shirt showed at the shoulder seam, the hat read as a top hat (KB-HUMANS-WILBURSUIT3, humans)
 
 - **Repro:** `dressPerson(engine, wilbur, 'townsman-1910')` on the Wilbur Character Creator rig (asset library, not in

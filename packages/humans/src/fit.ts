@@ -1167,6 +1167,17 @@ const TIE = {
   end: 0.04,
   bowSpan: 0.1,
   bowHeight: 0.04,
+  /**
+   * A four-in-hand's face: the band the last pass across the front (Ro Li) wraps round the knot stands `band` proud of
+   * the cloth under it, its lower edge `edge` up the knot at the middle and sloping `slope` across it (the wide end
+   * comes round from one side); below it the blade drops through the band (Co T) and dips `dimple` in at the middle,
+   * over `dimpleWidth` either side.
+   */
+  band: 0.0018,
+  edge: 0.42,
+  slope: 0.12,
+  dimple: 0.0025,
+  dimpleWidth: 0.45,
 } as const;
 /** An earlier layer holds an outer garment off the body this far past its own hem or top, metres: cloth drapes over a hem. */
 const OVERHANG = 2 * STEP;
@@ -2074,13 +2085,15 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
           for (let m = 0; m < M; m++) mesh.tri(centre, first + end * M + m, first + end * M + ((m + 1) % M), FACE.trim);
         }
       };
-      // A rounded section: `w` across, `d` deep, its back on `back` (out along `outward`, across along `across`).
-      const section = (back: V3, across: V3, outward: V3, w: number, d: number) =>
+      // A rounded section: `w` across, `d` deep, its back on `back` (out along `outward`, across along `across`); a
+      // `relief` (by the place across, -1 to 1) moves its front face out or in.
+      const section = (back: V3, across: V3, outward: V3, w: number, d: number, relief?: (x: number) => number) =>
         Array.from({ length: M }, (_, m): V3 => {
           const a = (2 * Math.PI * m) / M,
             x = Math.sign(Math.cos(a)) * Math.abs(Math.cos(a)) ** 0.8,
-            z = Math.sign(Math.sin(a)) * Math.abs(Math.sin(a)) ** 0.8;
-          return add(back, add(scale(across, (x * w) / 2), scale(outward, ((z + 1) * d) / 2)));
+            z = Math.sign(Math.sin(a)) * Math.abs(Math.sin(a)) ** 0.8,
+            lift = relief && z > 0 ? relief(x) * z : 0;
+          return add(back, add(scale(across, (x * w) / 2), scale(outward, ((z + 1) * d) / 2 + lift)));
         });
       const radial = (h: number, phi: number): V3 => {
         const d = sub(collarPoint(c, h, phi, 1), collarPoint(c, h, phi, 0));
@@ -2098,7 +2111,14 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
         loft(Array.from({ length: 5 }, (_, i) => section(collarPoint(c, h0 - 0.011 + (0.022 * i) / 4, Math.PI / 2, lift0 + 0.004), N.side, N.front, 0.02, 0.012)));
       } else {
         const top = Math.max(0.012, Math.min(height - 0.004, height - (shirt?.points ?? 0) + 0.006)),
-          S = 8,
+          S = 17,
+          // The knot's face: the wrapped band proud above its sloping lower edge, the dimple under it at the middle.
+          face = (u: number) => (x: number) => {
+            const edge = TIE.edge + TIE.slope * x,
+              band = TIE.band * smoothstep(edge - 0.04, edge + 0.04, u),
+              dip = TIE.dimple * Math.max(0, 1 - (x / TIE.dimpleWidth) ** 2) * (1 - smoothstep(0, edge, u));
+            return band - dip;
+          },
           knot = Array.from({ length: S }, (_, s) => {
             const u = s / (S - 1),
               h = top * u,
@@ -2110,7 +2130,7 @@ function fitGarments(a: Analysis, outfit: Outfit, o: Required<Omit<FitOptions, '
             // it is deep sets the collar further forward beside the centre than at it).
             let stand = lift0;
             for (let i = 0; i <= 6; i++) stand = Math.max(stand, dot3(sub(collarPoint(c, h, Math.PI / 2 - ((i / 6 - 0.5) * w) / frontR, lift0 + POINTS.stand), base), out));
-            return section(add(base, scale(out, stand)), N.side, out, w, (TIE.depthBottom + (TIE.depthTop - TIE.depthBottom) * u) * crown);
+            return section(add(base, scale(out, stand)), N.side, out, w, (TIE.depthBottom + (TIE.depthTop - TIE.depthBottom) * u) * crown, face(u));
           });
         loft(knot);
         // The blade: from under the knot down the shirt front, walked down the shirt's surface in 5 mm steps (a point

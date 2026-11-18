@@ -157,7 +157,7 @@ collar), and `points` parts its fronts from the stud and turns the top corners d
 front down to the break, with `lapel` lapels that roll back from the top button (flat at the break, standing 11 mm off the
 chest at the gorge, their folded edge two layers thick) and a turned-down collar on a coat that stops short of the lapel's
 point (the notch), and puts a waistcoat over the shoulders. A `cut: 'tie'` garment (`knot` `'four-in-hand'` or `'bow'`)
-ties at the collar's front over the shirt and under the waistcoat: a four-in-hand's tapered knot (Fink and Mao 1999) and
+ties at the collar's front over the shirt and under the waistcoat: a four-in-hand's tapered knot (Fink and Mao 1999), its face showing the wrapped band and the dimple under it, and
 its blade down the shirt front to the waist, lying on the shirt and skinned as it is. Coats with buttons hang from the chest to the seat over the waist's hollow and fall plumb below the chest (the hem
 never narrower than the chest, and no column of the front coming back in below a belly), as a sack coat does, from the
 chest as the body stands with its arms down: the armpit flesh of an A or T rest pose, which comes in with the arm, does
